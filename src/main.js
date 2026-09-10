@@ -60,11 +60,22 @@ function safePageName(urlOrName) {
   return path.basename(String(urlOrName || 'qcmv1.0.html'));
 }
 
+function isAdminBilanPage(pageName) {
+  return ['admin-bilan.html', 'bilan.html'].includes(String(pageName || '').toLowerCase());
+}
+
 function existingWebPage(pageName) {
   const webRoot = path.join(__dirname, '..', 'app', 'web');
   const candidate = path.join(webRoot, safePageName(pageName));
   if (fs.existsSync(candidate)) return candidate;
   return path.join(webRoot, 'qcmv1.0.html');
+}
+
+function verifyAdminPassword(password) {
+  const received = crypto.createHash('sha256').update(String(password || ''), 'utf8').digest('hex');
+  const expected = Buffer.from(ADMIN_PASSWORD_SHA256, 'utf8');
+  const actual = Buffer.from(received, 'utf8');
+  return expected.length === actual.length && crypto.timingSafeEqual(expected, actual);
 }
 
 function setSplashProgress(percent, message) {
@@ -156,7 +167,7 @@ function createWindow() {
     const current = readState();
     const page = safePageName(url);
     current.lastPage = page;
-    if (page.toLowerCase() !== 'bilan.html') {
+    if (!isAdminBilanPage(page)) {
       current.lastEvaluationPage = page;
     }
     writeState(current);
@@ -195,12 +206,13 @@ ipcMain.handle('state:save', (_event, payload) => {
 });
 
 ipcMain.handle('admin:verify', (_event, password) => {
-  const received = crypto.createHash('sha256').update(String(password || ''), 'utf8').digest('hex');
-  const expected = Buffer.from(ADMIN_PASSWORD_SHA256, 'utf8');
-  const actual = Buffer.from(received, 'utf8');
-  const ok = expected.length === actual.length && crypto.timingSafeEqual(expected, actual);
+  const ok = verifyAdminPassword(password);
   if (ok) adminSessionUnlocked = true;
   return ok;
+});
+
+ipcMain.handle('admin:verify-password', (_event, password) => {
+  return verifyAdminPassword(password);
 });
 
 ipcMain.handle('admin:status', () => adminSessionUnlocked);
@@ -212,7 +224,7 @@ ipcMain.handle('admin:lock', () => {
 
 ipcMain.handle('admin:open-bilan', () => {
   if (!mainWindow || !adminSessionUnlocked) return false;
-  const bilanPath = existingWebPage('bilan.html');
+  const bilanPath = existingWebPage('admin-bilan.html');
   if (!fs.existsSync(bilanPath)) return false;
   mainWindow.loadFile(bilanPath);
   return true;
