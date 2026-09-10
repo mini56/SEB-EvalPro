@@ -268,6 +268,16 @@ ipcMain.handle('admin:return-evaluation', () => {
   return true;
 });
 
+require('./session-close')({
+  app,
+  ipcMain,
+  getMainWindow: () => mainWindow,
+  getAdminUnlocked: () => adminSessionUnlocked,
+  setAdminUnlocked: (value) => { adminSessionUnlocked = !!value; },
+  writeState,
+  defaultState
+});
+
 app.whenReady().then(startApplication);
 
 app.on('window-all-closed', () => {
