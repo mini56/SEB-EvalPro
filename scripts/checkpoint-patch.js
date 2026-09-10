@@ -30,6 +30,43 @@ function patchTri() {
   }
   out = out.replace(prematureSaveBlock, '\n    // Temps et erreurs d’un tri ne sont persistés qu’au clic sur « Valider le tri ».\n');
 
+  if (!out.includes('let currentTri = 1;')) {
+    throw new Error('SEB EvalPro: état du tri introuvable.');
+  }
+  out = out.replace('let currentTri = 1;', 'let currentTri = 1;\n  let triStarted = false;');
+
+  if (!out.includes("validate.textContent = 'Valider le tri';\n      validate.disabled = false;")) {
+    throw new Error('SEB EvalPro: activation du bouton Valider le tri introuvable.');
+  }
+  out = out.replace(
+    "validate.textContent = 'Valider le tri';\n      validate.disabled = false;",
+    "validate.textContent = 'Valider le tri';\n      validate.disabled = !triStarted;"
+  );
+
+  if (!out.includes("function validateCurrentTri(){\n    if (currentTri > 5) return;")) {
+    throw new Error('SEB EvalPro: validation du tri introuvable.');
+  }
+  out = out.replace(
+    "function validateCurrentTri(){\n    if (currentTri > 5) return;",
+    "function validateCurrentTri(){\n    if (currentTri > 5) return;\n    if (!triStarted) {\n      window.alert('Démarrez le chronomètre avant de valider ce tri.');\n      return;\n    }"
+  );
+
+  if (!out.includes('currentTri += 1;\n    computeAndPersist();')) {
+    throw new Error('SEB EvalPro: passage au tri suivant introuvable.');
+  }
+  out = out.replace(
+    'currentTri += 1;\n    computeAndPersist();',
+    'currentTri += 1;\n    triStarted = false;\n    computeAndPersist();'
+  );
+
+  if (!out.includes("const validate = document.getElementById('resetBtn');\n    if (validate) validate.onclick = validateCurrentTri;")) {
+    throw new Error('SEB EvalPro: branchement du bouton Valider le tri introuvable.');
+  }
+  out = out.replace(
+    "const validate = document.getElementById('resetBtn');\n    if (validate) validate.onclick = validateCurrentTri;",
+    "const validate = document.getElementById('resetBtn');\n    if (validate) validate.onclick = validateCurrentTri;\n    const startButton = document.getElementById('startBtn');\n    if (startButton) startButton.addEventListener('click', function(){\n      triStarted = true;\n      updateTriState();\n    });"
+  );
+
   writePage(file, out);
 }
 
@@ -102,6 +139,13 @@ function patchQcmResume() {
 (function(){
   const VIEW_KEY = 'seb_evalpro_qcm_view';
   const DRAFT_KEY = 'seb_evalpro_qcm_drafts';
+  const EXERCISE_KEYS_TO_CLEAR = [
+    'eval_brique',
+    'eval_brique_auto',
+    'seb_evalpro_brique_checkpoint',
+    'tri_cheville_data',
+    'autoEvaltri_resultats'
+  ];
   let saveTimer = null;
   let viewTimer = null;
 
@@ -112,6 +156,25 @@ function patchQcmResume() {
   function readDrafts(){
     try { return JSON.parse(sessionStorage.getItem(DRAFT_KEY) || '{}') || {}; }
     catch (_) { return {}; }
+  }
+
+  function clearPreviousBriqueAndTriForNewEvaluation(){
+    EXERCISE_KEYS_TO_CLEAR.forEach((key) => sessionStorage.removeItem(key));
+  }
+
+  function installNewEvaluationReset(){
+    const original = window.verifierNomLieu;
+    if (typeof original !== 'function') return;
+    window.verifierNomLieu = function(){
+      const nom = document.getElementById('nom')?.value.trim() || '';
+      const prenom = document.getElementById('prénom')?.value.trim() || '';
+      const lieu = document.getElementById('lieu')?.value.trim() || '';
+      const groupe = document.getElementById('groupe')?.value.trim() || '';
+      if (nom && prenom && lieu && groupe) {
+        clearPreviousBriqueAndTriForNewEvaluation();
+      }
+      return original.apply(this, arguments);
+    };
   }
 
   function saveCurrentDraft(){
@@ -182,6 +245,7 @@ function patchQcmResume() {
   }
 
   document.addEventListener('DOMContentLoaded', function(){
+    installNewEvaluationReset();
     restoreView();
     document.addEventListener('input', scheduleDraftSave, true);
     document.addEventListener('change', scheduleDraftSave, true);
@@ -202,4 +266,4 @@ function patchQcmResume() {
 patchTri();
 patchBrique();
 patchQcmResume();
-console.log('SEB EvalPro: reprise de parcours renforcée (tri validé uniquement, briques 10 min, reprise QCM exacte).');
+console.log('SEB EvalPro: reprise de parcours renforcée (nouvelle évaluation propre, tri démarré avant validation, briques 10 min, reprise QCM exacte).');
