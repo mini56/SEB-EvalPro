@@ -37,15 +37,18 @@ function pageName() {
   }
 }
 
+function isAdminBilanPage(page = pageName()) {
+  return ['admin-bilan.html', 'bilan.html'].includes(String(page || '').toLowerCase());
+}
+
 function buildSnapshot() {
   const page = pageName();
-  const isBilan = page.toLowerCase() === 'bilan.html';
   return {
     ...restoredState,
     sessionStorage: storageToObject(window.sessionStorage),
     localStorage: storageToObject(window.localStorage),
     lastPage: page,
-    lastEvaluationPage: isBilan
+    lastEvaluationPage: isAdminBilanPage(page)
       ? (restoredState.lastEvaluationPage || 'qcmv1.0.html')
       : page
   };
@@ -185,8 +188,9 @@ function injectAdminBar() {
   }, true);
 
   const updateAdminButtons = () => {
-    bilanButton.hidden = !adminUnlocked || pageName().toLowerCase() === 'bilan.html';
-    returnButton.hidden = !adminUnlocked || pageName().toLowerCase() !== 'bilan.html';
+    const onBilan = isAdminBilanPage();
+    bilanButton.hidden = !adminUnlocked || onBilan;
+    returnButton.hidden = !adminUnlocked || !onBilan;
     adminButton.textContent = adminUnlocked ? 'Verrouiller' : 'Administrateur';
   };
 
@@ -243,5 +247,6 @@ window.addEventListener('beforeunload', () => {
 });
 
 contextBridge.exposeInMainWorld('sebEvalPro', {
-  save: () => saveNow(false)
+  save: () => saveNow(false),
+  verifyAdminPassword: (password) => ipcRenderer.invoke('admin:verify-password', password)
 });
