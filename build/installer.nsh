@@ -71,7 +71,7 @@ FunctionEnd
 Function SebBrandingFinishLeave
   ${NSD_GetState} $SebBrandingRunCheckbox $0
   ${If} $0 == ${BST_CHECKED}
-    ${StdUtils.ExecShellAsUser} $0 "$launchLink" "open" ""
+    ${StdUtils.ExecShellAsUser} $0 "$INSTDIR\${APP_EXECUTABLE_FILENAME}" "open" ""
   ${EndIf}
 FunctionEnd
 !endif
