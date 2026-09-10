@@ -6,6 +6,7 @@ const crypto = require('crypto');
 const ADMIN_PASSWORD_SHA256 = 'c800892ba3f11b33d36eedf7d3c4297f2b6c02e2c347dda8954b4c577f6666b5';
 const STATE_VERSION = 1;
 let mainWindow = null;
+let adminSessionUnlocked = false;
 
 function stateFilePath() {
   return path.join(app.getPath('userData'), 'evaluation-state.json');
@@ -17,6 +18,7 @@ function defaultState() {
     sessionStorage: {},
     localStorage: {},
     lastPage: 'qcmv1.0.html',
+    lastEvaluationPage: 'qcmv1.0.html',
     updatedAt: null
   };
 }
@@ -64,6 +66,8 @@ function existingWebPage(pageName) {
 
 function createWindow() {
   const state = readState();
+  adminSessionUnlocked = false;
+
   mainWindow = new BrowserWindow({
     title: 'SEB EvalPro',
     show: false,
@@ -79,7 +83,7 @@ function createWindow() {
   });
 
   mainWindow.setMenuBarVisibility(false);
-  mainWindow.loadFile(existingWebPage(state.lastPage));
+  mainWindow.loadFile(existingWebPage(state.lastEvaluationPage || state.lastPage));
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
@@ -88,7 +92,11 @@ function createWindow() {
 
   mainWindow.webContents.on('did-navigate', (_event, url) => {
     const current = readState();
-    current.lastPage = safePageName(url);
+    const page = safePageName(url);
+    current.lastPage = page;
+    if (page.toLowerCase() !== 'bilan.html') {
+      current.lastEvaluationPage = page;
+    }
     writeState(current);
   });
 
@@ -96,6 +104,7 @@ function createWindow() {
 
   mainWindow.on('closed', () => {
     mainWindow = null;
+    adminSessionUnlocked = false;
   });
 }
 
@@ -119,11 +128,20 @@ ipcMain.handle('admin:verify', (_event, password) => {
   const received = crypto.createHash('sha256').update(String(password || ''), 'utf8').digest('hex');
   const expected = Buffer.from(ADMIN_PASSWORD_SHA256, 'utf8');
   const actual = Buffer.from(received, 'utf8');
-  return expected.length === actual.length && crypto.timingSafeEqual(expected, actual);
+  const ok = expected.length === actual.length && crypto.timingSafeEqual(expected, actual);
+  if (ok) adminSessionUnlocked = true;
+  return ok;
+});
+
+ipcMain.handle('admin:status', () => adminSessionUnlocked);
+
+ipcMain.handle('admin:lock', () => {
+  adminSessionUnlocked = false;
+  return true;
 });
 
 ipcMain.handle('admin:open-bilan', () => {
-  if (!mainWindow) return false;
+  if (!mainWindow || !adminSessionUnlocked) return false;
   const bilanPath = existingWebPage('bilan.html');
   if (!fs.existsSync(bilanPath)) return false;
   mainWindow.loadFile(bilanPath);
@@ -131,9 +149,9 @@ ipcMain.handle('admin:open-bilan', () => {
 });
 
 ipcMain.handle('admin:return-evaluation', () => {
-  if (!mainWindow) return false;
+  if (!mainWindow || !adminSessionUnlocked) return false;
   const state = readState();
-  mainWindow.loadFile(existingWebPage(state.lastPage === 'bilan.html' ? 'qcmv1.0.html' : state.lastPage));
+  mainWindow.loadFile(existingWebPage(state.lastEvaluationPage || 'qcmv1.0.html'));
   return true;
 });
 
