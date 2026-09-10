@@ -12,7 +12,7 @@
     "dist:linux": "npm run prepare:web && electron-builder --linux AppImage"
   },
   "devDependencies": {
-    "adm-zip": "0.5.16",
+    "adm-zip": "0.6.0",
     "electron": "44.3.0",
     "electron-builder": "26.15.3"
   },
