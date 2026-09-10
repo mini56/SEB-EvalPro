@@ -27,6 +27,12 @@ mustReplace(
 );
 
 mustReplace(
+  "function auto(){const sc=json('scores_data',{});const carre=",
+  "function auto(){const sc=json('scores_data',{});const brique=json('eval_brique',null);if(brique&&brique.niveau!==undefined&&brique.niveau!==null&&String(brique.niveau)!==''){const be=parseInt(brique.niveau,10);if(!isNaN(be)){const bl=be<=1?'I':be<=3?'II':'III';apply('briques-identification',bl,'- '+be+' erreur(s)');apply('briques-manipulation',bl,'- '+be+' erreur(s)')}}const carre=",
+  'prise en compte des briques dans le bilan'
+);
+
+mustReplace(
   "level(row('tri-temps'),sec<720?'I':sec<840?'II':'III');",
   "apply('tri-temps',sec<720?'I':sec<840?'II':'III');",
   'niveau automatique tri temps'
@@ -52,4 +58,4 @@ mustReplace(
 );
 
 fs.writeFileSync(target, html, 'utf8');
-console.log('SEB EvalPro: bilan corrigé (commentaires automatiques + couleurs Word institutionnelles).');
+console.log('SEB EvalPro: bilan corrigé (briques + commentaires automatiques + couleurs Word institutionnelles).');

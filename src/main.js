@@ -13,9 +13,46 @@ let mainWindow = null;
 let splashWindow = null;
 let splashStartedAt = 0;
 let adminSessionUnlocked = false;
+let downloadRoutingInstalled = false;
 
 function stateFilePath() {
   return path.join(app.getPath('userData'), 'evaluation-state.json');
+}
+
+function sebDocumentsRoot() {
+  return path.join(app.getPath('documents'), 'SEB EvalPro');
+}
+
+function bilanDocumentsDir() {
+  return path.join(sebDocumentsRoot(), 'Bilans');
+}
+
+function ensureSebDocumentsFolders() {
+  fs.mkdirSync(bilanDocumentsDir(), { recursive: true });
+}
+
+function uniqueOutputPath(directory, filename) {
+  const parsed = path.parse(filename);
+  let target = path.join(directory, filename);
+  let index = 2;
+  while (fs.existsSync(target)) {
+    target = path.join(directory, `${parsed.name}_${index}${parsed.ext}`);
+    index += 1;
+  }
+  return target;
+}
+
+function installDownloadRouting() {
+  if (!mainWindow || mainWindow.isDestroyed() || downloadRoutingInstalled) return;
+  downloadRoutingInstalled = true;
+  mainWindow.webContents.session.on('will-download', (_event, item) => {
+    const filename = path.basename(item.getFilename() || 'Evaluation.doc');
+    if (!/\.docx?$/i.test(filename)) return;
+    try {
+      ensureSebDocumentsFolders();
+      item.setSavePath(uniqueOutputPath(bilanDocumentsDir(), filename));
+    } catch (_) {}
+  });
 }
 
 function defaultState() {
@@ -147,6 +184,7 @@ function finishStartup() {
   setTimeout(() => {
     if (!mainWindow || mainWindow.isDestroyed()) return;
     mainWindow.show();
+    mainWindow.setKiosk(true);
     mainWindow.setFullScreen(true);
     applyAdaptiveZoom();
     mainWindow.focus();
@@ -163,6 +201,7 @@ function createWindow() {
     title: 'SEB EvalPro',
     show: false,
     fullscreen: true,
+    kiosk: true,
     autoHideMenuBar: true,
     backgroundColor: '#ffffff',
     webPreferences: {
@@ -174,6 +213,7 @@ function createWindow() {
   });
 
   mainWindow.setMenuBarVisibility(false);
+  installDownloadRouting();
   setSplashProgress(48, 'Chargement du parcours…');
   mainWindow.loadFile(existingWebPage(state.lastEvaluationPage || state.lastPage));
 
@@ -213,6 +253,7 @@ function createWindow() {
 }
 
 function startApplication() {
+  ensureSebDocumentsFolders();
   createSplashWindow();
   setTimeout(() => {
     setSplashProgress(20, 'Préparation du programme…');
