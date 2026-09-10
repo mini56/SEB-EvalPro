@@ -29,7 +29,7 @@ Function SebBrandingWelcomeCreate
 
   ${NSD_CreateBitmap} 0 0 100% 100% ""
   Pop $SebBrandingWelcomeImage
-  ${NSD_SetStretchedBitmap} $SebBrandingWelcomeImage "$PLUGINSDIR\seb-eval-pro-branding.bmp" $SebBrandingWelcomeHandle
+  ${NSD_SetBitmap} $SebBrandingWelcomeImage "$PLUGINSDIR\seb-eval-pro-branding.bmp" $SebBrandingWelcomeHandle
 
   GetDlgItem $0 $HWNDPARENT 1
   SendMessage $0 ${WM_SETTEXT} 0 "STR:Suivant >"
@@ -50,7 +50,7 @@ Function SebBrandingFinishCreate
 
   ${NSD_CreateBitmap} 0 0 100% 100% ""
   Pop $SebBrandingFinishImage
-  ${NSD_SetStretchedBitmap} $SebBrandingFinishImage "$PLUGINSDIR\seb-eval-pro-branding.bmp" $SebBrandingFinishHandle
+  ${NSD_SetBitmap} $SebBrandingFinishImage "$PLUGINSDIR\seb-eval-pro-branding.bmp" $SebBrandingFinishHandle
 
   ${NSD_CreateCheckbox} 105u 174u 120u 13u "Lancer SEB-éval-PRO"
   Pop $SebBrandingRunCheckbox
