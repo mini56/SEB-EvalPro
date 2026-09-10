@@ -4,9 +4,13 @@ $root = Split-Path -Parent $PSScriptRoot
 $buildDir = Join-Path $root 'build'
 $qcmPath = Join-Path $root 'source/qcmv1.0.html'
 $packagePath = Join-Path $root 'package.json'
+$sourceIcon = Join-Path $root 'source/imageqcm/avatar_icon.ico'
 
 if (-not (Test-Path $qcmPath)) {
   throw 'SEB-éval-PRO : source/qcmv1.0.html introuvable pour le logo institutionnel.'
+}
+if (-not (Test-Path $sourceIcon)) {
+  throw 'SEB-éval-PRO : icône source imageqcm/avatar_icon.ico introuvable.'
 }
 if (-not (Get-Command magick -ErrorAction SilentlyContinue)) {
   throw 'SEB-éval-PRO : ImageMagick (magick) est requis pour générer le visuel NSIS.'
@@ -35,8 +39,15 @@ $canvas = Join-Path $buildDir '_sidebar-canvas.png'
 $sidebarPng = Join-Path $buildDir '_sidebar.png'
 $headerBmp = Join-Path $buildDir 'installerHeader.bmp'
 $sidebarBmp = Join-Path $buildDir 'installerSidebar.bmp'
+$appIconPng = Join-Path $buildDir '_app-icon-256.png'
+$appIconIco = Join-Path $buildDir 'app-icon.ico'
 
 Set-Content -Path $logoSvg -Value $match.Value -Encoding UTF8
+
+# L'icône du dépôt est conservée à l'identique et agrandie proprement pour satisfaire Windows (minimum 256 px).
+$largestIconFrame = "${sourceIcon}[4]"
+& magick $largestIconFrame -resize '240x240>' -gravity center -background none -extent '256x256' $appIconPng
+& magick $appIconPng -define 'icon:auto-resize=256,128,64,48,32,16' $appIconIco
 
 # Le logo et le A proviennent directement du SVG institutionnel présent dans le QCM.
 & magick $logoSvg -background white -alpha remove -alpha off -resize '1028x' $logoPng
@@ -61,7 +72,7 @@ $lightFont = if ($fontList -match '(?m)^\s*Font:\s+Calibri-Light\s*$') { 'Calibr
 & magick $canvas $logoSmall -gravity North -geometry '+0+14' -composite $title -gravity North -geometry '+0+126' -composite $versionPng -gravity North -geometry '+0+166' -composite -alpha off $sidebarPng
 & magick $sidebarPng -alpha off -type TrueColor "BMP3:$sidebarBmp"
 
-$cleanup = @($logoSvg, $logoPng, $aPng, $logoSmall, $title1, $title3, $title, $versionPng, $canvas, $sidebarPng, (Join-Path $buildDir '_a-small.png'))
+$cleanup = @($logoSvg, $logoPng, $aPng, $logoSmall, $title1, $title3, $title, $versionPng, $canvas, $sidebarPng, $appIconPng, (Join-Path $buildDir '_a-small.png'))
 foreach ($file in $cleanup) {
   Remove-Item -Force -ErrorAction SilentlyContinue $file
 }
