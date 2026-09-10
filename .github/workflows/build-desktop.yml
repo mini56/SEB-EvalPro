@@ -2,6 +2,9 @@ name: Build SEB EvalPro desktop
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - desktop-foundation
 
 jobs:
   build-windows:
