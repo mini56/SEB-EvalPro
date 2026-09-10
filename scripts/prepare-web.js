@@ -1,19 +1,19 @@
 const fs = require('fs');
 const path = require('path');
-const AdmZip = require('adm-zip');
 
 const root = path.resolve(__dirname, '..');
-const sourceZip = path.join(root, 'source', 'QCM.zip');
+const sourceDir = path.join(root, 'source');
 const outputDir = path.join(root, 'app', 'web');
 const overridesDir = path.join(root, 'overrides');
 
-function copyTree(source, destination) {
+function copyTree(source, destination, skipNames = new Set()) {
   if (!fs.existsSync(source)) return;
   fs.mkdirSync(destination, { recursive: true });
   for (const entry of fs.readdirSync(source, { withFileTypes: true })) {
+    if (skipNames.has(entry.name)) continue;
     const from = path.join(source, entry.name);
     const to = path.join(destination, entry.name);
-    if (entry.isDirectory()) copyTree(from, to);
+    if (entry.isDirectory()) copyTree(from, to, skipNames);
     else fs.copyFileSync(from, to);
   }
 }
@@ -71,30 +71,24 @@ function repairCaseSensitiveReferences() {
   return repaired;
 }
 
-if (!fs.existsSync(sourceZip)) {
-  console.error('SEB EvalPro: source/QCM.zip est absent. Ajoutez le ZIP original du plateau avant le build.');
+if (!fs.existsSync(sourceDir)) {
+  console.error('SEB EvalPro: le dossier source/ est absent.');
   process.exit(2);
+}
+
+const requiredSourceFiles = ['qcmv1.0.html', 'bilan.html', 'nwtexte.html'];
+for (const required of requiredSourceFiles) {
+  if (!fs.existsSync(path.join(sourceDir, required))) {
+    console.error(`SEB EvalPro: fichier obligatoire absent de source/ : ${required}`);
+    process.exit(3);
+  }
 }
 
 fs.rmSync(outputDir, { recursive: true, force: true });
 fs.mkdirSync(outputDir, { recursive: true });
 
-const zip = new AdmZip(sourceZip);
-zip.extractAllTo(outputDir, true);
-
-const requiredFiles = ['qcmv1.0.html', 'bilan.html', 'nwtexte.html'];
-for (const required of requiredFiles) {
-  const target = path.join(outputDir, required);
-  if (!fs.existsSync(target)) {
-    console.error(`SEB EvalPro: fichier obligatoire absent du ZIP : ${required}`);
-    process.exit(3);
-  }
-}
-
+copyTree(sourceDir, outputDir, new Set(['QCM.lnk', 'README.md']));
 copyTree(overridesDir, outputDir);
+
 const repaired = repairCaseSensitiveReferences();
-
-const obsoleteShortcut = path.join(outputDir, 'QCM.lnk');
-if (fs.existsSync(obsoleteShortcut)) fs.rmSync(obsoleteShortcut, { force: true });
-
-console.log(`SEB EvalPro: plateau préparé dans app/web (${repaired} référence(s) de casse réparée(s)).`);
+console.log(`SEB EvalPro: plateau préparé depuis les fichiers source/ (${repaired} référence(s) de casse réparée(s)).`);
