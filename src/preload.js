@@ -7,7 +7,9 @@ const BAR_HIDE_DELAY = 450;
 let restoredState = {};
 let adminUnlocked = false;
 let saveTimer = null;
+let periodicSaveTimer = null;
 let barHideTimer = null;
+let closingSession = false;
 
 function objectToStorage(storage, values) {
   if (!storage || !values || typeof values !== 'object') return;
@@ -55,6 +57,7 @@ function buildSnapshot() {
 }
 
 function saveNow(sync = false) {
+  if (closingSession) return;
   const snapshot = buildSnapshot();
   restoredState = snapshot;
   if (sync) {
@@ -65,6 +68,7 @@ function saveNow(sync = false) {
 }
 
 function scheduleSave() {
+  if (closingSession) return;
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => saveNow(false), 250);
 }
@@ -125,6 +129,53 @@ function createPasswordDialog() {
   });
 }
 
+function createSessionCloseDialog() {
+  return new Promise((resolve) => {
+    const backdrop = document.createElement('div');
+    backdrop.id = 'seb-evalpro-session-close-dialog';
+    backdrop.innerHTML = `
+      <div class="seb-session-close-card" role="dialog" aria-modal="true" aria-label="Fermer cette session">
+        <div class="seb-session-close-title">Fermer cette session ?</div>
+        <div class="seb-session-close-text">
+          L'évaluation en cours et ses données de travail seront effacées.
+          Au prochain démarrage, SEB EvalPro commencera sur une nouvelle évaluation vierge.
+        </div>
+        <div class="seb-session-close-warning">Les éléments non exportés ne pourront plus être récupérés.</div>
+        <div class="seb-session-close-actions">
+          <button type="button" id="seb-session-close-cancel">Annuler</button>
+          <button type="button" id="seb-session-close-ok" class="danger">Fermer cette session</button>
+        </div>
+      </div>`;
+
+    const style = document.createElement('style');
+    style.textContent = `
+      #seb-evalpro-session-close-dialog{position:fixed;inset:0;z-index:2147483647;background:rgba(0,0,0,.42);display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif}
+      #seb-evalpro-session-close-dialog .seb-session-close-card{width:430px;max-width:calc(100vw - 40px);background:#fff;border:1px solid #aaa;border-radius:8px;padding:20px;box-shadow:0 10px 35px rgba(0,0,0,.3);box-sizing:border-box}
+      #seb-evalpro-session-close-dialog .seb-session-close-title{font-size:20px;font-weight:700;color:#c00000;margin-bottom:12px}
+      #seb-evalpro-session-close-dialog .seb-session-close-text{font-size:14px;line-height:1.45;color:#222}
+      #seb-evalpro-session-close-dialog .seb-session-close-warning{font-size:13px;font-weight:700;color:#c00000;margin-top:10px}
+      #seb-evalpro-session-close-dialog .seb-session-close-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
+      #seb-evalpro-session-close-dialog button{font-family:Arial,sans-serif;font-size:14px;padding:8px 14px;border:1px solid #999;border-radius:4px;background:#f2f2f2;cursor:pointer}
+      #seb-evalpro-session-close-dialog button.danger{background:#c00000;color:#fff;border-color:#c00000}
+    `;
+    backdrop.appendChild(style);
+    document.body.appendChild(backdrop);
+
+    const finish = (value) => {
+      backdrop.remove();
+      resolve(value);
+    };
+
+    backdrop.querySelector('#seb-session-close-cancel').addEventListener('click', () => finish(false));
+    backdrop.querySelector('#seb-session-close-ok').addEventListener('click', () => finish(true));
+    backdrop.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') finish(false);
+      if (event.key === 'Enter') finish(true);
+    });
+    backdrop.querySelector('#seb-session-close-cancel').focus();
+  });
+}
+
 function injectAdminBar() {
   if (!document.body || document.getElementById('seb-evalpro-topbar')) return;
 
@@ -135,6 +186,7 @@ function injectAdminBar() {
     <div class="seb-evalpro-spacer"></div>
     <button id="seb-evalpro-return" type="button" hidden>Retour à l'évaluation</button>
     <button id="seb-evalpro-bilan" type="button" hidden>Bilan</button>
+    <button id="seb-evalpro-close-session" type="button" hidden>Fermer cette session</button>
     <button id="seb-evalpro-admin" type="button">Administrateur</button>`;
 
   const hotzone = document.createElement('div');
@@ -153,6 +205,8 @@ function injectAdminBar() {
     #seb-evalpro-topbar .seb-evalpro-spacer{flex:1}
     #seb-evalpro-topbar button{font-family:Arial,sans-serif;font-size:14px;padding:6px 12px;border:1px solid rgba(255,255,255,.75);border-radius:4px;background:#fff;color:#0070c0;cursor:pointer}
     #seb-evalpro-topbar button:hover{background:#f2f2f2}
+    #seb-evalpro-topbar #seb-evalpro-close-session{background:#c00000;color:#fff;border-color:#fff}
+    #seb-evalpro-topbar #seb-evalpro-close-session:hover{background:#a00000}
   `;
   document.head.appendChild(style);
   document.body.prepend(bar);
@@ -161,6 +215,7 @@ function injectAdminBar() {
   const adminButton = bar.querySelector('#seb-evalpro-admin');
   const bilanButton = bar.querySelector('#seb-evalpro-bilan');
   const returnButton = bar.querySelector('#seb-evalpro-return');
+  const closeSessionButton = bar.querySelector('#seb-evalpro-close-session');
 
   const showBar = () => {
     clearTimeout(barHideTimer);
@@ -169,6 +224,7 @@ function injectAdminBar() {
 
   const hideBar = () => {
     if (document.getElementById('seb-evalpro-admin-dialog')) return;
+    if (document.getElementById('seb-evalpro-session-close-dialog')) return;
     bar.classList.remove('seb-evalpro-visible');
   };
 
@@ -191,6 +247,7 @@ function injectAdminBar() {
     const onBilan = isAdminBilanPage();
     bilanButton.hidden = !adminUnlocked || onBilan;
     returnButton.hidden = !adminUnlocked || !onBilan;
+    closeSessionButton.hidden = !adminUnlocked;
     adminButton.textContent = adminUnlocked ? 'Verrouiller' : 'Administrateur';
   };
 
@@ -223,6 +280,39 @@ function injectAdminBar() {
     await ipcRenderer.invoke('admin:return-evaluation');
   });
 
+  closeSessionButton.addEventListener('click', async () => {
+    showBar();
+    const confirmed = await createSessionCloseDialog();
+    if (!confirmed) {
+      scheduleHideBar();
+      return;
+    }
+
+    closingSession = true;
+    clearTimeout(saveTimer);
+    if (periodicSaveTimer) clearInterval(periodicSaveTimer);
+
+    try {
+      window.sessionStorage.clear();
+      window.localStorage.clear();
+    } catch (_) {}
+
+    const cleanState = {
+      version: 1,
+      sessionStorage: {},
+      localStorage: {},
+      lastPage: 'qcmv1.0.html',
+      lastEvaluationPage: 'qcmv1.0.html',
+      updatedAt: null
+    };
+
+    try {
+      ipcRenderer.sendSync('state:save-sync', cleanState);
+    } catch (_) {}
+
+    await ipcRenderer.invoke('admin:close-session').catch(() => false);
+  });
+
   updateAdminButtons();
   hideBar();
 }
@@ -239,11 +329,11 @@ window.addEventListener('DOMContentLoaded', async () => {
   document.addEventListener('input', scheduleSave, true);
   document.addEventListener('change', scheduleSave, true);
   document.addEventListener('click', scheduleSave, true);
-  setInterval(() => saveNow(false), 1000);
+  periodicSaveTimer = setInterval(() => saveNow(false), 1000);
 });
 
 window.addEventListener('beforeunload', () => {
-  saveNow(true);
+  if (!closingSession) saveNow(true);
 });
 
 contextBridge.exposeInMainWorld('sebEvalPro', {
