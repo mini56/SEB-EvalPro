@@ -100,18 +100,20 @@ function createPasswordDialog() {
       backdrop.remove();
       resolve(value);
     };
-    backdrop.querySelector('#seb-admin-cancel').addEventListener('click', () => finish(null));
+
+    backdrop.querySelector('#seb-admin-cancel').addEventListener('click', () => finish(false));
     backdrop.querySelector('#seb-admin-ok').addEventListener('click', async () => {
       const ok = await ipcRenderer.invoke('admin:verify', input.value);
-      if (ok) finish(input.value);
+      input.value = '';
+      if (ok) finish(true);
       else {
         error.textContent = 'Mot de passe incorrect.';
-        input.select();
+        input.focus();
       }
     });
     input.addEventListener('keydown', (event) => {
       if (event.key === 'Enter') backdrop.querySelector('#seb-admin-ok').click();
-      if (event.key === 'Escape') finish(null);
+      if (event.key === 'Escape') finish(false);
     });
     input.focus();
   });
@@ -148,19 +150,21 @@ function injectAdminBar() {
   const returnButton = bar.querySelector('#seb-evalpro-return');
 
   const updateAdminButtons = () => {
-    bilanButton.hidden = !adminUnlocked;
+    bilanButton.hidden = !adminUnlocked || pageName().toLowerCase() === 'bilan.html';
     returnButton.hidden = !adminUnlocked || pageName().toLowerCase() !== 'bilan.html';
     adminButton.textContent = adminUnlocked ? 'Verrouiller' : 'Administrateur';
   };
 
   adminButton.addEventListener('click', async () => {
     if (adminUnlocked) {
+      await ipcRenderer.invoke('admin:lock');
       adminUnlocked = false;
       updateAdminButtons();
       return;
     }
-    const password = await createPasswordDialog();
-    if (password !== null) {
+
+    const ok = await createPasswordDialog();
+    if (ok) {
       adminUnlocked = true;
       updateAdminButtons();
     }
@@ -185,7 +189,8 @@ try {
   objectToStorage(window.localStorage, restoredState.localStorage);
 } catch (_) {}
 
-window.addEventListener('DOMContentLoaded', () => {
+window.addEventListener('DOMContentLoaded', async () => {
+  adminUnlocked = await ipcRenderer.invoke('admin:status');
   injectAdminBar();
   document.addEventListener('input', scheduleSave, true);
   document.addEventListener('change', scheduleSave, true);
