@@ -1,0 +1,505 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>Éditeur Word-like hors-ligne (final)</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+
+html, body {
+  height: 100%;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.main {
+  flex: 1;
+  display: flex;
+  gap: 10px;
+  margin: 10px;
+}
+
+#left, #right {
+  flex: 1;
+  border: 1px solid #ccc;
+  padding: 5px;
+  background: #fafafa;
+  display: flex;
+  flex-direction: column;
+}
+
+.footer {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  padding: 20px;
+  border-top: 1px solid #ccc;
+}
+
+.footer button {
+  padding: 10px 20px;
+  font-size: 16px;
+  border-radius: 8px;
+  border: none;
+  background: #1a73e8;
+  color: white;
+  cursor: pointer;
+}
+
+.footer button:hover {
+  background: #0d5bb8;
+}
+
+    body { font-family: Arial, sans-serif; margin:10px; display:flex; gap:20px; }
+    #left {
+      flex:1; border:1px solid #ccc; padding:12px; min-height:600px; background:#fafafa;
+    }
+    #right {
+      flex:1; max-width:50%; display:flex; flex-direction:column;
+      max-height: calc(100vh - 40px); /* Limite la hauteur totale */
+      overflow: hidden; /* Empêche tout débordement du conteneur */
+    }
+    #toolbar { 
+      margin-bottom:10px; display:flex; flex-wrap:wrap; gap:6px; align-items:center;
+      flex-shrink: 0; /* Empêche la toolbar de rétrécir */
+    }
+    .toolbar-row2 { 
+      margin-bottom:10px; display:flex; flex-wrap:wrap; gap:6px; align-items:center;
+      flex-shrink: 0; /* Empêche la toolbar de rétrécir */
+    }
+    #toolbar button, #toolbar select, .color-btn,
+    .toolbar-row2 button, .toolbar-row2 select, .toolbar-row2 .color-btn {
+      height:34px;
+      padding:6px 6px;
+      font-size:14px;
+      cursor:pointer;
+      border:1px solid #ccc;
+      border-radius:6px;
+      background:#FFFFFF;
+      box-sizing:border-box;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      gap:4px;
+    }
+    #toolbar select { font-size:13px; padding:4px 6px; height:34px; }
+    .toolbar-row2 select { font-size:13px; padding:4px 6px; height:34px; }
+	
+    #toolbar button.active { background-color: #FFFFFF;
+  background-image: -webkit-linear-gradient(top, #FFFFFF,  #c2eefc);
+  background-image: -moz-linear-gradient(top, #FFFFFF, #c2eefc);
+  background-image: -ms-linear-gradient(top, #FFFFFF,  #c2eefc);
+  background-image: -o-linear-gradient(top, #FFFFFF,  #c2eefc);
+  background-image: linear-gradient(to bottom, #FFFFFF,  #c2eefc); color:black; } /* couleur active des bouton*/
+  
+	 #toolbar button:hover {  background-color: #FFFFFF;
+  background-image: -webkit-linear-gradient(top, #FFFFFF,  #f5f3f0);
+  background-image: -moz-linear-gradient(top, #FFFFFF, #f5f3f0);
+  background-image: -ms-linear-gradient(top, #FFFFFF,  #f5f3f0);
+  background-image: -o-linear-gradient(top, #FFFFFF,  #f5f3f0);
+  background-image: linear-gradient(to bottom, #FFFFFF,  #f5f3f0);}
+  
+	 .toolbar-row2 button:hover {  background-color: #FFFFFF;
+  background-image: -webkit-linear-gradient(top, #FFFFFF,  #f5f3f0);
+  background-image: -moz-linear-gradient(top, #FFFFFF, #f5f3f0);
+  background-image: -ms-linear-gradient(top, #FFFFFF,  #f5f3f0);
+  background-image: -o-linear-gradient(top, #FFFFFF,  #f5f3f0);
+  background-image: linear-gradient(to bottom, #FFFFFF,  #f5f3f0);}
+  
+    btn-ul.active {  background-color: #3434eb;}
+	
+    .color-picker-container {
+      position: relative;
+      height: 34px;
+    }
+    .color-picker-btn {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 6px 8px;
+      height: 34px;
+      cursor: pointer;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      background: #FFFFFF;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.25);
+      box-sizing: border-box;
+    }
+    .color-picker-btn:hover {
+        background-color: #FFFFFF;
+  background-image: -webkit-linear-gradient(top, #FFFFFF,  #f5f3f0);
+  background-image: -moz-linear-gradient(top, #FFFFFF,  #f5f3f0);
+  background-image: -ms-linear-gradient(top, #FFFFFF,  #f5f3f0);
+  background-image: -o-linear-gradient(top, #FFFFFF,  #f5f3f0);
+  background-image: linear-gradient(to bottom, #FFFFFF,  #f5f3f0);
+    }
+	#toolbar select:hover {
+        background-color: #FFFFFF;
+  background-image: -webkit-linear-gradient(top, #FFFFFF,  #f5f3f0);
+  background-image: -moz-linear-gradient(top, #FFFFFF,  #f5f3f0);
+  background-image: -ms-linear-gradient(top, #FFFFFF,  #f5f3f0);
+  background-image: -o-linear-gradient(top, #FFFFFF,  #f5f3f0);
+  background-image: linear-gradient(to bottom, #FFFFFF,  #f5f3f0);
+    }
+	.toolbar-row2 select:hover {
+        background-color: #FFFFFF;
+  background-image: -webkit-linear-gradient(top, #FFFFFF,  #f5f3f0);
+  background-image: -moz-linear-gradient(top, #FFFFFF,  #f5f3f0);
+  background-image: -ms-linear-gradient(top, #FFFFFF,  #f5f3f0);
+  background-image: -o-linear-gradient(top, #FFFFFF,  #f5f3f0);
+  background-image: linear-gradient(to bottom, #FFFFFF,  #f5f3f0);
+    }
+    .color-indicator {
+      width: 20px;
+      height: 20px;
+      border: 1px solid #666;
+      border-radius: 3px;
+      display: inline-block;
+    }
+    .color-picker-menu {
+      display: none;
+      position: absolute;
+      top: 38px;
+      left: 0;
+      background: #fff;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      padding: 10px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      z-index: 1000;
+      width: 180px;
+    }
+    .color-picker-menu.show {
+      display: block;
+    }
+    .color-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+    .color-swatch {
+      width: 36px;
+      height: 36px;
+      border: 2px solid #999;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .color-swatch:hover {
+      border-color: #007BFF;
+      transform: scale(1.1);
+    }
+    .color-swatch.selected {
+      border-color: #007BFF;
+      border-width: 3px;
+    }
+    .custom-color-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding-top: 8px;
+      border-top: 1px solid #ddd;
+    }
+    .custom-color-row label {
+      font-size: 12px;
+      flex: 1;
+    }
+    .custom-color-row input[type="color"] {
+      width: 50px;
+      height: 30px;
+      border: 1px solid #999;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    
+    .align-icon {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      width: 18px;
+    }
+    .align-icon span {
+      height: 2px;
+      background: currentColor;
+      border-radius: 1px;
+    }
+    .align-left span:nth-child(1) { width: 100%; }
+    .align-left span:nth-child(2) { width: 80%; }
+    .align-left span:nth-child(3) { width: 90%; }
+    
+    .align-center span:nth-child(1) { width: 80%; margin: 0 auto; }
+    .align-center span:nth-child(2) { width: 60%; margin: 0 auto; }
+    .align-center span:nth-child(3) { width: 70%; margin: 0 auto; }
+    
+    .align-right span:nth-child(1) { width: 100%; margin-left: auto; }
+    .align-right span:nth-child(2) { width: 80%; margin-left: auto; }
+    .align-right span:nth-child(3) { width: 90%; margin-left: auto; }
+    
+    #editor { 
+      border:1px solid #ccc; 
+      padding:12px; 
+      flex: 1; /* Prend tout l'espace disponible */
+      overflow-y: auto; /* Scroll vertical seulement */
+      overflow-x: hidden; /* Pas de scroll horizontal */
+      word-wrap: break-word; /* Retour à la ligne automatique */
+      overflow-wrap: break-word; /* Retour à la ligne pour les mots longs */
+      white-space: normal; /* Permet le retour à la ligne */
+      zoom: 1.05; /* Effet loupe : agrandit visuellement de 5% */
+      -moz-transform: scale(1.05); /* Pour Firefox */
+      -moz-transform-origin: 0 0;
+      box-sizing: border-box; /* Inclut padding et border dans la largeur */
+      max-width: 95%; /* Compense le zoom de 1.05 (100% / 1.05 ≈ 95%) */
+      width: 95%; /* Prend 95% de la largeur pour compenser le zoom */
+    }
+    img.inserted { max-width:320px; display:block; margin:6px 0; }
+
+    .menu-container { position:relative; }
+    #menu-fichier {
+      display:none;
+      position:absolute;
+      top:38px;
+      left:0;
+      background:#fff;
+      border:1px solid #ccc;
+      border-radius:6px;
+      min-width:180px;
+      box-shadow:0 2px 6px rgba(0,0,0,0.2);
+      z-index:100;
+    }
+    #menu-fichier div {
+      padding:8px 12px;
+      cursor:pointer;
+      font-size:14px;
+    }
+    #menu-fichier div:hover {
+      background:#007BFF;
+      color:white;
+    }
+
+    .flex-spacer {
+  flex:1 1 auto;
+  height:34px;
+  border:1px solid #ccc;
+  border-radius:6px;
+  background:#FFFFFF;
+  cursor:default;
+  pointer-events:none;
+}
+ #toolbar button, 
+#toolbar select,
+.color-picker-btn,
+.flex-spacer,
+.toolbar-row2 button,
+.toolbar-row2 select {
+  box-shadow: 0 2px 4px rgba(0,0,0,0.25);
+}
+#right .editor-footer {
+  display: flex;
+  justify-content: center;
+  align-items: center; /* Centre verticalement les boutons */
+  gap: 20px;
+  flex: 0 0 auto; /* Ne grandit ni ne rétrécit, taille automatique */
+  padding: 20px 0; /* Espacement égal en haut et en bas */
+  min-height: 80px; /* Hauteur minimale pour avoir de l'espace */
+}
+
+#right .editor-footer button {
+  padding: 10px 20px;
+  font-size: 16px;
+  border-radius: 8px;
+  border: none;
+  background: #1a73e8;
+  color: white;
+  cursor: pointer;
+}
+
+#right .editor-footer button:hover {
+  background: #0d5bb8;
+}
+/* === STYLE DES BOUTONS ACTIFS (tous) === */
+#toolbar button.active,
+.toolbar-row2 button.active {
+  background-color: #c2eefc !important; /* bleu très clair, harmonieux */
+  background-image: -webkit-linear-gradient(top, #ffffff, #c2eefc) !important;
+  background-image: -moz-linear-gradient(top, #ffffff, #c2eefc) !important;
+  background-image: -ms-linear-gradient(top, #ffffff, #c2eefc) !important;
+  background-image: -o-linear-gradient(top, #ffffff, #c2eefc) !important;
+  background-image: linear-gradient(to bottom, #ffffff, #c2eefc) !important;
+  border-color: #66b9f0 !important;
+  color: #000000 !important;
+  box-shadow: 0 2px 6px rgba(26,115,232,0.4) !important;
+}
+
+/* === Pour compatibilité spécifique UL / OL si besoin === */
+#btn-ul.active,
+#btn-ol.active {
+  background-color: #c2eefc !important;
+  background-image: linear-gradient(to bottom, #ffffff, #c2eefc) !important;
+  border-color: #66b9f0 !important;
+  color: #000000 !important;
+  box-shadow: 0 2px 6px rgba(26,115,232,0.4) !important;
+}
+
+/* === État hover prioritaire sur non-actif === */
+#toolbar button:not(.active):hover,
+.toolbar-row2 button:not(.active):hover {
+  background-color: #ffffff;
+  background-image: -webkit-linear-gradient(top, #ffffff, #f5f3f0);
+  background-image: -moz-linear-gradient(top, #ffffff, #f5f3f0);
+  background-image: -ms-linear-gradient(top, #ffffff, #f5f3f0);
+  background-image: -o-linear-gradient(top, #ffffff, #f5f3f0);
+  background-image: linear-gradient(to bottom, #ffffff, #f5f3f0);
+}
+.editor-paragraph {
+  display: block;
+  padding-left: 4px;
+  min-height: 1em;
+}
+#editor div {
+  margin: 0;
+  padding: 0;
+  word-wrap: break-word; /* Force le retour à la ligne */
+  overflow-wrap: break-word;
+}
+#editor ul, #editor ol {
+  margin-left: 24px; /* garde une indentation propre pour les listes */
+  padding-left: 20px;
+  word-wrap: break-word; /* Force le retour à la ligne dans les listes */
+}
+#editor li {
+  word-wrap: break-word; /* Force le retour à la ligne dans les items de liste */
+  overflow-wrap: break-word;
+}
+#editor .after-list {
+  margin: 0;
+  padding: 0;
+  min-height: 1em;
+  display: block;
+}
+
+  </style>
+</head>
+<!---------------------------------------------------------------partie 2------------------------------------------------------------------->
+<body>
+<!-- PAGE D’AUTOÉVALUATION -->
+<div id="pageAutoEval2" class="page">
+<div class="main">
+<div id="left" style="flex: 1;">
+
+  <h2 style="color:#1a73e8;"><img src="imageqcm/casecoche.png" alt="Illustration case coche" style="width:48px;height:48px;">  Autoévaluation personnelle</h2>
+  </br>
+
+   <p style="margin-top:20px;">
+      <strong>Évaluez votre ressenti et votre progression pour la partie “Traitement de texte” et “Envoi d’e-mail”.</strong><br>
+      Cochez les affirmations qui correspondent à votre expérience pendant cette activité.
+    </p>
+</br>
+  <form id="autoEvalForm">
+
+    <p><u>Utilisation du traitement de texte :</u></p>
+
+    <div class="fr-checkbox-group">
+      <input type="checkbox" id="stresstexte" name="auto" value="stress">
+      <label class="fr-label" for="stresstexte">Je me suis senti(e) stressé(e) ou bloqué(e) à certains moments lors de cette activité.</label>
+    </div>
+
+    <div class="fr-checkbox-group">
+      <input type="checkbox" id="outilstexte" name="auto" value="outilstexte">
+      <label class="fr-label" for="outilstexte">Je n’utilise jamais cet outil, c’est donc compliqué pour moi.</label>
+    </div>
+
+    <div class="fr-checkbox-group">
+      <input type="checkbox" id="difficultetexte" name="auto" value="difficultetexte">
+      <label class="fr-label" for="difficultetexte">Je n’ai pas de difficulté avec cet outil, c’est facile pour moi.</label>
+    </div>
+
+    <p><u>Utilisation d’une boîte de messagerie :</u></p>
+
+    <div class="fr-checkbox-group">
+      <input type="checkbox" id="stressmessage" name="auto" value="stressmessage">
+      <label class="fr-label" for="stressmessage">Je me suis senti(e) stressé(e) ou bloqué(e) à certains moments lors de cette activité.</label>
+    </div>
+
+    <div class="fr-checkbox-group">
+      <input type="checkbox" id="outilsmessage" name="auto" value="outilsmessage">
+      <label class="fr-label" for="outilsmessage">Je n’utilise jamais cet outil, c’est donc compliqué pour moi.</label>
+    </div>
+
+    <div class="fr-checkbox-group">
+      <input type="checkbox" id="difficultemessage" name="auto" value="difficultemessage">
+      <label class="fr-label" for="difficultemessage">Je n’ai pas de difficulté avec cet outil, c’est facile pour moi.</label>
+    </div>
+
+    <p style="margin-top:10px;">
+      Laissez un commentaire pour préciser votre ressenti sur ces outils :
+    </p>
+
+    <textarea id="autoCommentoutils" rows="4" cols="50" style="width:95%;border:1px solid #ccc;border-radius:6px;padding:6px;"
+      placeholder="Écrivez ici votre remarque libre..."></textarea>
+</form>
+</div>
+<div id="right" style="flex: 1;">
+<!-- ✅ Image ajoutée au-dessus des boutons -->
+  <div class="image-container" style="text-align:center; margin-bottom:20px;">
+    <img src="imageqcm/imgautoevaltic.png" alt="Illustration autoévaluation" style="max-width:90%; height:auto; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,0.2);">
+  </div>
+<div class="footer">
+    <div class="tablecenter" style="margin-top:20px;">
+      <button type="button" onclick="saveAutoEval2()" class="suivant">Valider mon autoévaluation</button>
+      <button type="button" onclick="passAutoEval2()" class="passez">Passer</button>
+
+    </div>
+</div>
+</div>
+    <div id="autoEvalResult" style="margin-top:20px;text-align:center;font-weight:600;"></div>
+	  
+</div>	
+</div>
+<script>
+function saveAutoEval2() {
+  // Récupère les cases cochées
+  const selections = [...document.querySelectorAll("#autoEvalForm input[type='checkbox']:checked")]
+    .map(c => c.value);
+
+  // Récupère le commentaire
+  const commentaire = (document.getElementById("autoCommentoutils")?.value || "").trim();
+
+  // Enregistre DANS sessionStorage, clé unique lue par qcmv1.0.html
+  const data = { selections, commentaire };
+  try {
+    sessionStorage.setItem("autoEval2_resultats", JSON.stringify(data));
+    console.log("✅ Autoévaluation enregistrée :", data);
+  } catch (e) {
+    console.error("❌ Erreur lors de la sauvegarde :", e);
+  }
+
+  // Feedback utilisateur (chaînes fermées !)
+  const resultDiv = document.getElementById("autoEvalResult");
+  if (selections.length === 0 && !commentaire) {
+    resultDiv.style.color = "red";
+    resultDiv.textContent = "Aucune sélection effectuée.";
+  } else {
+    resultDiv.style.color = "green";
+    resultDiv.textContent = "Autoévaluation enregistrée avec succès.";
+  }
+
+  // Redirection vers la page 11 des résultats
+  setTimeout(() => {
+   // sessionStorage.setItem("goto_page", "11"); // si tu l’utilises dans qcmv1
+  //  window.location.href = "qcmv1.0.html?page=11#page11";
+  window.location.href = "paronymes.html";
+  
+  });
+}
+
+// Le bouton "Passer" doit faire la même chose (enregistrer puis rediriger)
+function passAutoEval2() {
+  saveAutoEval2();
+}
+</script>
+
+
+</body>
+</html>

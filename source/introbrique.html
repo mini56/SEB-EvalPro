@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Intro</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+  body, html {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    background: black;
+    overflow: hidden;
+  }
+
+  video {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  /* Effet de fondu */
+  #fade {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%;
+    height: 100%;
+    background: black;
+    opacity: 0;
+    transition: opacity 1.5s ease-in-out;
+    pointer-events: none;
+  }
+</style>
+</head>
+
+<body>
+<video id="introVideo" autoplay muted playsinline>
+  <source src="imageqcm/video_brique.mp4" type="video/mp4">
+</video>
+
+<div id="fade"></div>
+
+<script>
+const video = document.getElementById("introVideo");
+const fade = document.getElementById("fade");
+
+video.onended = () => {
+  fade.style.opacity = 1;
+
+  setTimeout(() => {
+    window.location.href = "brique.html";
+  }, 1500);
+};
+</script>
+
+</body>
+</html>

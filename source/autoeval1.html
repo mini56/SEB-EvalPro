@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>Évaluation — Autoévaluation personnelle</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+html, body {
+  height: 100%;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  font-family: Arial, sans-serif;
+}
+
+/* Structure principale */
+.main {
+  flex: 1;
+  display: flex;
+  gap: 10px;
+  margin: 10px;
+}
+
+#left, #right {
+  flex: 1;
+  border: 1px solid #ccc;
+  padding: 12px;
+  background: #fafafa;
+  display: flex;
+  flex-direction: column;
+}
+
+.footer {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  padding: 20px;
+  border-top: 1px solid #ccc;
+}
+
+.footer button {
+  padding: 10px 20px;
+  font-size: 16px;
+  border-radius: 8px;
+  border: none;
+  background: #1a73e8;
+  color: white;
+  cursor: pointer;
+}
+
+.footer button:hover {
+  background: #0d5bb8;
+}
+  </style>
+</head>
+<body>
+<!-- PAGE D’AUTOÉVALUATION -->
+<div id="pageAutoEval1" class="page">
+  <div class="main">
+    <!-- Colonne gauche -->
+    <div id="left">
+      <h2 style="color:#1a73e8;">
+        <img src="imageqcm/casecoche.png" alt="Illustration case coche" style="width:48px;height:48px;vertical-align:middle;">
+        Autoévaluation personnelle
+      </h2>
+
+      <strong>À cette étape, prenez un moment pour évaluer votre ressenti et votre progression.</strong></p>
+      <p><img src="imageqcm/avatar_transparant.png" alt="Img" style="width:45px;height:45px;vertical-align:middle;">  
+         Cochez les affirmations qui correspondent le mieux à votre expérience pendant cette activité.</p>
+
+      <form id="autoEvalForm">
+ <div class="fr-checkbox-group">
+      <input type="checkbox" id="ease" name="auto" value="ease">
+      <label class="fr-label" for="ease">Je me suis senti(e) à l’aise dans les exercices proposés.</label>
+    </div>
+
+    <div class="fr-checkbox-group">
+      <input type="checkbox" id="difficulties" name="auto" value="difficulties">
+      <label class="fr-label" for="difficulties">J’ai rencontré des difficultés sur certaines consignes ou calculs.</label>
+    </div>
+
+    <div class="fr-checkbox-group">
+      <input type="checkbox" id="progress" name="auto" value="progress">
+      <label class="fr-label" for="progress">Je pense avoir progressé dans mes compétences de base.</label>
+    </div>
+
+    <div class="fr-checkbox-group">
+      <input type="checkbox" id="motivation" name="auto" value="motivation">
+      <label class="fr-label" for="motivation">Cette activité m’a donné envie d’en apprendre davantage.</label>
+    </div>
+
+    <div class="fr-checkbox-group">
+      <input type="checkbox" id="stress" name="auto" value="stress">
+      <label class="fr-label" for="stress">Je me suis senti(e) stressé(e) ou bloqué(e) à certains moments.</label>
+    </div>
+</br>
+    <p style="margin-top:10px;">
+      Laissez un commentaire pour préciser votre ressenti :
+    </p>
+</br>
+    <textarea id="autoComment" rows="10" cols="50" style="width:95%;border:1px solid #ccc;border-radius:6px;padding:6px;"
+      placeholder="Écrivez ici votre remarque libre..."></textarea>
+	  
+        <!--p style="margin-top:10px;">Laissez un commentaire pour préciser votre ressenti sur ces outils :</p>
+        <textarea id="autoCommentoutils" rows="10" style="width:95%;border:1px solid #ccc;border-radius:6px;padding:6px;"
+          placeholder="Écrivez ici votre remarque libre..."></textarea-->
+      </form>
+    </div>
+
+    <!-- Colonne droite -->
+    <div id="right">
+      <div style="text-align:center; margin-bottom:20px;">
+        <img src="imageqcm/imgautoevcalc.png" alt="Illustration autoévaluation" style="max-width:90%; height:auto; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,0.2);">
+      </div>
+
+      <div class="footer">
+        <button type="button" onclick="saveAutoEval1(); passerEtapeSuivante()">Valider mon autoévaluation</button>
+        <button type="button" onclick="passerEtapeSuivante()">Étape suivante ➜</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Script principal -->
+<script>
+
+function saveAutoEval1() {
+  // Récupération des cases cochées
+  const selections = [];
+  document.querySelectorAll('#autoEvalForm input[type="checkbox"]:checked')
+    .forEach(cb => selections.push(cb.value));
+
+  // Récupération du commentaire
+  const commentaire = document.getElementById('autoComment')?.value.trim() || "";
+
+  // Enregistrement dans sessionStorage
+  sessionStorage.setItem("autoEval1_resultats", JSON.stringify({
+    selections: selections,
+    commentaire: commentaire
+  }));
+
+  console.log("✅ Données autoévaluation 1 enregistrées :", selections, commentaire);
+
+  // Redirection vers la page suivante
+  window.location.href = "introbrique.html";
+}
+
+function passerEtapeSuivante() {
+  if (confirm("Souhaitez-vous passer à l'étape suivante ?")) {
+    // Même comportement que le bouton principal : enregistre avant de passer
+    saveAutoEval1();
+  }
+}
+
+</script>
+</body>
+</html>
