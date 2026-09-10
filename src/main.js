@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
@@ -6,6 +6,9 @@ const crypto = require('crypto');
 const ADMIN_PASSWORD_SHA256 = 'c800892ba3f11b33d36eedf7d3c4297f2b6c02e2c347dda8954b4c577f6666b5';
 const STATE_VERSION = 1;
 const MIN_SPLASH_MS = 1400;
+const DESIGN_WIDTH = 1600;
+const DESIGN_HEIGHT = 900;
+const MIN_ZOOM_FACTOR = 0.60;
 let mainWindow = null;
 let splashWindow = null;
 let splashStartedAt = 0;
@@ -78,6 +81,22 @@ function verifyAdminPassword(password) {
   return expected.length === actual.length && crypto.timingSafeEqual(expected, actual);
 }
 
+function calculateAdaptiveZoom() {
+  if (!mainWindow || mainWindow.isDestroyed()) return 1;
+  const bounds = mainWindow.getBounds();
+  const display = screen.getDisplayMatching(bounds);
+  const size = display && display.size ? display.size : { width: bounds.width, height: bounds.height };
+  const widthFactor = Number(size.width || bounds.width || DESIGN_WIDTH) / DESIGN_WIDTH;
+  const heightFactor = Number(size.height || bounds.height || DESIGN_HEIGHT) / DESIGN_HEIGHT;
+  const factor = Math.min(1, widthFactor, heightFactor);
+  return Math.max(MIN_ZOOM_FACTOR, Math.round(factor * 100) / 100);
+}
+
+function applyAdaptiveZoom() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.webContents.setZoomFactor(calculateAdaptiveZoom());
+}
+
 function setSplashProgress(percent, message) {
   if (!splashWindow || splashWindow.isDestroyed()) return;
   const value = Math.max(0, Math.min(100, Number(percent) || 0));
@@ -129,6 +148,7 @@ function finishStartup() {
     if (!mainWindow || mainWindow.isDestroyed()) return;
     mainWindow.show();
     mainWindow.setFullScreen(true);
+    applyAdaptiveZoom();
     mainWindow.focus();
     if (splashWindow && !splashWindow.isDestroyed()) splashWindow.close();
   }, delay + 180);
@@ -157,6 +177,10 @@ function createWindow() {
   setSplashProgress(48, 'Chargement du parcours…');
   mainWindow.loadFile(existingWebPage(state.lastEvaluationPage || state.lastPage));
 
+  mainWindow.webContents.on('did-finish-load', () => {
+    applyAdaptiveZoom();
+  });
+
   mainWindow.webContents.once('did-finish-load', () => {
     setSplashProgress(86, 'Restauration de la session…');
   });
@@ -171,7 +195,14 @@ function createWindow() {
       current.lastEvaluationPage = page;
     }
     writeState(current);
+    applyAdaptiveZoom();
   });
+
+  mainWindow.on('enter-full-screen', () => {
+    setTimeout(applyAdaptiveZoom, 50);
+  });
+
+  mainWindow.on('resize', applyAdaptiveZoom);
 
   mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
 
