@@ -1,0 +1,36 @@
+{
+  "name": "seb-evalpro",
+  "version": "0.1.0",
+  "description": "Application desktop autonome du plateau technique SEB EvalPro",
+  "main": "src/main.js",
+  "author": "Sauvegarde 56",
+  "license": "UNLICENSED",
+  "scripts": {
+    "start": "electron .",
+    "dist:win": "electron-builder --win portable",
+    "dist:linux": "electron-builder --linux AppImage"
+  },
+  "devDependencies": {
+    "electron": "44.3.0",
+    "electron-builder": "26.15.3"
+  },
+  "build": {
+    "appId": "fr.sauvegarde56.sebevalpro",
+    "productName": "SEB EvalPro",
+    "asar": true,
+    "files": [
+      "src/**/*",
+      "app/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": ["portable"],
+      "artifactName": "SEB-EvalPro-${version}-Windows.${ext}"
+    },
+    "linux": {
+      "target": ["AppImage"],
+      "category": "Education",
+      "artifactName": "SEB-EvalPro-${version}-Linux.${ext}"
+    }
+  }
+}
