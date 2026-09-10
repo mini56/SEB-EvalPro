@@ -1,12 +1,12 @@
 {
   "name": "seb-evalpro",
   "version": "0.1.0",
-  "description": "Application desktop autonome du plateau technique SEB EvalPro",
+  "description": "Application desktop autonome du plateau technique SEB-éval-PRO",
   "main": "src/main.js",
   "author": "Sauvegarde 56",
   "license": "UNLICENSED",
   "scripts": {
-    "prepare:web": "node scripts/prepare-web.js && node scripts/checkpoint-patch.js && node scripts/full-new-evaluation-reset.js && node scripts/audit-corrections.js && node scripts/bilan-export-fixes.js && node scripts/brique-autoeval-fix.js && node scripts/candidate-results-lock.js",
+    "prepare:web": "node scripts/prepare-web.js && node scripts/checkpoint-patch.js && node scripts/full-new-evaluation-reset.js && node scripts/audit-corrections.js && node scripts/bilan-export-fixes.js && node scripts/brique-autoeval-fix.js && node scripts/candidate-results-lock.js && node scripts/visual-branding.js",
     "start": "npm run prepare:web && electron .",
     "dist:win": "npm run prepare:web && electron-builder --win --publish never",
     "dist:linux": "npm run prepare:web && electron-builder --linux AppImage --publish never"
@@ -17,7 +17,7 @@
   },
   "build": {
     "appId": "fr.sauvegarde56.sebevalpro",
-    "productName": "SEB EvalPro",
+    "productName": "SEB-éval-PRO",
     "asar": true,
     "files": [
       "src/**/*",
@@ -25,24 +25,27 @@
       "package.json"
     ],
     "win": {
-      "target": ["nsis", "portable"]
+      "target": ["nsis"],
+      "icon": "source/imageqcm/avatar_icon.ico"
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": "always",
       "createStartMenuShortcut": true,
-      "shortcutName": "SEB EvalPro",
+      "shortcutName": "SEB-éval-PRO",
+      "installerIcon": "source/imageqcm/avatar_icon.ico",
+      "uninstallerIcon": "source/imageqcm/avatar_icon.ico",
+      "installerHeader": "build/installerHeader.bmp",
+      "installerSidebar": "build/installerSidebar.bmp",
+      "uninstallerSidebar": "build/installerSidebar.bmp",
       "deleteAppDataOnUninstall": false,
-      "artifactName": "SEB-EvalPro-${version}-Windows-Setup.${ext}"
-    },
-    "portable": {
-      "artifactName": "SEB-EvalPro-${version}-Windows-Portable.${ext}"
+      "artifactName": "SEB-eval-PRO-${version}-Windows-Setup.${ext}"
     },
     "linux": {
       "target": ["AppImage"],
       "category": "Education",
-      "artifactName": "SEB-EvalPro-${version}-Linux.${ext}"
+      "artifactName": "SEB-eval-PRO-${version}-Linux.${ext}"
     }
   }
 }
