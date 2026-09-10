@@ -9,7 +9,6 @@ Var SebBrandingWelcomeHandle
 Var SebBrandingFinishDialog
 Var SebBrandingFinishImage
 Var SebBrandingFinishHandle
-Var SebBrandingRunCheckbox
 
 !macro preInit
   InitPluginsDir
@@ -38,7 +37,7 @@ Function SebBrandingWelcomeCreate
 FunctionEnd
 
 !macro customFinishPage
-  Page custom SebBrandingFinishCreate SebBrandingFinishLeave
+  Page custom SebBrandingFinishCreate
 !macroend
 
 Function SebBrandingFinishCreate
@@ -52,11 +51,6 @@ Function SebBrandingFinishCreate
   Pop $SebBrandingFinishImage
   ${NSD_SetBitmap} $SebBrandingFinishImage "$PLUGINSDIR\seb-eval-pro-branding.bmp" $SebBrandingFinishHandle
 
-  ${NSD_CreateCheckbox} 105u 174u 120u 13u "Lancer SEB-éval-PRO"
-  Pop $SebBrandingRunCheckbox
-  ${NSD_Check} $SebBrandingRunCheckbox
-  SetCtlColors $SebBrandingRunCheckbox 0x004D71 transparent
-
   GetDlgItem $0 $HWNDPARENT 1
   SendMessage $0 ${WM_SETTEXT} 0 "STR:Fermer"
   GetDlgItem $0 $HWNDPARENT 3
@@ -66,12 +60,5 @@ Function SebBrandingFinishCreate
 
   nsDialogs::Show
   ${NSD_FreeBitmap} $SebBrandingFinishHandle
-FunctionEnd
-
-Function SebBrandingFinishLeave
-  ${NSD_GetState} $SebBrandingRunCheckbox $0
-  ${If} $0 == ${BST_CHECKED}
-    ${StdUtils.ExecShellAsUser} $0 "$INSTDIR\${APP_EXECUTABLE_FILENAME}" "open" ""
-  ${EndIf}
 FunctionEnd
 !endif
