@@ -2,9 +2,12 @@ const { contextBridge, ipcRenderer } = require('electron');
 const path = require('path');
 
 const BAR_HEIGHT = 44;
+const HOTZONE_HEIGHT = 5;
+const BAR_HIDE_DELAY = 450;
 let restoredState = {};
 let adminUnlocked = false;
 let saveTimer = null;
+let barHideTimer = null;
 
 function objectToStorage(storage, values) {
   if (!storage || !values || typeof values !== 'object') return;
@@ -131,12 +134,18 @@ function injectAdminBar() {
     <button id="seb-evalpro-bilan" type="button" hidden>Bilan</button>
     <button id="seb-evalpro-admin" type="button">Administrateur</button>`;
 
+  const hotzone = document.createElement('div');
+  hotzone.id = 'seb-evalpro-top-hotzone';
+  hotzone.setAttribute('aria-hidden', 'true');
+
   const style = document.createElement('style');
   style.id = 'seb-evalpro-shell-style';
   style.textContent = `
     html{box-sizing:border-box}
-    body{padding-top:${BAR_HEIGHT}px !important;box-sizing:border-box}
-    #seb-evalpro-topbar{position:fixed;top:0;left:0;right:0;height:${BAR_HEIGHT}px;z-index:2147483646;display:flex;align-items:center;gap:8px;padding:0 12px;box-sizing:border-box;background:#0070c0;color:#fff;font-family:Arial,sans-serif;box-shadow:0 1px 4px rgba(0,0,0,.25)}
+    body{padding-top:0 !important;box-sizing:border-box}
+    #seb-evalpro-top-hotzone{position:fixed;top:0;left:0;right:0;height:${HOTZONE_HEIGHT}px;z-index:2147483645;background:transparent}
+    #seb-evalpro-topbar{position:fixed;top:0;left:0;right:0;height:${BAR_HEIGHT}px;z-index:2147483646;display:flex;align-items:center;gap:8px;padding:0 12px;box-sizing:border-box;background:#0070c0;color:#fff;font-family:Arial,sans-serif;box-shadow:0 1px 4px rgba(0,0,0,.25);transform:translateY(-100%);transition:transform .16s ease;will-change:transform}
+    #seb-evalpro-topbar.seb-evalpro-visible{transform:translateY(0)}
     #seb-evalpro-topbar .seb-evalpro-name{font-size:18px;font-weight:700;white-space:nowrap}
     #seb-evalpro-topbar .seb-evalpro-spacer{flex:1}
     #seb-evalpro-topbar button{font-family:Arial,sans-serif;font-size:14px;padding:6px 12px;border:1px solid rgba(255,255,255,.75);border-radius:4px;background:#fff;color:#0070c0;cursor:pointer}
@@ -144,10 +153,36 @@ function injectAdminBar() {
   `;
   document.head.appendChild(style);
   document.body.prepend(bar);
+  document.body.prepend(hotzone);
 
   const adminButton = bar.querySelector('#seb-evalpro-admin');
   const bilanButton = bar.querySelector('#seb-evalpro-bilan');
   const returnButton = bar.querySelector('#seb-evalpro-return');
+
+  const showBar = () => {
+    clearTimeout(barHideTimer);
+    bar.classList.add('seb-evalpro-visible');
+  };
+
+  const hideBar = () => {
+    if (document.getElementById('seb-evalpro-admin-dialog')) return;
+    bar.classList.remove('seb-evalpro-visible');
+  };
+
+  const scheduleHideBar = () => {
+    clearTimeout(barHideTimer);
+    barHideTimer = setTimeout(() => {
+      if (!bar.matches(':hover') && !hotzone.matches(':hover')) hideBar();
+    }, BAR_HIDE_DELAY);
+  };
+
+  hotzone.addEventListener('mouseenter', showBar);
+  hotzone.addEventListener('mouseleave', scheduleHideBar);
+  bar.addEventListener('mouseenter', showBar);
+  bar.addEventListener('mouseleave', scheduleHideBar);
+  document.addEventListener('mousemove', (event) => {
+    if (event.clientY <= 2) showBar();
+  }, true);
 
   const updateAdminButtons = () => {
     bilanButton.hidden = !adminUnlocked || pageName().toLowerCase() === 'bilan.html';
@@ -156,10 +191,13 @@ function injectAdminBar() {
   };
 
   adminButton.addEventListener('click', async () => {
+    showBar();
+
     if (adminUnlocked) {
       await ipcRenderer.invoke('admin:lock');
       adminUnlocked = false;
       updateAdminButtons();
+      scheduleHideBar();
       return;
     }
 
@@ -168,6 +206,7 @@ function injectAdminBar() {
       adminUnlocked = true;
       updateAdminButtons();
     }
+    scheduleHideBar();
   });
 
   bilanButton.addEventListener('click', async () => {
@@ -181,6 +220,7 @@ function injectAdminBar() {
   });
 
   updateAdminButtons();
+  hideBar();
 }
 
 try {
