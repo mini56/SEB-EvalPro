@@ -8,7 +8,7 @@
   "scripts": {
     "prepare:web": "node scripts/prepare-web.js",
     "start": "npm run prepare:web && electron .",
-    "dist:win": "npm run prepare:web && electron-builder --win portable --publish never",
+    "dist:win": "npm run prepare:web && electron-builder --win --publish never",
     "dist:linux": "npm run prepare:web && electron-builder --linux AppImage --publish never"
   },
   "devDependencies": {
@@ -25,8 +25,20 @@
       "package.json"
     ],
     "win": {
-      "target": ["portable"],
-      "artifactName": "SEB-EvalPro-${version}-Windows.${ext}"
+      "target": ["nsis", "portable"],
+      "icon": "source/imageqcm/avatar_icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true,
+      "shortcutName": "SEB EvalPro",
+      "deleteAppDataOnUninstall": false,
+      "artifactName": "SEB-EvalPro-${version}-Windows-Setup.${ext}"
+    },
+    "portable": {
+      "artifactName": "SEB-EvalPro-${version}-Windows-Portable.${ext}"
     },
     "linux": {
       "target": ["AppImage"],

@@ -5,7 +5,10 @@ const crypto = require('crypto');
 
 const ADMIN_PASSWORD_SHA256 = 'c800892ba3f11b33d36eedf7d3c4297f2b6c02e2c347dda8954b4c577f6666b5';
 const STATE_VERSION = 1;
+const MIN_SPLASH_MS = 1400;
 let mainWindow = null;
+let splashWindow = null;
+let splashStartedAt = 0;
 let adminSessionUnlocked = false;
 
 function stateFilePath() {
@@ -64,7 +67,64 @@ function existingWebPage(pageName) {
   return path.join(webRoot, 'qcmv1.0.html');
 }
 
+function setSplashProgress(percent, message) {
+  if (!splashWindow || splashWindow.isDestroyed()) return;
+  const value = Math.max(0, Math.min(100, Number(percent) || 0));
+  const js = `window.setStartupProgress && window.setStartupProgress(${value}, ${JSON.stringify(String(message || ''))});`;
+  splashWindow.webContents.executeJavaScript(js).catch(() => {});
+}
+
+function createSplashWindow() {
+  splashStartedAt = Date.now();
+  splashWindow = new BrowserWindow({
+    width: 640,
+    height: 390,
+    show: false,
+    frame: false,
+    resizable: false,
+    movable: true,
+    center: true,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    backgroundColor: '#ffffff',
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true
+    }
+  });
+
+  splashWindow.loadFile(path.join(__dirname, 'splash.html'), {
+    query: { version: app.getVersion() }
+  });
+
+  splashWindow.once('ready-to-show', () => {
+    if (!splashWindow || splashWindow.isDestroyed()) return;
+    splashWindow.show();
+    setSplashProgress(12, 'Initialisation de SEB EvalPro…');
+  });
+
+  splashWindow.on('closed', () => {
+    splashWindow = null;
+  });
+}
+
+function finishStartup() {
+  const elapsed = Date.now() - splashStartedAt;
+  const delay = Math.max(0, MIN_SPLASH_MS - elapsed);
+  setSplashProgress(100, 'Prêt');
+
+  setTimeout(() => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    mainWindow.show();
+    mainWindow.setFullScreen(true);
+    mainWindow.focus();
+    if (splashWindow && !splashWindow.isDestroyed()) splashWindow.close();
+  }, delay + 180);
+}
+
 function createWindow() {
+  setSplashProgress(28, 'Lecture de la sauvegarde…');
   const state = readState();
   adminSessionUnlocked = false;
 
@@ -83,12 +143,14 @@ function createWindow() {
   });
 
   mainWindow.setMenuBarVisibility(false);
+  setSplashProgress(48, 'Chargement du parcours…');
   mainWindow.loadFile(existingWebPage(state.lastEvaluationPage || state.lastPage));
 
-  mainWindow.once('ready-to-show', () => {
-    mainWindow.show();
-    mainWindow.setFullScreen(true);
+  mainWindow.webContents.once('did-finish-load', () => {
+    setSplashProgress(86, 'Restauration de la session…');
   });
+
+  mainWindow.once('ready-to-show', finishStartup);
 
   mainWindow.webContents.on('did-navigate', (_event, url) => {
     const current = readState();
@@ -106,6 +168,14 @@ function createWindow() {
     mainWindow = null;
     adminSessionUnlocked = false;
   });
+}
+
+function startApplication() {
+  createSplashWindow();
+  setTimeout(() => {
+    setSplashProgress(20, 'Préparation du programme…');
+    createWindow();
+  }, 120);
 }
 
 ipcMain.on('state:load-sync', (event) => {
@@ -155,12 +225,12 @@ ipcMain.handle('admin:return-evaluation', () => {
   return true;
 });
 
-app.whenReady().then(createWindow);
+app.whenReady().then(startApplication);
 
 app.on('window-all-closed', () => {
   app.quit();
 });
 
 app.on('activate', () => {
-  if (BrowserWindow.getAllWindows().length === 0) createWindow();
+  if (BrowserWindow.getAllWindows().length === 0) startApplication();
 });

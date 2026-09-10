@@ -71,6 +71,17 @@ function repairCaseSensitiveReferences() {
   return repaired;
 }
 
+function extractInstitutionalLogo() {
+  const qcmPath = path.join(outputDir, 'qcmv1.0.html');
+  const html = fs.readFileSync(qcmPath, 'utf8');
+  const match = html.match(/<svg\b[^>]*id=["']Calque_1["'][\s\S]*?<\/svg>/i);
+  if (!match) {
+    console.error('SEB EvalPro: logo institutionnel Sauvegarde 56 introuvable dans qcmv1.0.html.');
+    process.exit(4);
+  }
+  fs.writeFileSync(path.join(outputDir, 'sauvegarde56-logo.svg'), match[0], 'utf8');
+}
+
 if (!fs.existsSync(sourceDir)) {
   console.error('SEB EvalPro: le dossier source/ est absent.');
   process.exit(2);
@@ -89,6 +100,7 @@ fs.mkdirSync(outputDir, { recursive: true });
 
 copyTree(sourceDir, outputDir, new Set(['QCM.lnk', 'README.md']));
 copyTree(overridesDir, outputDir);
+extractInstitutionalLogo();
 
 const repaired = repairCaseSensitiveReferences();
-console.log(`SEB EvalPro: plateau préparé depuis les fichiers source/ (${repaired} référence(s) de casse réparée(s)).`);
+console.log(`SEB EvalPro: plateau préparé depuis les fichiers source/ (${repaired} référence(s) de casse réparée(s)), logo institutionnel extrait.`);

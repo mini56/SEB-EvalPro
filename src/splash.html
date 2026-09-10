@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SEB EvalPro</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; margin: 0; }
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      background: #ffffff;
+      color: #111111;
+      overflow: hidden;
+      user-select: none;
+    }
+    .splash {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 34px 48px 28px;
+      border: 1px solid #d5d5d5;
+      background: linear-gradient(to bottom, #ffffff 0%, #ffffff 64%, #ebeef5 100%);
+    }
+    .logo {
+      display: block;
+      width: 390px;
+      max-width: 90%;
+      height: auto;
+      margin: 0 auto 22px;
+    }
+    .name {
+      font-size: 31px;
+      line-height: 1.1;
+      font-weight: 700;
+      color: #0070c0;
+      margin: 0 0 8px;
+      text-align: center;
+    }
+    .version {
+      font-size: 15px;
+      color: #555555;
+      margin-bottom: 30px;
+    }
+    .progress-wrap { width: 100%; max-width: 500px; }
+    .progress-track {
+      width: 100%;
+      height: 15px;
+      overflow: hidden;
+      border: 1px solid #9f9f9f;
+      border-radius: 8px;
+      background: #ffffff;
+    }
+    .progress-fill {
+      width: 0%;
+      height: 100%;
+      background: #0070c0;
+      transition: width .22s ease;
+    }
+    .progress-info {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: center;
+      margin-top: 9px;
+      min-height: 18px;
+      font-size: 13px;
+      color: #444444;
+    }
+    #startup-percent { color: #0070c0; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <main class="splash" aria-label="Démarrage de SEB EvalPro">
+    <img class="logo" src="../app/web/sauvegarde56-logo.svg" alt="Sauvegarde 56 - action sociale et solidaire">
+    <div class="name">SEB EvalPro</div>
+    <div class="version" id="app-version">Version</div>
+    <div class="progress-wrap">
+      <div class="progress-track" role="progressbar" aria-label="Progression du démarrage" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="startup-progress">
+        <div class="progress-fill" id="startup-fill"></div>
+      </div>
+      <div class="progress-info">
+        <span id="startup-status">Initialisation…</span>
+        <span id="startup-percent">0 %</span>
+      </div>
+    </div>
+  </main>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const version = params.get('version') || '0.1.0';
+    document.getElementById('app-version').textContent = `Version ${version}`;
+
+    window.setStartupProgress = (percent, message) => {
+      const value = Math.max(0, Math.min(100, Math.round(Number(percent) || 0)));
+      document.getElementById('startup-fill').style.width = `${value}%`;
+      document.getElementById('startup-progress').setAttribute('aria-valuenow', String(value));
+      document.getElementById('startup-percent').textContent = `${value} %`;
+      if (message) document.getElementById('startup-status').textContent = message;
+    };
+  </script>
+</body>
+</html>
