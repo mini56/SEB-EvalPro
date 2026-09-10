@@ -6,7 +6,7 @@
   "author": "Sauvegarde 56",
   "license": "UNLICENSED",
   "scripts": {
-    "prepare:web": "node scripts/prepare-web.js",
+    "prepare:web": "node scripts/prepare-web.js && node scripts/checkpoint-patch.js",
     "start": "npm run prepare:web && electron .",
     "dist:win": "npm run prepare:web && electron-builder --win --publish never",
     "dist:linux": "npm run prepare:web && electron-builder --linux AppImage --publish never"
