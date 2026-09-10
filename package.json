@@ -8,8 +8,8 @@
   "scripts": {
     "prepare:web": "node scripts/prepare-web.js",
     "start": "npm run prepare:web && electron .",
-    "dist:win": "npm run prepare:web && electron-builder --win portable",
-    "dist:linux": "npm run prepare:web && electron-builder --linux AppImage"
+    "dist:win": "npm run prepare:web && electron-builder --win portable --publish never",
+    "dist:linux": "npm run prepare:web && electron-builder --linux AppImage --publish never"
   },
   "devDependencies": {
     "electron": "44.3.0",
