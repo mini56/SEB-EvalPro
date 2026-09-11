@@ -40,15 +40,46 @@ $brandingSvg = Join-Path $buildDir '_installer-branding.svg'
 $brandingBmp = Join-Path $buildDir 'installerBranding.bmp'
 $headerSvg = Join-Path $buildDir '_installer-header.svg'
 $headerBmp = Join-Path $buildDir 'installerHeader.bmp'
-$appIconMaster = Join-Path $buildDir '_app-icon-master.png'
+$appIconSourcePng = Join-Path $buildDir '_app-icon-source.png'
 $appIconIco = Join-Path $buildDir 'app-icon.ico'
 
-# Icône Windows : toutes les tailles sont désormais régénérées depuis une seule
-# trame normalisée, sans marge transparente excessive. Cela évite l'icône minuscule
-# en affichage Bureau « Icônes moyennes » tout en conservant le dessin d'origine.
-$largestIconFrame = "${sourceIcon}[4]"
-& magick $largestIconFrame -alpha on -trim +repage -resize '232x232>' -gravity center -background none -extent '256x256' $appIconMaster
-& magick $appIconMaster -define 'icon:auto-resize=256,128,96,64,48,40,32,24,20,16' $appIconIco
+# Le fichier source historique contient cinq images NON carrées (14x16, 27x32,
+# 41x48, 55x64 et 109x128). Windows attend au contraire des trames ICO carrées
+# correspondant à ses tailles d'affichage. C'est la cause de l'icône visuellement
+# trop petite selon le mode Petit/Moyen/Grand du Bureau.
+#
+# On repart donc du dessin le plus détaillé (109x128), on supprime seulement ses
+# marges transparentes, puis on fabrique explicitement chaque trame carrée Windows.
+# Aucun auto-resize ICO n'est utilisé : chaque canvas est contrôlé avant assemblage.
+& magick "${sourceIcon}[4]" -alpha on -trim +repage $appIconSourcePng
+
+$iconSizes = @(16, 20, 24, 32, 40, 48, 64, 96, 128, 256)
+$iconFrames = @()
+foreach ($size in $iconSizes) {
+  $frame = Join-Path $buildDir ("_app-icon-{0}.png" -f $size)
+
+  # Le personnage remplit toute la hauteur disponible, sans déformation ni rognage.
+  # Son rapport largeur/hauteur naturel est conservé puis centré sur un canvas carré.
+  & magick $appIconSourcePng -alpha on -resize "x$size" -gravity center -background none -extent "${size}x${size}" $frame
+
+  $geometry = (& magick identify -format '%wx%h' $frame).Trim()
+  if ($geometry -ne "${size}x${size}") {
+    throw "SEB-éval-PRO : trame icône invalide pour ${size}px ($geometry)."
+  }
+  $iconFrames += $frame
+}
+
+# Assemblage ICO Windows multi-résolution à partir des trames carrées validées.
+& magick @iconFrames $appIconIco
+
+# Contrôle bloquant : toutes les tailles Windows prévues doivent être réellement
+# présentes dans le .ico final. Cela évite de réintroduire une icône non standard.
+$icoInfo = (& magick identify -format '%wx%h`n' $appIconIco) -join "`n"
+foreach ($size in $iconSizes) {
+  if ($icoInfo -notmatch "(?m)^${size}x${size}$") {
+    throw "SEB-éval-PRO : la trame ${size}x${size} manque dans app-icon.ico."
+  }
+}
 
 # Visuel dédié à la zone réelle de la page NSIS : 450x228 pixels.
 # On garde la composition validée (logo, SEB-éval-PRO, version, slogans et vagues),
@@ -106,6 +137,9 @@ $header = @"
 Set-Content -Path $headerSvg -Value $header -Encoding UTF8
 & magick $headerSvg -background white -alpha remove -alpha off -type TrueColor "BMP3:$headerBmp"
 
-Remove-Item -Force -ErrorAction SilentlyContinue $brandingSvg, $headerSvg, $appIconMaster
+Remove-Item -Force -ErrorAction SilentlyContinue $brandingSvg, $headerSvg, $appIconSourcePng
+foreach ($frame in $iconFrames) {
+  Remove-Item -Force -ErrorAction SilentlyContinue $frame
+}
 
-Write-Host "SEB-éval-PRO : icône multi-tailles normalisée et visuel NSIS 450x228 générés pour la version $version."
+Write-Host "SEB-éval-PRO : icône Windows reconstruite en trames carrées 16/20/24/32/40/48/64/96/128/256 et visuel NSIS 450x228 généré pour la version $version."
