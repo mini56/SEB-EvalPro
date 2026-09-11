@@ -31,12 +31,19 @@ jobs:
         shell: pwsh
         run: |
           $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
-          $nsisCache = Join-Path $env:LOCALAPPDATA 'electron-builder\Cache\nsis'
-          $makensis = Get-ChildItem -Path $nsisCache -Filter makensis.exe -Recurse -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+          $makensis = Get-Command makensis.exe -ErrorAction SilentlyContinue
           if (-not $makensis) {
-            throw 'makensis.exe introuvable dans le cache electron-builder.'
+            choco install nsis --no-progress -y
+            $candidate = Join-Path ${env:ProgramFiles(x86)} 'NSIS\makensis.exe'
+            if (Test-Path $candidate) {
+              $makensis = Get-Item $candidate
+            }
           }
-          & $makensis.FullName "/DAPP_VERSION=$version" 'build\standalone-uninstaller.nsi'
+          if (-not $makensis) {
+            throw 'makensis.exe introuvable après installation de NSIS.'
+          }
+          $makensisPath = if ($makensis.Source) { $makensis.Source } else { $makensis.FullName }
+          & $makensisPath "/DAPP_VERSION=$version" 'build\standalone-uninstaller.nsi'
           if ($LASTEXITCODE -ne 0) {
             throw "Compilation du désinstallateur autonome échouée (code $LASTEXITCODE)."
           }
