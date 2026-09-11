@@ -75,6 +75,8 @@ jobs:
           $eAcute = [char]0x00E9
           $eGrave = [char]0x00E8
           $accentedName = "SEB-$($eAcute)val-PRO"
+          $diagnosticPath = Join-Path $env:TEMP 'seb-evalpro-uninstall-leftovers.txt'
+          Remove-Item -LiteralPath $diagnosticPath -Force -ErrorAction SilentlyContinue
 
           $nsiPath = (Resolve-Path 'build\standalone-uninstaller.nsi').Path
           $nsiBytes = [System.IO.File]::ReadAllBytes($nsiPath)
@@ -187,6 +189,11 @@ jobs:
 
           $uninstallProcess = Start-Process -FilePath $uninstaller -ArgumentList '/S' -Wait -PassThru
           if ($uninstallProcess.ExitCode -ne 0) {
+            if (Test-Path -LiteralPath $diagnosticPath) {
+              Write-Host '--- Diagnostic désinstallation SEB EvalPro ---'
+              Get-Content -LiteralPath $diagnosticPath | ForEach-Object { Write-Host $_ }
+              Write-Host '--- Fin diagnostic ---'
+            }
             throw "Le désinstalleur autonome a échoué avec le code $($uninstallProcess.ExitCode)."
           }
 

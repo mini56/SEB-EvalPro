@@ -6,6 +6,8 @@ $ErrorActionPreference = 'SilentlyContinue'
 $eAcute = [char]0x00E9
 $accentedName = "SEB-$($eAcute)val-PRO"
 $names = @($accentedName, 'SEB EvalPro', 'SEB-eval-PRO', 'seb-evalpro') | Select-Object -Unique
+$diagnosticPath = Join-Path $env:TEMP 'seb-evalpro-uninstall-leftovers.txt'
+Remove-Item -LiteralPath $diagnosticPath -Force -ErrorAction SilentlyContinue
 
 function ConvertTo-SebAscii {
     param([string]$Value)
@@ -260,10 +262,13 @@ Get-Process -ErrorAction SilentlyContinue | Where-Object {
 }
 
 if ($leftovers.Count -gt 0) {
-    Write-Output 'SEB EvalPro cleanup incomplete:'
-    $leftovers | Select-Object -Unique | ForEach-Object { Write-Output " - $_" }
+    $diagnosticLines = @('SEB EvalPro cleanup incomplete:')
+    $diagnosticLines += @($leftovers | Select-Object -Unique | ForEach-Object { " - $_" })
+    $diagnosticLines | Set-Content -LiteralPath $diagnosticPath -Encoding UTF8
+    $diagnosticLines | ForEach-Object { Write-Output $_ }
     exit 2
 }
 
+Remove-Item -LiteralPath $diagnosticPath -Force -ErrorAction SilentlyContinue
 Write-Output "$accentedName was uninstalled and its technical data were cleaned."
 exit 0
