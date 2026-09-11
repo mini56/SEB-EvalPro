@@ -165,7 +165,7 @@ jobs:
           } | Select-Object -Unique)
 
           if ($existingInstallRoots.Count -eq 0) {
-            throw 'Le Setup est enregistré mais aucun dossier d’installation réel n’a été trouvé.'
+            throw "Le Setup est enregistré mais aucun dossier d'installation réel n'a été trouvé."
           }
 
           $cacheProbePaths = @(
