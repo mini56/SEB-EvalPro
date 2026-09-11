@@ -76,39 +76,20 @@ jobs:
           $eGrave = [char]0x00E8
           $accentedName = "SEB-$($eAcute)val-PRO"
 
-          function Test-ByteSequence {
-            param(
-              [byte[]]$Haystack,
-              [byte[]]$Needle
-            )
-            if (-not $Needle -or $Needle.Length -eq 0 -or $Haystack.Length -lt $Needle.Length) {
-              return $false
-            }
-            for ($i = 0; $i -le ($Haystack.Length - $Needle.Length); $i++) {
-              $matches = $true
-              for ($j = 0; $j -lt $Needle.Length; $j++) {
-                if ($Haystack[$i + $j] -ne $Needle[$j]) {
-                  $matches = $false
-                  break
-                }
-              }
-              if ($matches) {
-                return $true
-              }
-            }
-            return $false
+          $nsiPath = (Resolve-Path 'build\standalone-uninstaller.nsi').Path
+          $nsiBytes = [System.IO.File]::ReadAllBytes($nsiPath)
+          if ($nsiBytes.Length -lt 3 -or $nsiBytes[0] -ne 0xEF -or $nsiBytes[1] -ne 0xBB -or $nsiBytes[2] -ne 0xBF) {
+            throw 'Le fichier NSIS du désinstalleur n’est pas en UTF-8 avec BOM.'
           }
-
-          $uninstallerBytes = [System.IO.File]::ReadAllBytes($uninstaller)
-          $expectedUnicodeStrings = @(
+          $nsiText = [System.IO.File]::ReadAllText($nsiPath, [System.Text.Encoding]::UTF8)
+          $expectedNsiStrings = @(
             "$accentedName - D$($eAcute)sinstallation compl$($eGrave)te",
             "Cette op$($eAcute)ration va d$($eAcute)sinstaller $accentedName",
-            'Les bilans et documents exportés dans Documents seront conservés.'
+            "Les bilans et documents export$($eAcute)s dans Documents seront conserv$($eAcute)s."
           )
-          foreach ($expectedString in $expectedUnicodeStrings) {
-            $needle = [System.Text.Encoding]::Unicode.GetBytes($expectedString)
-            if (-not (Test-ByteSequence -Haystack $uninstallerBytes -Needle $needle)) {
-              throw "Chaîne Unicode absente ou mal encodée dans le désinstalleur : $expectedString"
+          foreach ($expectedString in $expectedNsiStrings) {
+            if (-not $nsiText.Contains($expectedString)) {
+              throw "Chaîne française absente ou mal encodée dans la source NSIS : $expectedString"
             }
           }
 
@@ -233,7 +214,7 @@ jobs:
           }
 
           Write-Host 'Test réel installation -> désinstallation : OK'
-          Write-Host 'Accents du désinstalleur : OK'
+          Write-Host 'Encodage UTF-8/accents NSIS : OK'
           Write-Host 'Bilans/Documents conservés : OK'
       - uses: actions/upload-artifact@v4
         with:
