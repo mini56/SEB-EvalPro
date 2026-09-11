@@ -25,14 +25,13 @@ jobs:
       - name: Generate installer branding
         shell: pwsh
         run: ./scripts/generate-installer-branding.ps1
-      - name: Normalize Windows script encodings
+      - name: Normalize Windows NSIS encodings
         shell: pwsh
         run: |
           $utf8Bom = New-Object System.Text.UTF8Encoding($true)
           foreach ($relativePath in @(
             'build\installer.nsh',
-            'build\standalone-uninstaller.nsi',
-            'scripts\uninstall-clean.ps1'
+            'build\standalone-uninstaller.nsi'
           )) {
             $path = (Resolve-Path $relativePath).Path
             $text = [System.IO.File]::ReadAllText($path)
@@ -72,12 +71,9 @@ jobs:
           $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
           $setup = (Resolve-Path "dist\SEB-eval-PRO-$version-Windows-Setup.exe").Path
           $uninstaller = (Resolve-Path "dist\SEB-eval-PRO-$version-Windows-Desinstallation.exe").Path
-          $cleanupScript = (Resolve-Path 'scripts\uninstall-clean.ps1').Path
           $eAcute = [char]0x00E9
           $eGrave = [char]0x00E8
           $accentedName = "SEB-$($eAcute)val-PRO"
-          $diagnosticPath = Join-Path $env:TEMP 'seb-evalpro-uninstall-leftovers.txt'
-          Remove-Item -LiteralPath $diagnosticPath -Force -ErrorAction SilentlyContinue
 
           $nsiPath = (Resolve-Path 'build\standalone-uninstaller.nsi').Path
           $nsiBytes = [System.IO.File]::ReadAllBytes($nsiPath)
@@ -94,6 +90,9 @@ jobs:
             if (-not $nsiText.Contains($expectedString)) {
               throw "Chaîne française absente ou mal encodée dans la source NSIS : $expectedString"
             }
+          }
+          if ($nsiText -match '(?i)powershell\.exe|uninstall-clean\.ps1') {
+            throw 'Le nouveau désinstalleur ne doit dépendre d aucun script PowerShell externe.'
           }
 
           function ConvertTo-SebAscii {
@@ -190,17 +189,7 @@ jobs:
 
           $uninstallProcess = Start-Process -FilePath $uninstaller -ArgumentList '/S' -Wait -PassThru
           if ($uninstallProcess.ExitCode -ne 0) {
-            Write-Host "Première passe via le désinstalleur autonome : code $($uninstallProcess.ExitCode)."
-            Write-Host 'Lancement immédiat d une seconde passe directe du script de nettoyage pour diagnostic...'
-            & powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $cleanupScript
-            $secondPassCode = $LASTEXITCODE
-            Write-Host "Seconde passe directe : code $secondPassCode."
-            if (Test-Path -LiteralPath $diagnosticPath) {
-              Write-Host '--- Diagnostic désinstallation SEB EvalPro ---'
-              Get-Content -LiteralPath $diagnosticPath | ForEach-Object { Write-Host $_ }
-              Write-Host '--- Fin diagnostic ---'
-            }
-            throw "Le désinstalleur autonome a échoué avec le code $($uninstallProcess.ExitCode); seconde passe directe = $secondPassCode."
+            throw "Le nouveau désinstalleur autonome a échoué avec le code $($uninstallProcess.ExitCode)."
           }
 
           Start-Sleep -Seconds 2
@@ -212,7 +201,7 @@ jobs:
 
           foreach ($path in $existingInstallRoots) {
             if (Test-Path -LiteralPath $path) {
-              throw "Dossier d’installation encore présent après désinstallation : $path"
+              throw "Dossier d installation encore présent après désinstallation : $path"
             }
           }
 
@@ -226,6 +215,7 @@ jobs:
             throw 'Le fichier témoin dans Documents\SEB EvalPro\Bilans a été supprimé à tort.'
           }
 
+          Write-Host 'Nouveau désinstalleur NSIS pur : OK'
           Write-Host 'Test réel installation -> désinstallation : OK'
           Write-Host 'Encodage UTF-8/accents NSIS : OK'
           Write-Host 'Bilans/Documents conservés : OK'

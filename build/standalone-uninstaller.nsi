@@ -15,7 +15,9 @@ VIProductVersion "0.1.0.0"
 VIAddVersionKey /LANG=1036 "ProductName" "SEB-éval-PRO - Désinstallation"
 VIAddVersionKey /LANG=1036 "FileDescription" "Désinstallation complète de SEB-éval-PRO"
 VIAddVersionKey /LANG=1036 "ProductVersion" "${APP_VERSION}"
+VIAddVersionKey /LANG=1036 "FileVersion" "${APP_VERSION}"
 VIAddVersionKey /LANG=1036 "CompanyName" "Sauvegarde 56"
+VIAddVersionKey /LANG=1036 "LegalCopyright" "Sauvegarde 56"
 
 !define MUI_ABORTWARNING
 !insertmacro MUI_PAGE_WELCOME
@@ -27,69 +29,241 @@ Function .onInit
   IfSilent silent_mode
   MessageBox MB_ICONQUESTION|MB_YESNO "Cette opération va désinstaller SEB-éval-PRO, supprimer les anciens raccourcis et nettoyer les données techniques/cache de l'application.$\r$\n$\r$\nLes bilans et documents exportés dans Documents seront conservés.$\r$\n$\r$\nContinuer ?" IDYES confirmed
   Abort
-
 confirmed:
   Return
-
 silent_mode:
 FunctionEnd
 
-Section "Désinstallation complète"
-  SetOutPath "$PLUGINSDIR"
-  File /oname=seb-eval-pro-cleanup.ps1 "..\scripts\uninstall-clean.ps1"
-
-  DetailPrint "Recherche des anciennes installations SEB EvalPro / SEB-éval-PRO..."
-  nsExec::ExecToLog 'powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\seb-eval-pro-cleanup.ps1"'
+Function StopSebProcesses
+  nsExec::ExecToLog 'taskkill.exe /F /IM "SEB-éval-PRO.exe"'
   Pop $0
+  nsExec::ExecToLog 'taskkill.exe /F /IM "SEB-eval-PRO.exe"'
+  Pop $0
+  nsExec::ExecToLog 'taskkill.exe /F /IM "SEB EvalPro.exe"'
+  Pop $0
+  nsExec::ExecToLog 'taskkill.exe /F /IM "seb-evalpro.exe"'
+  Pop $0
+  Sleep 500
+FunctionEnd
 
-  Delete "$PLUGINSDIR\seb-eval-pro-cleanup.ps1"
+Function CleanupHKCU
+  StrCpy $0 0
+loop_hkcu:
+  EnumRegKey $1 HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall" $0
+  StrCmp $1 "" done_hkcu
+  ReadRegStr $2 HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\$1" "DisplayName"
+  StrCpy $3 $2 12
+  StrCmp $3 "SEB-éval-PRO" match_hkcu
+  StrCmp $3 "SEB-eval-PRO" match_hkcu
+  StrCpy $3 $2 11
+  StrCmp $3 "SEB EvalPro" match_hkcu
+  StrCmp $3 "seb-evalpro" match_hkcu
+  IntOp $0 $0 + 1
+  Goto loop_hkcu
 
-  ${If} $0 != 0
-    SetErrorLevel 2
+match_hkcu:
+  ReadRegStr $4 HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\$1" "InstallLocation"
+  ReadRegStr $5 HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\$1" "QuietUninstallString"
+  StrCmp $5 "" no_quiet_hkcu
+  DetailPrint "Désinstallation enregistrée : $2"
+  ExecWait '$5' $6
+  Goto remove_hkcu
 
-    ClearErrors
-    FileOpen $1 "$TEMP\seb-evalpro-uninstall-leftovers.txt" r
-    IfErrors diagnostic_done
-    FileRead $1 $2
-    FileRead $1 $2
-    FileClose $1
-    DetailPrint "$2"
+no_quiet_hkcu:
+  ReadRegStr $5 HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\$1" "UninstallString"
+  StrCmp $5 "" remove_hkcu
+  DetailPrint "Désinstallation enregistrée : $2"
+  ExecWait '$5 /S' $6
 
-    StrCpy $3 $2 12
-    StrCmp $3 " - Registry:" diagnostic_registry
-    StrCpy $3 $2 11
-    StrCmp $3 " - Install:" diagnostic_install
-    StrCpy $3 $2 8
-    StrCmp $3 " - Data:" diagnostic_data
-    StrCpy $3 $2 12
-    StrCmp $3 " - Shortcut:" diagnostic_shortcut
-    StrCpy $3 $2 11
-    StrCmp $3 " - Process:" diagnostic_process
-    Goto diagnostic_done
+remove_hkcu:
+  Sleep 800
+  StrCmp $4 "" +2
+  RMDir /r "$4"
+  DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\$1"
+  Goto loop_hkcu
 
-diagnostic_registry:
-    SetErrorLevel 21
-    Goto diagnostic_done
+done_hkcu:
+FunctionEnd
 
-diagnostic_install:
-    SetErrorLevel 22
-    Goto diagnostic_done
+Function CleanupHKLM64
+  SetRegView 64
+  StrCpy $0 0
+loop_hklm64:
+  EnumRegKey $1 HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall" $0
+  StrCmp $1 "" done_hklm64
+  ReadRegStr $2 HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\$1" "DisplayName"
+  StrCpy $3 $2 12
+  StrCmp $3 "SEB-éval-PRO" match_hklm64
+  StrCmp $3 "SEB-eval-PRO" match_hklm64
+  StrCpy $3 $2 11
+  StrCmp $3 "SEB EvalPro" match_hklm64
+  StrCmp $3 "seb-evalpro" match_hklm64
+  IntOp $0 $0 + 1
+  Goto loop_hklm64
 
-diagnostic_data:
-    SetErrorLevel 23
-    Goto diagnostic_done
+match_hklm64:
+  ReadRegStr $4 HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\$1" "InstallLocation"
+  ReadRegStr $5 HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\$1" "QuietUninstallString"
+  StrCmp $5 "" no_quiet_hklm64
+  DetailPrint "Désinstallation enregistrée : $2"
+  ExecWait '$5' $6
+  Goto remove_hklm64
 
-diagnostic_shortcut:
-    SetErrorLevel 24
-    Goto diagnostic_done
+no_quiet_hklm64:
+  ReadRegStr $5 HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\$1" "UninstallString"
+  StrCmp $5 "" remove_hklm64
+  DetailPrint "Désinstallation enregistrée : $2"
+  ExecWait '$5 /S' $6
 
-diagnostic_process:
-    SetErrorLevel 25
+remove_hklm64:
+  Sleep 800
+  StrCmp $4 "" +2
+  RMDir /r "$4"
+  DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\$1"
+  Goto loop_hklm64
 
-diagnostic_done:
-    IfSilent +2
-    MessageBox MB_ICONEXCLAMATION|MB_OK "Le nettoyage s'est terminé avec le code $0. Vérifiez qu'aucune instance de SEB-éval-PRO n'est encore ouverte."
-  ${Else}
-    DetailPrint "Désinstallation complète terminée."
-  ${EndIf}
+done_hklm64:
+FunctionEnd
+
+Function CleanupHKLM32
+  SetRegView 32
+  StrCpy $0 0
+loop_hklm32:
+  EnumRegKey $1 HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall" $0
+  StrCmp $1 "" done_hklm32
+  ReadRegStr $2 HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\$1" "DisplayName"
+  StrCpy $3 $2 12
+  StrCmp $3 "SEB-éval-PRO" match_hklm32
+  StrCmp $3 "SEB-eval-PRO" match_hklm32
+  StrCpy $3 $2 11
+  StrCmp $3 "SEB EvalPro" match_hklm32
+  StrCmp $3 "seb-evalpro" match_hklm32
+  IntOp $0 $0 + 1
+  Goto loop_hklm32
+
+match_hklm32:
+  ReadRegStr $4 HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\$1" "InstallLocation"
+  ReadRegStr $5 HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\$1" "QuietUninstallString"
+  StrCmp $5 "" no_quiet_hklm32
+  DetailPrint "Désinstallation enregistrée : $2"
+  ExecWait '$5' $6
+  Goto remove_hklm32
+
+no_quiet_hklm32:
+  ReadRegStr $5 HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\$1" "UninstallString"
+  StrCmp $5 "" remove_hklm32
+  DetailPrint "Désinstallation enregistrée : $2"
+  ExecWait '$5 /S' $6
+
+remove_hklm32:
+  Sleep 800
+  StrCmp $4 "" +2
+  RMDir /r "$4"
+  DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\$1"
+  Goto loop_hklm32
+
+done_hklm32:
+  SetRegView 64
+FunctionEnd
+
+Function CleanupKnownFolders
+  SetShellVarContext current
+
+  RMDir /r "$LOCALAPPDATA\Programs\SEB-éval-PRO"
+  RMDir /r "$LOCALAPPDATA\Programs\SEB-eval-PRO"
+  RMDir /r "$LOCALAPPDATA\Programs\SEB EvalPro"
+  RMDir /r "$LOCALAPPDATA\Programs\seb-evalpro"
+
+  RMDir /r "$APPDATA\SEB-éval-PRO"
+  RMDir /r "$APPDATA\SEB-eval-PRO"
+  RMDir /r "$APPDATA\SEB EvalPro"
+  RMDir /r "$APPDATA\seb-evalpro"
+  RMDir /r "$LOCALAPPDATA\SEB-éval-PRO"
+  RMDir /r "$LOCALAPPDATA\SEB-eval-PRO"
+  RMDir /r "$LOCALAPPDATA\SEB EvalPro"
+  RMDir /r "$LOCALAPPDATA\seb-evalpro"
+
+  Delete "$DESKTOP\SEB-éval-PRO.lnk"
+  Delete "$DESKTOP\SEB-eval-PRO.lnk"
+  Delete "$DESKTOP\SEB EvalPro.lnk"
+  Delete "$DESKTOP\seb-evalpro.lnk"
+  Delete "$SMPROGRAMS\SEB-éval-PRO.lnk"
+  Delete "$SMPROGRAMS\SEB-eval-PRO.lnk"
+  Delete "$SMPROGRAMS\SEB EvalPro.lnk"
+  Delete "$SMPROGRAMS\seb-evalpro.lnk"
+  RMDir /r "$SMPROGRAMS\SEB-éval-PRO"
+  RMDir /r "$SMPROGRAMS\SEB-eval-PRO"
+  RMDir /r "$SMPROGRAMS\SEB EvalPro"
+  RMDir /r "$SMPROGRAMS\seb-evalpro"
+
+  RMDir /r "$PROGRAMFILES64\SEB-éval-PRO"
+  RMDir /r "$PROGRAMFILES64\SEB-eval-PRO"
+  RMDir /r "$PROGRAMFILES64\SEB EvalPro"
+  RMDir /r "$PROGRAMFILES64\seb-evalpro"
+  RMDir /r "$PROGRAMFILES32\SEB-éval-PRO"
+  RMDir /r "$PROGRAMFILES32\SEB-eval-PRO"
+  RMDir /r "$PROGRAMFILES32\SEB EvalPro"
+  RMDir /r "$PROGRAMFILES32\seb-evalpro"
+
+  SetShellVarContext all
+  Delete "$DESKTOP\SEB-éval-PRO.lnk"
+  Delete "$DESKTOP\SEB-eval-PRO.lnk"
+  Delete "$DESKTOP\SEB EvalPro.lnk"
+  Delete "$DESKTOP\seb-evalpro.lnk"
+  Delete "$SMPROGRAMS\SEB-éval-PRO.lnk"
+  Delete "$SMPROGRAMS\SEB-eval-PRO.lnk"
+  Delete "$SMPROGRAMS\SEB EvalPro.lnk"
+  Delete "$SMPROGRAMS\seb-evalpro.lnk"
+  RMDir /r "$SMPROGRAMS\SEB-éval-PRO"
+  RMDir /r "$SMPROGRAMS\SEB-eval-PRO"
+  RMDir /r "$SMPROGRAMS\SEB EvalPro"
+  RMDir /r "$SMPROGRAMS\seb-evalpro"
+
+  SetShellVarContext current
+FunctionEnd
+
+Function VerifyCleanup
+  StrCpy $7 0
+  IfFileExists "$LOCALAPPDATA\Programs\SEB-éval-PRO" fail_cleanup
+  IfFileExists "$LOCALAPPDATA\Programs\SEB-eval-PRO" fail_cleanup
+  IfFileExists "$LOCALAPPDATA\Programs\SEB EvalPro" fail_cleanup
+  IfFileExists "$LOCALAPPDATA\Programs\seb-evalpro" fail_cleanup
+  IfFileExists "$APPDATA\SEB-éval-PRO" fail_cleanup
+  IfFileExists "$APPDATA\SEB-eval-PRO" fail_cleanup
+  IfFileExists "$APPDATA\SEB EvalPro" fail_cleanup
+  IfFileExists "$APPDATA\seb-evalpro" fail_cleanup
+  IfFileExists "$LOCALAPPDATA\SEB-éval-PRO" fail_cleanup
+  IfFileExists "$LOCALAPPDATA\SEB-eval-PRO" fail_cleanup
+  IfFileExists "$LOCALAPPDATA\SEB EvalPro" fail_cleanup
+  IfFileExists "$LOCALAPPDATA\seb-evalpro" fail_cleanup
+  Return
+fail_cleanup:
+  StrCpy $7 1
+FunctionEnd
+
+Section "Désinstallation complète"
+  DetailPrint "Arrêt de SEB-éval-PRO..."
+  Call StopSebProcesses
+
+  DetailPrint "Suppression des installations enregistrées..."
+  Call CleanupHKCU
+  Call CleanupHKLM64
+  Call CleanupHKLM32
+
+  DetailPrint "Suppression des dossiers techniques, caches et raccourcis..."
+  Call CleanupKnownFolders
+  Sleep 1000
+  Call CleanupKnownFolders
+
+  Call VerifyCleanup
+  StrCmp $7 0 cleanup_ok
+  SetErrorLevel 2
+  IfSilent cleanup_done
+  MessageBox MB_ICONEXCLAMATION|MB_OK "La désinstallation n'a pas pu supprimer toutes les données techniques. Fermez SEB-éval-PRO puis relancez le désinstalleur."
+  Goto cleanup_done
+
+cleanup_ok:
+  SetErrorLevel 0
+  DetailPrint "SEB-éval-PRO a été désinstallé. Les bilans et documents exportés ont été conservés."
+cleanup_done:
 SectionEnd
