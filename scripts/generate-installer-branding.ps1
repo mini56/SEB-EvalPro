@@ -74,7 +74,7 @@ foreach ($size in $iconSizes) {
 
 # Contrôle bloquant : toutes les tailles Windows prévues doivent être réellement
 # présentes dans le .ico final. Cela évite de réintroduire une icône non standard.
-$icoInfo = (& magick identify -format '%wx%h`n' $appIconIco) -join "`n"
+$icoInfo = (& magick identify -format "%wx%h`n" $appIconIco) -join "`n"
 foreach ($size in $iconSizes) {
   if ($icoInfo -notmatch "(?m)^${size}x${size}$") {
     throw "SEB-éval-PRO : la trame ${size}x${size} manque dans app-icon.ico."
