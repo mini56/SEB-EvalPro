@@ -40,65 +40,60 @@ $brandingSvg = Join-Path $buildDir '_installer-branding.svg'
 $brandingBmp = Join-Path $buildDir 'installerBranding.bmp'
 $headerSvg = Join-Path $buildDir '_installer-header.svg'
 $headerBmp = Join-Path $buildDir 'installerHeader.bmp'
-$appIconPng = Join-Path $buildDir '_app-icon-256.png'
+$appIconMaster = Join-Path $buildDir '_app-icon-master.png'
 $appIconIco = Join-Path $buildDir 'app-icon.ico'
 
-# Icône Windows : conserver les petites trames d'origine et ajouter une trame 256x256
-# afin que le bureau/la barre des tâches restent nets tout en satisfaisant electron-builder.
-$framePattern = Join-Path $buildDir '_icon-frame-%02d.png'
-& magick $sourceIcon $framePattern
-$frames = Get-ChildItem -Path $buildDir -Filter '_icon-frame-*.png' | Sort-Object Name
+# Icône Windows : toutes les tailles sont désormais régénérées depuis une seule
+# trame normalisée, sans marge transparente excessive. Cela évite l'icône minuscule
+# en affichage Bureau « Icônes moyennes » tout en conservant le dessin d'origine.
 $largestIconFrame = "${sourceIcon}[4]"
-& magick $largestIconFrame -resize 'x244' -gravity center -background none -extent '256x256' $appIconPng
-$iconArgs = @()
-foreach ($frame in $frames) { $iconArgs += $frame.FullName }
-$iconArgs += $appIconPng
-$iconArgs += $appIconIco
-& magick @iconArgs
+& magick $largestIconFrame -alpha on -trim +repage -resize '232x232>' -gravity center -background none -extent '256x256' $appIconMaster
+& magick $appIconMaster -define 'icon:auto-resize=256,128,96,64,48,40,32,24,20,16' $appIconIco
 
-# Le visuel plein écran de l'assistant reprend le modèle validé : logo Sauvegarde 56,
-# SEB-éval-PRO avec le A institutionnel orange exact, version Calibri Light bleue,
-# fond blanc et formes bleu clair.
+# Visuel dédié à la zone réelle de la page NSIS : 450x228 pixels.
+# On garde la composition validée (logo, SEB-éval-PRO, version, slogans et vagues),
+# mais tout est repositionné pour qu'aucun élément ne soit rogné dans l'assistant.
 $branding = @"
-<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="628" viewBox="0 0 1000 628">
-  <rect x="0" y="0" width="1000" height="628" fill="#ffffff"/>
-  <path d="M0 150 C150 180 230 330 330 470 C410 570 520 620 630 628 L0 628 Z" fill="#edf6ff"/>
-  <path d="M0 455 C155 475 255 545 360 628 L0 628 Z" fill="#cfe8ff"/>
-  <path d="M0 525 C135 540 205 582 278 628 L0 628 Z" fill="#9fd0f5"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="456" viewBox="0 0 900 456">
+  <rect x="0" y="0" width="900" height="456" fill="#ffffff"/>
+
+  <path d="M0 150 C125 170 205 270 285 365 C335 420 405 450 485 456 L0 456 Z" fill="#edf6ff"/>
+  <path d="M0 338 C120 350 205 392 300 456 L0 456 Z" fill="#cfe8ff"/>
+  <path d="M0 400 C105 409 165 430 222 456 L0 456 Z" fill="#9fd0f5"/>
 
   <g opacity="0.58" fill="#79baf0">
-    <circle cx="84" cy="382" r="24"/>
-    <circle cx="42" cy="408" r="17"/>
-    <circle cx="126" cy="408" r="17"/>
-    <path d="M49 455 C51 421 64 404 84 404 C104 404 117 421 119 455 Z"/>
-    <path d="M12 452 C13 429 24 419 40 419 C55 419 63 433 64 457 Z"/>
-    <path d="M105 457 C106 433 113 419 128 419 C144 419 154 429 156 452 Z"/>
+    <circle cx="73" cy="329" r="20"/>
+    <circle cx="39" cy="349" r="14"/>
+    <circle cx="107" cy="349" r="14"/>
+    <path d="M43 389 C45 360 56 346 73 346 C90 346 101 360 103 389 Z"/>
+    <path d="M15 387 C16 368 25 359 38 359 C51 359 58 371 59 391 Z"/>
+    <path d="M88 391 C89 371 95 359 108 359 C121 359 130 368 132 387 Z"/>
   </g>
 
-  <svg x="278" y="33" width="444" height="113" viewBox="0 0 257.1 65.5">
+  <svg x="262" y="18" width="376" height="96" viewBox="0 0 257.1 65.5">
     $logoInner
   </svg>
 
-  <text x="182" y="332" font-family="Calibri, Arial, sans-serif" font-size="82" font-weight="700" fill="#0873bd">SEB-év</text>
-  <svg x="506" y="256" width="84" height="84" viewBox="19 0 20 20">
+  <text x="205" y="268" font-family="Calibri, Arial, sans-serif" font-size="68" font-weight="700" fill="#0873bd">SEB-év</text>
+  <svg x="438" y="209" width="66" height="66" viewBox="19 0 20 20">
     <path fill="#F9B233" d="$aPath"/>
   </svg>
-  <text x="586" y="332" font-family="Calibri, Arial, sans-serif" font-size="82" font-weight="700" fill="#0873bd">l-PRO</text>
+  <text x="500" y="268" font-family="Calibri, Arial, sans-serif" font-size="68" font-weight="700" fill="#0873bd">l-PRO</text>
 
-  <text x="500" y="388" text-anchor="middle" font-family="Calibri Light, Calibri, Arial, sans-serif" font-size="34" font-weight="300" fill="#0873bd">Version $version</text>
+  <text x="450" y="318" text-anchor="middle" font-family="Calibri Light, Calibri, Arial, sans-serif" font-size="27" font-weight="300" fill="#0873bd">Version $version</text>
 
-  <text x="500" y="470" text-anchor="middle" font-family="Calibri Light, Calibri, Arial, sans-serif" font-size="27" font-weight="300" letter-spacing="4" fill="#79baf0">Évaluer aujourd’hui,</text>
-  <text x="500" y="510" text-anchor="middle" font-family="Calibri Light, Calibri, Arial, sans-serif" font-size="27" font-weight="300" letter-spacing="4" fill="#79baf0">construire demain</text>
-  <rect x="456" y="535" width="88" height="3" rx="2" fill="#79baf0"/>
+  <text x="450" y="374" text-anchor="middle" font-family="Calibri Light, Calibri, Arial, sans-serif" font-size="21" font-weight="300" letter-spacing="3" fill="#79baf0">Évaluer aujourd’hui,</text>
+  <text x="450" y="405" text-anchor="middle" font-family="Calibri Light, Calibri, Arial, sans-serif" font-size="21" font-weight="300" letter-spacing="3" fill="#79baf0">construire demain</text>
+  <rect x="413" y="423" width="74" height="3" rx="2" fill="#79baf0"/>
 
-  <text x="927" y="520" text-anchor="middle" font-family="Calibri Light, Calibri, Arial, sans-serif" font-size="17" font-style="italic" letter-spacing="1.2" fill="#79baf0">Des parcours</text>
-  <text x="927" y="544" text-anchor="middle" font-family="Calibri Light, Calibri, Arial, sans-serif" font-size="17" font-style="italic" letter-spacing="1.2" fill="#79baf0">pour des</text>
-  <text x="927" y="568" text-anchor="middle" font-family="Calibri Light, Calibri, Arial, sans-serif" font-size="17" font-style="italic" letter-spacing="1.2" fill="#79baf0">réussites durables</text>
-  <rect x="884" y="584" width="86" height="2" fill="#79baf0"/>
+  <text x="817" y="370" text-anchor="middle" font-family="Calibri Light, Calibri, Arial, sans-serif" font-size="14" font-style="italic" letter-spacing="0.8" fill="#79baf0">Des parcours</text>
+  <text x="817" y="390" text-anchor="middle" font-family="Calibri Light, Calibri, Arial, sans-serif" font-size="14" font-style="italic" letter-spacing="0.8" fill="#79baf0">pour des</text>
+  <text x="817" y="410" text-anchor="middle" font-family="Calibri Light, Calibri, Arial, sans-serif" font-size="14" font-style="italic" letter-spacing="0.8" fill="#79baf0">réussites durables</text>
+  <rect x="782" y="425" width="70" height="2" fill="#79baf0"/>
 </svg>
 "@
 Set-Content -Path $brandingSvg -Value $branding -Encoding UTF8
-& magick $brandingSvg -background white -alpha remove -alpha off -resize '500x314!' -type TrueColor "BMP3:$brandingBmp"
+& magick $brandingSvg -background white -alpha remove -alpha off -resize '450x228!' -type TrueColor "BMP3:$brandingBmp"
 
 $header = @"
 <svg xmlns="http://www.w3.org/2000/svg" width="150" height="57" viewBox="0 0 150 57">
@@ -111,7 +106,6 @@ $header = @"
 Set-Content -Path $headerSvg -Value $header -Encoding UTF8
 & magick $headerSvg -background white -alpha remove -alpha off -type TrueColor "BMP3:$headerBmp"
 
-Remove-Item -Force -ErrorAction SilentlyContinue $brandingSvg, $headerSvg, $appIconPng
-foreach ($frame in $frames) { Remove-Item -Force -ErrorAction SilentlyContinue $frame.FullName }
+Remove-Item -Force -ErrorAction SilentlyContinue $brandingSvg, $headerSvg, $appIconMaster
 
-Write-Host "SEB-éval-PRO : visuel plein écran NSIS généré avec le A institutionnel exact et la version $version."
+Write-Host "SEB-éval-PRO : icône multi-tailles normalisée et visuel NSIS 450x228 générés pour la version $version."
