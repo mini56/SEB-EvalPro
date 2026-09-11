@@ -27,6 +27,24 @@ jobs:
         run: ./scripts/generate-installer-branding.ps1
       - name: Build Windows installer
         run: npm run dist:win
+      - name: Build standalone Windows uninstaller
+        shell: pwsh
+        run: |
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $nsisCache = Join-Path $env:LOCALAPPDATA 'electron-builder\Cache\nsis'
+          $makensis = Get-ChildItem -Path $nsisCache -Filter makensis.exe -Recurse -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+          if (-not $makensis) {
+            throw 'makensis.exe introuvable dans le cache electron-builder.'
+          }
+          & $makensis.FullName "/DAPP_VERSION=$version" 'build\standalone-uninstaller.nsi'
+          if ($LASTEXITCODE -ne 0) {
+            throw "Compilation du désinstallateur autonome échouée (code $LASTEXITCODE)."
+          }
+          $uninstaller = "dist\SEB-eval-PRO-$version-Windows-Desinstallation.exe"
+          if (-not (Test-Path $uninstaller)) {
+            throw "Désinstallateur autonome absent : $uninstaller"
+          }
+          Write-Host "Désinstallateur autonome généré : $uninstaller"
       - uses: actions/upload-artifact@v4
         with:
           name: SEB-eval-PRO-Windows
