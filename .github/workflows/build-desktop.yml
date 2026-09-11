@@ -79,7 +79,7 @@ jobs:
           $nsiPath = (Resolve-Path 'build\standalone-uninstaller.nsi').Path
           $nsiBytes = [System.IO.File]::ReadAllBytes($nsiPath)
           if ($nsiBytes.Length -lt 3 -or $nsiBytes[0] -ne 0xEF -or $nsiBytes[1] -ne 0xBB -or $nsiBytes[2] -ne 0xBF) {
-            throw 'Le fichier NSIS du désinstalleur n’est pas en UTF-8 avec BOM.'
+            throw "Le fichier NSIS du désinstalleur n'est pas en UTF-8 avec BOM."
           }
           $nsiText = [System.IO.File]::ReadAllText($nsiPath, [System.Text.Encoding]::UTF8)
           $expectedNsiStrings = @(
