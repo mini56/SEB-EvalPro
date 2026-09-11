@@ -6,10 +6,13 @@
   "author": "Sauvegarde 56",
   "license": "UNLICENSED",
   "scripts": {
-    "prepare:web": "node scripts/prepare-web.js && node scripts/checkpoint-patch.js && node scripts/full-new-evaluation-reset.js && node scripts/audit-corrections.js && node scripts/bilan-export-fixes.js && node scripts/brique-autoeval-fix.js && node scripts/candidate-results-lock.js && node scripts/visual-branding.js && node scripts/qcm-ui-fixes.js",
+    "prepare:web": "node scripts/prepare-web.js && node scripts/checkpoint-patch.js && node scripts/full-new-evaluation-reset.js && node scripts/audit-corrections.js && node scripts/bilan-export-fixes.js && node scripts/brique-autoeval-fix.js && node scripts/candidate-results-lock.js && node scripts/visual-branding.js && node scripts/qcm-ui-fixes.js && node scripts/nwtexte-quill-fix.js",
     "start": "npm run prepare:web && electron .",
     "dist:win": "npm run prepare:web && electron-builder --win --publish never",
     "dist:linux": "npm run prepare:web && electron-builder --linux AppImage --publish never"
+  },
+  "dependencies": {
+    "quill": "2.0.3"
   },
   "devDependencies": {
     "electron": "44.3.0",
