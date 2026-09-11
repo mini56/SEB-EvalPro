@@ -46,6 +46,47 @@ Section "Désinstallation complète"
 
   ${If} $0 != 0
     SetErrorLevel 2
+
+    ClearErrors
+    FileOpen $1 "$TEMP\seb-evalpro-uninstall-leftovers.txt" r
+    IfErrors diagnostic_done
+    FileRead $1 $2
+    FileRead $1 $2
+    FileClose $1
+    DetailPrint "$2"
+
+    StrCpy $3 $2 12
+    StrCmp $3 " - Registry:" diagnostic_registry
+    StrCpy $3 $2 11
+    StrCmp $3 " - Install:" diagnostic_install
+    StrCpy $3 $2 8
+    StrCmp $3 " - Data:" diagnostic_data
+    StrCpy $3 $2 12
+    StrCmp $3 " - Shortcut:" diagnostic_shortcut
+    StrCpy $3 $2 11
+    StrCmp $3 " - Process:" diagnostic_process
+    Goto diagnostic_done
+
+diagnostic_registry:
+    SetErrorLevel 21
+    Goto diagnostic_done
+
+diagnostic_install:
+    SetErrorLevel 22
+    Goto diagnostic_done
+
+diagnostic_data:
+    SetErrorLevel 23
+    Goto diagnostic_done
+
+diagnostic_shortcut:
+    SetErrorLevel 24
+    Goto diagnostic_done
+
+diagnostic_process:
+    SetErrorLevel 25
+
+diagnostic_done:
     IfSilent +2
     MessageBox MB_ICONEXCLAMATION|MB_OK "Le nettoyage s'est terminé avec le code $0. Vérifiez qu'aucune instance de SEB-éval-PRO n'est encore ouverte."
   ${Else}
