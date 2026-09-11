@@ -1,95 +1,207 @@
 $ErrorActionPreference = 'SilentlyContinue'
 
-# Nettoyage complet de SEB EvalPro / SEB-éval-PRO.
-# Les documents utilisateur (notamment Documents\SEB EvalPro\Bilans) sont conservés.
+# Complete cleanup for SEB EvalPro / SEB-eval-PRO.
+# User documents, especially Documents\SEB EvalPro\Bilans, are never removed.
 
-$names = @('SEB-éval-PRO', 'SEB EvalPro', 'seb-evalpro')
+$eAcute = [char]0x00E9
+$accentedName = "SEB-$($eAcute)val-PRO"
+$names = @($accentedName, 'SEB EvalPro', 'SEB-eval-PRO', 'seb-evalpro') | Select-Object -Unique
 
-# Fermer les processus de l'application s'ils tournent encore.
-Get-Process | Where-Object {
-    $_.ProcessName -in @('SEB-éval-PRO', 'SEB EvalPro', 'seb-evalpro')
-} | Stop-Process -Force
+function ConvertTo-SebAscii {
+    param([string]$Value)
 
-# Rechercher toutes les anciennes installations enregistrées par Windows.
+    if ([string]::IsNullOrWhiteSpace($Value)) {
+        return ''
+    }
+
+    $normalized = $Value.Trim().ToLowerInvariant()
+    $normalized = $normalized.Replace([string]$eAcute, 'e')
+    $normalized = $normalized -replace '[\s_]+', '-'
+    return $normalized
+}
+
+function Test-SebEvalName {
+    param([string]$Value)
+
+    $normalized = ConvertTo-SebAscii $Value
+    if (-not $normalized) {
+        return $false
+    }
+
+    $normalized = $normalized -replace '-?\d+(?:\.\d+){1,3}(?:-.*)?$', ''
+    return $normalized -in @('seb-eval-pro', 'seb-evalpro')
+}
+
+function Test-SebEvalRegistryEntry {
+    param($Entry)
+
+    if (Test-SebEvalName $Entry.DisplayName) {
+        return $true
+    }
+
+    foreach ($candidate in @($Entry.InstallLocation, $Entry.UninstallString, $Entry.QuietUninstallString)) {
+        $normalized = ConvertTo-SebAscii $candidate
+        if ($normalized -match 'seb-eval-?pro') {
+            return $true
+        }
+    }
+
+    return $false
+}
+
+function Split-UninstallCommand {
+    param([string]$Command)
+
+    if ([string]::IsNullOrWhiteSpace($Command)) {
+        return $null
+    }
+
+    $expanded = [Environment]::ExpandEnvironmentVariables($Command.Trim())
+    if ($expanded -match '^\s*"([^"]+)"\s*(.*)$') {
+        return [pscustomobject]@{
+            Exe  = $matches[1]
+            Args = $matches[2]
+        }
+    }
+
+    if ($expanded -match '^\s*(.+?\.exe)\s*(.*)$') {
+        return [pscustomobject]@{
+            Exe  = $matches[1].Trim()
+            Args = $matches[2]
+        }
+    }
+
+    return $null
+}
+
+function Remove-PathWithRetry {
+    param([string]$Path)
+
+    if ([string]::IsNullOrWhiteSpace($Path)) {
+        return
+    }
+
+    for ($attempt = 0; $attempt -lt 12; $attempt++) {
+        if (-not (Test-Path -LiteralPath $Path)) {
+            return
+        }
+
+        Remove-Item -LiteralPath $Path -Recurse -Force -ErrorAction SilentlyContinue
+        Start-Sleep -Milliseconds 250
+    }
+}
+
 $registryPatterns = @(
     'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*',
     'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*',
     'HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*'
 )
 
-$registeredApps = @()
-foreach ($pattern in $registryPatterns) {
-    $registeredApps += Get-ItemProperty $pattern | Where-Object {
-        $_.DisplayName -and ($names -contains $_.DisplayName)
+function Get-SebEvalRegistryEntries {
+    $entries = @()
+    foreach ($pattern in $registryPatterns) {
+        $entries += @(Get-ItemProperty $pattern -ErrorAction SilentlyContinue | Where-Object {
+            Test-SebEvalRegistryEntry $_
+        })
     }
+    return @($entries)
 }
 
+# Stop the application if it is still running.
+Get-Process -ErrorAction SilentlyContinue | Where-Object {
+    Test-SebEvalName $_.ProcessName
+} | Stop-Process -Force -ErrorAction SilentlyContinue
+
+Start-Sleep -Milliseconds 500
+
+# Find every registered installation and run its own uninstaller silently first.
+$registeredApps = @(Get-SebEvalRegistryEntries)
 $installLocations = New-Object System.Collections.Generic.List[string]
+$executedUninstallers = @{}
+
 foreach ($entry in $registeredApps) {
     if ($entry.InstallLocation) {
         $installLocations.Add([Environment]::ExpandEnvironmentVariables($entry.InstallLocation.Trim('"')))
     }
 
     $command = $entry.QuietUninstallString
-    if (-not $command) { $command = $entry.UninstallString }
-    if (-not $command) { continue }
-
-    $exe = $null
-    $args = ''
-    if ($command -match '^\s*"([^"]+)"\s*(.*)$') {
-        $exe = $matches[1]
-        $args = $matches[2]
-    } elseif ($command -match '^\s*([^\s]+\.exe)\s*(.*)$') {
-        $exe = $matches[1]
-        $args = $matches[2]
+    if (-not $command) {
+        $command = $entry.UninstallString
     }
 
-    if ($exe -and (Test-Path -LiteralPath $exe)) {
-        if ($args -notmatch '(^|\s)/S($|\s)') { $args = ($args + ' /S').Trim() }
-        Start-Process -FilePath $exe -ArgumentList $args -Wait -WindowStyle Hidden
+    $parsed = Split-UninstallCommand $command
+    if (-not $parsed) {
+        continue
+    }
+
+    $exe = $parsed.Exe
+    $args = $parsed.Args
+
+    if ($exe) {
+        $parent = Split-Path -Parent $exe
+        if ($parent) {
+            $installLocations.Add($parent)
+        }
+    }
+
+    if (-not $exe -or -not (Test-Path -LiteralPath $exe)) {
+        continue
+    }
+
+    $uninstallerKey = $exe.ToLowerInvariant()
+    if ($executedUninstallers.ContainsKey($uninstallerKey)) {
+        continue
+    }
+    $executedUninstallers[$uninstallerKey] = $true
+
+    if ($args -notmatch '(^|\s)/S($|\s)') {
+        $args = ($args + ' /S').Trim()
+    }
+
+    $process = Start-Process -FilePath $exe -ArgumentList $args -Wait -PassThru -WindowStyle Hidden
+    if ($process -and $process.ExitCode -ne 0) {
+        Write-Output "Registered uninstaller returned code $($process.ExitCode): $exe"
     }
 }
 
-Start-Sleep -Milliseconds 700
+Start-Sleep -Milliseconds 1000
 
-# Supprimer les dossiers d'installation trouvés dans le registre.
-foreach ($location in ($installLocations | Select-Object -Unique)) {
-    if ($location -and (Test-Path -LiteralPath $location)) {
-        Remove-Item -LiteralPath $location -Recurse -Force
-    }
-}
-
-# Supprimer également les emplacements par défaut utilisés au fil des builds.
+# Known install locations used by current and older builds.
 $defaultInstallRoots = @(
-    (Join-Path $env:LOCALAPPDATA 'Programs\SEB-éval-PRO'),
+    (Join-Path $env:LOCALAPPDATA "Programs\$accentedName"),
     (Join-Path $env:LOCALAPPDATA 'Programs\SEB EvalPro'),
+    (Join-Path $env:LOCALAPPDATA 'Programs\SEB-eval-PRO'),
     (Join-Path $env:LOCALAPPDATA 'Programs\seb-evalpro'),
-    (Join-Path $env:ProgramFiles 'SEB-éval-PRO'),
-    (Join-Path $env:ProgramFiles 'SEB EvalPro')
+    (Join-Path $env:ProgramFiles $accentedName),
+    (Join-Path $env:ProgramFiles 'SEB EvalPro'),
+    (Join-Path $env:ProgramFiles 'SEB-eval-PRO'),
+    (Join-Path $env:ProgramFiles 'seb-evalpro')
 )
+
 if (${env:ProgramFiles(x86)}) {
-    $defaultInstallRoots += (Join-Path ${env:ProgramFiles(x86)} 'SEB-éval-PRO')
+    $defaultInstallRoots += (Join-Path ${env:ProgramFiles(x86)} $accentedName)
     $defaultInstallRoots += (Join-Path ${env:ProgramFiles(x86)} 'SEB EvalPro')
-}
-foreach ($path in $defaultInstallRoots) {
-    if ($path -and (Test-Path -LiteralPath $path)) {
-        Remove-Item -LiteralPath $path -Recurse -Force
-    }
+    $defaultInstallRoots += (Join-Path ${env:ProgramFiles(x86)} 'SEB-eval-PRO')
+    $defaultInstallRoots += (Join-Path ${env:ProgramFiles(x86)} 'seb-evalpro')
 }
 
-# Nettoyer les données/cache Electron des anciennes et nouvelles appellations.
+$allInstallRoots = @($installLocations) + $defaultInstallRoots
+foreach ($path in ($allInstallRoots | Where-Object { $_ } | Select-Object -Unique)) {
+    Remove-PathWithRetry $path
+}
+
+# Remove Electron userData/cache for every known product name.
 $dataRoots = @()
 foreach ($name in $names) {
     $dataRoots += (Join-Path $env:APPDATA $name)
     $dataRoots += (Join-Path $env:LOCALAPPDATA $name)
 }
+
 foreach ($path in ($dataRoots | Select-Object -Unique)) {
-    if (Test-Path -LiteralPath $path) {
-        Remove-Item -LiteralPath $path -Recurse -Force
-    }
+    Remove-PathWithRetry $path
 }
 
-# Retirer tous les raccourcis connus, y compris ceux laissés par d'anciens builds.
+# Remove desktop and Start Menu shortcuts from current-user and all-user locations.
 $shortcutRoots = @(
     [Environment]::GetFolderPath('Desktop'),
     [Environment]::GetFolderPath('CommonDesktopDirectory'),
@@ -98,25 +210,60 @@ $shortcutRoots = @(
 ) | Where-Object { $_ -and (Test-Path -LiteralPath $_) }
 
 foreach ($root in $shortcutRoots) {
-    Get-ChildItem -LiteralPath $root -Filter '*.lnk' -Recurse -Force | Where-Object {
-        $_.BaseName -in @('SEB-éval-PRO', 'SEB EvalPro', 'seb-evalpro')
-    } | Remove-Item -Force
+    Get-ChildItem -LiteralPath $root -Filter '*.lnk' -Recurse -Force -ErrorAction SilentlyContinue | Where-Object {
+        Test-SebEvalName $_.BaseName
+    } | Remove-Item -Force -ErrorAction SilentlyContinue
 }
 
-# Supprimer les entrées Désinstaller encore présentes après le nettoyage.
-foreach ($pattern in $registryPatterns) {
-    Get-ItemProperty $pattern | Where-Object {
-        $_.DisplayName -and ($names -contains $_.DisplayName)
-    } | ForEach-Object {
-        Remove-Item -LiteralPath $_.PSPath -Recurse -Force
-    }
+# Remove stale Add/Remove Programs entries after the physical cleanup.
+foreach ($entry in @(Get-SebEvalRegistryEntries)) {
+    Remove-Item -LiteralPath $entry.PSPath -Recurse -Force -ErrorAction SilentlyContinue
 }
 
-# Demander à Windows de rafraîchir ses icônes/raccourcis sans supprimer le cache global.
+# Ask Windows to refresh shortcut/icon display.
 $ie4uinit = Join-Path $env:SystemRoot 'System32\ie4uinit.exe'
 if (Test-Path -LiteralPath $ie4uinit) {
     Start-Process -FilePath $ie4uinit -ArgumentList '-show' -Wait -WindowStyle Hidden
 }
 
-Write-Output 'SEB-éval-PRO a été désinstallé et les anciennes données techniques ont été nettoyées.'
+# Final verification: return a failure code if technical traces still remain.
+$leftovers = New-Object System.Collections.Generic.List[string]
+
+foreach ($entry in @(Get-SebEvalRegistryEntries)) {
+    $leftovers.Add("Registry: $($entry.PSPath)")
+}
+
+foreach ($path in ($allInstallRoots | Where-Object { $_ } | Select-Object -Unique)) {
+    if (Test-Path -LiteralPath $path) {
+        $leftovers.Add("Install: $path")
+    }
+}
+
+foreach ($path in ($dataRoots | Select-Object -Unique)) {
+    if (Test-Path -LiteralPath $path) {
+        $leftovers.Add("Data: $path")
+    }
+}
+
+foreach ($root in $shortcutRoots) {
+    Get-ChildItem -LiteralPath $root -Filter '*.lnk' -Recurse -Force -ErrorAction SilentlyContinue | Where-Object {
+        Test-SebEvalName $_.BaseName
+    } | ForEach-Object {
+        $leftovers.Add("Shortcut: $($_.FullName)")
+    }
+}
+
+Get-Process -ErrorAction SilentlyContinue | Where-Object {
+    Test-SebEvalName $_.ProcessName
+} | ForEach-Object {
+    $leftovers.Add("Process: $($_.ProcessName)")
+}
+
+if ($leftovers.Count -gt 0) {
+    Write-Output 'SEB EvalPro cleanup incomplete:'
+    $leftovers | Select-Object -Unique | ForEach-Object { Write-Output " - $_" }
+    exit 2
+}
+
+Write-Output "$accentedName was uninstalled and its technical data were cleaned."
 exit 0

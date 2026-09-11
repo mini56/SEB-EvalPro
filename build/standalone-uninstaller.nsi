@@ -24,8 +24,14 @@ VIAddVersionKey /LANG=1036 "CompanyName" "Sauvegarde 56"
 !insertmacro MUI_LANGUAGE "French"
 
 Function .onInit
-  MessageBox MB_ICONQUESTION|MB_YESNO "Cette opération va désinstaller SEB-éval-PRO, supprimer les anciens raccourcis et nettoyer les données techniques/cache de l'application.$\r$\n$\r$\nLes bilans et documents exportés dans Documents seront conservés.$\r$\n$\r$\nContinuer ?" IDYES +2
+  IfSilent silent_mode
+  MessageBox MB_ICONQUESTION|MB_YESNO "Cette opération va désinstaller SEB-éval-PRO, supprimer les anciens raccourcis et nettoyer les données techniques/cache de l'application.$\r$\n$\r$\nLes bilans et documents exportés dans Documents seront conservés.$\r$\n$\r$\nContinuer ?" IDYES confirmed
   Abort
+
+confirmed:
+  Return
+
+silent_mode:
 FunctionEnd
 
 Section "Désinstallation complète"
@@ -33,12 +39,14 @@ Section "Désinstallation complète"
   File /oname=seb-eval-pro-cleanup.ps1 "..\scripts\uninstall-clean.ps1"
 
   DetailPrint "Recherche des anciennes installations SEB EvalPro / SEB-éval-PRO..."
-  nsExec::ExecToLog 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$PLUGINSDIR\seb-eval-pro-cleanup.ps1"'
+  nsExec::ExecToLog 'powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\seb-eval-pro-cleanup.ps1"'
   Pop $0
 
   Delete "$PLUGINSDIR\seb-eval-pro-cleanup.ps1"
 
   ${If} $0 != 0
+    SetErrorLevel 2
+    IfSilent +2
     MessageBox MB_ICONEXCLAMATION|MB_OK "Le nettoyage s'est terminé avec le code $0. Vérifiez qu'aucune instance de SEB-éval-PRO n'est encore ouverte."
   ${Else}
     DetailPrint "Désinstallation complète terminée."

@@ -25,6 +25,19 @@ jobs:
       - name: Generate installer branding
         shell: pwsh
         run: ./scripts/generate-installer-branding.ps1
+      - name: Normalize Windows script encodings
+        shell: pwsh
+        run: |
+          $utf8Bom = New-Object System.Text.UTF8Encoding($true)
+          foreach ($relativePath in @(
+            'build\installer.nsh',
+            'build\standalone-uninstaller.nsi',
+            'scripts\uninstall-clean.ps1'
+          )) {
+            $path = (Resolve-Path $relativePath).Path
+            $text = [System.IO.File]::ReadAllText($path)
+            [System.IO.File]::WriteAllText($path, $text, $utf8Bom)
+          }
       - name: Build Windows installer
         run: npm run dist:win
       - name: Build standalone Windows uninstaller
@@ -52,6 +65,149 @@ jobs:
             throw "Désinstallateur autonome absent : $uninstaller"
           }
           Write-Host "Désinstallateur autonome généré : $uninstaller"
+      - name: Test real Windows install and uninstall
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $setup = (Resolve-Path "dist\SEB-eval-PRO-$version-Windows-Setup.exe").Path
+          $uninstaller = (Resolve-Path "dist\SEB-eval-PRO-$version-Windows-Desinstallation.exe").Path
+          $eAcute = [char]0x00E9
+          $accentedName = "SEB-$($eAcute)val-PRO"
+
+          $expectedProductName = "$accentedName - D$($eAcute)sinstallation"
+          $expectedFileDescription = "D$($eAcute)sinstallation compl$($eAcute)te de $accentedName"
+          $versionInfo = (Get-Item $uninstaller).VersionInfo
+          if ($versionInfo.ProductName -ne $expectedProductName) {
+            throw "Encodage invalide du ProductName : '$($versionInfo.ProductName)'"
+          }
+          if ($versionInfo.FileDescription -ne $expectedFileDescription) {
+            throw "Encodage invalide de la FileDescription : '$($versionInfo.FileDescription)'"
+          }
+
+          function ConvertTo-SebAscii {
+            param([string]$Value)
+            if ([string]::IsNullOrWhiteSpace($Value)) {
+              return ''
+            }
+            $normalized = $Value.Trim().ToLowerInvariant()
+            $normalized = $normalized.Replace([string]$eAcute, 'e')
+            $normalized = $normalized -replace '[\s_]+', '-'
+            return $normalized
+          }
+
+          function Test-SebEvalRegistryEntry {
+            param($Entry)
+            $displayName = ConvertTo-SebAscii $Entry.DisplayName
+            $displayName = $displayName -replace '-?\d+(?:\.\d+){1,3}(?:-.*)?$', ''
+            if ($displayName -in @('seb-eval-pro', 'seb-evalpro')) {
+              return $true
+            }
+            foreach ($candidate in @($Entry.InstallLocation, $Entry.UninstallString, $Entry.QuietUninstallString)) {
+              if ((ConvertTo-SebAscii $candidate) -match 'seb-eval-?pro') {
+                return $true
+              }
+            }
+            return $false
+          }
+
+          $registryPatterns = @(
+            'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*',
+            'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*',
+            'HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*'
+          )
+
+          function Get-SebEvalRegistryEntries {
+            $entries = @()
+            foreach ($pattern in $registryPatterns) {
+              $entries += @(Get-ItemProperty $pattern -ErrorAction SilentlyContinue | Where-Object {
+                Test-SebEvalRegistryEntry $_
+              })
+            }
+            return @($entries)
+          }
+
+          $documents = [Environment]::GetFolderPath('MyDocuments')
+          $preservedFile = Join-Path $documents 'SEB EvalPro\Bilans\ci-preserve-after-uninstall.txt'
+          New-Item -ItemType Directory -Force -Path (Split-Path -Parent $preservedFile) | Out-Null
+          Set-Content -LiteralPath $preservedFile -Value 'must survive uninstall' -Encoding ascii
+
+          $setupProcess = Start-Process -FilePath $setup -ArgumentList '/S' -Wait -PassThru
+          if ($setupProcess.ExitCode -ne 0) {
+            throw "Le Setup silencieux a échoué avec le code $($setupProcess.ExitCode)."
+          }
+
+          Start-Sleep -Seconds 2
+          $installedEntries = @(Get-SebEvalRegistryEntries)
+          if ($installedEntries.Count -eq 0) {
+            throw 'Le Setup a terminé sans créer une installation SEB EvalPro détectable dans le registre.'
+          }
+
+          $trackedInstallRoots = New-Object System.Collections.Generic.List[string]
+          foreach ($entry in $installedEntries) {
+            if ($entry.InstallLocation) {
+              $trackedInstallRoots.Add([Environment]::ExpandEnvironmentVariables($entry.InstallLocation.Trim('"')))
+            }
+
+            $command = $entry.QuietUninstallString
+            if (-not $command) {
+              $command = $entry.UninstallString
+            }
+            if ($command -match '^\s*"([^"]+)"') {
+              $trackedInstallRoots.Add((Split-Path -Parent $matches[1]))
+            } elseif ($command -match '^\s*(.+?\.exe)') {
+              $trackedInstallRoots.Add((Split-Path -Parent $matches[1].Trim()))
+            }
+          }
+
+          $existingInstallRoots = @($trackedInstallRoots | Where-Object {
+            $_ -and (Test-Path -LiteralPath $_)
+          } | Select-Object -Unique)
+
+          if ($existingInstallRoots.Count -eq 0) {
+            throw 'Le Setup est enregistré mais aucun dossier d’installation réel n’a été trouvé.'
+          }
+
+          $cacheProbePaths = @(
+            (Join-Path $env:APPDATA $accentedName),
+            (Join-Path $env:LOCALAPPDATA $accentedName)
+          )
+          foreach ($path in $cacheProbePaths) {
+            New-Item -ItemType Directory -Force -Path $path | Out-Null
+            Set-Content -LiteralPath (Join-Path $path 'ci-cleanup-probe.txt') -Value 'remove me' -Encoding ascii
+          }
+
+          $uninstallProcess = Start-Process -FilePath $uninstaller -ArgumentList '/S' -Wait -PassThru
+          if ($uninstallProcess.ExitCode -ne 0) {
+            throw "Le désinstalleur autonome a échoué avec le code $($uninstallProcess.ExitCode)."
+          }
+
+          Start-Sleep -Seconds 2
+
+          $remainingEntries = @(Get-SebEvalRegistryEntries)
+          if ($remainingEntries.Count -ne 0) {
+            throw "Entrées de désinstallation encore présentes : $($remainingEntries.Count)"
+          }
+
+          foreach ($path in $existingInstallRoots) {
+            if (Test-Path -LiteralPath $path) {
+              throw "Dossier d’installation encore présent après désinstallation : $path"
+            }
+          }
+
+          foreach ($path in $cacheProbePaths) {
+            if (Test-Path -LiteralPath $path) {
+              throw "Données/cache encore présents après désinstallation : $path"
+            }
+          }
+
+          if (-not (Test-Path -LiteralPath $preservedFile)) {
+            throw 'Le fichier témoin dans Documents\SEB EvalPro\Bilans a été supprimé à tort.'
+          }
+
+          Write-Host 'Test réel installation -> désinstallation : OK'
+          Write-Host 'Accents du désinstalleur : OK'
+          Write-Host 'Bilans/Documents conservés : OK'
       - uses: actions/upload-artifact@v4
         with:
           name: SEB-eval-PRO-Windows
