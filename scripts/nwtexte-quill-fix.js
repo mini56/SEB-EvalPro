@@ -4,6 +4,7 @@ const path = require('path');
 const root = path.resolve(__dirname, '..');
 const webRoot = path.join(root, 'app', 'web');
 const nwtextePath = path.join(webRoot, 'nwtexte.html');
+const saveSimulationPath = path.join(webRoot, 'js', 'nwtexte-save-simulation.js');
 const quillDist = path.join(root, 'node_modules', 'quill', 'dist');
 const vendorDir = path.join(webRoot, 'vendor', 'quill');
 
@@ -13,8 +14,9 @@ function fail(message, code) {
 }
 
 if (!fs.existsSync(nwtextePath)) fail('nwtexte.html introuvable.', 2);
+if (!fs.existsSync(saveSimulationPath)) fail('simulation d’enregistrement nwtexte introuvable.', 3);
 for (const name of ['quill.js', 'quill.core.css']) {
-  if (!fs.existsSync(path.join(quillDist, name))) fail(`dépendance Quill manquante: ${name}`, 3);
+  if (!fs.existsSync(path.join(quillDist, name))) fail(`dépendance Quill manquante: ${name}`, 4);
 }
 
 fs.mkdirSync(vendorDir, { recursive: true });
@@ -37,15 +39,15 @@ html = html.replace(
 const legacyStart = html.indexOf("<script>\n(function () {\n  'use strict';");
 const nextSimpleMarker = '<script>\nfunction nextSimple(){';
 const legacyEnd = html.indexOf(nextSimpleMarker, legacyStart);
-if (legacyStart < 0 || legacyEnd < 0) fail('bloc moteur historique introuvable.', 4);
+if (legacyStart < 0 || legacyEnd < 0) fail('bloc moteur historique introuvable.', 5);
 
-const replacement = `<script src="vendor/quill/quill.js"></script>\n<script src="js/nwtexte-quill-engine.js"></script>\n\n`;
+const replacement = `<script src="vendor/quill/quill.js"></script>\n<script src="js/nwtexte-quill-engine.js"></script>\n<script src="js/nwtexte-save-simulation.js"></script>\n\n`;
 html = html.slice(0, legacyStart) + replacement + html.slice(legacyEnd);
 
 const afterButtons = (html.match(/<button\b/gi) || []).length;
 const afterSelects = (html.match(/<select\b/gi) || []).length;
 if (beforeButtons !== afterButtons || beforeSelects !== afterSelects) {
-  fail(`interface modifiée par erreur (boutons ${beforeButtons}->${afterButtons}, listes ${beforeSelects}->${afterSelects}).`, 5);
+  fail(`interface modifiée par erreur (boutons ${beforeButtons}->${afterButtons}, listes ${beforeSelects}->${afterSelects}).`, 6);
 }
 
 for (const required of [
@@ -53,10 +55,11 @@ for (const required of [
   'onchange="setFontSize(this.value)"',
   'onchange="changerInterligne(this.value)"',
   'onclick="nextSimple()"',
-  'js/nwtexte-quill-engine.js'
+  'js/nwtexte-quill-engine.js',
+  'js/nwtexte-save-simulation.js'
 ]) {
-  if (!html.includes(required)) fail(`contrôle de structure absent: ${required}`, 6);
+  if (!html.includes(required)) fail(`contrôle de structure absent: ${required}`, 7);
 }
 
 fs.writeFileSync(nwtextePath, html, 'utf8');
-console.log(`SEB EvalPro nwtexte: Quill 2 intégré sans changement de barre d'outils (${afterButtons} boutons, ${afterSelects} listes).`);
+console.log(`SEB EvalPro nwtexte: Quill 2 + simulation d’enregistrement intégrés sans changement de barre d'outils (${afterButtons} boutons, ${afterSelects} listes).`);
