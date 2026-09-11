@@ -9,6 +9,8 @@ on:
 jobs:
   build-windows:
     runs-on: windows-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -219,7 +221,31 @@ jobs:
           Write-Host 'Test réel installation -> désinstallation : OK'
           Write-Host 'Encodage UTF-8/accents NSIS : OK'
           Write-Host 'Bilans/Documents conservés : OK'
+      - name: Publish Windows executables to private GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $tag = "seb-evalpro-v$version-build-${{ github.run_number }}"
+          $setup = "dist\SEB-eval-PRO-$version-Windows-Setup.exe"
+          $uninstaller = "dist\SEB-eval-PRO-$version-Windows-Desinstallation.exe"
+          $title = "SEB EvalPro $version - Build #${{ github.run_number }}"
+          $notes = "Build Windows validé automatiquement : installation, désinstallation, accents UTF-8 et conservation des bilans/Documents testés. Dépôt privé : téléchargement réservé aux utilisateurs autorisés."
+
+          gh release view $tag --repo "${{ github.repository }}" *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag $setup $uninstaller --clobber --repo "${{ github.repository }}"
+          } else {
+            gh release create $tag $setup $uninstaller --target "${{ github.sha }}" --title $title --notes $notes --prerelease --repo "${{ github.repository }}"
+          }
+          if ($LASTEXITCODE -ne 0) {
+            throw "Publication de la Release privée échouée (code $LASTEXITCODE)."
+          }
+          Write-Host "Release privée publiée : $tag"
       - uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: SEB-eval-PRO-Windows
           path: dist/*
@@ -236,6 +262,7 @@ jobs:
       - name: Build Linux AppImage
         run: npm run dist:linux
       - uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: SEB-eval-PRO-Linux
           path: dist/*
