@@ -72,6 +72,7 @@ jobs:
           $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
           $setup = (Resolve-Path "dist\SEB-eval-PRO-$version-Windows-Setup.exe").Path
           $uninstaller = (Resolve-Path "dist\SEB-eval-PRO-$version-Windows-Desinstallation.exe").Path
+          $cleanupScript = (Resolve-Path 'scripts\uninstall-clean.ps1').Path
           $eAcute = [char]0x00E9
           $eGrave = [char]0x00E8
           $accentedName = "SEB-$($eAcute)val-PRO"
@@ -189,12 +190,17 @@ jobs:
 
           $uninstallProcess = Start-Process -FilePath $uninstaller -ArgumentList '/S' -Wait -PassThru
           if ($uninstallProcess.ExitCode -ne 0) {
+            Write-Host "Première passe via le désinstalleur autonome : code $($uninstallProcess.ExitCode)."
+            Write-Host 'Lancement immédiat d une seconde passe directe du script de nettoyage pour diagnostic...'
+            & powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $cleanupScript
+            $secondPassCode = $LASTEXITCODE
+            Write-Host "Seconde passe directe : code $secondPassCode."
             if (Test-Path -LiteralPath $diagnosticPath) {
               Write-Host '--- Diagnostic désinstallation SEB EvalPro ---'
               Get-Content -LiteralPath $diagnosticPath | ForEach-Object { Write-Host $_ }
               Write-Host '--- Fin diagnostic ---'
             }
-            throw "Le désinstalleur autonome a échoué avec le code $($uninstallProcess.ExitCode)."
+            throw "Le désinstalleur autonome a échoué avec le code $($uninstallProcess.ExitCode); seconde passe directe = $secondPassCode."
           }
 
           Start-Sleep -Seconds 2
