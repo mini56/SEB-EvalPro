@@ -106,10 +106,10 @@ $branding = @"
   </svg>
 
   <text x="205" y="268" font-family="Calibri, Arial, sans-serif" font-size="68" font-weight="700" fill="#0873bd">SEB-év</text>
-  <svg x="415" y="220" width="48" height="48" viewBox="19 0 20 20">
+  <svg x="397" y="220" width="48" height="48" viewBox="19 0 20 20">
     <path fill="#F9B233" d="$aPath"/>
   </svg>
-  <text x="458" y="268" font-family="Calibri, Arial, sans-serif" font-size="68" font-weight="700" fill="#0873bd">l-PRO</text>
+  <text x="436" y="268" font-family="Calibri, Arial, sans-serif" font-size="68" font-weight="700" fill="#0873bd">l-PRO</text>
 
   <text x="450" y="318" text-anchor="middle" font-family="Calibri Light, Calibri, Arial, sans-serif" font-size="27" font-weight="300" fill="#0873bd">Version $version</text>
 
