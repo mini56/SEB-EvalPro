@@ -2,6 +2,49 @@
 !include "LogicLib.nsh"
 !include "WinMessages.nsh"
 
+# Désinstallation propre pour les tests et les futures mises à jour.
+# On supprime l'installation, les raccourcis anciens/nouveaux et les données/cache
+# Electron de l'application. Les exports utilisateur dans Documents\SEB EvalPro
+# (notamment Bilans) ne sont volontairement jamais touchés.
+!macro customUnInstall
+  DetailPrint "Nettoyage des anciennes données SEB-éval-PRO..."
+
+  # Nettoyer les raccourcis du contexte d'installation courant.
+  Delete "$DESKTOP\SEB EvalPro.lnk"
+  Delete "$DESKTOP\SEB-éval-PRO.lnk"
+  Delete "$SMPROGRAMS\SEB EvalPro.lnk"
+  Delete "$SMPROGRAMS\SEB-éval-PRO.lnk"
+  RMDir "$SMPROGRAMS\SEB EvalPro"
+  RMDir "$SMPROGRAMS\SEB-éval-PRO"
+
+  # Electron conserve userData et les caches dans le profil de l'utilisateur.
+  # Plusieurs noms ont été utilisés au cours des builds : on les nettoie tous.
+  ${If} $installMode == "all"
+    SetShellVarContext current
+  ${EndIf}
+
+  Delete "$DESKTOP\SEB EvalPro.lnk"
+  Delete "$DESKTOP\SEB-éval-PRO.lnk"
+  Delete "$SMPROGRAMS\SEB EvalPro.lnk"
+  Delete "$SMPROGRAMS\SEB-éval-PRO.lnk"
+  RMDir /r "$APPDATA\seb-evalpro"
+  RMDir /r "$APPDATA\SEB EvalPro"
+  RMDir /r "$APPDATA\SEB-éval-PRO"
+  RMDir /r "$LOCALAPPDATA\seb-evalpro"
+  RMDir /r "$LOCALAPPDATA\SEB EvalPro"
+  RMDir /r "$LOCALAPPDATA\SEB-éval-PRO"
+
+  ${If} $installMode == "all"
+    SetShellVarContext all
+    Delete "$DESKTOP\SEB EvalPro.lnk"
+    Delete "$DESKTOP\SEB-éval-PRO.lnk"
+    Delete "$SMPROGRAMS\SEB EvalPro.lnk"
+    Delete "$SMPROGRAMS\SEB-éval-PRO.lnk"
+    RMDir "$SMPROGRAMS\SEB EvalPro"
+    RMDir "$SMPROGRAMS\SEB-éval-PRO"
+  ${EndIf}
+!macroend
+
 !ifndef BUILD_UNINSTALLER
 Var SebBrandingWelcomeDialog
 Var SebBrandingWelcomeImage
