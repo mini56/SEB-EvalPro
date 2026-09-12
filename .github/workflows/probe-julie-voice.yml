@@ -15,7 +15,8 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           Add-Type -AssemblyName System.Runtime.WindowsRuntime
-          $voices = [Windows.Media.SpeechSynthesis.SpeechSynthesizer]::AllVoices
+          $type = [Windows.Media.SpeechSynthesis.SpeechSynthesizer, Windows.Media.SpeechSynthesis, ContentType=WindowsRuntime]
+          $voices = $type::AllVoices
           Write-Host 'WINRT_VOICES_BEGIN'
           $voices | ForEach-Object { Write-Host ("VOICE|{0}|{1}|{2}" -f $_.DisplayName, $_.Language, $_.Id) }
           Write-Host 'WINRT_VOICES_END'
