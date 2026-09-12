@@ -1,0 +1,98 @@
+name: Generate Julie dictation audio
+
+on:
+  workflow_dispatch:
+
+jobs:
+  generate-julie:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate Microsoft Julie dictation recording
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $capability = Get-WindowsCapability -Online | Where-Object Name -eq 'Language.TextToSpeech~~~fr-FR~0.0.1.0'
+          if (-not $capability -or $capability.State -ne 'Installed') {
+            Write-Host 'Installation du composant Text-to-Speech fr-FR...'
+            Add-WindowsCapability -Online -Name 'Language.TextToSpeech~~~fr-FR~0.0.1.0' | Out-Host
+          }
+
+          Add-Type -AssemblyName System.Runtime.WindowsRuntime
+          $synth = New-Object Windows.Media.SpeechSynthesis.SpeechSynthesizer
+          $voices = [Windows.Media.SpeechSynthesis.SpeechSynthesizer]::AllVoices
+          Write-Host 'Voix disponibles:'
+          $voices | ForEach-Object { Write-Host (" - {0} | {1} | {2}" -f $_.DisplayName, $_.Language, $_.Id) }
+          $julie = $voices | Where-Object { $_.DisplayName -match 'Julie' -and $_.Language -match '^fr-FR' } | Select-Object -First 1
+          if (-not $julie) {
+            throw 'Microsoft Julie fr-FR introuvable sur le runner Windows.'
+          }
+          Write-Host ("Voix retenue: {0} ({1})" -f $julie.DisplayName, $julie.Language)
+          $synth.Voice = $julie
+
+          if ($synth.Options.PSObject.Properties.Name -contains 'SpeakingRate') {
+            $synth.Options.SpeakingRate = 0.80
+            Write-Host 'SpeakingRate WinRT fixé à 0.80.'
+          } else {
+            throw 'La propriété SpeakingRate WinRT est indisponible; génération refusée pour préserver la vitesse validée.'
+          }
+
+          $phrases = @(
+            "Ce matin, un client a téléphoné au service commercial de l'entreprise.",
+            "Il n'était pas content de sa dernière livraison de fournitures.",
+            "En effet, plusieurs cartons étaient endommagés à l'arrivée.",
+            "De plus, certains articles manquaient dans le colis.",
+            "Le client a demandé un remboursement rapide ou un nouvel envoi complet.",
+            "La secrétaire a noté sa réclamation avec précision.",
+            "Elle lui a promis une réponse avant la fin de la semaine.",
+            "Le responsable du magasin doit vérifier le stock disponible dès demain."
+          )
+          $escaped = $phrases | ForEach-Object { [System.Security.SecurityElement]::Escape($_) }
+          $body = [string]::Join('<break time="1000ms"/>', $escaped)
+          $ssml = '<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="fr-FR"><voice name="' + [System.Security.SecurityElement]::Escape($julie.Id) + '">' + $body + '</voice></speak>'
+
+          function Await-WinRT($AsyncOperation, $ResultType) {
+            $method = [System.WindowsRuntimeSystemExtensions].GetMethods() |
+              Where-Object { $_.Name -eq 'AsTask' -and $_.IsGenericMethod -and $_.GetParameters().Count -eq 1 } |
+              Select-Object -First 1
+            $task = $method.MakeGenericMethod($ResultType).Invoke($null, @($AsyncOperation))
+            $task.Wait()
+            return $task.Result
+          }
+
+          $stream = Await-WinRT ($synth.SynthesizeSsmlToStreamAsync($ssml)) ([Windows.Media.SpeechSynthesis.SpeechSynthesisStream])
+          $input = [System.IO.WindowsRuntimeStreamExtensions]::AsStreamForRead($stream)
+          New-Item -ItemType Directory -Force -Path source | Out-Null
+          $wavPath = Join-Path (Resolve-Path source) 'dictee-microsoft-julie-080-pause1s.wav'
+          $output = [System.IO.File]::Create($wavPath)
+          try { $input.CopyTo($output) } finally { $output.Dispose(); $input.Dispose(); $stream.Dispose(); $synth.Dispose() }
+
+          $sha = (Get-FileHash $wavPath -Algorithm SHA256).Hash.ToLowerInvariant()
+          $size = (Get-Item $wavPath).Length
+          Write-Host "WAV Julie généré: $size octets - SHA256 $sha"
+          if ($size -lt 10000) { throw 'Fichier audio Julie anormalement petit.' }
+
+          $bytes = [System.IO.File]::ReadAllBytes($wavPath)
+          $b64 = [Convert]::ToBase64String($bytes)
+          $chunkSize = 12000
+          $count = [Math]::Ceiling($b64.Length / $chunkSize)
+          for ($i = 0; $i -lt $count; $i++) {
+            $start = $i * $chunkSize
+            $len = [Math]::Min($chunkSize, $b64.Length - $start)
+            $chunk = $b64.Substring($start, $len)
+            $name = ('source/dictee-julie-{0:D3}.b64' -f $i)
+            [System.IO.File]::WriteAllText((Join-Path $PWD $name), $chunk, (New-Object System.Text.UTF8Encoding($false)))
+          }
+          [System.IO.File]::WriteAllText((Join-Path $PWD 'source/dictee-julie-manifest.txt'), "parts=$count`nbytes=$size`nsha256=$sha`nvoice=$($julie.DisplayName)`nrate=0.80`npause_ms=1000`n", (New-Object System.Text.UTF8Encoding($false)))
+          Remove-Item $wavPath
+
+      - name: Commit generated Julie recording transport
+        shell: pwsh
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add source/dictee-julie-*.b64 source/dictee-julie-manifest.txt
+          git commit -m 'Generate fixed Microsoft Julie dictation recording'
+          git push origin HEAD:desktop-foundation
