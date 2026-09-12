@@ -50,7 +50,12 @@ for (const name of audioParts) {
 const audioBase64 = audioParts.map(name => fs.readFileSync(path.join(webRoot, name), 'utf8').trim()).join('');
 const audioTarget = path.join(webRoot, 'dictee-reclamation-client.ogg');
 fs.writeFileSync(audioTarget, Buffer.from(audioBase64, 'base64'));
-audioParts.forEach(name => fs.unlinkSync(path.join(webRoot, name)));
+
+// Supprimer tous les fragments de transport du dossier final, y compris un éventuel
+// fragment historique inutilisé. L'application embarque uniquement le fichier OGG final.
+fs.readdirSync(webRoot)
+  .filter(name => /^dictee-audio-.*\.b64$/.test(name))
+  .forEach(name => fs.unlinkSync(path.join(webRoot, name)));
 
 const audioBytes = fs.readFileSync(audioTarget);
 const audioSha256 = crypto.createHash('sha256').update(audioBytes).digest('hex');
