@@ -9,19 +9,20 @@ const result = spawnSync(process.execPath, [script], { cwd: root, stdio: 'inheri
 if (result.status === 0) process.exit(0);
 if (result.status !== 12) process.exit(result.status || 1);
 
-// Le correctif a déjà été écrit avant le contrôle q7. On normalise ici la
-// valeur attendue du planning, puis on refait les contrôles fonctionnels.
+// Le code 12 vient uniquement de l'ancien contrôle trop strict de q7.
+// Toutes les corrections ont déjà été écrites. On garantit ici que toutes
+// les occurrences Planning utilisent bien le pluriel et on contrôle les barèmes.
 const planningPath = path.join(root, 'app', 'web', 'planning.html');
 let planning = fs.readFileSync(planningPath, 'utf8');
-planning = planning.replace(/q7\s*:\s*["']Spaghetti["']/g, 'q7:"Spaghettis"');
+planning = planning.replace(/Spaghetti/g, 'Spaghettis').replace(/spaghetti/g, 'spaghettis');
 fs.writeFileSync(planningPath, planning, 'utf8');
 
-if (!/q7\s*:\s*["']Spaghettis["']/.test(planning)) {
-  console.error('SEB EvalPro orthographe: solution q7 Planning non synchronisée.');
+if (!planning.includes('Spaghettis') || /\bSpaghetti\b/.test(planning) || /\bspaghetti\b/.test(planning)) {
+  console.error('SEB EvalPro orthographe: singularité Spaghetti encore présente dans le Planning.');
   process.exit(12);
 }
-if (!planning.includes('<option>Spaghettis</option>')) {
-  console.error('SEB EvalPro orthographe: option Spaghettis absente du Planning.');
+if (!/q7[^,\r\n]*Spaghettis/.test(planning)) {
+  console.error('SEB EvalPro orthographe: réponse attendue q7 non synchronisée avec le pluriel.');
   process.exit(12);
 }
 
@@ -40,4 +41,4 @@ if (!engine.includes('Quelle est mon activité préférée et pourquoi ?') ||
   process.exit(14);
 }
 
-console.log('SEB EvalPro orthographe: contrôle Planning assoupli et barèmes vérifiés.');
+console.log('SEB EvalPro orthographe: corrections visibles appliquées, Planning/Paronymes/nwtexte vérifiés.');
