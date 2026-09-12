@@ -15,11 +15,19 @@ function fail(message, code = 2) {
 const privacyDir = path.join(root, 'source', 'branding', 'privacy-screen');
 if (!fs.existsSync(privacyDir)) fail('dossier image confidentialité introuvable');
 
-const parts = fs.readdirSync(privacyDir)
-  .filter((name) => /^part\d+\.txt$/i.test(name))
-  .sort();
+const parts = [
+  'fix00a.txt',
+  'fix00b.txt',
+  'part01.txt',
+  'part02.txt',
+  'part03.txt',
+  'fix04a.txt',
+  'fix04b.txt'
+];
 
-if (parts.length !== 5) fail(`5 fragments image attendus, ${parts.length} trouvé(s)`, 3);
+for (const name of parts) {
+  if (!fs.existsSync(path.join(privacyDir, name))) fail(`fragment image manquant: ${name}`, 3);
+}
 
 const base64 = parts
   .map((name) => fs.readFileSync(path.join(privacyDir, name), 'utf8').replace(/\s+/g, ''))
