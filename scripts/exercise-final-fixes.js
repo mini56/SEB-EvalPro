@@ -25,6 +25,12 @@ function replaceOnce(text, search, replacement, label) {
   return text.replace(search, replacement);
 }
 
+function insertBeforeLast(text, marker, addition, label) {
+  const index = text.toLowerCase().lastIndexOf(marker.toLowerCase());
+  if (index < 0) fail(`point d'insertion introuvable pour ${label}`, 3);
+  return text.slice(0, index) + addition + text.slice(index);
+}
+
 // -----------------------------------------------------------------------------
 // Tri de chevilles : correction du texte demandé, sans modifier l'interface.
 // -----------------------------------------------------------------------------
@@ -43,6 +49,8 @@ function replaceOnce(text, search, replacement, label) {
 
 // -----------------------------------------------------------------------------
 // Brique : pas de remise à zéro ; code de validation masqué par gros points.
+// Le code doit être reconnu immédiatement. Le nombre d'erreurs reste obligatoire
+// avant l'enregistrement final.
 // -----------------------------------------------------------------------------
 {
   const { target, text } = read('app/web/brique.html');
@@ -69,10 +77,30 @@ function replaceOnce(text, search, replacement, label) {
     'masquage code Brique'
   );
 
+  if (!out.includes('id="seb-brique-secret-style"')) {
+    const secretStyle = `\n<style id="seb-brique-secret-style">\n#secretCode::placeholder {\n  font-size: 14px;\n  letter-spacing: 0;\n  line-height: normal;\n  color: #64748b;\n  opacity: 1;\n}\n</style>\n`;
+    out = replaceOnce(out, '</head>', secretStyle + '</head>', 'style placeholder Brique');
+  }
+
+  out = replaceOnce(
+    out,
+    `    function checkInputs() {\n      const errFilled = errInput.value.trim() !== "";\n      const codeValid = /^svg56$/i.test(codeInput.value.trim());\n      validBtn.disabled = !(errFilled && codeValid);\n      if (!codeValid && codeInput.value.trim().length >= 5) {\n        msgDiv.textContent = "Code incorrect !";\n      } else {\n        msgDiv.textContent = "";\n      }\n    }`,
+    `    function checkInputs() {\n      const rawCode = codeInput.value.trim();\n      const errFilled = errInput.value.trim() !== "";\n      const codeValid = rawCode.toLowerCase() === "svg56";\n\n      // Le mot de passe déverrouille immédiatement le bouton.\n      // Le nombre d'erreurs reste contrôlé au clic sur Valider.\n      validBtn.disabled = !codeValid;\n\n      if (!rawCode) {\n        msgDiv.textContent = "";\n      } else if (!codeValid && rawCode.length >= 5) {\n        msgDiv.textContent = "Code incorrect !";\n      } else if (codeValid && !errFilled) {\n        msgDiv.textContent = "Code correct — renseignez le nombre d’erreurs.";\n      } else if (codeValid) {\n        msgDiv.textContent = "Code correct.";\n      } else {\n        msgDiv.textContent = "";\n      }\n    }`,
+    'validation code Brique'
+  );
+
+  out = replaceOnce(
+    out,
+    `    validBtn.onclick = function () {\n  const datas = {`,
+    `    validBtn.onclick = function () {\n  if (codeInput.value.trim().toLowerCase() !== "svg56") {\n    msgDiv.textContent = "Code incorrect !";\n    codeInput.focus();\n    return;\n  }\n  if (errInput.value.trim() === "") {\n    msgDiv.textContent = "Renseignez le nombre d’erreurs avant de valider.";\n    errInput.focus();\n    return;\n  }\n  const datas = {`,
+    'contrôle final Brique'
+  );
+
   if (out.includes('id="resetBtn"') || out.includes('getElementById("resetBtn").onclick')) {
     fail('la remise à zéro Brique est encore active', 4);
   }
   if (!out.includes('type="password" id="secretCode"')) fail('le code Brique n’est pas masqué', 5);
+  if (!out.includes('Code correct — renseignez le nombre d’erreurs.')) fail('retour de validation du code Brique absent', 5);
 
   write(target, out);
 }
@@ -105,6 +133,9 @@ function replaceOnce(text, search, replacement, label) {
 // -----------------------------------------------------------------------------
 // Page 2 : supprimer les flèches/curseurs des champs numériques et bloquer les
 // variations accidentelles à la molette ou avec Flèche haut/bas.
+// IMPORTANT : injecter le script avant le DERNIER </body>. Le premier </body>
+// appartient au modèle HTML de l'export Word et provoquerait une fuite de code
+// JavaScript visible à l'écran.
 // -----------------------------------------------------------------------------
 {
   const { target, text } = read('app/web/qcmv1.0.html');
@@ -120,7 +151,13 @@ function replaceOnce(text, search, replacement, label) {
 
   if (!out.includes('id="seb-page2-safe-number-inputs"')) {
     const js = `\n<script id="seb-page2-safe-number-inputs">\ndocument.addEventListener('DOMContentLoaded', function () {\n  document.querySelectorAll('#page2 input[type="number"]').forEach(function (input) {\n    input.addEventListener('wheel', function (event) {\n      event.preventDefault();\n    }, { passive: false });\n    input.addEventListener('keydown', function (event) {\n      if (event.key === 'ArrowUp' || event.key === 'ArrowDown') event.preventDefault();\n    });\n  });\n});\n</script>\n`;
-    out = replaceOnce(out, '</body>', js + '</body>', 'protection saisie page 2');
+    out = insertBeforeLast(out, '</body>', js, 'protection saisie page 2');
+  }
+
+  const safeScriptPos = out.indexOf('id="seb-page2-safe-number-inputs"');
+  const exportMarkerPos = out.indexOf('NOM DE FICHIER PERSONNALISÉ');
+  if (safeScriptPos >= 0 && exportMarkerPos >= 0 && safeScriptPos < exportMarkerPos) {
+    fail('Page 2: le script de protection a été injecté dans le modèle Word', 10);
   }
 
   // Vérifie aussi que le résultat général utilise bien le total réel de l'exercice Paronymes.
@@ -129,4 +166,4 @@ function replaceOnce(text, search, replacement, label) {
   write(target, out);
 }
 
-console.log('SEB EvalPro exercices: tri corrigé, Brique sans remise à zéro + code masqué, Paronymes vérifié 20/20, page 2 sans curseurs numériques.');
+console.log('SEB EvalPro exercices: tri corrigé, Brique sans remise à zéro + code masqué/validé, Paronymes vérifié 20/20, page 2 sans curseurs numériques et sans fuite JavaScript.');
