@@ -1,0 +1,27 @@
+name: Probe Julie voice
+
+on:
+  push:
+    branches:
+      - tmp-julie-voice-probe
+
+jobs:
+  probe:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Probe WinRT voices
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Add-Type -AssemblyName System.Runtime.WindowsRuntime
+          $voices = [Windows.Media.SpeechSynthesis.SpeechSynthesizer]::AllVoices
+          Write-Host 'WINRT_VOICES_BEGIN'
+          $voices | ForEach-Object { Write-Host ("VOICE|{0}|{1}|{2}" -f $_.DisplayName, $_.Language, $_.Id) }
+          Write-Host 'WINRT_VOICES_END'
+          $julie = $voices | Where-Object { $_.DisplayName -match 'Julie' -and $_.Language -match '^fr-FR' } | Select-Object -First 1
+          if ($julie) {
+            Write-Host ("JULIE_FOUND|{0}|{1}|{2}" -f $julie.DisplayName, $julie.Language, $julie.Id)
+          } else {
+            Write-Host 'JULIE_NOT_FOUND'
+          }
