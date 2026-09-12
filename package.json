@@ -6,7 +6,7 @@
   "author": "Sauvegarde 56",
   "license": "UNLICENSED",
   "scripts": {
-    "prepare:web": "node scripts/prepare-web.js && node scripts/checkpoint-patch.js && node scripts/full-new-evaluation-reset.js && node scripts/audit-corrections.js && node scripts/bilan-export-fixes.js && node scripts/brique-autoeval-fix.js && node scripts/candidate-results-lock.js && node scripts/visual-branding.js && node scripts/qcm-ui-fixes.js && node scripts/nwtexte-quill-fix.js && node scripts/priority-fixes.js && node scripts/result-docx-style-fix.js && node scripts/exercise-final-fixes.js && node scripts/orthography-runner.js",
+    "prepare:web": "node scripts/prepare-web.js && node scripts/checkpoint-patch.js && node scripts/full-new-evaluation-reset.js && node scripts/audit-corrections.js && node scripts/bilan-export-fixes.js && node scripts/brique-autoeval-fix.js && node scripts/candidate-results-lock.js && node scripts/visual-branding.js && node scripts/qcm-ui-fixes.js && node scripts/nwtexte-quill-fix.js && node scripts/priority-fixes.js && node scripts/result-docx-style-fix.js && node scripts/exercise-final-fixes.js && node scripts/orthography-runner.js && node scripts/brique-result-first-line-fix.js",
     "start": "npm run prepare:web && electron .",
     "dist:win": "npm run prepare:web && electron-builder --win --publish never",
     "dist:linux": "npm run prepare:web && electron-builder --linux AppImage --publish never"
