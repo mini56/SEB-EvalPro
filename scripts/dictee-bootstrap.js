@@ -26,14 +26,24 @@ decodeGzipBase64File(htmlPayload, htmlTarget);
 fs.unlinkSync(htmlPayload);
 
 // Reconstituer exactement l'audio OGG Opus issu de l'enregistrement fourni.
-// Les fragments centraux sont volontairement plus petits afin de fiabiliser leur transport.
-const prefixParts = [0, 1, 2, 3].map(i => `dictee-audio-${String(i).padStart(2, '0')}.b64`);
-const middleParts = fs.readdirSync(webRoot)
-  .filter(name => /^dictee-audio-mid-\d{2}\.b64$/.test(name))
-  .sort();
-const suffixParts = ['dictee-audio-06.b64'];
-const audioParts = [...prefixParts, ...middleParts, ...suffixParts];
-if (middleParts.length !== 8) fail(`nombre de fragments audio centraux incorrect: ${middleParts.length}`);
+// L'ordre est explicite et les deux morceaux midfix remplacent le fragment central
+// volontairement scindé pour fiabiliser son transport via GitHub.
+const audioParts = [
+  'dictee-audio-00.b64',
+  'dictee-audio-01.b64',
+  'dictee-audio-02.b64',
+  'dictee-audio-03.b64',
+  'dictee-audio-mid-00.b64',
+  'dictee-audio-mid-01.b64',
+  'dictee-audio-mid-02.b64',
+  'dictee-audio-mid-03.b64',
+  'dictee-audio-midfix-00.b64',
+  'dictee-audio-midfix-01.b64',
+  'dictee-audio-mid-05.b64',
+  'dictee-audio-mid-06.b64',
+  'dictee-audio-mid-07.b64',
+  'dictee-audio-06.b64'
+];
 for (const name of audioParts) {
   if (!fs.existsSync(path.join(webRoot, name))) fail(`fragment audio introuvable: ${name}`);
 }
