@@ -131,11 +131,9 @@ function insertBeforeLast(text, marker, addition, label) {
 }
 
 // -----------------------------------------------------------------------------
-// Page 2 : supprimer les flèches/curseurs des champs numériques et bloquer les
-// variations accidentelles à la molette ou avec Flèche haut/bas.
-// IMPORTANT : injecter le script avant le DERNIER </body>. Le premier </body>
-// appartient au modèle HTML de l'export Word et provoquerait une fuite de code
-// JavaScript visible à l'écran.
+// Page 2 + résultat Brique : supprimer les flèches/curseurs des champs numériques,
+// bloquer les variations accidentelles, éviter la fuite JavaScript à l'écran et
+// supprimer le décalage avant les réponses cochées de l'autoévaluation Brique.
 // -----------------------------------------------------------------------------
 {
   const { target, text } = read('app/web/qcmv1.0.html');
@@ -154,10 +152,20 @@ function insertBeforeLast(text, marker, addition, label) {
     out = insertBeforeLast(out, '</body>', js, 'protection saisie page 2');
   }
 
+  out = replaceOnce(
+    out,
+    '<div style="margin:5px 0 5px 20px;">',
+    '<div style="margin:5px 0;">',
+    'alignement autoévaluation Brique dans les résultats'
+  );
+
   const safeScriptPos = out.indexOf('id="seb-page2-safe-number-inputs"');
   const exportMarkerPos = out.indexOf('NOM DE FICHIER PERSONNALISÉ');
   if (safeScriptPos >= 0 && exportMarkerPos >= 0 && safeScriptPos < exportMarkerPos) {
     fail('Page 2: le script de protection a été injecté dans le modèle Word', 10);
+  }
+  if (out.includes('margin:5px 0 5px 20px;')) {
+    fail('Résultat Brique: décalage des réponses autoévaluation encore présent', 11);
   }
 
   // Vérifie aussi que le résultat général utilise bien le total réel de l'exercice Paronymes.
@@ -166,4 +174,4 @@ function insertBeforeLast(text, marker, addition, label) {
   write(target, out);
 }
 
-console.log('SEB EvalPro exercices: tri corrigé, Brique sans remise à zéro + code masqué/validé, Paronymes vérifié 20/20, page 2 sans curseurs numériques et sans fuite JavaScript.');
+console.log('SEB EvalPro exercices: tri corrigé, Brique sans remise à zéro + code masqué/validé + résultat aligné, Paronymes vérifié 20/20, page 2 sans curseurs numériques et sans fuite JavaScript.');
