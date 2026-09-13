@@ -84,11 +84,12 @@ foreach ($size in $iconSizes) {
 
 # Adapter sans déformer l'écran d'accueil au format NSIS 450x228 puis ajouter
 # automatiquement le numéro du build courant en bas à droite.
-$fontPath = Join-Path $env:WINDIR 'Fonts\arial.ttf'
-if (-not (Test-Path $fontPath)) { throw 'SEB-éval-PRO : police Arial Windows introuvable pour le numéro de build.' }
+# Le numéro utilise la police Windows Segoe UI et le bleu institutionnel SEB.
+$fontPath = Join-Path $env:WINDIR 'Fonts\segoeui.ttf'
+if (-not (Test-Path $fontPath)) { throw 'SEB-éval-PRO : police Segoe UI Windows introuvable pour le numéro de build.' }
 $fontPathMagick = $fontPath -replace '\\','/'
 
-& magick $brandingSource -resize '450x228^' -gravity center -extent '450x228' -gravity southeast -font $fontPathMagick -pointsize 14 -fill white -stroke black -strokewidth 2 -annotate '+10+8' $buildLabel -stroke none -fill white -annotate '+10+8' $buildLabel -background white -alpha remove -alpha off -type TrueColor "BMP3:$brandingBmp"
+& magick $brandingSource -resize '450x228^' -gravity center -extent '450x228' -gravity southeast -font $fontPathMagick -pointsize 14 -fill '#1a73e8' -stroke white -strokewidth 1 -annotate '+10+8' $buildLabel -stroke none -fill '#1a73e8' -annotate '+10+8' $buildLabel -background white -alpha remove -alpha off -type TrueColor "BMP3:$brandingBmp"
 if ($LASTEXITCODE -ne 0 -or -not (Test-Path $brandingBmp)) { throw 'SEB-éval-PRO : génération de installerBranding.bmp échouée.' }
 $brandingGeometry = (& magick identify -format '%wx%h' $brandingBmp).Trim()
 if ($brandingGeometry -ne '450x228') { throw "SEB-éval-PRO : visuel Setup invalide ($brandingGeometry au lieu de 450x228)." }
@@ -107,4 +108,4 @@ Set-Content -Path $headerSvg -Value $header -Encoding UTF8
 Remove-Item -Force -ErrorAction SilentlyContinue $headerSvg, $appIconSourcePng, $brandingSource
 foreach ($frame in $iconFrames) { Remove-Item -Force -ErrorAction SilentlyContinue $frame }
 
-Write-Host "SEB-éval-PRO : écran d'accueil validé utilisé pour le Setup; $buildLabel ajouté en bas à droite."
+Write-Host "SEB-éval-PRO : écran d'accueil validé utilisé pour le Setup; $buildLabel ajouté en Segoe UI bleu en bas à droite."
