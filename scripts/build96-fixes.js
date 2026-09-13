@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 const root = path.resolve(__dirname, '..');
-const buildNumber = String(process.env.GITHUB_RUN_NUMBER || 'DEV');
+const buildNumber = String(process.env.SEB_BUILD_LABEL || process.env.GITHUB_RUN_NUMBER || 'DEV');
 
 function fail(message, code = 2) {
   console.error(`SEB EvalPro corrections #96: ${message}`);
@@ -56,7 +56,7 @@ function replaceOnce(text, search, replacement, label) {
 }
 
 // 3) Afficher le numéro du build dans la barre Administrateur.
-//    Le numéro vient directement de GitHub Actions (GITHUB_RUN_NUMBER).
+//    Le numéro vient de GitHub Actions ou d'un libellé explicite de test.
 {
   const { file, text } = read('src/preload.js');
   let out = text;
