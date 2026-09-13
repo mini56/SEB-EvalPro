@@ -12,6 +12,8 @@ env:
 jobs:
   build-windows-replay-test:
     runs-on: windows-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -27,7 +29,9 @@ jobs:
           }
       - name: Generate installer branding
         shell: pwsh
-        run: ./scripts/generate-installer-branding.ps1
+        run: |
+          $env:GITHUB_RUN_NUMBER = $env:SEB_BUILD_LABEL
+          ./scripts/generate-installer-branding.ps1
       - name: Normalize Windows NSIS encodings
         shell: pwsh
         run: |
@@ -46,10 +50,32 @@ jobs:
           if (-not (Test-Path 'src\replay-preload.js')) { throw 'replay-preload.js absent' }
           $preload = Get-Content 'src\preload.js' -Raw
           $main = Get-Content 'src\main.js' -Raw
-          if (-not $preload.Contains("replayPrototype.install();")) { throw 'Replay UI non branchée' }
-          if (-not $main.Contains("buildNumber: '134-REPLAY-TEST'")) { throw 'Build replay non figé dans les archives' }
+          if (-not $preload.Contains('replayPrototype.install();')) { throw 'Replay UI non branchée' }
+          if (-not $main.Contains('buildNumber: "134-REPLAY-TEST"')) { throw 'Build replay non figé dans les archives' }
           Write-Host 'Replay prototype wiring: OK'
+      - name: Publish replay test installer to private GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tag = 'seb-evalpro-replay-test-134'
+          $setup = 'dist\SEB-eval-PRO-0.1.0-Windows-Setup.exe'
+          if (-not (Test-Path $setup)) { throw 'Setup Windows replay absent' }
+          $hash = (Get-FileHash -Algorithm SHA256 $setup).Hash.ToLowerInvariant()
+          $notes = "Prototype isolé basé strictement sur le Build #134 validé.`n`nFonction testée : archivage du parcours à l'affichage de la page Résultats, sélection d'un parcours administrateur, replay type diaporama en lecture seule, Build d'origine affiché, aucun recalcul.`n`nSHA256 Setup : $hash"
+          gh release view $tag --repo "${{ github.repository }}" *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag $setup --clobber --repo "${{ github.repository }}"
+            gh release edit $tag --title 'SEB EvalPro Build #134 - REPLAY TEST' --notes $notes --prerelease --repo "${{ github.repository }}"
+          } else {
+            gh release create $tag $setup --target "${{ github.sha }}" --title 'SEB EvalPro Build #134 - REPLAY TEST' --notes $notes --prerelease --repo "${{ github.repository }}"
+          }
+          if ($LASTEXITCODE -ne 0) { throw 'Publication de la Release replay test échouée' }
+          Write-Host "Replay test publié : $tag"
+          Write-Host "SHA256 : $hash"
       - uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: SEB-EvalPro-134-REPLAY-TEST-Windows
           path: dist/SEB-eval-PRO-0.1.0-Windows-Setup.exe
@@ -66,6 +92,7 @@ jobs:
       - name: Build Linux replay prototype
         run: npm run dist:linux
       - uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: SEB-EvalPro-134-REPLAY-TEST-Linux
           path: dist/*.AppImage
