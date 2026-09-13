@@ -1,0 +1,71 @@
+name: Test candidate replay prototype
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - tmp-candidate-replay-test
+
+env:
+  SEB_BUILD_LABEL: 134-REPLAY-TEST
+
+jobs:
+  build-windows-replay-test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: npm install
+      - name: Ensure ImageMagick
+        shell: pwsh
+        run: |
+          if (-not (Get-Command magick -ErrorAction SilentlyContinue)) {
+            choco install imagemagick --no-progress -y
+          }
+      - name: Generate installer branding
+        shell: pwsh
+        run: ./scripts/generate-installer-branding.ps1
+      - name: Normalize Windows NSIS encodings
+        shell: pwsh
+        run: |
+          $utf8Bom = New-Object System.Text.UTF8Encoding($true)
+          foreach ($relativePath in @('build\installer.nsh','build\standalone-uninstaller.nsi')) {
+            $path = (Resolve-Path $relativePath).Path
+            $text = [System.IO.File]::ReadAllText($path)
+            [System.IO.File]::WriteAllText($path, $text, $utf8Bom)
+          }
+      - name: Build Windows replay prototype
+        run: npm run dist:win
+      - name: Verify replay modules packaged in source build
+        shell: pwsh
+        run: |
+          if (-not (Test-Path 'src\replay-main.js')) { throw 'replay-main.js absent' }
+          if (-not (Test-Path 'src\replay-preload.js')) { throw 'replay-preload.js absent' }
+          $preload = Get-Content 'src\preload.js' -Raw
+          $main = Get-Content 'src\main.js' -Raw
+          if (-not $preload.Contains("replayPrototype.install();")) { throw 'Replay UI non branchée' }
+          if (-not $main.Contains("buildNumber: '134-REPLAY-TEST'")) { throw 'Build replay non figé dans les archives' }
+          Write-Host 'Replay prototype wiring: OK'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SEB-EvalPro-134-REPLAY-TEST-Windows
+          path: dist/SEB-eval-PRO-0.1.0-Windows-Setup.exe
+
+  build-linux-replay-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: npm install
+      - name: Build Linux replay prototype
+        run: npm run dist:linux
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SEB-EvalPro-134-REPLAY-TEST-Linux
+          path: dist/*.AppImage
