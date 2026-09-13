@@ -5,6 +5,7 @@ const root = path.resolve(__dirname, '..');
 const webRoot = path.join(root, 'app', 'web');
 const nwtextePath = path.join(webRoot, 'nwtexte.html');
 const saveSimulationPath = path.join(webRoot, 'js', 'nwtexte-save-simulation.js');
+const closedDialogsPath = path.join(webRoot, 'js', 'nwtexte-closed-dialogs.js');
 const quillDist = path.join(root, 'node_modules', 'quill', 'dist');
 const vendorDir = path.join(webRoot, 'vendor', 'quill');
 
@@ -15,6 +16,7 @@ function fail(message, code) {
 
 if (!fs.existsSync(nwtextePath)) fail('nwtexte.html introuvable.', 2);
 if (!fs.existsSync(saveSimulationPath)) fail('simulation d’enregistrement nwtexte introuvable.', 3);
+if (!fs.existsSync(closedDialogsPath)) fail('fenêtres fictives Ouvrir/Image nwtexte introuvables.', 8);
 for (const name of ['quill.js', 'quill.core.css']) {
   if (!fs.existsSync(path.join(quillDist, name))) fail(`dépendance Quill manquante: ${name}`, 4);
 }
@@ -36,12 +38,22 @@ html = html.replace(
   '<div id="editor" spellcheck="true"></div>'
 );
 
+const realOpenControl = '<div><label style="cursor:pointer; display:block;">📂 Ouvrir<input type="file" id="openFile" accept=".txt,.html" style="display:none;" onchange="ouvrirFichier(this.files)"></label></div>';
+const fakeOpenControl = '<div onclick="ouvrirFichierFictif(); toggleMenu(false)">📂 Ouvrir</div>';
+if (!html.includes(realOpenControl)) fail('contrôle Ouvrir historique introuvable.', 9);
+html = html.replace(realOpenControl, fakeOpenControl);
+
+const realImageControl = '      <input type="file" accept="image/*" onchange="insererImage(this.files)" id="input-image" style="display:none;">\n      <button onclick="document.getElementById(\'input-image\').click()" title="Insérer une image">';
+const fakeImageControl = '      <button onclick="ouvrirImageFictive()" title="Insérer une image">';
+if (!html.includes(realImageControl)) fail('contrôle Image historique introuvable.', 10);
+html = html.replace(realImageControl, fakeImageControl);
+
 const legacyStart = html.indexOf("<script>\n(function () {\n  'use strict';");
 const nextSimpleMarker = '<script>\nfunction nextSimple(){';
 const legacyEnd = html.indexOf(nextSimpleMarker, legacyStart);
 if (legacyStart < 0 || legacyEnd < 0) fail('bloc moteur historique introuvable.', 5);
 
-const replacement = `<script src="vendor/quill/quill.js"></script>\n<script src="js/nwtexte-quill-engine.js"></script>\n<script src="js/nwtexte-save-simulation.js"></script>\n\n`;
+const replacement = `<script src="vendor/quill/quill.js"></script>\n<script src="js/nwtexte-quill-engine.js"></script>\n<script src="js/nwtexte-save-simulation.js"></script>\n<script src="js/nwtexte-closed-dialogs.js"></script>\n\n`;
 html = html.slice(0, legacyStart) + replacement + html.slice(legacyEnd);
 
 const afterButtons = (html.match(/<button\b/gi) || []).length;
@@ -55,11 +67,16 @@ for (const required of [
   'onchange="setFontSize(this.value)"',
   'onchange="changerInterligne(this.value)"',
   'onclick="nextSimple()"',
+  'onclick="ouvrirFichierFictif(); toggleMenu(false)"',
+  'onclick="ouvrirImageFictive()"',
   'js/nwtexte-quill-engine.js',
-  'js/nwtexte-save-simulation.js'
+  'js/nwtexte-save-simulation.js',
+  'js/nwtexte-closed-dialogs.js'
 ]) {
   if (!html.includes(required)) fail(`contrôle de structure absent: ${required}`, 7);
 }
 
+if (/type=["']file["']/i.test(html)) fail('un accès fichier Windows subsiste dans nwtexte.html.', 11);
+
 fs.writeFileSync(nwtextePath, html, 'utf8');
-console.log(`SEB EvalPro nwtexte: Quill 2 + simulation d’enregistrement intégrés sans changement de barre d'outils (${afterButtons} boutons, ${afterSelects} listes).`);
+console.log(`SEB EvalPro nwtexte: Quill 2 + simulations internes intégrés; aucun sélecteur de fichier Windows; interface conservée (${afterButtons} boutons, ${afterSelects} listes).`);
