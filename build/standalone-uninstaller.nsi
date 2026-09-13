@@ -224,19 +224,55 @@ FunctionEnd
 
 Function VerifyCleanup
   StrCpy $7 0
-  IfFileExists "$LOCALAPPDATA\Programs\SEB-éval-PRO" fail_cleanup
-  IfFileExists "$LOCALAPPDATA\Programs\SEB-eval-PRO" fail_cleanup
-  IfFileExists "$LOCALAPPDATA\Programs\SEB EvalPro" fail_cleanup
-  IfFileExists "$LOCALAPPDATA\Programs\seb-evalpro" fail_cleanup
-  IfFileExists "$APPDATA\SEB-éval-PRO" fail_cleanup
-  IfFileExists "$APPDATA\SEB-eval-PRO" fail_cleanup
-  IfFileExists "$APPDATA\SEB EvalPro" fail_cleanup
-  IfFileExists "$APPDATA\seb-evalpro" fail_cleanup
-  IfFileExists "$LOCALAPPDATA\SEB-éval-PRO" fail_cleanup
-  IfFileExists "$LOCALAPPDATA\SEB-eval-PRO" fail_cleanup
-  IfFileExists "$LOCALAPPDATA\SEB EvalPro" fail_cleanup
-  IfFileExists "$LOCALAPPDATA\seb-evalpro" fail_cleanup
+  IfFileExists "$LOCALAPPDATA\Programs\SEB-éval-PRO" remain_install_accent
+  IfFileExists "$LOCALAPPDATA\Programs\SEB-eval-PRO" remain_install_ascii
+  IfFileExists "$LOCALAPPDATA\Programs\SEB EvalPro" remain_install_space
+  IfFileExists "$LOCALAPPDATA\Programs\seb-evalpro" remain_install_lower
+  IfFileExists "$APPDATA\SEB-éval-PRO" remain_appdata_accent
+  IfFileExists "$APPDATA\SEB-eval-PRO" remain_appdata_ascii
+  IfFileExists "$APPDATA\SEB EvalPro" remain_appdata_space
+  IfFileExists "$APPDATA\seb-evalpro" remain_appdata_lower
+  IfFileExists "$LOCALAPPDATA\SEB-éval-PRO" remain_local_accent
+  IfFileExists "$LOCALAPPDATA\SEB-eval-PRO" remain_local_ascii
+  IfFileExists "$LOCALAPPDATA\SEB EvalPro" remain_local_space
+  IfFileExists "$LOCALAPPDATA\seb-evalpro" remain_local_lower
   Return
+remain_install_accent:
+  DetailPrint "Encore présent : $LOCALAPPDATA\Programs\SEB-éval-PRO"
+  Goto fail_cleanup
+remain_install_ascii:
+  DetailPrint "Encore présent : $LOCALAPPDATA\Programs\SEB-eval-PRO"
+  Goto fail_cleanup
+remain_install_space:
+  DetailPrint "Encore présent : $LOCALAPPDATA\Programs\SEB EvalPro"
+  Goto fail_cleanup
+remain_install_lower:
+  DetailPrint "Encore présent : $LOCALAPPDATA\Programs\seb-evalpro"
+  Goto fail_cleanup
+remain_appdata_accent:
+  DetailPrint "Encore présent : $APPDATA\SEB-éval-PRO"
+  Goto fail_cleanup
+remain_appdata_ascii:
+  DetailPrint "Encore présent : $APPDATA\SEB-eval-PRO"
+  Goto fail_cleanup
+remain_appdata_space:
+  DetailPrint "Encore présent : $APPDATA\SEB EvalPro"
+  Goto fail_cleanup
+remain_appdata_lower:
+  DetailPrint "Encore présent : $APPDATA\seb-evalpro"
+  Goto fail_cleanup
+remain_local_accent:
+  DetailPrint "Encore présent : $LOCALAPPDATA\SEB-éval-PRO"
+  Goto fail_cleanup
+remain_local_ascii:
+  DetailPrint "Encore présent : $LOCALAPPDATA\SEB-eval-PRO"
+  Goto fail_cleanup
+remain_local_space:
+  DetailPrint "Encore présent : $LOCALAPPDATA\SEB EvalPro"
+  Goto fail_cleanup
+remain_local_lower:
+  DetailPrint "Encore présent : $LOCALAPPDATA\seb-evalpro"
+  Goto fail_cleanup
 fail_cleanup:
   StrCpy $7 1
 FunctionEnd
@@ -251,12 +287,20 @@ Section "Désinstallation complète"
   Call CleanupHKLM32
 
   DetailPrint "Suppression des dossiers techniques, caches et raccourcis..."
+  StrCpy $8 0
+cleanup_retry:
   Call CleanupKnownFolders
-  Sleep 1000
-  Call CleanupKnownFolders
-
   Call VerifyCleanup
   StrCmp $7 0 cleanup_ok
+  IntOp $8 $8 + 1
+  IntCmp $8 12 cleanup_failed cleanup_wait cleanup_failed
+cleanup_wait:
+  DetailPrint "Nettoyage encore en cours, nouvelle tentative ($8/12)..."
+  Call StopSebProcesses
+  Sleep 1000
+  Goto cleanup_retry
+
+cleanup_failed:
   SetErrorLevel 2
   IfSilent cleanup_done
   MessageBox MB_ICONEXCLAMATION|MB_OK "La désinstallation n'a pas pu supprimer toutes les données techniques. Fermez SEB-éval-PRO puis relancez le désinstalleur."
