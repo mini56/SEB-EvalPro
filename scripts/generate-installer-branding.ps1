@@ -8,7 +8,7 @@ $privacyPartsDir = Join-Path $root 'source/branding/privacy-screen'
 
 if (-not (Test-Path $qcmPath)) { throw 'SEB-éval-PRO : source/qcmv1.0.html introuvable pour le logo institutionnel.' }
 if (-not (Test-Path $sourceIcon)) { throw 'SEB-éval-PRO : icône source imageqcm/avatar_icon.ico introuvable.' }
-if (-not (Test-Path $privacyPartsDir)) { throw 'SEB-éval-PRO : fragments de l’écran d’accueil introuvables.' }
+if (-not (Test-Path $privacyPartsDir)) { throw "SEB-éval-PRO : fragments de l’écran d’accueil introuvables." }
 if (-not (Get-Command magick -ErrorAction SilentlyContinue)) { throw 'SEB-éval-PRO : ImageMagick (magick) est requis pour générer les visuels NSIS.' }
 
 New-Item -ItemType Directory -Force -Path $buildDir | Out-Null
