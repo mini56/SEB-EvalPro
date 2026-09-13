@@ -20,6 +20,15 @@ html = html.replace(
   ''
 );
 
+const cleanedBeforeRuntime = html
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .replace(/\s+/g, ' ')
+  .toLowerCase();
+if (cleanedBeforeRuntime.includes('le debit est fixe a la vitesse normale 1,00')) {
+  fail('ancien texte vitesse 1,00 encore présent après nettoyage');
+}
+
 const runtime = String.raw`
 <script id="${marker}">
 (() => {
@@ -229,15 +238,8 @@ const runtime = String.raw`
 html = html.replace(/<\/body>/i, `${runtime}\n</body>`);
 fs.writeFileSync(target, html, 'utf8');
 
-const normalized = html
-  .normalize('NFD')
-  .replace(/[\u0300-\u036f]/g, '')
-  .replace(/\s+/g, ' ')
-  .toLowerCase();
-
 if (!html.includes(marker)) fail('correctif final UI absent');
 if (!html.includes('dictee-reclamation-client.wav')) fail('WAV fixe absent de dictee.html');
-if (normalized.includes('le debit est fixe a la vitesse normale 1,00')) fail('ancien texte vitesse 1,00 encore présent');
 if (html.includes('SpeechSynthesisUtterance') || html.includes('speechSynthesis')) fail('dépendance synthèse vocale encore présente dans la dictée');
 if (!html.includes('seb-dictee-left-actions')) fail('déplacement Vérifier/Suivant absent');
 if (!html.includes('alignPrivacyButtonWithAbandon')) fail('alignement écran accueil/Abandonner absent');
