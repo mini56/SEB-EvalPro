@@ -35,7 +35,8 @@ function write(file, text) {
   write(file, out);
 }
 
-// Brancher le module preload : archive à l'affichage de Résultats + UI admin en lecture seule.
+// Brancher le module preload : captures visuelles pendant le parcours, archivage
+// définitif à l'affichage de Résultats, puis lecteur administrateur en lecture seule.
 {
   const { file, text } = read('src/preload.js');
   let out = text;
@@ -59,28 +60,37 @@ function write(file, text) {
   write(file, out);
 }
 
-// Contrôles bloquants sur les modules livrés avec l'application.
+// Contrôles bloquants : le nouveau replay doit être une archive autonome de
+// diapositives figées, pas un simple rapport reconstruit depuis les données.
 {
   const replayMain = read('src/replay-main.js').text;
   const replayPreload = read('src/replay-preload.js').text;
   const requiredMain = [
     "path.join(app.getPath('documents'), 'SEB EvalPro', 'parcours')",
+    "ipcMain.handle('replay:capture-page'",
     "ipcMain.handle('replay:archive-final'",
     "ipcMain.handle('admin:list-parcours'",
     "ipcMain.handle('admin:load-parcours'",
-    "Archive modifiée ou corrompue : replay refusé.",
-    "readOnly: true"
+    "ipcMain.handle('admin:get-parcours-slide'",
+    "archiveMode: 'VISUAL_FROZEN_SLIDES'",
+    'futureVersionIndependent: true',
+    "path.join(tempFolder, 'manifest.json')",
+    "path.join(tempFolder, 'slides')",
+    'Archive modifiée ou corrompue : replay refusé.',
+    'readOnly: true'
   ];
   const requiredPreload = [
     "final.classList.contains('visible')",
-    "seb_evalpro_replay_archive_file",
-    "Rejouer un parcours",
-    "LECTURE SEULE · AUCUN RECALCUL",
-    "Choisir le parcours à rejouer",
-    "Documents\\\\SEB EvalPro\\\\parcours"
+    'replay:capture-page',
+    'seb_evalpro_replay_archive_file',
+    'Rejouer un parcours',
+    'LECTURE SEULE · ARCHIVE VISUELLE FIGÉE · AUCUN RECALCUL',
+    'Choisir le parcours à rejouer',
+    'Documents\\\\SEB EvalPro\\\\parcours',
+    'admin:get-parcours-slide'
   ];
   for (const token of requiredMain) if (!replayMain.includes(token)) fail('contrôle backend manquant: ' + token);
   for (const token of requiredPreload) if (!replayPreload.includes(token)) fail('contrôle interface manquant: ' + token);
 }
 
-console.log(`SEB EvalPro replay prototype: archivage figé sur page Résultats, dossier parcours, replay administrateur lecture seule, Build #${buildNumber}.`);
+console.log(`SEB EvalPro replay visuel: pages réelles figées pendant le parcours, archive autonome créée sur Résultats, lecture seule sans recalcul, Build #${buildNumber}.`);
