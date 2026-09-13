@@ -7,7 +7,7 @@ on:
       - tmp-candidate-replay-test
 
 env:
-  SEB_BUILD_LABEL: 134-REPLAY-TEST
+  SEB_BUILD_LABEL: 134-REPLAY-VISUAL-TEST
 
 jobs:
   build-windows-replay-test:
@@ -21,6 +21,11 @@ jobs:
           node-version: '22'
       - name: Install dependencies
         run: npm install
+      - name: Syntax check replay modules
+        run: |
+          node --check src/replay-main.js
+          node --check src/replay-preload.js
+          node --check scripts/candidate-replay-prototype.js
       - name: Ensure ImageMagick
         shell: pwsh
         run: |
@@ -43,41 +48,46 @@ jobs:
           }
       - name: Build Windows replay prototype
         run: npm run dist:win
-      - name: Verify replay modules packaged in source build
+      - name: Verify autonomous visual replay wiring
         shell: pwsh
         run: |
           if (-not (Test-Path 'src\replay-main.js')) { throw 'replay-main.js absent' }
           if (-not (Test-Path 'src\replay-preload.js')) { throw 'replay-preload.js absent' }
           $preload = Get-Content 'src\preload.js' -Raw
           $main = Get-Content 'src\main.js' -Raw
+          $replayMain = Get-Content 'src\replay-main.js' -Raw
+          $replayPreload = Get-Content 'src\replay-preload.js' -Raw
           if (-not $preload.Contains('replayPrototype.install();')) { throw 'Replay UI non branchée' }
-          if (-not $main.Contains('buildNumber: "134-REPLAY-TEST"')) { throw 'Build replay non figé dans les archives' }
-          Write-Host 'Replay prototype wiring: OK'
-      - name: Publish replay test installer to private GitHub Release
+          if (-not $main.Contains('buildNumber: "134-REPLAY-VISUAL-TEST"')) { throw 'Build replay non figé dans les archives' }
+          if (-not $replayMain.Contains("archiveMode: 'VISUAL_FROZEN_SLIDES'")) { throw 'Archive visuelle autonome absente' }
+          if (-not $replayMain.Contains("ipcMain.handle('replay:capture-page'")) { throw 'Capture visuelle des pages absente' }
+          if (-not $replayPreload.Contains('LECTURE SEULE · ARCHIVE VISUELLE FIGÉE · AUCUN RECALCUL')) { throw 'Lecteur visuel lecture seule absent' }
+          Write-Host 'Replay visuel autonome: OK'
+      - name: Publish visual replay test installer to private GitHub Release
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $tag = 'seb-evalpro-replay-test-134'
+          $tag = 'seb-evalpro-replay-visual-test-134'
           $setup = 'dist\SEB-eval-PRO-0.1.0-Windows-Setup.exe'
           if (-not (Test-Path $setup)) { throw 'Setup Windows replay absent' }
           $hash = (Get-FileHash -Algorithm SHA256 $setup).Hash.ToLowerInvariant()
-          $notes = "Prototype isolé basé strictement sur le Build #134 validé.`n`nFonction testée : archivage du parcours à l'affichage de la page Résultats, sélection d'un parcours administrateur, replay type diaporama en lecture seule, Build d'origine affiché, aucun recalcul.`n`nSHA256 Setup : $hash"
+          $notes = "Prototype visuel isolé basé strictement sur le Build #134 validé.`n`nCette version enregistre progressivement les pages réellement vues/remplies, puis crée au moment de l'affichage de Résultats une archive autonome dans Documents\SEB EvalPro\parcours. Chaque archive contient ses propres diapositives figées, le Build d'origine et les données de contrôle : elle ne dépend donc pas des exercices présents dans une future version de SEB EvalPro.`n`nReplay administrateur : lecture seule, aucune modification, aucun recalcul.`n`nSHA256 Setup : $hash"
           gh release view $tag --repo "${{ github.repository }}" *> $null
           if ($LASTEXITCODE -eq 0) {
             gh release upload $tag $setup --clobber --repo "${{ github.repository }}"
-            gh release edit $tag --title 'SEB EvalPro Build #134 - REPLAY TEST' --notes $notes --prerelease --repo "${{ github.repository }}"
+            gh release edit $tag --title 'SEB EvalPro Build #134 - REPLAY VISUEL TEST' --notes $notes --prerelease --repo "${{ github.repository }}"
           } else {
-            gh release create $tag $setup --target "${{ github.sha }}" --title 'SEB EvalPro Build #134 - REPLAY TEST' --notes $notes --prerelease --repo "${{ github.repository }}"
+            gh release create $tag $setup --target "${{ github.sha }}" --title 'SEB EvalPro Build #134 - REPLAY VISUEL TEST' --notes $notes --prerelease --repo "${{ github.repository }}"
           }
-          if ($LASTEXITCODE -ne 0) { throw 'Publication de la Release replay test échouée' }
-          Write-Host "Replay test publié : $tag"
+          if ($LASTEXITCODE -ne 0) { throw 'Publication de la Release replay visuel test échouée' }
+          Write-Host "Replay visuel test publié : $tag"
           Write-Host "SHA256 : $hash"
       - uses: actions/upload-artifact@v4
         continue-on-error: true
         with:
-          name: SEB-EvalPro-134-REPLAY-TEST-Windows
+          name: SEB-EvalPro-134-REPLAY-VISUAL-TEST-Windows
           path: dist/SEB-eval-PRO-0.1.0-Windows-Setup.exe
 
   build-linux-replay-test:
@@ -89,10 +99,15 @@ jobs:
           node-version: '22'
       - name: Install dependencies
         run: npm install
+      - name: Syntax check replay modules
+        run: |
+          node --check src/replay-main.js
+          node --check src/replay-preload.js
+          node --check scripts/candidate-replay-prototype.js
       - name: Build Linux replay prototype
         run: npm run dist:linux
       - uses: actions/upload-artifact@v4
         continue-on-error: true
         with:
-          name: SEB-EvalPro-134-REPLAY-TEST-Linux
+          name: SEB-EvalPro-134-REPLAY-VISUAL-TEST-Linux
           path: dist/*.AppImage
