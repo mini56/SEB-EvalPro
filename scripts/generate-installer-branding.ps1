@@ -86,8 +86,9 @@ foreach ($size in $iconSizes) {
 # automatiquement le numéro du build courant en bas à droite.
 $fontPath = Join-Path $env:WINDIR 'Fonts\arial.ttf'
 if (-not (Test-Path $fontPath)) { throw 'SEB-éval-PRO : police Arial Windows introuvable pour le numéro de build.' }
+$fontPathMagick = $fontPath -replace '\\','/'
 
-& magick $brandingSource -resize '450x228^' -gravity center -extent '450x228' -gravity southeast -font $fontPath -pointsize 14 -fill white -stroke black -strokewidth 2 -annotate '+10+8' $buildLabel -stroke none -fill white -annotate '+10+8' $buildLabel -background white -alpha remove -alpha off -type TrueColor "BMP3:$brandingBmp"
+& magick $brandingSource -resize '450x228^' -gravity center -extent '450x228' -gravity southeast -font $fontPathMagick -pointsize 14 -fill white -stroke black -strokewidth 2 -annotate '+10+8' $buildLabel -stroke none -fill white -annotate '+10+8' $buildLabel -background white -alpha remove -alpha off -type TrueColor "BMP3:$brandingBmp"
 if ($LASTEXITCODE -ne 0 -or -not (Test-Path $brandingBmp)) { throw 'SEB-éval-PRO : génération de installerBranding.bmp échouée.' }
 $brandingGeometry = (& magick identify -format '%wx%h' $brandingBmp).Trim()
 if ($brandingGeometry -ne '450x228') { throw "SEB-éval-PRO : visuel Setup invalide ($brandingGeometry au lieu de 450x228)." }
