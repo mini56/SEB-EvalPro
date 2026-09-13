@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 const root = path.resolve(__dirname, '..');
-const buildNumber = String(process.env.GITHUB_RUN_NUMBER || 'DEV');
+const buildNumber = String(process.env.SEB_BUILD_LABEL || process.env.GITHUB_RUN_NUMBER || 'DEV');
 
 function fail(message) {
   console.error('SEB EvalPro replay prototype: ' + message);
