@@ -1,8 +1,11 @@
 const { ipcRenderer } = require('electron');
 const path = require('path');
+const crypto = require('crypto');
 
 let installed = false;
 let archiveInFlight = false;
+let captureTimer = null;
+let lastCaptureRequestAt = 0;
 
 function storageToObject(storage) {
   const out = {};
@@ -23,25 +26,109 @@ function pageName() {
   }
 }
 
-function parseJson(value, fallback = null) {
-  try { return JSON.parse(String(value || '')); } catch (_) { return fallback; }
-}
-
 function candidateLabel(candidate) {
   const nom = String((candidate && candidate.nom) || '').trim();
   const prenom = String((candidate && (candidate.prenom || candidate['prénom'])) || '').trim();
   return [nom, prenom].filter(Boolean).join(' ') || 'Candidat non identifié';
 }
 
+function replayToken() {
+  const key = 'seb_evalpro_replay_token';
+  let value = '';
+  try { value = String(window.sessionStorage.getItem(key) || ''); } catch (_) {}
+  if (/^[A-Za-z0-9-]{12,100}$/.test(value)) return value;
+  try { value = crypto.randomUUID(); } catch (_) { value = `${Date.now()}-${Math.random().toString(16).slice(2)}-${Math.random().toString(16).slice(2)}`; }
+  try { window.sessionStorage.setItem(key, value); } catch (_) {}
+  return value;
+}
+
+function visibleQcmPage() {
+  if (pageName().toLowerCase() !== 'qcmv1.0.html') return null;
+  const candidates = Array.from(document.querySelectorAll('[id^="page"]'));
+  return candidates.find((el) => el.classList && el.classList.contains('visible')) || null;
+}
+
+function titleFromElement(root, fallback) {
+  try {
+    const heading = root && root.querySelector ? root.querySelector('h1,h2,h3,.titre,.title') : null;
+    const text = heading ? String(heading.textContent || '').replace(/\s+/g, ' ').trim() : '';
+    if (text) return text.slice(0, 180);
+  } catch (_) {}
+  const docTitle = String(document.title || '').replace(/\s+/g, ' ').trim();
+  return (docTitle || fallback).slice(0, 180);
+}
+
+function currentPageDescriptor() {
+  const file = pageName();
+  if (file.toLowerCase() === 'qcmv1.0.html') {
+    const visible = visibleQcmPage();
+    if (visible && visible.id) {
+      return {
+        pageKey: `${file}#${visible.id}`,
+        title: titleFromElement(visible, visible.id)
+      };
+    }
+  }
+  return { pageKey: file, title: titleFromElement(document.body, file) };
+}
+
+function privacyLayerVisible() {
+  const layer = document.getElementById('seb-evalpro-privacy-layer');
+  if (!layer) return false;
+  try {
+    const style = getComputedStyle(layer);
+    return style.display !== 'none' && style.visibility !== 'hidden';
+  } catch (_) {
+    return false;
+  }
+}
+
+async function captureCurrentPage(reason = 'state', force = false) {
+  if (!document.body) return { ok: false };
+  if (window.sessionStorage.getItem('seb_evalpro_replay_archive_file')) return { ok: false, archived: true };
+  if (privacyLayerVisible()) return { ok: false, privacy: true };
+  if (document.getElementById('seb-replay-viewer') || document.getElementById('seb-replay-chooser')) return { ok: false, replayUi: true };
+
+  const now = Date.now();
+  if (!force && now - lastCaptureRequestAt < 180) return { ok: false, throttled: true };
+  lastCaptureRequestAt = now;
+  const descriptor = currentPageDescriptor();
+  try {
+    return await ipcRenderer.invoke('replay:capture-page', {
+      token: replayToken(),
+      pageKey: descriptor.pageKey,
+      title: descriptor.title,
+      reason,
+      viewport: {
+        width: window.innerWidth,
+        height: window.innerHeight,
+        scrollX: window.scrollX,
+        scrollY: window.scrollY,
+        scrollWidth: document.documentElement ? document.documentElement.scrollWidth : 0,
+        scrollHeight: document.documentElement ? document.documentElement.scrollHeight : 0
+      }
+    });
+  } catch (_) {
+    return { ok: false };
+  }
+}
+
+function scheduleCapture(reason, delay = 350) {
+  if (window.sessionStorage.getItem('seb_evalpro_replay_archive_file')) return;
+  clearTimeout(captureTimer);
+  captureTimer = setTimeout(() => captureCurrentPage(reason), delay);
+}
+
 function buildArchivePayload() {
   const final = document.getElementById('pageFinale');
   const finalPageVisible = !!(final && final.classList.contains('visible'));
   return {
+    token: replayToken(),
     finalPageVisible,
     sessionStorage: storageToObject(window.sessionStorage),
     localStorage: storageToObject(window.localStorage),
     lastPage: pageName(),
-    lastEvaluationPage: pageName()
+    lastEvaluationPage: currentPageDescriptor().pageKey
   };
 }
 
@@ -53,15 +140,54 @@ async function archiveIfFinalVisible() {
 
   archiveInFlight = true;
   try {
+    await new Promise((resolve) => setTimeout(resolve, 180));
+    await captureCurrentPage('final-results', true);
     const result = await ipcRenderer.invoke('replay:archive-final', buildArchivePayload());
     if (result && result.ok && result.filename) {
       window.sessionStorage.setItem('seb_evalpro_replay_archive_file', result.filename);
       window.sessionStorage.setItem('seb_evalpro_replay_archive_build', String(result.build || ''));
+      window.sessionStorage.setItem('seb_evalpro_replay_archive', JSON.stringify({
+        filename: result.filename,
+        build: result.build,
+        slides: result.slides,
+        integritySha256: result.integritySha256
+      }));
     }
   } catch (_) {
   } finally {
     archiveInFlight = false;
   }
+}
+
+function installCaptureRecorder() {
+  if (!document.body) return;
+  setTimeout(() => captureCurrentPage('page-open', true), 700);
+
+  document.addEventListener('input', () => scheduleCapture('input', 450), true);
+  document.addEventListener('change', () => scheduleCapture('change', 220), true);
+  document.addEventListener('click', (event) => {
+    const target = event.target && event.target.closest ? event.target.closest('button,a,input,select,textarea,[contenteditable]') : null;
+    if (!target) return;
+    captureCurrentPage('before-action', true);
+    scheduleCapture('after-action', 320);
+  }, true);
+
+  const observer = new MutationObserver((mutations) => {
+    let pageChanged = false;
+    for (const mutation of mutations) {
+      if (mutation.type !== 'attributes' || mutation.attributeName !== 'class') continue;
+      const target = mutation.target;
+      if (target && target.id && /^page/i.test(target.id)) {
+        pageChanged = true;
+        break;
+      }
+    }
+    if (pageChanged) {
+      scheduleCapture('page-change', 300);
+      setTimeout(archiveIfFinalVisible, 380);
+    }
+  });
+  observer.observe(document.body, { subtree: true, attributes: true, attributeFilter: ['class'] });
 }
 
 function installArchiveWatcher() {
@@ -78,42 +204,34 @@ function addReplayStyle() {
   const style = document.createElement('style');
   style.id = 'seb-replay-style';
   style.textContent = `
-    #seb-evalpro-topbar .seb-admin-left-actions,
-    #seb-evalpro-topbar .seb-admin-right-actions{display:flex;align-items:center;gap:8px}
+    #seb-evalpro-topbar .seb-admin-left-actions,#seb-evalpro-topbar .seb-admin-right-actions{display:flex;align-items:center;gap:8px}
     #seb-evalpro-topbar .seb-admin-left-actions{margin-left:8px;padding-left:10px;border-left:1px solid rgba(255,255,255,.5)}
     #seb-evalpro-topbar .seb-admin-right-actions{margin-left:8px;padding-left:12px;border-left:1px solid rgba(255,255,255,.5)}
     #seb-evalpro-replay{background:#e8f3ff!important;color:#005b9f!important;border-color:#fff!important;font-weight:700}
-    #seb-replay-chooser,#seb-replay-viewer{position:fixed;inset:0;z-index:2147483647;background:rgba(0,0,0,.52);display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif}
-    .seb-replay-card{width:min(920px,94vw);max-height:86vh;background:#fff;border:1px solid #aaa;border-radius:10px;box-shadow:0 15px 48px rgba(0,0,0,.34);display:flex;flex-direction:column;overflow:hidden}
+    #seb-replay-chooser,#seb-replay-viewer{position:fixed;inset:0;z-index:2147483647;background:rgba(0,0,0,.58);display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif}
+    .seb-replay-card{width:min(980px,95vw);max-height:88vh;background:#fff;border:1px solid #aaa;border-radius:10px;box-shadow:0 15px 48px rgba(0,0,0,.34);display:flex;flex-direction:column;overflow:hidden}
     .seb-replay-head{background:#0070c0;color:#fff;padding:14px 18px;display:flex;align-items:center;gap:12px}
     .seb-replay-head-title{font-size:20px;font-weight:700;flex:1}
     .seb-replay-build{font-size:13px;font-weight:700;background:#fff;color:#0070c0;border-radius:14px;padding:4px 9px}
     .seb-replay-readonly{font-size:12px;font-weight:700;background:#fff3cd;color:#7a5b00;border:1px solid #e7cb70;border-radius:14px;padding:4px 9px}
     .seb-replay-body{padding:16px;overflow:auto;background:#f5f7fb;min-height:260px}
     .seb-replay-path{font-size:12px;color:#666;margin-bottom:10px}
-    .seb-replay-row{display:grid;grid-template-columns:1.6fr .8fr .7fr auto;gap:10px;align-items:center;padding:10px 12px;background:#fff;border:1px solid #d8dde8;border-radius:7px;margin-bottom:8px}
-    .seb-replay-row strong{font-size:15px;color:#222}
-    .seb-replay-row small{color:#666}
-    .seb-replay-row .bad{color:#c00000;font-weight:700}
+    .seb-replay-row{display:grid;grid-template-columns:1.5fr .65fr .55fr .8fr auto;gap:10px;align-items:center;padding:10px 12px;background:#fff;border:1px solid #d8dde8;border-radius:7px;margin-bottom:8px}
+    .seb-replay-row strong{font-size:15px;color:#222}.seb-replay-row small{color:#666}.seb-replay-row .bad{color:#c00000;font-weight:700}.seb-replay-row .legacy{color:#9a6700;font-weight:700}
     .seb-replay-actions{display:flex;justify-content:flex-end;gap:10px;padding:12px 16px;border-top:1px solid #ddd;background:#fff}
     .seb-replay-actions button,.seb-replay-row button{font:700 14px Arial,sans-serif;padding:8px 14px;border:1px solid #999;border-radius:5px;background:#f2f2f2;cursor:pointer}
-    .seb-replay-row button.primary,.seb-replay-actions button.primary{background:#0070c0;color:#fff;border-color:#0070c0}
-    .seb-slide-card{width:min(1120px,95vw);height:min(780px,90vh);background:#fff;border-radius:12px;box-shadow:0 16px 50px rgba(0,0,0,.38);display:flex;flex-direction:column;overflow:hidden}
-    .seb-slide-head{background:#0070c0;color:#fff;padding:12px 18px;display:flex;align-items:center;gap:10px}
-    .seb-slide-title{font-size:20px;font-weight:700;flex:1}
-    .seb-slide-meta{font-size:12px;font-weight:700;background:#fff;color:#0070c0;padding:4px 8px;border-radius:12px}
-    .seb-slide-readonly{font-size:12px;font-weight:700;background:#fff3cd;color:#6e5200;padding:4px 8px;border-radius:12px}
-    .seb-slide-content{flex:1;overflow:auto;padding:24px 28px;background:linear-gradient(#fff,#f5f7fb)}
-    .seb-slide-page-title{font-size:26px;font-weight:700;color:#0070c0;margin:0 0 18px}
-    .seb-slide-grid{display:grid;grid-template-columns:minmax(180px,34%) 1fr;gap:8px 16px;align-items:start}
-    .seb-slide-label{font-weight:700;color:#333;background:#edf3fa;padding:8px;border-radius:5px}
-    .seb-slide-value{white-space:pre-wrap;word-break:break-word;background:#fff;border:1px solid #dde4ee;padding:8px;border-radius:5px;min-height:20px}
-    .seb-slide-empty{padding:30px;text-align:center;color:#666;font-style:italic}
-    .seb-slide-foot{display:flex;align-items:center;gap:10px;padding:12px 16px;border-top:1px solid #ddd;background:#fff}
-    .seb-slide-counter{flex:1;text-align:center;font-weight:700;color:#555}
-    .seb-slide-foot button{font:700 14px Arial,sans-serif;padding:8px 15px;border:1px solid #999;border-radius:5px;background:#f2f2f2;cursor:pointer}
-    .seb-slide-foot button.primary{background:#0070c0;color:#fff;border-color:#0070c0}
-    .seb-slide-foot button:disabled{opacity:.45;cursor:default}
+    .seb-replay-row button.primary,.seb-replay-actions button.primary{background:#0070c0;color:#fff;border-color:#0070c0}.seb-replay-row button:disabled{opacity:.45;cursor:default}
+    .seb-visual-card{width:98vw;height:94vh;background:#111;border-radius:8px;box-shadow:0 16px 50px rgba(0,0,0,.42);display:flex;flex-direction:column;overflow:hidden}
+    .seb-visual-head{background:#0070c0;color:#fff;padding:10px 16px;display:flex;align-items:center;gap:10px}
+    .seb-visual-title{font-size:18px;font-weight:700;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .seb-visual-meta{font-size:12px;font-weight:700;background:#fff;color:#0070c0;padding:4px 8px;border-radius:12px;white-space:nowrap}
+    .seb-visual-readonly{font-size:12px;font-weight:700;background:#fff3cd;color:#6e5200;padding:4px 8px;border-radius:12px;white-space:nowrap}
+    .seb-visual-stage{flex:1;min-height:0;overflow:auto;background:#272727;display:flex;align-items:center;justify-content:center;padding:12px;box-sizing:border-box}
+    .seb-visual-stage img{display:block;max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain;background:#fff;box-shadow:0 2px 14px rgba(0,0,0,.35);user-select:none;-webkit-user-drag:none}
+    .seb-visual-loading{color:#fff;font-size:16px;font-weight:700}.seb-visual-warning{color:#7a5b00;background:#fff3cd;border:1px solid #e7cb70;padding:18px 22px;border-radius:8px;max-width:760px;text-align:center;line-height:1.45}
+    .seb-visual-foot{display:flex;align-items:center;gap:10px;padding:10px 14px;border-top:1px solid #444;background:#fff}
+    .seb-visual-counter{flex:1;text-align:center;font-weight:700;color:#555}.seb-visual-pagekey{font-size:12px;color:#777;max-width:34%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .seb-visual-foot button{font:700 14px Arial,sans-serif;padding:8px 15px;border:1px solid #999;border-radius:5px;background:#f2f2f2;cursor:pointer}.seb-visual-foot button.primary{background:#0070c0;color:#fff;border-color:#0070c0}.seb-visual-foot button:disabled{opacity:.45;cursor:default}
   `;
   document.head.appendChild(style);
 }
@@ -149,9 +267,8 @@ function regroupAdminButtons() {
   const anchor = build || name;
   if (anchor) anchor.insertAdjacentElement('afterend', left);
   else bar.prepend(left);
-  if (spacer) {
-    spacer.insertAdjacentElement('afterend', right);
-  } else {
+  if (spacer) spacer.insertAdjacentElement('afterend', right);
+  else {
     const newSpacer = document.createElement('div');
     newSpacer.className = 'seb-evalpro-spacer';
     left.insertAdjacentElement('afterend', newSpacer);
@@ -173,270 +290,168 @@ function regroupAdminButtons() {
   refreshReplayVisibility();
 }
 
-function flatten(value, prefix = '', out = [], depth = 0) {
-  if (out.length >= 80) return out;
-  if (depth > 4) {
-    out.push({ label: prefix || 'Valeur', value: String(value) });
-    return out;
-  }
-  if (value === null || value === undefined) {
-    out.push({ label: prefix || 'Valeur', value: '' });
-    return out;
-  }
-  if (typeof value !== 'object') {
-    out.push({ label: prefix || 'Valeur', value: String(value) });
-    return out;
-  }
-  if (Array.isArray(value)) {
-    value.forEach((item, index) => flatten(item, prefix ? `${prefix} [${index + 1}]` : `Élément ${index + 1}`, out, depth + 1));
-    return out;
-  }
-  Object.entries(value).forEach(([key, item]) => flatten(item, prefix ? `${prefix} > ${key}` : key, out, depth + 1));
-  return out;
+function formatDate(value) {
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? String(value || '') : parsed.toLocaleString('fr-FR');
 }
 
-function buildReplaySlides(archive) {
-  const slides = [];
-  const snapshot = (archive && archive.snapshot) || {};
-  const s = snapshot.sessionStorage || {};
-  const candidate = archive.candidate || parseJson(s.candidat_data, {}) || {};
+function createReplayChooserDialog() {
+  return new Promise(async (resolve) => {
+    addReplayStyle();
+    const old = document.getElementById('seb-replay-chooser');
+    if (old) old.remove();
+    const backdrop = document.createElement('div');
+    backdrop.id = 'seb-replay-chooser';
+    backdrop.innerHTML = `
+      <div class="seb-replay-card" role="dialog" aria-modal="true" aria-label="Choisir le parcours à rejouer">
+        <div class="seb-replay-head">
+          <div class="seb-replay-head-title">Choisir le parcours à rejouer</div>
+          <div class="seb-replay-readonly">LECTURE SEULE · AUCUN RECALCUL</div>
+        </div>
+        <div class="seb-replay-body">
+          <div class="seb-replay-path">Documents\\SEB EvalPro\\parcours — les nouveaux parcours contiennent leurs propres diapositives figées et ne dépendent pas de la version actuelle.</div>
+          <div id="seb-replay-list">Chargement…</div>
+        </div>
+        <div class="seb-replay-actions"><button type="button" id="seb-replay-close">Fermer</button></div>
+      </div>`;
+    document.body.appendChild(backdrop);
+    const finish = () => { backdrop.remove(); resolve(); };
+    backdrop.querySelector('#seb-replay-close').addEventListener('click', finish);
 
-  slides.push({
-    title: 'Identification du parcours',
-    entries: [
-      { label: 'Candidat', value: candidateLabel(candidate) },
-      { label: 'Date', value: candidate.date || '' },
-      { label: 'Lieu', value: candidate.lieu || '' },
-      { label: 'Groupe', value: candidate.groupe || '' },
-      { label: 'Build utilisé', value: `Build #${archive.build || '?'}` },
-      { label: 'Archive créée', value: archive.archivedAt ? new Date(archive.archivedAt).toLocaleString('fr-FR') : '' }
-    ]
-  });
-
-  const pageNames = {
-    page0: 'Identification', page2: 'Calculs contextualisés Q1-Q5', page2_1: 'Calculs contextualisés Q6-Q10',
-    page3: 'Durées / horaires', page4: 'Fractions', page5: 'Ordonnancement', page5_1: 'Postures',
-    page6: 'Conversions', pageTexteTrous: 'Texte à trous', page8: 'Messagerie', pageFinale: 'Résultats'
-  };
-  const drafts = parseJson(s.seb_evalpro_qcm_drafts, {}) || {};
-  Object.entries(drafts).forEach(([pageId, draft]) => {
-    const entries = [];
-    const values = Array.isArray(draft && draft.values) ? draft.values : [];
-    values.forEach((item, index) => {
-      if (!item) return;
-      const type = String(item.type || '').toLowerCase();
-      if ((type === 'checkbox' || type === 'radio') && !item.checked) return;
-      const value = (type === 'checkbox' || type === 'radio') ? 'Sélectionné' : String(item.value ?? '');
-      if (!value.trim()) return;
-      entries.push({ label: item.id || item.name || `Champ ${index + 1}`, value });
-    });
-    if (Array.isArray(draft && draft.items)) {
-      const selected = draft.items.map((v, i) => v ? i + 1 : null).filter(Boolean);
-      if (selected.length) entries.push({ label: 'Éléments sélectionnés', value: selected.join(', ') });
+    const list = backdrop.querySelector('#seb-replay-list');
+    let items = [];
+    try { items = await ipcRenderer.invoke('admin:list-parcours'); } catch (_) {}
+    list.innerHTML = '';
+    if (!Array.isArray(items) || !items.length) {
+      list.innerHTML = '<div style="padding:30px;text-align:center;color:#555">Aucun parcours archivé.</div>';
+      return;
     }
-    if (entries.length) slides.push({ title: pageNames[pageId] || `Page ${pageId}`, entries });
-  });
 
-  const reponses = parseJson(s.reponses_data, {}) || {};
-  if (reponses.page7_contenu_texte) {
-    slides.push({ title: 'Traitement de texte', entries: [{ label: 'Texte réellement enregistré', value: String(reponses.page7_contenu_texte) }] });
-  }
-
-  const moduleDefs = [
-    ['Dictée', ['dictee_data']],
-    ['Genre / Nombre', ['user_genrenombres', 'erreurs_exercice']],
-    ['Paronymes', ['paronymes_reponses', 'paronymes_score', 'paronymes_total']],
-    ['Messagerie', ['page8_data']],
-    ['Planning', ['planningCorrection', 'planningScore']],
-    ['Rangement de stock', ['stockCorrect', 'stockErrors', 'stockTotal']],
-    ['Construction à base de briques', ['eval_brique', 'eval_brique_auto']],
-    ['Tri de chevilles', ['tri_cheville_data', 'autoEvaltri_resultats']],
-    ['Puzzle Gratte-ciel', ['carre_magique_score', 'carre_magique_erreurs']],
-    ['Autoévaluation 1', ['autoEval1_resultats']],
-    ['Autoévaluation 2', ['autoEval2_resultats']]
-  ];
-
-  moduleDefs.forEach(([title, keys]) => {
-    const entries = [];
-    keys.forEach((key) => {
-      if (!(key in s)) return;
-      const parsed = parseJson(s[key], undefined);
-      if (parsed !== undefined && parsed !== null && typeof parsed === 'object') flatten(parsed, key, entries);
-      else entries.push({ label: key, value: String(s[key] ?? '') });
-    });
-    if (entries.length) slides.push({ title, entries });
-  });
-
-  const scores = parseJson(s.scores_data, {}) || {};
-  const scoreEntries = flatten(scores).filter((e) => !String(e.label).includes('page7_analyse'));
-  if (scoreEntries.length) {
-    slides.push({
-      title: 'Scores archivés',
-      entries: [{ label: 'Règle', value: 'Valeurs enregistrées au moment de la page Résultats — aucun recalcul pendant le replay.' }, ...scoreEntries]
-    });
-  }
-
-  if (slides.length === 1) {
-    slides.push({ title: 'Données enregistrées', entries: [{ label: 'Information', value: 'Aucune donnée détaillée supplémentaire n’a été trouvée dans cette archive.' }] });
-  }
-  return slides;
-}
-
-function openReplayViewer(archive) {
-  document.getElementById('seb-replay-chooser')?.remove();
-  document.getElementById('seb-replay-viewer')?.remove();
-  const slides = buildReplaySlides(archive);
-  let index = 0;
-
-  const layer = document.createElement('div');
-  layer.id = 'seb-replay-viewer';
-  const card = document.createElement('div');
-  card.className = 'seb-slide-card';
-  const head = document.createElement('div');
-  head.className = 'seb-slide-head';
-  const title = document.createElement('div');
-  title.className = 'seb-slide-title';
-  title.textContent = candidateLabel(archive.candidate || {});
-  const build = document.createElement('div');
-  build.className = 'seb-slide-meta';
-  build.textContent = `Évaluation : Build #${archive.build || '?'}`;
-  const readonly = document.createElement('div');
-  readonly.className = 'seb-slide-readonly';
-  readonly.textContent = 'LECTURE SEULE · AUCUN RECALCUL';
-  head.append(title, build, readonly);
-
-  const content = document.createElement('div');
-  content.className = 'seb-slide-content';
-  const foot = document.createElement('div');
-  foot.className = 'seb-slide-foot';
-  const prev = document.createElement('button');
-  prev.textContent = '← Précédent';
-  const counter = document.createElement('div');
-  counter.className = 'seb-slide-counter';
-  const next = document.createElement('button');
-  next.className = 'primary';
-  next.textContent = 'Suivant →';
-  const close = document.createElement('button');
-  close.textContent = 'Fermer le replay';
-  foot.append(prev, counter, next, close);
-  card.append(head, content, foot);
-  layer.appendChild(card);
-  document.body.appendChild(layer);
-
-  function render() {
-    const slide = slides[index];
-    content.innerHTML = '';
-    const h = document.createElement('div');
-    h.className = 'seb-slide-page-title';
-    h.textContent = slide.title;
-    content.appendChild(h);
-    if (!slide.entries || !slide.entries.length) {
-      const empty = document.createElement('div');
-      empty.className = 'seb-slide-empty';
-      empty.textContent = 'Aucune donnée enregistrée pour cette page.';
-      content.appendChild(empty);
-    } else {
-      const grid = document.createElement('div');
-      grid.className = 'seb-slide-grid';
-      slide.entries.forEach((entry) => {
-        const l = document.createElement('div');
-        l.className = 'seb-slide-label';
-        l.textContent = String(entry.label || 'Valeur');
-        const v = document.createElement('div');
-        v.className = 'seb-slide-value';
-        v.textContent = String(entry.value ?? '');
-        grid.append(l, v);
+    items.forEach((item) => {
+      const row = document.createElement('div');
+      row.className = 'seb-replay-row';
+      const who = document.createElement('strong');
+      who.textContent = candidateLabel(item.candidate);
+      const when = document.createElement('small');
+      when.textContent = formatDate(item.archivedAt);
+      const build = document.createElement('small');
+      build.textContent = `Build #${item.build || '?'}`;
+      const mode = document.createElement('small');
+      if (item.legacy) {
+        mode.className = 'legacy';
+        mode.textContent = 'Ancien prototype';
+      } else {
+        mode.textContent = `${Number(item.slideCount || 0)} diapositive(s)`;
+      }
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'primary';
+      button.textContent = 'Rejouer';
+      if (!item.integrityOk) {
+        button.disabled = true;
+        button.textContent = 'Archive invalide';
+        mode.className = 'bad';
+      } else if (item.legacy) {
+        button.textContent = 'Voir info';
+      }
+      button.addEventListener('click', async () => {
+        const loaded = await ipcRenderer.invoke('admin:load-parcours', item.filename);
+        if (!loaded || !loaded.ok) {
+          alert((loaded && loaded.error) || 'Impossible d’ouvrir ce parcours.');
+          return;
+        }
+        finish();
+        await createVisualReplayViewer(item.filename, loaded.archive, !!loaded.legacy, loaded.warning || '');
       });
-      content.appendChild(grid);
-    }
-    counter.textContent = `Diapo ${index + 1} / ${slides.length}`;
-    prev.disabled = index === 0;
-    next.disabled = index >= slides.length - 1;
-    content.scrollTop = 0;
-  }
-
-  prev.addEventListener('click', () => { if (index > 0) { index -= 1; render(); } });
-  next.addEventListener('click', () => { if (index < slides.length - 1) { index += 1; render(); } });
-  close.addEventListener('click', () => layer.remove());
-  layer.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') layer.remove();
-    if (event.key === 'ArrowLeft' && index > 0) { index -= 1; render(); }
-    if (event.key === 'ArrowRight' && index < slides.length - 1) { index += 1; render(); }
+      row.append(who, when, build, mode, button);
+      list.appendChild(row);
+    });
   });
-  layer.tabIndex = -1;
-  layer.focus();
-  render();
 }
 
-async function createReplayChooserDialog() {
-  document.getElementById('seb-replay-chooser')?.remove();
-  const layer = document.createElement('div');
-  layer.id = 'seb-replay-chooser';
-  const card = document.createElement('div');
-  card.className = 'seb-replay-card';
-  const head = document.createElement('div');
-  head.className = 'seb-replay-head';
-  const title = document.createElement('div');
-  title.className = 'seb-replay-head-title';
-  title.textContent = 'Choisir le parcours à rejouer';
-  const badge = document.createElement('div');
-  badge.className = 'seb-replay-readonly';
-  badge.textContent = 'LECTURE SEULE';
-  head.append(title, badge);
-  const body = document.createElement('div');
-  body.className = 'seb-replay-body';
-  const pathInfo = document.createElement('div');
-  pathInfo.className = 'seb-replay-path';
-  pathInfo.textContent = 'Archives : Documents\\SEB EvalPro\\parcours';
-  body.appendChild(pathInfo);
-  const actions = document.createElement('div');
-  actions.className = 'seb-replay-actions';
-  const close = document.createElement('button');
-  close.textContent = 'Fermer';
-  actions.appendChild(close);
-  card.append(head, body, actions);
-  layer.appendChild(card);
-  document.body.appendChild(layer);
-  close.addEventListener('click', () => layer.remove());
+function createVisualReplayViewer(filename, archive, legacy, warning) {
+  return new Promise((resolve) => {
+    addReplayStyle();
+    const old = document.getElementById('seb-replay-viewer');
+    if (old) old.remove();
+    const slides = Array.isArray(archive && archive.slides) ? archive.slides : [];
+    let index = 0;
+    let renderToken = 0;
+    const backdrop = document.createElement('div');
+    backdrop.id = 'seb-replay-viewer';
+    backdrop.innerHTML = `
+      <div class="seb-visual-card" role="dialog" aria-modal="true" aria-label="Replay visuel du parcours">
+        <div class="seb-visual-head">
+          <div id="seb-visual-title" class="seb-visual-title">${candidateLabel(archive && archive.candidate)}</div>
+          <div class="seb-visual-meta">Build #${String((archive && archive.build) || '?')}</div>
+          <div class="seb-visual-readonly">LECTURE SEULE · ARCHIVE VISUELLE FIGÉE · AUCUN RECALCUL</div>
+        </div>
+        <div id="seb-visual-stage" class="seb-visual-stage"></div>
+        <div class="seb-visual-foot">
+          <button type="button" id="seb-visual-prev">← Précédent</button>
+          <div id="seb-visual-pagekey" class="seb-visual-pagekey"></div>
+          <div id="seb-visual-counter" class="seb-visual-counter"></div>
+          <button type="button" id="seb-visual-next" class="primary">Suivant →</button>
+          <button type="button" id="seb-visual-close">Fermer le replay</button>
+        </div>
+      </div>`;
+    document.body.appendChild(backdrop);
 
-  let files = [];
-  try { files = await ipcRenderer.invoke('admin:list-parcours'); } catch (_) {}
-  if (!Array.isArray(files) || !files.length) {
-    const empty = document.createElement('div');
-    empty.className = 'seb-slide-empty';
-    empty.textContent = 'Aucun parcours archivé pour le moment.';
-    body.appendChild(empty);
-    return;
-  }
+    const stage = backdrop.querySelector('#seb-visual-stage');
+    const title = backdrop.querySelector('#seb-visual-title');
+    const counter = backdrop.querySelector('#seb-visual-counter');
+    const pageKey = backdrop.querySelector('#seb-visual-pagekey');
+    const prev = backdrop.querySelector('#seb-visual-prev');
+    const next = backdrop.querySelector('#seb-visual-next');
+    const close = backdrop.querySelector('#seb-visual-close');
 
-  files.forEach((item) => {
-    const row = document.createElement('div');
-    row.className = 'seb-replay-row';
-    const who = document.createElement('div');
-    const strong = document.createElement('strong');
-    strong.textContent = candidateLabel(item.candidate || {});
-    const small = document.createElement('small');
-    small.textContent = item.candidate && item.candidate.date ? ` · ${item.candidate.date}` : '';
-    who.append(strong, small);
-    const when = document.createElement('div');
-    when.textContent = item.archivedAt ? new Date(item.archivedAt).toLocaleString('fr-FR') : '';
-    const build = document.createElement('div');
-    build.textContent = `Build #${item.build || '?'}`;
-    const button = document.createElement('button');
-    button.className = 'primary';
-    button.textContent = item.integrityOk ? 'Rejouer' : 'Archive invalide';
-    button.disabled = !item.integrityOk;
-    if (!item.integrityOk) build.classList.add('bad');
-    button.addEventListener('click', async () => {
-      const result = await ipcRenderer.invoke('admin:load-parcours', item.filename);
-      if (!result || !result.ok) {
-        window.alert((result && result.error) || 'Impossible de charger cette archive.');
+    const finish = () => { backdrop.remove(); resolve(); };
+    close.addEventListener('click', finish);
+
+    async function render() {
+      const myToken = ++renderToken;
+      if (legacy || !slides.length) {
+        title.textContent = `${candidateLabel(archive && archive.candidate)} — Build #${String((archive && archive.build) || '?')}`;
+        stage.innerHTML = `<div class="seb-visual-warning">${warning || 'Ce parcours provient de l’ancien prototype. Il ne contient pas de pages visuelles figées et ne peut donc pas être rejoué dans les conditions réelles.'}</div>`;
+        counter.textContent = 'Aucune diapositive visuelle';
+        pageKey.textContent = '';
+        prev.disabled = true;
+        next.disabled = true;
         return;
       }
-      openReplayViewer(result.archive);
+
+      const slide = slides[index];
+      title.textContent = `${candidateLabel(archive && archive.candidate)} — ${slide.title || 'Page'}`;
+      counter.textContent = `${index + 1} / ${slides.length}`;
+      pageKey.textContent = slide.pageKey || '';
+      prev.disabled = index <= 0;
+      next.disabled = index >= slides.length - 1;
+      stage.innerHTML = '<div class="seb-visual-loading">Chargement de la page figée…</div>';
+      let result = null;
+      try { result = await ipcRenderer.invoke('admin:get-parcours-slide', filename, slide.file); } catch (_) {}
+      if (myToken !== renderToken) return;
+      if (!result || !result.ok || !result.dataUrl) {
+        stage.innerHTML = `<div class="seb-visual-warning">${(result && result.error) || 'Impossible de charger cette diapositive.'}</div>`;
+        return;
+      }
+      const image = document.createElement('img');
+      image.alt = slide.title || 'Page archivée du parcours';
+      image.draggable = false;
+      image.src = result.dataUrl;
+      stage.innerHTML = '';
+      stage.appendChild(image);
+    }
+
+    prev.addEventListener('click', () => { if (index > 0) { index -= 1; render(); } });
+    next.addEventListener('click', () => { if (index < slides.length - 1) { index += 1; render(); } });
+    backdrop.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') finish();
+      else if (event.key === 'ArrowLeft' && index > 0) { index -= 1; render(); }
+      else if (event.key === 'ArrowRight' && index < slides.length - 1) { index += 1; render(); }
     });
-    row.append(who, when, build, button);
-    body.appendChild(row);
+    backdrop.tabIndex = -1;
+    backdrop.focus();
+    render();
   });
 }
 
@@ -445,6 +460,7 @@ function install() {
   installed = true;
   addReplayStyle();
   regroupAdminButtons();
+  installCaptureRecorder();
   installArchiveWatcher();
 }
 
