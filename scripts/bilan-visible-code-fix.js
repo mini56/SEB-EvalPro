@@ -2,11 +2,10 @@ const fs = require('fs');
 const path = require('path');
 
 const root = path.resolve(__dirname, '..');
-const webDir = path.join(root, 'app', 'web');
-const files = ['bilan.html', 'admin-bilan.html'];
+const target = path.join(root, 'app', 'web', 'qcmv1.0.html');
 
 function fail(message) {
-  console.error('SEB EvalPro bilan affichage: ' + message);
+  console.error('SEB EvalPro QCM affichage: ' + message);
   process.exit(2);
 }
 
@@ -16,53 +15,65 @@ function markerIsInsideScript(html, index) {
   return open >= 0 && open > close;
 }
 
-let removedLeaks = 0;
+if (!fs.existsSync(target)) fail('qcmv1.0.html généré introuvable');
+let html = fs.readFileSync(target, 'utf8');
 
-for (const name of files) {
-  const target = path.join(webDir, name);
-  if (!fs.existsSync(target)) continue;
-  let html = fs.readFileSync(target, 'utf8');
+const markerText = 'NOM DE FICHIER PERSONNALISÉ';
+let marker = html.indexOf(markerText);
+if (marker < 0) fail('bloc de nom de fichier Word introuvable');
 
-  const leakRe = /;\s*\/\/[\s\S]{0,220}?NOM DE FICHIER PERSONNALISÉ[\s\S]*?setTimeout\(\(\)\s*=>\s*URL\.revokeObjectURL\(url\),\s*100\);\s*\}/g;
-  html = html.replace(leakRe, (match, offset) => {
-    const markerOffset = match.indexOf('NOM DE FICHIER PERSONNALISÉ');
-    const absoluteMarker = offset + Math.max(0, markerOffset);
-    if (markerIsInsideScript(html, absoluteMarker)) return match;
-    removedLeaks += 1;
-    return '';
-  });
+let repaired = false;
 
-  if (name === 'bilan.html') {
-    const filenameSetup = `const sebCandidateForWordFilename = (() => {\n    try { return JSON.parse(sessionStorage.getItem('candidat_data') || '{}') || {}; } catch (_) { return {}; }\n  })();\n  const sebCleanFilenamePart = (value) => String(value || '')\n    .normalize('NFD').replace(/[\\u0300-\\u036f]/g, '')\n    .replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');\n  const sebNom = sebCleanFilenamePart(sebCandidateForWordFilename.nom);\n  const sebPrenom = sebCleanFilenamePart(sebCandidateForWordFilename['prénom'] || sebCandidateForWordFilename.prenom);\n  let sebFilename = 'Evaluation_SEB';\n  if (sebNom && sebPrenom) sebFilename = 'Evaluation_' + sebNom + '_' + sebPrenom;\n  sebFilename += '_' + new Date().toISOString().split('T')[0] + '.doc';`;
+// Le bloc appartient à exportToWord(). S'il est sorti du <script>, cela signifie
+// qu'une fermeture </script> a coupé la fonction avant sa fin. On retire uniquement
+// cette fermeture prématurée; la fermeture normale située après la fonction reste en place.
+if (!markerIsInsideScript(html, marker)) {
+  const functionStart = html.lastIndexOf('function exportToWord()', marker);
+  const prematureClose = html.lastIndexOf('</script>', marker);
+  const scriptOpen = functionStart >= 0 ? html.lastIndexOf('<script', functionStart) : -1;
+  const normalClose = html.indexOf('</script>', marker);
 
-    if (!html.includes('sebCandidateForWordFilename')) {
-      const staticLine = "link.download = 'Evaluation_SEB_' + new Date().toISOString().split('T')[0] + '.doc';";
-      if (html.includes(staticLine)) {
-        html = html.replace(staticLine, filenameSetup + "\n  link.download = sebFilename;");
-      } else if (html.includes('link.download = filename;')) {
-        html = html.replace('link.download = filename;', filenameSetup + "\n  link.download = sebFilename;");
-      } else {
-        fail('ligne de nom de fichier Word introuvable dans bilan.html');
-      }
-    }
+  if (functionStart < 0 || scriptOpen < 0 || prematureClose <= functionStart || normalClose < 0) {
+    fail('structure exportToWord incohérente, réparation automatique refusée');
   }
 
-  const visibleMarker = html.indexOf('NOM DE FICHIER PERSONNALISÉ');
-  if (visibleMarker >= 0 && !markerIsInsideScript(html, visibleMarker)) {
-    fail('code JavaScript encore visible hors <script> dans ' + name);
-  }
-
-  fs.writeFileSync(target, html, 'utf8');
+  html = html.slice(0, prematureClose) + html.slice(prematureClose + '</script>'.length);
+  repaired = true;
+  marker = html.indexOf(markerText);
 }
 
-if (removedLeaks === 0) {
-  fail('aucun bloc JavaScript visible détecté : correction non vérifiée');
+if (!markerIsInsideScript(html, marker)) {
+  fail('bloc Word encore visible hors <script> après correction');
 }
 
-const bilanPath = path.join(webDir, 'bilan.html');
-const bilan = fs.readFileSync(bilanPath, 'utf8');
-if (!bilan.includes('link.download = sebFilename;') || !bilan.includes("sessionStorage.getItem('candidat_data')")) {
-  fail('export Word personnalisé non préservé dans bilan.html');
+// Contrôles bloquants : le code doit rester fonctionnel et intégralement dans exportToWord.
+const functionStart = html.lastIndexOf('function exportToWord()', marker);
+const functionScriptOpen = html.lastIndexOf('<script', functionStart);
+const functionScriptClose = html.indexOf('</script>', marker);
+if (functionStart < 0 || functionScriptOpen < 0 || functionScriptClose < 0) {
+  fail('fonction exportToWord non encadrée par un script valide');
 }
 
-console.log(`SEB EvalPro bilan: ${removedLeaks} bloc(s) JavaScript visible(s) supprimé(s); export Word personnalisé conservé.`);
+const exportBlock = html.slice(functionStart, functionScriptClose);
+for (const required of [
+  "let filename = 'Evaluation_SEB'",
+  'filename = `Evaluation_${nomClean}_${prenomClean}`',
+  "filename += '_' + new Date().toISOString().split('T')[0] + '.doc'",
+  "const blob = new Blob(['\\ufeff', html]",
+  'link.download = filename',
+  'URL.revokeObjectURL(url)'
+]) {
+  if (!exportBlock.includes(required)) fail('export Word incomplet : ' + required);
+}
+
+// Empêcher qu'une copie du même code soit rendue comme texte ailleurs dans le document.
+let searchFrom = 0;
+while (true) {
+  const index = html.indexOf(markerText, searchFrom);
+  if (index < 0) break;
+  if (!markerIsInsideScript(html, index)) fail('copie visible du bloc Word détectée hors <script>');
+  searchFrom = index + markerText.length;
+}
+
+fs.writeFileSync(target, html, 'utf8');
+console.log('SEB EvalPro QCM: code export Word invisible et fonctionnel; réparation fermeture prématurée=' + (repaired ? 'oui' : 'non') + '.');
