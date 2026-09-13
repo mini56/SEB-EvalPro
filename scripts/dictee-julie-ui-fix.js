@@ -110,12 +110,20 @@ const runtime = String.raw`
   }
 
   function removeObsoleteSpeedText() {
-    const fragments = Array.from(document.querySelectorAll('p,li,div,span,small,strong'));
-    for (const el of fragments) {
-      const text = norm(el.textContent);
-      if (text.includes('le debit est fixe a la vitesse normale 1,00') && text.includes("il n'est pas possible d'accelerer l'enregistrement")) {
-        el.remove();
-      }
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    const nodes = [];
+    let node;
+    while ((node = walker.nextNode())) nodes.push(node);
+
+    for (const textNode of nodes) {
+      const raw = String(textNode.nodeValue || '');
+      const normalized = norm(raw);
+      if (!normalized.includes('le debit est fixe a la vitesse normale 1,00')) continue;
+      if (!normalized.includes("il n'est pas possible d'accelerer l'enregistrement")) continue;
+      textNode.nodeValue = raw.replace(
+        /Le débit est fixé à la vitesse normale\s*1[,.]00\.?(?:\s|\u00a0)*Il n['’]est pas possible d['’]accélérer l['’]enregistrement\.?/giu,
+        ''
+      );
     }
   }
 
@@ -124,13 +132,24 @@ const runtime = String.raw`
     if (!audio) return false;
 
     const expected = 'dictee-reclamation-client.wav';
+    let sourceChanged = false;
     const sources = Array.from(audio.querySelectorAll('source'));
-    for (const source of sources) source.setAttribute('src', expected);
-    audio.setAttribute('src', expected);
+    for (const source of sources) {
+      if (source.getAttribute('src') !== expected) {
+        source.setAttribute('src', expected);
+        sourceChanged = true;
+      }
+    }
+    if (audio.getAttribute('src') !== expected) {
+      audio.setAttribute('src', expected);
+      sourceChanged = true;
+    }
     audio.defaultPlaybackRate = 1;
     audio.playbackRate = 1;
     audio.preload = 'auto';
-    try { audio.load(); } catch (_) {}
+    if (sourceChanged) {
+      try { audio.load(); } catch (_) {}
+    }
 
     const actions = findActionButtons();
     const ensurePlay = () => {
