@@ -19,7 +19,8 @@ function write(file, text) {
   fs.writeFileSync(file, text, 'utf8');
 }
 
-// Brancher le backend d'archivage/replay après tous les correctifs du Build #134.
+// Brancher les backends d'archivage/replay et d'historique des bilans après
+// tous les correctifs du Build #134.
 {
   const { file, text } = read('src/main.js');
   let out = text;
@@ -27,16 +28,17 @@ function write(file, text) {
     const marker = "require('./session-close')({";
     const index = out.indexOf(marker);
     if (index < 0) fail('point d’insertion main.js introuvable');
-    const block = `// SEB_CANDIDATE_REPLAY_PROTO_MAIN\nrequire('./replay-main')({\n  app,\n  ipcMain,\n  getAdminUnlocked: () => adminSessionUnlocked,\n  buildNumber: ${JSON.stringify(buildNumber)}\n});\n\n`;
+    const block = `// SEB_CANDIDATE_REPLAY_PROTO_MAIN\nrequire('./replay-main')({\n  app,\n  ipcMain,\n  getAdminUnlocked: () => adminSessionUnlocked,\n  buildNumber: ${JSON.stringify(buildNumber)}\n});\nrequire('./bilan-history-main')({\n  app,\n  ipcMain,\n  getAdminUnlocked: () => adminSessionUnlocked,\n  buildNumber: ${JSON.stringify(buildNumber)}\n});\n\n`;
     out = out.slice(0, index) + block + out.slice(index);
   }
   if (!out.includes("require('./replay-main')")) fail('backend replay non branché');
-  if (!out.includes(`buildNumber: ${JSON.stringify(buildNumber)}`)) fail('numéro de build replay non injecté');
+  if (!out.includes("require('./bilan-history-main')")) fail('backend historique bilan non branché');
+  if (!out.includes(`buildNumber: ${JSON.stringify(buildNumber)}`)) fail('numéro de build non injecté');
   write(file, out);
 }
 
-// Brancher le module preload : captures visuelles pendant le parcours, archivage
-// définitif à l'affichage de Résultats, puis lecteur administrateur en lecture seule.
+// Brancher les modules preload : captures visuelles du parcours + historique
+// autonome et éditable des bilans administrateur.
 {
   const { file, text } = read('src/preload.js');
   let out = text;
@@ -45,26 +47,30 @@ function write(file, text) {
     if (!out.includes(importMarker)) fail('import path preload introuvable');
     out = out.replace(
       importMarker,
-      `${importMarker}\nconst replayPrototype = require('./replay-preload');\n// SEB_CANDIDATE_REPLAY_PROTO_PRELOAD`
+      `${importMarker}\nconst replayPrototype = require('./replay-preload');\nconst bilanHistory = require('./bilan-history-preload');\n// SEB_CANDIDATE_REPLAY_PROTO_PRELOAD`
     );
 
     const domMarker = "  injectAdminBar();\n  document.addEventListener('input', scheduleSave, true);";
-    if (!out.includes(domMarker)) fail('point d’installation replay dans DOMContentLoaded introuvable');
+    if (!out.includes(domMarker)) fail('point d’installation modules dans DOMContentLoaded introuvable');
     out = out.replace(
       domMarker,
-      "  injectAdminBar();\n  replayPrototype.install();\n  document.addEventListener('input', scheduleSave, true);"
+      "  injectAdminBar();\n  replayPrototype.install();\n  bilanHistory.install();\n  document.addEventListener('input', scheduleSave, true);"
     );
   }
   if (!out.includes("require('./replay-preload')")) fail('module replay preload non importé');
+  if (!out.includes("require('./bilan-history-preload')")) fail('module historique bilan preload non importé');
   if (!out.includes('replayPrototype.install();')) fail('module replay preload non installé');
+  if (!out.includes('bilanHistory.install();')) fail('module historique bilan non installé');
   write(file, out);
 }
 
-// Contrôles bloquants : le nouveau replay doit être une archive autonome de
-// diapositives figées, pas un simple rapport reconstruit depuis les données.
+// Contrôles bloquants : replay visuel autonome + bilans historiques autonomes,
+// éditables par révisions sans écraser l'original.
 {
   const replayMain = read('src/replay-main.js').text;
   const replayPreload = read('src/replay-preload.js').text;
+  const bilanMain = read('src/bilan-history-main.js').text;
+  const bilanPreload = read('src/bilan-history-preload.js').text;
   const requiredMain = [
     "path.join(app.getPath('documents'), 'SEB EvalPro', 'parcours')",
     "ipcMain.handle('replay:capture-page'",
@@ -89,8 +95,29 @@ function write(file, text) {
     'Documents\\\\SEB EvalPro\\\\parcours',
     'admin:get-parcours-slide'
   ];
-  for (const token of requiredMain) if (!replayMain.includes(token)) fail('contrôle backend manquant: ' + token);
-  for (const token of requiredPreload) if (!replayPreload.includes(token)) fail('contrôle interface manquant: ' + token);
+  const requiredBilanMain = [
+    "path.join(app.getPath('documents'), 'SEB EvalPro', 'Bilans', 'Historique')",
+    "ipcMain.handle('bilan-history:save-current'",
+    "ipcMain.handle('bilan-history:list'",
+    "ipcMain.handle('bilan-history:load'",
+    "ipcMain.handle('bilan-history:save-revision'",
+    "type: TYPE",
+    "autonomous: true",
+    "editable: true",
+    "immutableRevision: true"
+  ];
+  const requiredBilanPreload = [
+    'Ouvrir un ancien bilan',
+    'Enregistrer une nouvelle révision',
+    'Documents\\\\SEB EvalPro\\\\Bilans\\\\Historique',
+    "bilan-history:save-current",
+    "bilan-history:save-revision",
+    'le bilan d\'origine n\'est jamais écrasé'
+  ];
+  for (const token of requiredMain) if (!replayMain.includes(token)) fail('contrôle backend replay manquant: ' + token);
+  for (const token of requiredPreload) if (!replayPreload.includes(token)) fail('contrôle interface replay manquant: ' + token);
+  for (const token of requiredBilanMain) if (!bilanMain.includes(token)) fail('contrôle backend bilan manquant: ' + token);
+  for (const token of requiredBilanPreload) if (!bilanPreload.includes(token)) fail('contrôle interface bilan manquant: ' + token);
 }
 
-console.log(`SEB EvalPro replay visuel: pages réelles figées pendant le parcours, archive autonome créée sur Résultats, lecture seule sans recalcul, Build #${buildNumber}.`);
+console.log(`SEB EvalPro prototype: replay visuel autonome + historique de bilans éditable par révisions, Build #${buildNumber}.`);
