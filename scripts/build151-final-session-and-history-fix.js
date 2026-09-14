@@ -51,10 +51,11 @@ function checkJs(text, label) {
     'blocage de toute capture hors dernière capture Résultats'
   );
 
+  // Build #147 ajoute déjà adminWorkBlocked au debounce : on y ajoute l'arrêt Résultats.
   out = replaceRequired(
     out,
-    `function scheduleCapture(reason, delay = 350) {\n  if (window.sessionStorage.getItem('seb_evalpro_replay_archive_file')) return;`,
-    `function scheduleCapture(reason, delay = 350) {\n  if (replayCaptureStopped()) return;\n  if (window.sessionStorage.getItem('seb_evalpro_replay_archive_file')) return;`,
+    `function scheduleCapture(reason, delay = 350) {\n  if (adminWorkBlocked()) return;`,
+    `function scheduleCapture(reason, delay = 350) {\n  if (adminWorkBlocked() || replayCaptureStopped()) return;`,
     'annulation des captures différées après Résultats'
   );
 
@@ -80,7 +81,7 @@ function checkJs(text, label) {
     "seb_evalpro_replay_capture_stopped",
     "reason !== 'final-results'",
     'stopReplayCaptureAfterResults();',
-    'if (replayCaptureStopped()) return;'
+    'adminWorkBlocked() || replayCaptureStopped()'
   ]) if (!out.includes(token)) fail('contrôle arrêt Résultats absent: ' + token, 5);
 
   checkJs(out, 'replay-preload.js');
