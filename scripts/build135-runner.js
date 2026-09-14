@@ -75,6 +75,21 @@ replaceExact(
   'signature export Word historique'
 );
 
+// Build #137 : le Word d'une révision historique doit conserver le rendu
+// institutionnel du bilan : NE bleu clair, I vert, II orange, III rouge.
+// Le format JSON historique n'est pas modifié : compatibilité #134+ conservée.
+replaceExact(
+  "    const levels = ['NE','I','II','III'].map((level) => `<td style=\"text-align:center;font-weight:bold\">${row.level === level ? level : ''}</td>`).join('');\n",
+  "    const levelColors = { NE:'#ccffff', I:'#92d050', II:'#ed7d31', III:'#c00000' };\n    const levelTextColors = { NE:'#000000', I:'#000000', II:'#ffffff', III:'#ffffff' };\n    const levels = ['NE','I','II','III'].map((level) => {\n      const selected = row.level === level;\n      const background = selected ? levelColors[level] : '#ffffff';\n      const color = selected ? levelTextColors[level] : '#000000';\n      return `<td style=\"text-align:center;font-weight:bold;background:${background};color:${color};vertical-align:middle\">${selected ? level : ''}</td>`;\n    }).join('');\n",
+  'couleurs des cases NE/I/II/III du Word historique'
+);
+
+replaceExact(
+  "  const html = `<!doctype html><html><head><meta charset=\"utf-8\"><style>@page{size:A4 landscape;margin:10mm}body{font-family:Calibri,Arial,sans-serif;font-size:10pt}table{width:100%;border-collapse:collapse}th,td{border:1px solid #000;padding:5px;vertical-align:top}th{background:#0070c0;color:#fff}</style></head><body><h2>Bilan institutionnel</h2><p><b>Nom :</b> ${escapeHtml(candidate.nom || '')} &nbsp; <b>Prénom :</b> ${escapeHtml(candidate.prenom || '')} &nbsp; <b>Date :</b> ${escapeHtml(candidate.date || '')} &nbsp; <b>Build d'origine :</b> #${escapeHtml(originalBuild || '?')}</p><table><thead><tr><th>Modules</th><th>NE</th><th>I</th><th>II</th><th>III</th><th>Commentaires</th></tr></thead><tbody>${rows}</tbody></table></body></html>`;\n",
+  "  const html = `<!doctype html><html><head><meta charset=\"utf-8\"><style>@page{size:A4 landscape;margin:10mm}body{font-family:Calibri,Arial,sans-serif;font-size:10pt}table{width:100%;border-collapse:collapse}th,td{border:1px solid #000;padding:5px;vertical-align:top}th{background:#0070c0;color:#fff}th:nth-child(2){background:#ccffff;color:#000}th:nth-child(3){background:#92d050;color:#000}th:nth-child(4){background:#ed7d31;color:#fff}th:nth-child(5){background:#c00000;color:#fff}</style></head><body><h2>Bilan institutionnel</h2><p><b>Nom :</b> ${escapeHtml(candidate.nom || '')} &nbsp; <b>Prénom :</b> ${escapeHtml(candidate.prenom || '')} &nbsp; <b>Date :</b> ${escapeHtml(candidate.date || '')} &nbsp; <b>Build d'origine :</b> #${escapeHtml(originalBuild || '?')}</p><table><thead><tr><th>Modules</th><th>NE</th><th>I</th><th>II</th><th>III</th><th>Commentaires</th></tr></thead><tbody>${rows}</tbody></table></body></html>`;\n",
+  'couleurs des en-têtes NE/I/II/III du Word historique'
+);
+
 replaceExact(
   "  a.href = url; a.download = `Bilan_${safe(candidate.nom || 'NOM')}_${safe(candidate.prenom || 'PRENOM')}_${safe(candidate.date || '')}.doc`;\n  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 3000);\n",
   "  const revisionNumber = Number.isFinite(Number(revision)) ? Number(revision) : 0;\n  const revisionSuffix = `_R${String(revisionNumber).padStart(2, '0')}`;\n  const wordFilename = `Bilan_${safe(candidate.nom || 'NOM')}_${safe(candidate.prenom || 'PRENOM')}_${safe(candidate.date || '')}${revisionSuffix}.doc`;\n  a.href = url; a.download = wordFilename;\n  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 3000);\n  return wordFilename;\n",
@@ -86,6 +101,11 @@ for (const required of [
   'Word créé automatiquement',
   'exportHistoricalWord(card, candidate, archive.originalBuild, currentRevision)',
   'const revisionSuffix = `_R${String(revisionNumber).padStart(2, \'0\')}`;',
+  "const levelColors = { NE:'#ccffff', I:'#92d050', II:'#ed7d31', III:'#c00000' };",
+  'th:nth-child(2){background:#ccffff;color:#000}',
+  'th:nth-child(3){background:#92d050;color:#000}',
+  'th:nth-child(4){background:#ed7d31;color:#fff}',
+  'th:nth-child(5){background:#c00000;color:#fff}',
   'return wordFilename;'
 ]) {
   if (!preload.includes(required)) {
@@ -95,4 +115,4 @@ for (const required of [
 }
 
 fs.writeFileSync(preloadPath, preload, 'utf8');
-console.log('SEB EvalPro Build #135 hotfix: toute nouvelle révision d’un ancien bilan crée aussi automatiquement son Word dans Documents\\SEB EvalPro\\Bilans.');
+console.log('SEB EvalPro Build #137: Word historique corrigé — NE bleu clair, I vert, II orange, III rouge, lettre visible dans la case sélectionnée; archives JSON #134+ inchangées.');
