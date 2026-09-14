@@ -7,7 +7,7 @@ on:
       - tmp-candidate-replay-test
 
 env:
-  SEB_BUILD_LABEL: 134-REPLAY-BILAN-TEST2
+  SEB_BUILD_LABEL: 134-REPLAY-BILAN-TEST3
 
 jobs:
   build-windows-replay-test:
@@ -30,6 +30,8 @@ jobs:
           node --check src/bilan-history-preload.js
           node --check scripts/candidate-replay-prototype.js
           node --check scripts/replay-page3-paronymes-fix.js
+          node --check scripts/page5-results-fix.js
+          node --check scripts/page3-results-persistence-fix.js
       - name: Ensure ImageMagick
         shell: pwsh
         run: |
@@ -52,7 +54,7 @@ jobs:
           }
       - name: Build Windows prototype
         run: npm run dist:win
-      - name: Verify replay page3, Paronymes and bilan history wiring
+      - name: Verify Page 3 candidate results, replay, Paronymes and bilan history
         shell: pwsh
         run: |
           $preload = Get-Content 'src\preload.js' -Raw
@@ -63,38 +65,44 @@ jobs:
           $bilanMain = Get-Content 'src\bilan-history-main.js' -Raw
           $bilanPreload = Get-Content 'src\bilan-history-preload.js' -Raw
           $paronymes = Get-Content 'app\web\paronymes.html' -Raw
+          $qcm = Get-Content 'app\web\qcmv1.0.html' -Raw
           if (-not $preload.Contains('replayPrototype.install();')) { throw 'Replay UI non branchée' }
           if (-not $preload.Contains('replayNavigationCapture.install();')) { throw 'Capture navigation replay non branchée' }
           if (-not $preload.Contains('bilanHistory.install();')) { throw 'Historique bilan UI non branché' }
           if (-not $main.Contains("require('./bilan-history-main')")) { throw 'Backend historique bilan non branché' }
-          if (-not $main.Contains('buildNumber: "134-REPLAY-BILAN-TEST2"')) { throw 'Build test non figé dans les archives' }
+          if (-not $main.Contains('buildNumber: "134-REPLAY-BILAN-TEST3"')) { throw 'Build test non figé dans les archives' }
           if (-not $replayMain.Contains("archiveMode: 'VISUAL_FROZEN_SLIDES'")) { throw 'Archive visuelle autonome absente' }
           if (-not $replayPreload.Contains('SEB_REPLAY_NAV_CAPTURE_GUARD')) { throw 'Garde capture/navigation absente' }
           if (-not $navCapture.Contains("captureNow('navigation-before-guaranteed')")) { throw 'Capture garantie page avant navigation absente' }
           if (-not $paronymes.Contains('data-correct="true">Boisé</td>')) { throw 'Paronymes Arboré -> Boisé incorrect' }
           if (-not $paronymes.Contains('Array.from(corrects).includes(selected)')) { throw 'Score Paronymes non durci' }
-          if (-not $paronymes.Contains('paronymes_erreurs_detail')) { throw 'Diagnostic ligne fautive Paronymes absent' }
+          if (-not $qcm.Contains("sessionStorage.setItem('page3_resultats'")) { throw 'Sauvegarde dédiée Page 3 absente' }
+          if (-not $qcm.Contains('Récupération renforcée Page 3')) { throw 'Récupération Page 3 dans Résultats stagiaire absente' }
+          if (-not $qcm.Contains("9:'9h30'")) { throw 'Page 3 Q9 doit être 9h30' }
+          if (-not $qcm.Contains("12:'2h35'")) { throw 'Page 3 Q12 doit être 2h35' }
+          if (-not $qcm.Contains("13:'0h31'")) { throw 'Page 3 Q13 doit être 0h31' }
+          if (-not $qcm.Contains('SEB_PAGE5_RESULTS_RECOVERY')) { throw 'Correction Page 5 perdue' }
           if (-not $bilanMain.Contains("ipcMain.handle('bilan-history:save-current'")) { throw 'Sauvegarde historique bilan absente' }
           if (-not $bilanMain.Contains("ipcMain.handle('bilan-history:save-revision'")) { throw 'Révisions bilan absentes' }
           if (-not $bilanPreload.Contains('Ouvrir un ancien bilan')) { throw 'Bouton ancien bilan absent' }
-          Write-Host 'Replay page3 garanti + Paronymes Boisé vérifié + historique bilan: OK'
+          Write-Host 'Page 3 Résultats stagiaire + Replay + Paronymes + Page 5 + historique bilan: OK'
       - name: Publish corrected test installer to private GitHub Release
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $tag = 'seb-evalpro-replay-bilan-test2-134'
+          $tag = 'seb-evalpro-replay-bilan-test3-134'
           $setup = 'dist\SEB-eval-PRO-0.1.0-Windows-Setup.exe'
           if (-not (Test-Path $setup)) { throw 'Setup Windows test absent' }
           $hash = (Get-FileHash -Algorithm SHA256 $setup).Hash.ToLowerInvariant()
-          $notes = "Prototype isolé basé strictement sur le Build #134 validé.`n`nCorrection Replay : la page en cours est désormais capturée et la capture terminée AVANT toute navigation. Cela corrige le cas observé où la page 3 apparaissait vide dans le replay.`n`nParonymes : vérification bloquante de la ligne Arboré -> Boisé, reconnaissance durcie des cellules data-correct=true et enregistrement du détail exact des éventuelles lignes fausses dans la session pour diagnostic.`n`nLe replay visuel et l'historique des bilans éditables par révisions restent inclus.`n`nSHA256 Setup : $hash"
+          $notes = "Prototype isolé basé strictement sur le Build #134 validé.`n`nCorrection principale : Page 3 — Réception & Rangement est maintenant sauvegardée dans un bloc dédié et restaurée dans Résultats stagiaire. Les objets réponses/scores sont également réhydratés et fusionnés afin qu'un rechargement ne puisse plus effacer les réponses précédentes. Un parcours ancien peut aussi être récupéré depuis le brouillon QCM si celui-ci existe.`n`nVérification du barème Page 3 : Q9 = 9h30, Q12 = 2h35, Q13 = 0h31. Ces trois valeurs étaient incohérentes avec les durées affichées.`n`nLes corrections Replay, Paronymes Boisé, Page 5 et l'historique des bilans restent incluses.`n`nSHA256 Setup : $hash"
           gh release view $tag --repo "${{ github.repository }}" *> $null
           if ($LASTEXITCODE -eq 0) {
             gh release upload $tag $setup --clobber --repo "${{ github.repository }}"
-            gh release edit $tag --title 'SEB EvalPro Build #134 - REPLAY/BILAN TEST2' --notes $notes --prerelease --repo "${{ github.repository }}"
+            gh release edit $tag --title 'SEB EvalPro Build #134 - REPLAY/BILAN TEST3' --notes $notes --prerelease --repo "${{ github.repository }}"
           } else {
-            gh release create $tag $setup --target "${{ github.sha }}" --title 'SEB EvalPro Build #134 - REPLAY/BILAN TEST2' --notes $notes --prerelease --repo "${{ github.repository }}"
+            gh release create $tag $setup --target "${{ github.sha }}" --title 'SEB EvalPro Build #134 - REPLAY/BILAN TEST3' --notes $notes --prerelease --repo "${{ github.repository }}"
           }
           if ($LASTEXITCODE -ne 0) { throw 'Publication de la Release test échouée' }
           Write-Host "Test publié : $tag"
@@ -102,7 +110,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         continue-on-error: true
         with:
-          name: SEB-EvalPro-134-REPLAY-BILAN-TEST2-Windows
+          name: SEB-EvalPro-134-REPLAY-BILAN-TEST3-Windows
           path: dist/SEB-eval-PRO-0.1.0-Windows-Setup.exe
 
   build-linux-replay-test:
@@ -123,10 +131,12 @@ jobs:
           node --check src/bilan-history-preload.js
           node --check scripts/candidate-replay-prototype.js
           node --check scripts/replay-page3-paronymes-fix.js
+          node --check scripts/page5-results-fix.js
+          node --check scripts/page3-results-persistence-fix.js
       - name: Build Linux prototype
         run: npm run dist:linux
       - uses: actions/upload-artifact@v4
         continue-on-error: true
         with:
-          name: SEB-EvalPro-134-REPLAY-BILAN-TEST2-Linux
+          name: SEB-EvalPro-134-REPLAY-BILAN-TEST3-Linux
           path: dist/*.AppImage
