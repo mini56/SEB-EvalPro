@@ -2,139 +2,221 @@ const fs = require('fs');
 const path = require('path');
 
 const root = path.resolve(__dirname, '..');
-const preloadPath = path.join(root, 'src', 'preload.js');
-if (!fs.existsSync(preloadPath)) {
-  console.error('SEB EvalPro affichage: src/preload.js introuvable.');
-  process.exit(2);
+
+function fail(message, code = 2) {
+  console.error('SEB EvalPro stabilité Admin: ' + message);
+  process.exit(code);
 }
 
-let text = fs.readFileSync(preloadPath, 'utf8').replace(/\r\n/g, '\n');
-
-// La page principale conserve une gouttière stable, mais ne force plus une
-// scrollbar permanente. Le scroll de fond sera verrouillé uniquement pendant
-// l'ouverture des fenêtres administrateur modales.
-const oldCss = `    html{box-sizing:border-box}\n    body{padding-top:0 !important;box-sizing:border-box}`;
-const newCss = `    html{box-sizing:border-box;overflow-y:auto;overflow-x:hidden;scrollbar-gutter:stable}\n    body{padding-top:0 !important;box-sizing:border-box;overflow-x:hidden}`;
-
-if (!text.includes(oldCss)) {
-  console.error('SEB EvalPro affichage: CSS shell attendu introuvable.');
-  process.exit(3);
-}
-text = text.replace(oldCss, newCss);
-
-// Chromium peut conserver une ancienne position scrollX après un changement de
-// page. On neutralise uniquement cette position horizontale, sans toucher au
-// défilement vertical normal.
-const marker = `  updateAdminButtons();\n  hideBar();\n}`;
-const replacement = `  updateAdminButtons();\n  hideBar();\n\n  const lockHorizontalPosition = () => {\n    if (window.scrollX !== 0) window.scrollTo(0, window.scrollY);\n  };\n  window.addEventListener('scroll', lockHorizontalPosition, { passive: true });\n  window.addEventListener('resize', lockHorizontalPosition, { passive: true });\n  setTimeout(lockHorizontalPosition, 0);\n}`;
-
-if (!text.includes(marker)) {
-  console.error('SEB EvalPro affichage: point de verrouillage horizontal introuvable.');
-  process.exit(4);
-}
-text = text.replace(marker, replacement);
-fs.writeFileSync(preloadPath, text, 'utf8');
-
-// ---------------------------------------------------------------------------
-// Fenêtres Admin "Ouvrir un ancien bilan" : une seule scrollbar verticale.
-// Le bug provenait de la scrollbar de la page principale qui restait active
-// derrière la scrollbar propre du sélecteur / éditeur historique.
-// ---------------------------------------------------------------------------
-const historyPath = path.join(root, 'src', 'bilan-history-preload.js');
-if (!fs.existsSync(historyPath)) {
-  console.error('SEB EvalPro affichage: src/bilan-history-preload.js introuvable.');
-  process.exit(5);
+function read(relativePath) {
+  const file = path.join(root, relativePath);
+  if (!fs.existsSync(file)) fail(`fichier introuvable: ${relativePath}`);
+  return { file, text: fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n') };
 }
 
-let history = fs.readFileSync(historyPath, 'utf8').replace(/\r\n/g, '\n');
+function write(file, text) {
+  fs.writeFileSync(file, text, 'utf8');
+}
 
-function replaceHistory(search, replacement, label) {
-  if (!history.includes(search)) {
-    console.error(`SEB EvalPro affichage Admin: cible introuvable pour ${label}.`);
-    process.exit(6);
+function replaceOnce(text, search, replacement, label) {
+  if (!text.includes(search)) fail(`cible introuvable pour ${label}`, 3);
+  return text.replace(search, replacement);
+}
+
+// -----------------------------------------------------------------------------
+// 1. Shell Electron : supprimer les anciens correctifs globaux de scroll.
+//    Le Build #142/#144 forçait window.scrollTo() pendant scroll/resize. Lors
+//    d'un clic dans le bilan Admin, un simple reflow pouvait donc provoquer un
+//    aller-retour horizontal visible. Aucun code global ne doit repositionner
+//    la fenêtre pendant le travail de l'administrateur.
+// -----------------------------------------------------------------------------
+{
+  const { file, text } = read('src/preload.js');
+  let out = text;
+
+  const oldCssVariants = [
+    `    html{box-sizing:border-box;overflow-y:scroll;overflow-x:hidden;scrollbar-gutter:stable}\n    body{padding-top:0 !important;box-sizing:border-box;overflow-x:hidden}`,
+    `    html{box-sizing:border-box;overflow-y:auto;overflow-x:hidden;scrollbar-gutter:stable}\n    body{padding-top:0 !important;box-sizing:border-box;overflow-x:hidden}`
+  ];
+  for (const oldCss of oldCssVariants) {
+    if (out.includes(oldCss)) {
+      out = out.replace(oldCss, `    html{box-sizing:border-box}\n    body{padding-top:0 !important;box-sizing:border-box}`);
+    }
   }
-  history = history.replace(search, replacement);
-}
 
-const chooserMarker = 'async function openChooser() {';
-if (!history.includes('// SEB_ADMIN_MODAL_SCROLL_LOCK')) {
-  const helpers = `// SEB_ADMIN_MODAL_SCROLL_LOCK\nlet sebAdminModalDepth = 0;\nlet sebAdminScrollSnapshot = null;\n\nfunction lockAdminBackgroundScroll() {\n  const html = document.documentElement;\n  const body = document.body;\n  if (!html || !body) return;\n  sebAdminModalDepth += 1;\n  if (sebAdminModalDepth !== 1) return;\n  sebAdminScrollSnapshot = {\n    htmlOverflow: html.style.overflow,\n    htmlOverflowY: html.style.overflowY,\n    htmlOverflowX: html.style.overflowX,\n    bodyOverflow: body.style.overflow,\n    bodyOverflowY: body.style.overflowY,\n    bodyOverflowX: body.style.overflowX\n  };\n  // scrollbar-gutter:stable sur <html> conserve la largeur utile pendant le verrouillage.\n  html.style.overflow = 'hidden';\n  body.style.overflow = 'hidden';\n}\n\nfunction unlockAdminBackgroundScroll() {\n  if (sebAdminModalDepth <= 0) return;\n  sebAdminModalDepth -= 1;\n  if (sebAdminModalDepth !== 0) return;\n  const html = document.documentElement;\n  const body = document.body;\n  const snap = sebAdminScrollSnapshot || {};\n  if (html) {\n    html.style.overflow = snap.htmlOverflow || '';\n    html.style.overflowY = snap.htmlOverflowY || '';\n    html.style.overflowX = snap.htmlOverflowX || '';\n  }\n  if (body) {\n    body.style.overflow = snap.bodyOverflow || '';\n    body.style.overflowY = snap.bodyOverflowY || '';\n    body.style.overflowX = snap.bodyOverflowX || '';\n  }\n  sebAdminScrollSnapshot = null;\n}\n\nfunction closeAdminHistoryOverlay(overlay) {\n  if (overlay && overlay.isConnected) overlay.remove();\n  unlockAdminBackgroundScroll();\n}\n\n`;
-  if (!history.includes(chooserMarker)) {
-    console.error('SEB EvalPro affichage Admin: fonction openChooser introuvable.');
-    process.exit(7);
+  const badLock = `\n\n  const lockHorizontalPosition = () => {\n    if (window.scrollX !== 0) window.scrollTo(0, window.scrollY);\n  };\n  window.addEventListener('scroll', lockHorizontalPosition, { passive: true });\n  window.addEventListener('resize', lockHorizontalPosition, { passive: true });\n  setTimeout(lockHorizontalPosition, 0);`;
+  if (out.includes(badLock)) out = out.replace(badLock, '');
+
+  for (const forbidden of [
+    'lockHorizontalPosition',
+    'window.scrollTo(0, window.scrollY)',
+    'overflow-y:scroll;overflow-x:hidden;scrollbar-gutter:stable'
+  ]) {
+    if (out.includes(forbidden)) fail('ancien correctif global encore présent: ' + forbidden, 4);
   }
-  history = history.replace(chooserMarker, helpers + chooserMarker);
+
+  write(file, out);
 }
 
-replaceHistory(
-  `  const existing = document.getElementById('seb-bilan-history-chooser');\n  if (existing) existing.remove();`,
-  `  const existing = document.getElementById('seb-bilan-history-chooser');\n  if (existing) closeAdminHistoryOverlay(existing);`,
-  'fermeture ancien sélecteur'
-);
+// -----------------------------------------------------------------------------
+// 2. Bilan Admin courant : un clic ne doit modifier que l'état de la case.
+//    - pas de lettre injectée dans le flux de la cellule ;
+//    - pas de changement de largeur du bandeau d'état ;
+//    - sauvegarde silencieuse sur clic/changement pour éviter tout reflow du
+//      bandeau d'outils à chaque action.
+// -----------------------------------------------------------------------------
+{
+  const { file, text } = read('app/web/admin-bilan.html');
+  let out = text;
 
-replaceHistory(
-  `  document.body.appendChild(overlay);\n  overlay.querySelector('#seb-bh-close').addEventListener('click', () => overlay.remove());\n  overlay.addEventListener('keydown', (event) => { if (event.key === 'Escape') overlay.remove(); });`,
-  `  document.body.appendChild(overlay);\n  lockAdminBackgroundScroll();\n  overlay.querySelector('#seb-bh-close').addEventListener('click', () => closeAdminHistoryOverlay(overlay));\n  overlay.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeAdminHistoryOverlay(overlay); });`,
-  'verrouillage du sélecteur historique'
-);
+  out = replaceOnce(
+    out,
+    '#status{margin-left:auto;font-size:10pt}',
+    '#status{margin-left:auto;font-size:10pt;flex:0 0 250px;min-width:250px;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
+    'largeur stable du statut Admin'
+  );
 
-replaceHistory(
-  `          overlay.remove();\n          openEditor(result.filename, result.archive);`,
-  `          openEditor(result.filename, result.archive);\n          closeAdminHistoryOverlay(overlay);`,
-  'transition sélecteur vers éditeur'
-);
+  out = replaceOnce(
+    out,
+    '.level.on:after{content:attr(data-l);font-weight:700;font-size:14pt}',
+    '.level.on:after{content:none}',
+    'case de niveau sans contenu dynamique'
+  );
 
-replaceHistory(
-  `function openEditor(filename, archive) {\n  const existing = document.getElementById('seb-bilan-history-editor');\n  if (existing) existing.remove();`,
-  `function openEditor(filename, archive) {\n  const existing = document.getElementById('seb-bilan-history-editor');\n  if (existing) closeAdminHistoryOverlay(existing);`,
-  'fermeture ancien éditeur'
-);
+  out = replaceOnce(out, 'function save(){', 'function save(silent=false){', 'sauvegarde Admin silencieuse');
+  out = replaceOnce(
+    out,
+    "window.sebEvalPro?.save?.();status('Modifications enregistrées')}",
+    "window.sebEvalPro?.save?.();if(!silent)status('Modifications enregistrées')}",
+    'statut uniquement sur sauvegarde explicite'
+  );
 
-replaceHistory(
-  `  document.body.appendChild(overlay);\n  const card = overlay.querySelector('.seb-bh-editor-card');`,
-  `  document.body.appendChild(overlay);\n  lockAdminBackgroundScroll();\n  const card = overlay.querySelector('.seb-bh-editor-card');`,
-  'verrouillage éditeur historique'
-);
+  out = replaceOnce(
+    out,
+    "document.querySelectorAll('.level').forEach(x=>x.onclick=()=>{level(x.closest('tr'),x.dataset.l);save()});",
+    "document.querySelectorAll('.level').forEach(x=>x.onclick=()=>{level(x.closest('tr'),x.dataset.l);save(true)});",
+    'clic niveau sans reflow de statut'
+  );
 
-replaceHistory(
-  `  overlay.querySelector('#seb-bh-editor-close').addEventListener('click', () => overlay.remove());`,
-  `  overlay.querySelector('#seb-bh-editor-close').addEventListener('click', () => closeAdminHistoryOverlay(overlay));\n  overlay.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeAdminHistoryOverlay(overlay); });`,
-  'fermeture éditeur historique'
-);
+  out = replaceOnce(
+    out,
+    "if(t)t.value=x.value;save()});",
+    "if(t)t.value=x.value;save(true)});",
+    'sélection commentaire sans reflow de statut'
+  );
 
-// Le conteneur modal est le seul élément qui doit défiler verticalement.
-// Aucune scrollbar horizontale ne doit apparaître dans l'éditeur Admin.
-replaceHistory(
-  `.seb-bh-body{padding:15px;overflow:auto;background:#f5f7fb}`,
-  `.seb-bh-body{padding:15px;overflow-y:auto;overflow-x:hidden;scrollbar-gutter:stable;background:#f5f7fb;min-width:0}`,
-  'scroll unique du sélecteur'
-);
-
-replaceHistory(
-  `.seb-bh-editor-body{flex:1;overflow:auto;padding:16px;background:#fff}`,
-  `.seb-bh-editor-body{flex:1;min-width:0;overflow-y:auto;overflow-x:hidden;scrollbar-gutter:stable;padding:16px;background:#fff}`,
-  'scroll unique de l éditeur'
-);
-
-replaceHistory(
-  `.seb-bh-table th,.seb-bh-table td{border:1px solid #000;padding:5px;vertical-align:top}`,
-  `.seb-bh-table th,.seb-bh-table td{border:1px solid #000;padding:5px;vertical-align:top;overflow-wrap:anywhere;word-break:normal}`,
-  'prévention débordement horizontal du tableau'
-);
-
-for (const token of [
-  'overflow-y:auto;overflow-x:hidden;scrollbar-gutter:stable',
-  '// SEB_ADMIN_MODAL_SCROLL_LOCK',
-  "html.style.overflow = 'hidden';",
-  "body.style.overflow = 'hidden';",
-  'closeAdminHistoryOverlay(overlay)',
-  '.seb-bh-editor-body{flex:1;min-width:0;overflow-y:auto;overflow-x:hidden;scrollbar-gutter:stable'
-]) {
-  if (!history.includes(token) && !text.includes(token)) {
-    console.error('SEB EvalPro affichage Admin: contrôle final absent: ' + token);
-    process.exit(8);
+  for (const required of [
+    '.level.on:after{content:none}',
+    'function save(silent=false){',
+    'save(true)});',
+    'flex:0 0 250px'
+  ]) {
+    if (!out.includes(required)) fail('contrôle Bilan Admin absent: ' + required, 5);
   }
+
+  write(file, out);
 }
 
-fs.writeFileSync(historyPath, history, 'utf8');
-console.log('SEB EvalPro: bug Admin corrigé — la page de fond est verrouillée pendant les fenêtres historiques; une seule scrollbar verticale reste active; plus de tremblement gauche/droite.');
+// -----------------------------------------------------------------------------
+// 3. Ancien bilan ouvert depuis Admin : conserver une seule zone de défilement
+//    sans toucher à la position de la fenêtre à chaque clic. Le verrouillage de
+//    fond est appliqué uniquement pendant la présence réelle d'une modale.
+// -----------------------------------------------------------------------------
+{
+  const { file, text } = read('src/bilan-history-preload.js');
+  let out = text;
+
+  out = replaceOnce(
+    out,
+    `    #seb-evalpro-old-bilan{background:#f4ecff!important;color:#5a2794!important;border-color:#fff!important;font-weight:700}`,
+    `    html.seb-admin-modal-open{overflow-y:hidden!important;scrollbar-gutter:stable}\n    html.seb-admin-modal-open body{overflow:hidden!important}\n    #seb-evalpro-old-bilan{background:#f4ecff!important;color:#5a2794!important;border-color:#fff!important;font-weight:700}`,
+    'verrouillage visuel local des modales Admin'
+  );
+
+  out = replaceOnce(
+    out,
+    `.seb-bh-body{padding:15px;overflow:auto;background:#f5f7fb}`,
+    `.seb-bh-body{padding:15px;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;background:#f5f7fb;min-width:0}`,
+    'scroll interne sélecteur historique'
+  );
+
+  out = replaceOnce(
+    out,
+    `.seb-bh-editor-body{flex:1;overflow:auto;padding:16px;background:#fff}`,
+    `.seb-bh-editor-body{flex:1;min-width:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;padding:16px;background:#fff}`,
+    'scroll interne éditeur historique'
+  );
+
+  out = replaceOnce(
+    out,
+    `.seb-bh-level.on:after{content:attr(data-level);font-weight:700;font-size:16px}`,
+    `.seb-bh-level.on:after{content:none}`,
+    'case historique sans contenu dynamique'
+  );
+
+  const chooserMarker = 'async function openChooser() {';
+  if (!out.includes('// SEB_ADMIN_MODAL_CLASS_LOCK')) {
+    const helper = `// SEB_ADMIN_MODAL_CLASS_LOCK\nlet sebAdminModalDepth = 0;\nfunction lockAdminModalPage() {\n  sebAdminModalDepth += 1;\n  if (sebAdminModalDepth === 1) document.documentElement.classList.add('seb-admin-modal-open');\n}\nfunction unlockAdminModalPage() {\n  if (sebAdminModalDepth <= 0) return;\n  sebAdminModalDepth -= 1;\n  if (sebAdminModalDepth === 0) document.documentElement.classList.remove('seb-admin-modal-open');\n}\nfunction closeAdminHistoryOverlay(overlay) {\n  if (overlay && overlay.isConnected) overlay.remove();\n  unlockAdminModalPage();\n}\n\n`;
+    if (!out.includes(chooserMarker)) fail('fonction openChooser introuvable', 6);
+    out = out.replace(chooserMarker, helper + chooserMarker);
+  }
+
+  out = replaceOnce(
+    out,
+    `  const existing = document.getElementById('seb-bilan-history-chooser');\n  if (existing) existing.remove();`,
+    `  const existing = document.getElementById('seb-bilan-history-chooser');\n  if (existing) closeAdminHistoryOverlay(existing);`,
+    'fermeture sélecteur existant'
+  );
+
+  out = replaceOnce(
+    out,
+    `  document.body.appendChild(overlay);\n  overlay.querySelector('#seb-bh-close').addEventListener('click', () => overlay.remove());\n  overlay.addEventListener('keydown', (event) => { if (event.key === 'Escape') overlay.remove(); });`,
+    `  document.body.appendChild(overlay);\n  lockAdminModalPage();\n  overlay.querySelector('#seb-bh-close').addEventListener('click', () => closeAdminHistoryOverlay(overlay));\n  overlay.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeAdminHistoryOverlay(overlay); });`,
+    'ouverture/fermeture sélecteur'
+  );
+
+  out = replaceOnce(
+    out,
+    `          overlay.remove();\n          openEditor(result.filename, result.archive);`,
+    `          openEditor(result.filename, result.archive);\n          closeAdminHistoryOverlay(overlay);`,
+    'transition sélecteur vers éditeur'
+  );
+
+  out = replaceOnce(
+    out,
+    `function openEditor(filename, archive) {\n  const existing = document.getElementById('seb-bilan-history-editor');\n  if (existing) existing.remove();`,
+    `function openEditor(filename, archive) {\n  const existing = document.getElementById('seb-bilan-history-editor');\n  if (existing) closeAdminHistoryOverlay(existing);`,
+    'fermeture éditeur existant'
+  );
+
+  out = replaceOnce(
+    out,
+    `  document.body.appendChild(overlay);\n  const card = overlay.querySelector('.seb-bh-editor-card');`,
+    `  document.body.appendChild(overlay);\n  lockAdminModalPage();\n  const card = overlay.querySelector('.seb-bh-editor-card');`,
+    'ouverture éditeur historique'
+  );
+
+  out = replaceOnce(
+    out,
+    `  overlay.querySelector('#seb-bh-editor-close').addEventListener('click', () => overlay.remove());`,
+    `  overlay.querySelector('#seb-bh-editor-close').addEventListener('click', () => closeAdminHistoryOverlay(overlay));\n  overlay.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeAdminHistoryOverlay(overlay); });`,
+    'fermeture éditeur historique'
+  );
+
+  for (const required of [
+    '// SEB_ADMIN_MODAL_CLASS_LOCK',
+    '.seb-bh-level.on:after{content:none}',
+    'overscroll-behavior:contain',
+    "classList.add('seb-admin-modal-open')",
+    'closeAdminHistoryOverlay(overlay)'
+  ]) {
+    if (!out.includes(required)) fail('contrôle historique Admin absent: ' + required, 7);
+  }
+  for (const forbidden of ['window.scrollTo(0, window.scrollY)', 'lockHorizontalPosition']) {
+    if (out.includes(forbidden)) fail('repositionnement horizontal interdit présent dans historique: ' + forbidden, 8);
+  }
+
+  write(file, out);
+}
+
+console.log('SEB EvalPro: stabilité Admin corrigée à la source — aucun scroll horizontal forcé, cases sans contenu dynamique, sauvegarde silencieuse au clic et scroll modal isolé.');
