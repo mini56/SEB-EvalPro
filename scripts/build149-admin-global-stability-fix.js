@@ -31,8 +31,8 @@ function checkJs(text, label) {
 
 // -----------------------------------------------------------------------------
 // 1. Replay preload : aucune capture pendant TOUTE interaction Admin.
-//    Le premier clic sur « Administrateur » doit être filtré AVANT l'ouverture
-//    de la boîte de mot de passe, sinon le capteur before-action part trop tôt.
+//    Le premier clic sur « Administrateur » est filtré AVANT l'ouverture
+//    de la boîte de mot de passe, donc aucun before-action ne peut partir.
 // -----------------------------------------------------------------------------
 {
   const { file, text } = read('src/replay-preload.js');
@@ -69,12 +69,22 @@ function adminInteractionTarget(target) {
     'filtres input/change Admin du replay'
   );
 
-  out = replaceRequired(
-    out,
-    `  document.addEventListener('click', (event) => {\n    const target = event.target && event.target.closest ? event.target.closest('button,a,input,select,textarea,[contenteditable]') : null;\n    if (!target) return;\n    captureCurrentPage('before-action', true);\n    scheduleCapture('after-action', 320);\n  }, true);`,
-    `  document.addEventListener('click', (event) => {\n    if (adminWorkBlocked() || adminInteractionTarget(event.target)) return;\n    const target = event.target && event.target.closest ? event.target.closest('button,a,input,select,textarea,[contenteditable]') : null;\n    if (!target) return;\n    captureCurrentPage('before-action', true);\n    scheduleCapture('after-action', 320);\n  }, true);`,
-    'filtre premier clic Administrateur'
-  );
+  // Cible volontairement souple : certains correctifs précédents ont enrichi le
+  // corps du listener click. On injecte la garde au début du listener recorder,
+  // sans dépendre du reste de son contenu.
+  const recorderStart = out.indexOf('function installCaptureRecorder()');
+  const recorderEnd = out.indexOf('\n}\n\nfunction installArchiveWatcher()', recorderStart);
+  const clickMarker = `  document.addEventListener('click', (event) => {`;
+  const clickAt = out.indexOf(clickMarker, recorderStart);
+  if (recorderStart < 0 || recorderEnd < 0 || clickAt < recorderStart || clickAt > recorderEnd) {
+    fail('listener click du recorder replay introuvable', 5);
+  }
+  const guard = `\n    if (adminWorkBlocked() || adminInteractionTarget(event.target)) return;`;
+  const recorderSegment = out.slice(recorderStart, recorderEnd);
+  if (!recorderSegment.includes('adminInteractionTarget(event.target)')) {
+    const insertAt = clickAt + clickMarker.length;
+    out = out.slice(0, insertAt) + guard + out.slice(insertAt);
+  }
 
   for (const token of [
     'function adminInteractionTarget(target)',
@@ -157,8 +167,7 @@ function adminInteractionTarget(target) {
 
 // -----------------------------------------------------------------------------
 // 4. Bilans historiques : scroll interne fiable, sans modifier la largeur du
-//    document derrière. On ne verrouille plus html/body : l'overlay fixe et
-//    overscroll-behavior:contain suffisent, et évitent le saut de scrollbar.
+//    document derrière. L'overlay fixe + overscroll-behavior suffisent.
 // -----------------------------------------------------------------------------
 {
   const { file, text } = read('src/bilan-history-preload.js');
