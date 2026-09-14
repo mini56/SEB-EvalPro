@@ -115,3 +115,115 @@ for (const required of [
 
 fs.writeFileSync(preloadPath, preload, 'utf8');
 console.log('SEB EvalPro Build #138: Word historique corrigé — NE/I/II/III uniquement en en-tête; cases de résultat vides et seulement colorées; archives JSON #134+ inchangées.');
+
+// Build #139 : l'export Word historique est écrit directement par le processus
+// principal dans Documents\\SEB EvalPro\\Bilans. Aucun téléchargement navigateur
+// n'est utilisé : le fichier doit exister sur disque avant d'afficher le succès.
+{
+  const mainPath = path.join(__dirname, '..', 'src', 'bilan-history-main.js');
+  let main = fs.readFileSync(mainPath, 'utf8').replace(/\r\n/g, '\n');
+  if (!main.includes("bilan-history:write-word-sync")) {
+    const closeMarker = '\n};\n';
+    const closeIndex = main.lastIndexOf(closeMarker);
+    if (closeIndex < 0) {
+      console.error('SEB EvalPro Build #139 Word historique: fin de bilan-history-main.js introuvable.');
+      process.exit(5);
+    }
+    const directWriter = `
+  function historicalWordDir() {
+    return path.join(app.getPath('documents'), 'SEB EvalPro', 'Bilans');
+  }
+
+  function uniqueHistoricalWordPath(filename) {
+    const directory = historicalWordDir();
+    fs.mkdirSync(directory, { recursive: true });
+    const parsed = path.parse(filename);
+    let target = path.join(directory, filename);
+    let index = 2;
+    while (fs.existsSync(target)) {
+      target = path.join(directory, \`${'${parsed.name}'}_${'${index}'}${'${parsed.ext}'}\`);
+      index += 1;
+    }
+    return target;
+  }
+
+  ipcMain.on('bilan-history:write-word-sync', (event, payload) => {
+    if (!getAdminUnlocked()) {
+      event.returnValue = { ok: false, error: 'Accès administrateur requis.' };
+      return;
+    }
+    try {
+      const filename = path.basename(String((payload && payload.filename) || ''));
+      if (!filename || !filename.toLowerCase().endsWith('.doc')) throw new Error('Nom du document Word invalide.');
+      const html = String((payload && payload.html) || '');
+      if (html.length < 100 || !html.includes('<table')) throw new Error('Contenu Word vide ou invalide.');
+      const target = uniqueHistoricalWordPath(filename);
+      const temp = \`${'${target}'}.tmp\`;
+      fs.writeFileSync(temp, '\\uFEFF' + html, 'utf8');
+      fs.renameSync(temp, target);
+      if (!fs.existsSync(target)) throw new Error('Le document Word n’a pas été créé sur le disque.');
+      const size = fs.statSync(target).size;
+      if (size < 100) throw new Error('Le document Word créé est vide.');
+      event.returnValue = { ok: true, filename: path.basename(target), path: target, size };
+    } catch (error) {
+      event.returnValue = { ok: false, error: error && error.message ? error.message : String(error) };
+    }
+  });
+`;
+    main = main.slice(0, closeIndex) + directWriter + main.slice(closeIndex);
+    fs.writeFileSync(mainPath, main, 'utf8');
+  }
+
+  let finalPreload = fs.readFileSync(preloadPath, 'utf8').replace(/\r\n/g, '\n');
+  const functionStart = finalPreload.indexOf('function exportHistoricalWord(card, candidate, originalBuild, revision) {');
+  const functionEndMarker = '\n}\n\nfunction install() {';
+  const functionEnd = finalPreload.indexOf(functionEndMarker, functionStart);
+  if (functionStart < 0 || functionEnd < 0) {
+    console.error('SEB EvalPro Build #139 Word historique: fonction exportHistoricalWord introuvable.');
+    process.exit(6);
+  }
+
+  const directExport = `function exportHistoricalWord(card, candidate, originalBuild, revision) {
+  const doc = buildEditorDocument(card);
+  const rows = doc.rows.map((row) => {
+    if (row.kind === 'section') return \`<tr><td colspan="6" style="background:#9cc2e5;font-weight:bold">${'${escapeHtml(row.sectionText)}'}</td></tr>\`;
+    const levelColors = { NE:'#ccffff', I:'#92d050', II:'#ed7d31', III:'#c00000' };
+    const levels = ['NE','I','II','III'].map((level) => {
+      const selected = row.level === level;
+      const background = selected ? levelColors[level] : '#ffffff';
+      return \`<td style="text-align:center;background:${'${background}'};vertical-align:middle"></td>\`;
+    }).join('');
+    const comments = [row.preset, row.comment, row.detail].filter(Boolean).map(escapeHtml).join('<br>');
+    return \`<tr><td style="white-space:pre-line">${'${escapeHtml(row.moduleText)}'}</td>${'${levels}'}<td>${'${comments}'}</td></tr>\`;
+  }).join('');
+  const html = \`<!doctype html><html><head><meta charset="utf-8"><style>@page{size:A4 landscape;margin:10mm}body{font-family:Calibri,Arial,sans-serif;font-size:10pt}table{width:100%;border-collapse:collapse}th,td{border:1px solid #000;padding:5px;vertical-align:top}th{background:#0070c0;color:#fff}th:nth-child(2){background:#ccffff;color:#000}th:nth-child(3){background:#92d050;color:#000}th:nth-child(4){background:#ed7d31;color:#fff}th:nth-child(5){background:#c00000;color:#fff}</style></head><body><h2>Bilan institutionnel</h2><p><b>Nom :</b> ${'${escapeHtml(candidate.nom || \'\')}'} &nbsp; <b>Prénom :</b> ${'${escapeHtml(candidate.prenom || \'\')}'} &nbsp; <b>Date :</b> ${'${escapeHtml(candidate.date || \'\')}'} &nbsp; <b>Build d\'origine :</b> #${'${escapeHtml(originalBuild || \'?\')}'}</p><table><thead><tr><th>Modules</th><th>NE</th><th>I</th><th>II</th><th>III</th><th>Commentaires</th></tr></thead><tbody>${'${rows}'}</tbody></table></body></html>\`;
+  const safe = (v) => String(v || '').replace(/[^A-Za-z0-9À-ÿ_-]+/g, '_').replace(/^_+|_+$/g, '');
+  const revisionNumber = Number.isFinite(Number(revision)) ? Number(revision) : 0;
+  const revisionSuffix = \`_R${'${String(revisionNumber).padStart(2, \'0\')}' }\`;
+  const wordFilename = \`Bilan_${'${safe(candidate.nom || \'NOM\')}'}_${'${safe(candidate.prenom || \'PRENOM\')}'}_${'${safe(candidate.date || \'\')}'}${'${revisionSuffix}'}.doc\`;
+  const result = ipcRenderer.sendSync('bilan-history:write-word-sync', { filename: wordFilename, html });
+  if (!result || !result.ok) throw new Error((result && result.error) || 'Écriture du document Word impossible.');
+  return result.path || result.filename || wordFilename;
+}`;
+
+  finalPreload = finalPreload.slice(0, functionStart) + directExport + finalPreload.slice(functionEnd + 2);
+  fs.writeFileSync(preloadPath, finalPreload, 'utf8');
+
+  const checkMain = fs.readFileSync(mainPath, 'utf8');
+  const checkPreload = fs.readFileSync(preloadPath, 'utf8');
+  for (const token of [
+    "ipcMain.on('bilan-history:write-word-sync'",
+    "path.join(app.getPath('documents'), 'SEB EvalPro', 'Bilans')",
+    "fs.writeFileSync(temp, '\\uFEFF' + html, 'utf8')",
+    "ipcRenderer.sendSync('bilan-history:write-word-sync'",
+    "return result.path || result.filename || wordFilename;",
+    'background:${background};vertical-align:middle\"></td>'
+  ]) {
+    if (!checkMain.includes(token) && !checkPreload.includes(token)) {
+      console.error('SEB EvalPro Build #139 Word historique: contrôle direct absent: ' + token);
+      process.exit(7);
+    }
+  }
+}
+
+console.log('SEB EvalPro Build #139: les Word historiques modifiés sont écrits directement et vérifiés dans Documents\\SEB EvalPro\\Bilans; cases de niveau colorées mais vides; JSON #134+ inchangés.');
