@@ -75,13 +75,14 @@ replaceExact(
   'signature export Word historique'
 );
 
-// Build #137 : le Word d'une révision historique doit conserver le rendu
-// institutionnel du bilan : NE bleu clair, I vert, II orange, III rouge.
+// Build #138 : les lettres NE/I/II/III restent uniquement dans la première
+// ligne d'en-tête. Dans les lignes de résultat, la case sélectionnée est
+// uniquement colorée et reste vide, comme dans le bilan institutionnel.
 // Le format JSON historique n'est pas modifié : compatibilité #134+ conservée.
 replaceExact(
   "    const levels = ['NE','I','II','III'].map((level) => `<td style=\"text-align:center;font-weight:bold\">${row.level === level ? level : ''}</td>`).join('');\n",
-  "    const levelColors = { NE:'#ccffff', I:'#92d050', II:'#ed7d31', III:'#c00000' };\n    const levelTextColors = { NE:'#000000', I:'#000000', II:'#ffffff', III:'#ffffff' };\n    const levels = ['NE','I','II','III'].map((level) => {\n      const selected = row.level === level;\n      const background = selected ? levelColors[level] : '#ffffff';\n      const color = selected ? levelTextColors[level] : '#000000';\n      return `<td style=\"text-align:center;font-weight:bold;background:${background};color:${color};vertical-align:middle\">${selected ? level : ''}</td>`;\n    }).join('');\n",
-  'couleurs des cases NE/I/II/III du Word historique'
+  "    const levelColors = { NE:'#ccffff', I:'#92d050', II:'#ed7d31', III:'#c00000' };\n    const levels = ['NE','I','II','III'].map((level) => {\n      const selected = row.level === level;\n      const background = selected ? levelColors[level] : '#ffffff';\n      return `<td style=\"text-align:center;background:${background};vertical-align:middle\"></td>`;\n    }).join('');\n",
+  'cases NE/I/II/III colorées mais vides dans le Word historique'
 );
 
 replaceExact(
@@ -102,17 +103,15 @@ for (const required of [
   'exportHistoricalWord(card, candidate, archive.originalBuild, currentRevision)',
   'const revisionSuffix = `_R${String(revisionNumber).padStart(2, \'0\')}`;',
   "const levelColors = { NE:'#ccffff', I:'#92d050', II:'#ed7d31', III:'#c00000' };",
-  'th:nth-child(2){background:#ccffff;color:#000}',
-  'th:nth-child(3){background:#92d050;color:#000}',
-  'th:nth-child(4){background:#ed7d31;color:#fff}',
-  'th:nth-child(5){background:#c00000;color:#fff}',
+  'background:${background};vertical-align:middle\"></td>',
+  '<th>Modules</th><th>NE</th><th>I</th><th>II</th><th>III</th><th>Commentaires</th>',
   'return wordFilename;'
 ]) {
   if (!preload.includes(required)) {
-    console.error(`SEB EvalPro Build #135 Word historique: contrôle final absent: ${required}`);
+    console.error(`SEB EvalPro Build #138 Word historique: contrôle final absent: ${required}`);
     process.exit(4);
   }
 }
 
 fs.writeFileSync(preloadPath, preload, 'utf8');
-console.log('SEB EvalPro Build #137: Word historique corrigé — NE bleu clair, I vert, II orange, III rouge, lettre visible dans la case sélectionnée; archives JSON #134+ inchangées.');
+console.log('SEB EvalPro Build #138: Word historique corrigé — NE/I/II/III uniquement en en-tête; cases de résultat vides et seulement colorées; archives JSON #134+ inchangées.');
