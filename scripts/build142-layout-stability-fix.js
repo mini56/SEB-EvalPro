@@ -25,10 +25,6 @@ function replaceOnce(text, search, replacement, label) {
 
 // -----------------------------------------------------------------------------
 // 1. Shell Electron : supprimer les anciens correctifs globaux de scroll.
-//    Le Build #142/#144 forçait window.scrollTo() pendant scroll/resize. Lors
-//    d'un clic dans le bilan Admin, un simple reflow pouvait donc provoquer un
-//    aller-retour horizontal visible. Aucun code global ne doit repositionner
-//    la fenêtre pendant le travail de l'administrateur.
 // -----------------------------------------------------------------------------
 {
   const { file, text } = read('src/preload.js');
@@ -39,31 +35,21 @@ function replaceOnce(text, search, replacement, label) {
     `    html{box-sizing:border-box;overflow-y:auto;overflow-x:hidden;scrollbar-gutter:stable}\n    body{padding-top:0 !important;box-sizing:border-box;overflow-x:hidden}`
   ];
   for (const oldCss of oldCssVariants) {
-    if (out.includes(oldCss)) {
-      out = out.replace(oldCss, `    html{box-sizing:border-box}\n    body{padding-top:0 !important;box-sizing:border-box}`);
-    }
+    if (out.includes(oldCss)) out = out.replace(oldCss, `    html{box-sizing:border-box}\n    body{padding-top:0 !important;box-sizing:border-box}`);
   }
 
   const badLock = `\n\n  const lockHorizontalPosition = () => {\n    if (window.scrollX !== 0) window.scrollTo(0, window.scrollY);\n  };\n  window.addEventListener('scroll', lockHorizontalPosition, { passive: true });\n  window.addEventListener('resize', lockHorizontalPosition, { passive: true });\n  setTimeout(lockHorizontalPosition, 0);`;
   if (out.includes(badLock)) out = out.replace(badLock, '');
 
-  for (const forbidden of [
-    'lockHorizontalPosition',
-    'window.scrollTo(0, window.scrollY)',
-    'overflow-y:scroll;overflow-x:hidden;scrollbar-gutter:stable'
-  ]) {
+  for (const forbidden of ['lockHorizontalPosition','window.scrollTo(0, window.scrollY)','overflow-y:scroll;overflow-x:hidden;scrollbar-gutter:stable']) {
     if (out.includes(forbidden)) fail('ancien correctif global encore présent: ' + forbidden, 4);
   }
-
   write(file, out);
 }
 
 // -----------------------------------------------------------------------------
-// 2. Bilan Admin courant : un clic ne doit modifier que l'état de la case.
-//    - pas de lettre injectée dans le flux de la cellule ;
-//    - pas de changement de largeur du bandeau d'état ;
-//    - sauvegarde silencieuse sur clic/changement pour éviter tout reflow du
-//      bandeau d'outils à chaque action.
+// 2. Bilan Admin courant : un clic ne doit provoquer aucun changement de
+//    géométrie. Les symboles dans les cases ont déjà été retirés par qcm-ui-fixes.
 // -----------------------------------------------------------------------------
 {
   const { file, text } = read('app/web/admin-bilan.html');
@@ -76,12 +62,9 @@ function replaceOnce(text, search, replacement, label) {
     'largeur stable du statut Admin'
   );
 
-  out = replaceOnce(
-    out,
-    '.level.on:after{content:attr(data-l);font-weight:700;font-size:14pt}',
-    '.level.on:after{content:none}',
-    'case de niveau sans contenu dynamique'
-  );
+  const dynamicLevelContent = '.level.on:after{content:attr(data-l);font-weight:700;font-size:14pt}';
+  if (out.includes(dynamicLevelContent)) out = out.replace(dynamicLevelContent, '');
+  if (out.includes('content:attr(data-l)')) fail('contenu dynamique de niveau encore présent', 5);
 
   out = replaceOnce(out, 'function save(){', 'function save(silent=false){', 'sauvegarde Admin silencieuse');
   out = replaceOnce(
@@ -105,22 +88,15 @@ function replaceOnce(text, search, replacement, label) {
     'sélection commentaire sans reflow de statut'
   );
 
-  for (const required of [
-    '.level.on:after{content:none}',
-    'function save(silent=false){',
-    'save(true)});',
-    'flex:0 0 250px'
-  ]) {
+  for (const required of ['function save(silent=false){','save(true)});','flex:0 0 250px']) {
     if (!out.includes(required)) fail('contrôle Bilan Admin absent: ' + required, 5);
   }
-
   write(file, out);
 }
 
 // -----------------------------------------------------------------------------
-// 3. Ancien bilan ouvert depuis Admin : conserver une seule zone de défilement
-//    sans toucher à la position de la fenêtre à chaque clic. Le verrouillage de
-//    fond est appliqué uniquement pendant la présence réelle d'une modale.
+// 3. Ancien bilan ouvert depuis Admin : une seule zone de défilement interne,
+//    aucun repositionnement horizontal global et cases colorées sans texte.
 // -----------------------------------------------------------------------------
 {
   const { file, text } = read('src/bilan-history-preload.js');
@@ -147,12 +123,9 @@ function replaceOnce(text, search, replacement, label) {
     'scroll interne éditeur historique'
   );
 
-  out = replaceOnce(
-    out,
-    `.seb-bh-level.on:after{content:attr(data-level);font-weight:700;font-size:16px}`,
-    `.seb-bh-level.on:after{content:none}`,
-    'case historique sans contenu dynamique'
-  );
+  const historyDynamicLevel = `.seb-bh-level.on:after{content:attr(data-level);font-weight:700;font-size:16px}`;
+  if (out.includes(historyDynamicLevel)) out = out.replace(historyDynamicLevel, `.seb-bh-level.on:after{content:none}`);
+  if (out.includes('content:attr(data-level)')) fail('contenu dynamique historique encore présent', 6);
 
   const chooserMarker = 'async function openChooser() {';
   if (!out.includes('// SEB_ADMIN_MODAL_CLASS_LOCK')) {
@@ -161,59 +134,18 @@ function replaceOnce(text, search, replacement, label) {
     out = out.replace(chooserMarker, helper + chooserMarker);
   }
 
-  out = replaceOnce(
-    out,
-    `  const existing = document.getElementById('seb-bilan-history-chooser');\n  if (existing) existing.remove();`,
-    `  const existing = document.getElementById('seb-bilan-history-chooser');\n  if (existing) closeAdminHistoryOverlay(existing);`,
-    'fermeture sélecteur existant'
-  );
+  out = replaceOnce(out, `  const existing = document.getElementById('seb-bilan-history-chooser');\n  if (existing) existing.remove();`, `  const existing = document.getElementById('seb-bilan-history-chooser');\n  if (existing) closeAdminHistoryOverlay(existing);`, 'fermeture sélecteur existant');
+  out = replaceOnce(out, `  document.body.appendChild(overlay);\n  overlay.querySelector('#seb-bh-close').addEventListener('click', () => overlay.remove());\n  overlay.addEventListener('keydown', (event) => { if (event.key === 'Escape') overlay.remove(); });`, `  document.body.appendChild(overlay);\n  lockAdminModalPage();\n  overlay.querySelector('#seb-bh-close').addEventListener('click', () => closeAdminHistoryOverlay(overlay));\n  overlay.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeAdminHistoryOverlay(overlay); });`, 'ouverture/fermeture sélecteur');
+  out = replaceOnce(out, `          overlay.remove();\n          openEditor(result.filename, result.archive);`, `          openEditor(result.filename, result.archive);\n          closeAdminHistoryOverlay(overlay);`, 'transition sélecteur vers éditeur');
+  out = replaceOnce(out, `function openEditor(filename, archive) {\n  const existing = document.getElementById('seb-bilan-history-editor');\n  if (existing) existing.remove();`, `function openEditor(filename, archive) {\n  const existing = document.getElementById('seb-bilan-history-editor');\n  if (existing) closeAdminHistoryOverlay(existing);`, 'fermeture éditeur existant');
+  out = replaceOnce(out, `  document.body.appendChild(overlay);\n  const card = overlay.querySelector('.seb-bh-editor-card');`, `  document.body.appendChild(overlay);\n  lockAdminModalPage();\n  const card = overlay.querySelector('.seb-bh-editor-card');`, 'ouverture éditeur historique');
+  out = replaceOnce(out, `  overlay.querySelector('#seb-bh-editor-close').addEventListener('click', () => overlay.remove());`, `  overlay.querySelector('#seb-bh-editor-close').addEventListener('click', () => closeAdminHistoryOverlay(overlay));\n  overlay.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeAdminHistoryOverlay(overlay); });`, 'fermeture éditeur historique');
 
-  out = replaceOnce(
-    out,
-    `  document.body.appendChild(overlay);\n  overlay.querySelector('#seb-bh-close').addEventListener('click', () => overlay.remove());\n  overlay.addEventListener('keydown', (event) => { if (event.key === 'Escape') overlay.remove(); });`,
-    `  document.body.appendChild(overlay);\n  lockAdminModalPage();\n  overlay.querySelector('#seb-bh-close').addEventListener('click', () => closeAdminHistoryOverlay(overlay));\n  overlay.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeAdminHistoryOverlay(overlay); });`,
-    'ouverture/fermeture sélecteur'
-  );
-
-  out = replaceOnce(
-    out,
-    `          overlay.remove();\n          openEditor(result.filename, result.archive);`,
-    `          openEditor(result.filename, result.archive);\n          closeAdminHistoryOverlay(overlay);`,
-    'transition sélecteur vers éditeur'
-  );
-
-  out = replaceOnce(
-    out,
-    `function openEditor(filename, archive) {\n  const existing = document.getElementById('seb-bilan-history-editor');\n  if (existing) existing.remove();`,
-    `function openEditor(filename, archive) {\n  const existing = document.getElementById('seb-bilan-history-editor');\n  if (existing) closeAdminHistoryOverlay(existing);`,
-    'fermeture éditeur existant'
-  );
-
-  out = replaceOnce(
-    out,
-    `  document.body.appendChild(overlay);\n  const card = overlay.querySelector('.seb-bh-editor-card');`,
-    `  document.body.appendChild(overlay);\n  lockAdminModalPage();\n  const card = overlay.querySelector('.seb-bh-editor-card');`,
-    'ouverture éditeur historique'
-  );
-
-  out = replaceOnce(
-    out,
-    `  overlay.querySelector('#seb-bh-editor-close').addEventListener('click', () => overlay.remove());`,
-    `  overlay.querySelector('#seb-bh-editor-close').addEventListener('click', () => closeAdminHistoryOverlay(overlay));\n  overlay.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeAdminHistoryOverlay(overlay); });`,
-    'fermeture éditeur historique'
-  );
-
-  for (const required of [
-    '// SEB_ADMIN_MODAL_CLASS_LOCK',
-    '.seb-bh-level.on:after{content:none}',
-    'overscroll-behavior:contain',
-    "classList.add('seb-admin-modal-open')",
-    'closeAdminHistoryOverlay(overlay)'
-  ]) {
+  for (const required of ['// SEB_ADMIN_MODAL_CLASS_LOCK','overscroll-behavior:contain',"classList.add('seb-admin-modal-open')",'closeAdminHistoryOverlay(overlay)']) {
     if (!out.includes(required)) fail('contrôle historique Admin absent: ' + required, 7);
   }
-  for (const forbidden of ['window.scrollTo(0, window.scrollY)', 'lockHorizontalPosition']) {
-    if (out.includes(forbidden)) fail('repositionnement horizontal interdit présent dans historique: ' + forbidden, 8);
+  for (const forbidden of ['window.scrollTo(0, window.scrollY)','lockHorizontalPosition','content:attr(data-level)']) {
+    if (out.includes(forbidden)) fail('mécanisme instable encore présent: ' + forbidden, 8);
   }
 
   write(file, out);
