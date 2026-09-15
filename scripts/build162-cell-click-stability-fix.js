@@ -5,7 +5,7 @@ const vm = require('vm');
 const root = path.resolve(__dirname, '..');
 
 function fail(message, code = 2) {
-  console.error('SEB EvalPro Build #162 cell click stability: ' + message);
+  console.error('SEB EvalPro cell click stability: ' + message);
   process.exit(code);
 }
 function read(relativePath) {
@@ -24,12 +24,28 @@ function checkJs(text, label) {
 {
   const { file, text } = read('src/replay-preload.js');
   let out = text;
-  const clickBlock = `  document.addEventListener('click', (event) => {\n    if (adminWorkBlocked() || adminInteractionTarget(event.target)) return;\n    const target = event.target && event.target.closest ? event.target.closest('button,a,input,select,textarea,[contenteditable]') : null;\n    if (!target) return;\n    captureCurrentPage('before-action', true);\n    scheduleCapture('after-action', 320);\n  }, true);\n`;
-  if (!out.includes(clickBlock)) fail('listener de capture générique au clic introuvable', 5);
-  out = out.replace(clickBlock, '');
-  if (out.includes("captureCurrentPage('before-action', true)")) fail('capture before-action encore présente', 6);
-  if (!out.includes("scheduleCapture('input', 450)")) fail('capture input absente', 7);
-  if (!out.includes("scheduleCapture('change', 220)")) fail('capture change absente', 8);
+  const beforeMarker = "captureCurrentPage('before-action', true);";
+  const markerAt = out.indexOf(beforeMarker);
+  if (markerAt < 0) fail('capture before-action introuvable', 5);
+
+  const listenerStart = out.lastIndexOf("  document.addEventListener('click', (event) => {", markerAt);
+  const listenerEnd = out.indexOf("  }, true);", markerAt);
+  if (listenerStart < 0 || listenerEnd < 0 || listenerEnd <= markerAt) fail('bornes du listener click Replay introuvables', 6);
+
+  const clickBlock = out.slice(listenerStart, listenerEnd + "  }, true);".length);
+  for (const expected of [
+    "event.target.closest",
+    "button,a,input,select,textarea,[contenteditable]",
+    "captureCurrentPage('before-action', true)",
+    "scheduleCapture('after-action', 320)"
+  ]) {
+    if (!clickBlock.includes(expected)) fail('listener click inattendu, contrôle absent: ' + expected, 7);
+  }
+  out = out.slice(0, listenerStart) + out.slice(listenerEnd + "  }, true);".length);
+
+  if (out.includes(beforeMarker)) fail('capture before-action encore présente', 8);
+  if (!out.includes("scheduleCapture('input', 450)")) fail('capture input absente', 9);
+  if (!out.includes("scheduleCapture('change', 220)")) fail('capture change absente', 10);
   checkJs(out, 'replay-preload.js');
   fs.writeFileSync(file, out, 'utf8');
 }
@@ -40,14 +56,23 @@ function checkJs(text, label) {
 {
   const { file, text } = read('src/replay-navigation-capture.js');
   let out = text;
-  const focusoutBlock = `  document.addEventListener('focusout', () => {\n    setTimeout(() => { captureNow('focusout'); }, 70);\n  }, true);\n`;
-  if (!out.includes(focusoutBlock)) fail('listener focusout Replay introuvable', 9);
-  out = out.replace(focusoutBlock, '');
-  if (out.includes("captureNow('focusout')")) fail('capture focusout encore présente', 10);
-  if (!out.includes("captureNow('change-immediate')")) fail('capture change-immediate absente', 11);
-  if (!out.includes("await captureNow('navigation-before-guaranteed')")) fail('capture garantie avant navigation absente', 12);
+  const focusMarker = "captureNow('focusout')";
+  const markerAt = out.indexOf(focusMarker);
+  if (markerAt < 0) fail('capture focusout introuvable', 11);
+
+  const listenerStart = out.lastIndexOf("  document.addEventListener('focusout'", markerAt);
+  const listenerEnd = out.indexOf("  }, true);", markerAt);
+  if (listenerStart < 0 || listenerEnd < 0 || listenerEnd <= markerAt) fail('bornes du listener focusout introuvables', 12);
+
+  const focusBlock = out.slice(listenerStart, listenerEnd + "  }, true);".length);
+  if (!focusBlock.includes("setTimeout(() => { captureNow('focusout'); }, 70)")) fail('listener focusout inattendu', 13);
+  out = out.slice(0, listenerStart) + out.slice(listenerEnd + "  }, true);".length);
+
+  if (out.includes(focusMarker)) fail('capture focusout encore présente', 14);
+  if (!out.includes("captureNow('change-immediate')")) fail('capture change-immediate absente', 15);
+  if (!out.includes("await captureNow('navigation-before-guaranteed')")) fail('capture garantie avant navigation absente', 16);
   checkJs(out, 'replay-navigation-capture.js');
   fs.writeFileSync(file, out, 'utf8');
 }
 
-console.log('SEB EvalPro Build #162: aucun screenshot Replay au simple clic/focus de cellule; captures de saisie et navigation conservées.');
+console.log('SEB EvalPro: aucun screenshot Replay au simple clic/focus de cellule; captures de saisie et navigation conservées.');
