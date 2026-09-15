@@ -8,5 +8,14 @@ const fixes=[
   ["sebBhSummary=function(card,c){","sebV4HistorySummary=function(card,c){"]
 ];
 for(const [a,b] of fixes){if(!s.includes(a))throw new Error('Correctif V5 introuvable: '+a);s=s.replace(a,b)}
+function rawTemplateNewlines(name){
+  const needle='const '+name+'=String.raw`';
+  const a=s.indexOf(needle);if(a<0)throw new Error('Template V5 introuvable: '+name);
+  const c=a+needle.length,e=s.indexOf('`;',c);if(e<0)throw new Error('Fin template V5 introuvable: '+name);
+  const body=s.slice(c,e).replace(/\\n/g,'\n');
+  s=s.slice(0,c)+body+s.slice(e);
+}
+rawTemplateNewlines('block');
+rawTemplateNewlines('addon');
 fs.writeFileSync(temp,s,'utf8');
 try{require(temp)}finally{try{fs.unlinkSync(temp)}catch(_){}}
