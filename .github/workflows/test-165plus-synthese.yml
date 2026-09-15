@@ -39,6 +39,7 @@ jobs:
         run: |
           npm run prepare:web
           node scripts/build165plus-history-synthesis.js
+          node scripts/build165plus-institutional-synthesis-v4.js
           npx electron-builder --win --publish never
       - name: Build standalone Windows uninstaller
         shell: pwsh
@@ -65,7 +66,7 @@ jobs:
           $setup = "dist\\SEB-eval-PRO-$version-Windows-Setup.exe"
           $uninstaller = "dist\\SEB-eval-PRO-$version-Windows-Desinstallation.exe"
           $title = "SEB EvalPro 165+ - Test synthèse bilan #${{ github.run_number }}"
-          $notes = "Prototype isolé dérivé strictement du Build #165 validé. Test de la synthèse automatique du bilan courant et des anciens bilans. Ne remplace pas la version de référence."
+          $notes = "Prototype isolé dérivé strictement du Build #165 validé. Test de la synthèse institutionnelle développée et du bloc Ressenti stagiaire, sur bilan courant et anciens bilans. Ne remplace pas la version de référence."
           gh release create $tag $setup $uninstaller --target "${{ github.sha }}" --title $title --notes $notes --prerelease --repo "${{ github.repository }}"
           if ($LASTEXITCODE -ne 0) { throw "Publication release test échouée : $LASTEXITCODE" }
       - uses: actions/upload-artifact@v4
@@ -87,6 +88,7 @@ jobs:
         run: |
           npm run prepare:web
           node scripts/build165plus-history-synthesis.js
+          node scripts/build165plus-institutional-synthesis-v4.js
           npx electron-builder --linux AppImage --publish never
       - uses: actions/upload-artifact@v4
         continue-on-error: true
