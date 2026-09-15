@@ -1,0 +1,53 @@
+const fs=require('fs');const path=require('path');const vm=require('vm');
+const file=path.join(__dirname,'..','app','web','admin-bilan.html');
+function fail(m){console.error('SEB EvalPro 165+ synthèse: '+m);process.exit(2)}
+if(!fs.existsSync(file))fail('admin-bilan.html introuvable');
+let html=fs.readFileSync(file,'utf8').replace(/\r\n/g,'\n');
+if(html.includes('seb-165plus-synthese-bilan'))fail('prototype déjà injecté');
+const end=html.toLowerCase().lastIndexOf('</body>');if(end<0)fail('</body> introuvable');
+const block=String.raw`
+<style id="seb-165plus-synthese-style">
+.seb-admin-abandon-section,.seb-admin-abandon-row{display:none!important}
+#seb-bilan-synthese{margin:16px 0 4px;border:1px solid #9cc2e5;background:#f7fbff;padding:14px}
+#seb-bilan-synthese h2{margin:0 0 5px;color:#1f4e79;font-size:16pt}
+#seb-bilan-synthese .help{margin:0 0 10px;font-size:10pt;color:#444}
+#seb-bilan-synthese .actions{display:flex;gap:8px;align-items:center;margin-bottom:9px}
+#seb-bilan-synthese button{border:0;border-radius:5px;background:#0070c0;color:#fff;padding:8px 13px;font-weight:700;cursor:pointer}
+#seb-bilan-synthese-text{width:100%;min-height:190px;padding:9px;font:11pt Calibri,Arial,sans-serif;line-height:1.35;resize:vertical;border:1px solid #888;background:#fff}
+#seb-abandon-reference{margin-top:10px;padding:9px 11px;border-left:4px solid #ed7d31;background:#fff8ef;font-size:10pt;white-space:pre-line}
+@media print{.seb-admin-abandon-section,.seb-admin-abandon-row,#seb-bilan-synthese .actions,#seb-abandon-reference,#seb-bilan-synthese .help{display:none!important}#seb-bilan-synthese{border:0;background:#fff;padding:0;margin-top:12px}#seb-bilan-synthese-text{border:0;resize:none;overflow:visible}}
+</style>
+<script id="seb-165plus-synthese-bilan">
+(()=>{'use strict';
+const A='seb_evalpro_abandons',S='seb_evalpro_bilan_synthese',K='admin_bilan_state',AC='Exercice abandonné.';
+const map={
+'brique.html':['briques-identification','briques-manipulation'],'stock.html':['organisation'],'planning.html':['planning'],'tri_de_cheville.html':['tri-temps','tri-erreurs'],'nwtexte.html':['texte'],'nvmail.html':['mail'],'carre.html':['carre'],'paronymes.html':['expression'],'genrenombres.html':['expression'],'qcmv1.0.html#pageTexteTrous':['expression'],'qcmv1.0.html#page2':['math-enonce'],'qcmv1.0.html#page2_1':['math-enonce'],'qcmv1.0.html#page3':['math-problemes'],'qcmv1.0.html#page4':['math-problemes'],'qcmv1.0.html#page6':['math-problemes'],'qcmv1.0.html#page8':['mail']};
+const names={'fabrication-plan':'la lecture et la compréhension d’un plan','fabrication-tracage':'les opérations de traçage et de repérage','fabrication-decoupe':'les opérations de découpe','fabrication-assemblage':'les opérations de pliage et d’assemblage','fabrication-finition':'les opérations de finition','briques-identification':'l’identification et l’interprétation d’un schéma simple','briques-manipulation':'la manipulation et l’assemblage de pièces','carre':'la résolution de problèmes structurés','organisation':'la gestion logistique','planning':'la gestion de plannings sous contraintes','tri-temps':'le rythme de réalisation de la tâche de tri','tri-erreurs':'la fiabilité dans la tâche de tri','texte':'l’utilisation du traitement de texte','mail':'l’utilisation de la messagerie électronique','expression':'l’expression écrite','math-enonce':'la compréhension d’un énoncé et d’une consigne en mathématiques','math-problemes':'la résolution de problèmes mathématiques'};
+function j(k,d){try{return JSON.parse(sessionStorage.getItem(k)||'null')??d}catch{return d}}
+function abandons(){const v=j(A,[]);return Array.isArray(v)?v:[]}
+function key(r){return String(r?.key||String(r?.page||'')+(r?.qcmPage?'#'+r.qcmPage:''))}
+function targets(r){return map[key(r)]||map[String(r?.page||'')]||[]}
+function lev(row,l){row.querySelectorAll('.level').forEach(c=>c.classList.toggle('on',c.dataset.l===l));row.dataset.level=l}
+function applyAbandons(){const set=new Set;abandons().forEach(r=>targets(r).forEach(id=>{const row=document.querySelector('tr[data-r="'+id+'"]');if(!row)return;set.add(id);lev(row,'NE');const s=row.querySelector('.csel'),t=row.querySelector('.ctxt'),d=row.querySelector('.detail');if(s){const o=[...s.options].find(x=>x.dataset.l==='NE');if(o)s.value=o.value}if(t)t.value=AC;if(d)d.textContent='';row.dataset.sebAbandoned='1'}));return set}
+function persist(){let x=j(K,{rows:{}});if(!x||typeof x!=='object')x={rows:{}};if(!x.rows)x.rows={};document.querySelectorAll('tr[data-r]').forEach(r=>x.rows[r.dataset.r]={level:r.dataset.level||'',select:r.querySelector('.csel')?.value||'',comment:r.querySelector('.ctxt')?.value||'',detail:r.querySelector('.detail')?.textContent||''});const a=document.getElementById('triAvg'),e=document.getElementById('triErr'),t=document.getElementById('triTimes');if(a)x.triAvg=a.textContent;if(e)x.triErr=e.textContent;if(t)x.triTimes=t.innerHTML;sessionStorage.setItem(K,JSON.stringify(x));window.sebEvalPro?.save?.()}
+function join(v){v=v.filter(Boolean);return v.length<2?(v[0]||''):v.length===2?v[0]+' et '+v[1]:v.slice(0,-1).join(', ')+' et '+v.at(-1)}
+function reason(r){const q=Array.isArray(r?.raisons)?r.raisons:[],v=[];if(q.includes('Je ne comprends pas la consigne'))v.push('une difficulté à comprendre la consigne');if(q.includes('L’exercice est trop difficile'))v.push('une difficulté jugée trop importante');if(q.includes('Fatigue, gêne ou douleur'))v.push('une fatigue, une gêne ou une douleur signalée');if(q.includes('Autre raison'))v.push('un autre motif signalé');return v.length?' en raison de '+join(v):''}
+function reference(){const el=document.getElementById('seb-abandon-reference');if(!el)return;const a=abandons();if(!a.length){el.hidden=true;el.textContent='';return}el.hidden=false;el.textContent='Motifs d’abandon saisis par le stagiaire — référence administrateur uniquement\n'+a.map(r=>'• '+String(r.exercice||r.page||'Exercice')+' — '+(Array.isArray(r.raisons)&&r.raisons.length?r.raisons.join(' ; '):'motif non renseigné')+(String(r.commentaire||'').trim()?' — précision libre : '+String(r.commentaire).trim():'')).join('\n')}
+function generate(){const abandoned=applyAbandons(),g={I:[],II:[],III:[],NE:[]},obs=[];document.querySelectorAll('tr[data-r]').forEach(r=>{const id=r.dataset.r,l=r.dataset.level||'';if(g[l]&&!(l==='NE'&&abandoned.has(id)))g[l].push(names[id]||id);const t=String(r.querySelector('.ctxt')?.value||'').trim(),s=String(r.querySelector('.csel')?.value||'').trim();if(t&&t!==AC&&t!==s)obs.push(t.replace(/\s+/g,' '))});const p=[];if(g.I.length)p.push('Les résultats mettent en évidence des acquis satisfaisants concernant '+join(g.I)+'.');if(g.II.length)p.push('Un accompagnement ou des consignes complémentaires restent nécessaires pour '+join(g.II)+'.');if(g.III.length)p.push('Des difficultés plus marquées sont observées concernant '+join(g.III)+'.');if(g.NE.length)p.push('Les éléments suivants n’ont pas été évalués : '+join(g.NE)+'.');abandons().forEach(r=>p.push('L’exercice « '+String(r.exercice||r.page||'Exercice')+' » a été abandonné'+reason(r)+'.'));if(obs.length)p.push('Observations complémentaires : '+obs.join(' '));return p.length?p.join('\n\n'):'La synthèse pourra être générée lorsque le bilan comportera des éléments évalués.'}
+function saveSummary(){const a=document.getElementById('seb-bilan-synthese-text');if(a){sessionStorage.setItem(S,a.value||'');window.sebEvalPro?.save?.()}}
+function install(){const table=document.getElementById('bilan');if(!table||document.getElementById('seb-bilan-synthese'))return;const sec=document.createElement('section');sec.id='seb-bilan-synthese';sec.innerHTML='<h2>Synthèse du bilan</h2><p class="help">Synthèse automatique locale, modifiable par l’administrateur avant enregistrement et export.</p><div class="actions"><button type="button" id="seb-generate-synthese">Générer / régénérer la synthèse</button><span id="seb-synthese-status"></span></div><textarea id="seb-bilan-synthese-text"></textarea><div id="seb-abandon-reference" hidden></div>';table.insertAdjacentElement('afterend',sec);const area=document.getElementById('seb-bilan-synthese-text');area.value=sessionStorage.getItem(S)||'';area.addEventListener('input',saveSummary);document.getElementById('seb-generate-synthese').addEventListener('click',()=>{area.value=generate();saveSummary();persist();document.getElementById('seb-synthese-status').textContent='Synthèse générée — vous pouvez la modifier.';reference()});document.getElementById('auto')?.addEventListener('click',()=>setTimeout(()=>{applyAbandons();persist();reference()},0));document.getElementById('save')?.addEventListener('click',()=>{saveSummary();applyAbandons();persist()});applyAbandons();persist();reference()}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
+})();
+</script>
+`;
+html=html.slice(0,end)+block+html.slice(end);
+const clone="function word(){save();const c=cand(),t=$('#bilan').cloneNode(true);";
+if(!html.includes(clone))fail('fonction Word courant introuvable');
+html=html.replace(clone,clone+"t.querySelectorAll('.seb-admin-abandon-section,.seb-admin-abandon-row').forEach(x=>x.remove());");
+const a="const meta='<p><b>Nom :</b> '+esc(c.nom)+' &nbsp; <b>Prénom :</b> '+esc(c.prenom)+' &nbsp; <b>Date :</b> '+esc(c.date)+'</p>',h='<!doctype html><html><head><meta charset=\"utf-8\">'+st+'</head><body><div class=\"Section1\">'+meta+t.outerHTML+'</div></body></html>'";
+if(!html.includes(a))fail('point synthèse Word introuvable');
+const b="const meta='<p><b>Nom :</b> '+esc(c.nom)+' &nbsp; <b>Prénom :</b> '+esc(c.prenom)+' &nbsp; <b>Date :</b> '+esc(c.date)+'</p>',summaryText=String(sessionStorage.getItem('seb_evalpro_bilan_synthese')||'').trim(),summaryHtml=summaryText?'<h2 style=\"margin-top:18pt\">Synthèse de l’évaluation</h2><p style=\"white-space:pre-wrap\">'+esc(summaryText)+'</p>':'',h='<!doctype html><html><head><meta charset=\"utf-8\">'+st+'</head><body><div class=\"Section1\">'+meta+t.outerHTML+summaryHtml+'</div></body></html>'";
+html=html.replace(a,b);
+const re=/<script\b([^>]*)>([\s\S]*?)<\/script>/gi;let m;while((m=re.exec(html))){if(/\bsrc\s*=/.test(m[1]||''))continue;const c=String(m[2]||'').trim();if(c)try{new vm.Script(c)}catch(e){fail('JS inline invalide: '+e.message)}}
+for(const x of ['seb-165plus-synthese-bilan','Exercice abandonné.','Générer / régénérer la synthèse','summaryHtml=summaryText'])if(!html.includes(x))fail('contrôle absent: '+x);
+fs.writeFileSync(file,html,'utf8');console.log('SEB EvalPro 165+ : abandon => NE + « Exercice abandonné. »; motifs hors tableau; synthèse automatique locale modifiable + export Word courant.');
