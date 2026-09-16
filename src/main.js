@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
+const { createLocalAiService } = require('./local-ai');
 
 const ADMIN_PASSWORD_SHA256 = 'c800892ba3f11b33d36eedf7d3c4297f2b6c02e2c347dda8954b4c577f6666b5';
 const STATE_VERSION = 1;
@@ -14,6 +15,7 @@ let splashWindow = null;
 let splashStartedAt = 0;
 let adminSessionUnlocked = false;
 let downloadRoutingInstalled = false;
+const localAi = createLocalAiService({ app });
 
 function stateFilePath() {
   return path.join(app.getPath('userData'), 'evaluation-state.json');
@@ -309,6 +311,16 @@ ipcMain.handle('admin:return-evaluation', () => {
   return true;
 });
 
+ipcMain.handle('ai:status', () => {
+  if (!adminSessionUnlocked) return { available: false, offline: true, error: 'Accès administrateur requis.' };
+  return localAi.status();
+});
+
+ipcMain.handle('ai:rewrite-synthesis', async (_event, text) => {
+  if (!adminSessionUnlocked) return { ok: false, error: 'Accès administrateur requis.' };
+  return localAi.rewrite(String(text || ''));
+});
+
 require('./session-close')({
   app,
   ipcMain,
@@ -320,6 +332,10 @@ require('./session-close')({
 });
 
 app.whenReady().then(startApplication);
+
+app.on('before-quit', () => {
+  localAi.stop();
+});
 
 app.on('window-all-closed', () => {
   app.quit();
