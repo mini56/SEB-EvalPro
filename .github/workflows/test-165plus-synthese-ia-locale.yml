@@ -34,6 +34,37 @@ jobs:
             node --check $file
             if ($LASTEXITCODE -ne 0) { throw "JavaScript invalide: $file" }
           }
+          @'
+          const { __test } = require('./src/local-ai');
+          const { validateRewrite } = __test;
+          const source = [
+            'Dans les activités de fabrication, la lecture du plan et la découpe sont maîtrisées. Le traçage, le repérage, le pliage, l’assemblage et les finitions demandent encore davantage de contrôle et de précision.',
+            'Concernant les outils numériques, le traitement de texte reste difficile. La messagerie nécessite encore un accompagnement.',
+            'En mathématiques, la compréhension d’une consigne simple constitue un point d’appui. Les calculs et la résolution de problèmes n’ont pas été évalués.'
+          ].join('\n\n');
+          const valid = [
+            'Dans les activités de fabrication, la lecture du plan ainsi que la découpe sont maîtrisées. Le traçage, le repérage, le pliage, l’assemblage et les finitions nécessitent encore davantage de contrôle et de précision.',
+            'Concernant les outils numériques, le traitement de texte demeure difficile, tandis que la messagerie nécessite encore un accompagnement.',
+            'En mathématiques, la compréhension d’une consigne simple reste un point d’appui. Les calculs et la résolution de problèmes n’ont pas été évalués.'
+          ].join('\n\n');
+          validateRewrite(source, valid);
+          const rejects = [
+            valid.replace(', l’assemblage et les finitions', ' et l’assemblage'),
+            valid.replace('Dans les activités de fabrication', 'La personne participe activement. Dans les activités de fabrication'),
+            valid.replace('un accompagnement', 'un accompagnement continu'),
+            valid.replace('Les calculs et la résolution de problèmes n’ont pas été évalués.', 'Les calculs et la résolution de problèmes nécessitent encore un accompagnement.'),
+            valid.replace(/\n\n/g, ' '),
+            valid.replace('demeure difficile', 'demeure difficile dans 2 situations')
+          ];
+          for (const sample of rejects) {
+            let rejected = false;
+            try { validateRewrite(source, sample); } catch (_) { rejected = true; }
+            if (!rejected) throw new Error('Un cas de dérive IA n’a pas été rejeté.');
+          }
+          console.log('SEB IA guard test: OK - cas synthétiques anonymes.');
+          '@ | Set-Content -Path '_local-ai-guard-test.js' -Encoding UTF8
+          node _local-ai-guard-test.js
+          if ($LASTEXITCODE -ne 0) { throw 'Contrôle de fidélité IA échoué.' }
 
       - name: Prepare embedded local AI runtime
         shell: pwsh
@@ -77,41 +108,29 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $port = 39472
-          $args = @('--model',(Resolve-Path 'ai-runtime\Qwen3-1.7B-Q4_K_M.gguf').Path,'--host','127.0.0.1','--port',"$port",'--ctx-size','1024','--threads','2','--n-gpu-layers','0')
-          $proc = Start-Process -FilePath (Resolve-Path 'ai-runtime\llama-server.exe').Path -ArgumentList $args -PassThru -WindowStyle Hidden -RedirectStandardOutput '_ai-server-out.log' -RedirectStandardError '_ai-server-err.log'
-          try {
-            $ready = $false
-            for ($i=0; $i -lt 180; $i++) {
-              Start-Sleep -Milliseconds 500
-              if ($proc.HasExited) { throw "llama-server s'est arrêté avec le code $($proc.ExitCode)." }
-              try {
-                $health = Invoke-RestMethod -Uri "http://127.0.0.1:$port/health" -TimeoutSec 2
-                if ($health.status -eq 'ok') { $ready = $true; break }
-              } catch {}
-            }
-            if (-not $ready) { throw 'Le serveur IA local ne devient pas prêt.' }
-
-            $body = @{
-              model = 'Qwen3-1.7B-Q4_K_M.gguf'
-              messages = @(
-                @{ role='system'; content='Tu réponds en français et uniquement avec le mot OK.' },
-                @{ role='user'; content='/no_think Réponds uniquement OK.' }
-              )
-              temperature = 0.7
-              top_p = 0.8
-              max_tokens = 24
-              seed = 42
-              stream = $false
-            } | ConvertTo-Json -Depth 8
-            $reply = Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:$port/v1/chat/completions" -ContentType 'application/json; charset=utf-8' -Body $body -TimeoutSec 120
-            $text = [string]$reply.choices[0].message.content
-            if ([string]::IsNullOrWhiteSpace($text)) { throw 'Inférence locale vide.' }
-            Write-Host "Smoke inference IA locale: $text"
-          }
-          finally {
-            if ($proc -and -not $proc.HasExited) { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue }
-          }
+          @'
+          const { createLocalAiService } = require('./src/local-ai');
+          const source = [
+            'Dans les activités de fabrication, la lecture du plan et la découpe sont maîtrisées. Le traçage, le repérage, le pliage, l’assemblage et les finitions demandent encore davantage de contrôle et de précision.',
+            'Concernant les outils numériques, le traitement de texte reste difficile. La messagerie nécessite encore un accompagnement.',
+            'En mathématiques, la compréhension d’une consigne simple constitue un point d’appui. Les calculs et la résolution de problèmes n’ont pas été évalués.'
+          ].join('\n\n');
+          (async()=>{
+            const service=createLocalAiService({app:{isPackaged:false}});
+            try {
+              const result=await service.rewrite(source);
+              if(!result?.ok) throw new Error(result?.error||'réécriture IA vide');
+              if(!/pliag/i.test(result.text)||!/finit/i.test(result.text)) throw new Error('compétence protégée perdue');
+              const norm=result.text.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+              if(/activement|accompagnement continu|supplementaire/.test(norm)) throw new Error('qualificatif non sourcé ajouté');
+              if(!/(?:pas|non)[^.!?]{0,80}evalu/.test(norm)) throw new Error('non-évalué perdu');
+              console.log(`SEB IA smoke réel: OK - ${result.passes} passe(s), ${Math.max(1,Math.round(result.elapsedMs/1000))} s.`);
+              console.log(result.text);
+            } finally { service.stop(); }
+          })().then(()=>process.exit(0)).catch(e=>{console.error(e.stack||e);process.exit(2)});
+          '@ | Set-Content -Path '_local-ai-smoke.js' -Encoding UTF8
+          node _local-ai-smoke.js
+          if ($LASTEXITCODE -ne 0) { throw 'Smoke test réel de reformulation IA échoué.' }
 
       - name: Ensure ImageMagick
         shell: pwsh
@@ -202,7 +221,7 @@ jobs:
           $setup = "dist\SEB-eval-PRO-$version-Windows-Setup.exe"
           $uninstaller = "dist\SEB-eval-PRO-$version-Windows-Desinstallation.exe"
           $title = "SEB EvalPro - Test IA locale #${{ github.run_number }}"
-          $notes = "Prototype isolé dérivé du test sans IA #28. Qwen3-1.7B Q4_K_M et llama.cpp CPU x64 sont embarqués dans l'installeur. Test réel Electron ajouté : la Release n'est publiée que si la barre Administrateur est présente et s'affiche réellement au bord supérieur. Aucune connexion Internet n'est requise pendant le plateau. Ne remplace pas le Build #165 officiel."
+          $notes = "Prototype isolé dérivé du test sans IA #28. Reformulation IA locale en deux passes : rédaction puis contrôle de fidélité, avec une troisième passe de réparation uniquement si le garde détecte une omission ou un ajout. Les compétences citées, les éléments non évalués, la structure des paragraphes et les degrés de difficulté sont protégés automatiquement. Qwen3-1.7B Q4_K_M et llama.cpp CPU x64 restent entièrement hors ligne. Ne remplace pas le Build #165 officiel."
           gh release create $tag $setup $uninstaller --target "${{ github.sha }}" --title $title --notes $notes --prerelease --repo "${{ github.repository }}"
           if ($LASTEXITCODE -ne 0) { throw "Publication release IA locale échouée : $LASTEXITCODE" }
 
