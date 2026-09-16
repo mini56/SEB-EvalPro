@@ -19,17 +19,17 @@ if (!source.includes('window.__sebEvalProRefreshAdminBar = updateAdminButtons;')
   source = source.replace(oldRefresh, newRefresh);
 }
 
-const oldBoot = `window.addEventListener('DOMContentLoaded', async () => {\n  adminUnlocked = await ipcRenderer.invoke('admin:status');\n  injectAdminBar();\n  document.addEventListener('input', scheduleSave, true);\n  document.addEventListener('change', scheduleSave, true);\n  document.addEventListener('click', scheduleSave, true);\n  periodicSaveTimer = setInterval(() => saveNow(false), 1000);\n});`;
+const oldBootPrefix = `window.addEventListener('DOMContentLoaded', async () => {\n  adminUnlocked = await ipcRenderer.invoke('admin:status');\n  injectAdminBar();`;
+const newBootPrefix = `window.addEventListener('DOMContentLoaded', async () => {\n  // La barre doit apparaître immédiatement, indépendamment du délai IPC.\n  injectAdminBar();\n  try {\n    adminUnlocked = !!await Promise.race([\n      ipcRenderer.invoke('admin:status'),\n      new Promise((resolve) => setTimeout(() => resolve(adminUnlocked), 600))\n    ]);\n  } catch (_) {}\n  if (typeof window.__sebEvalProRefreshAdminBar === 'function') {\n    window.__sebEvalProRefreshAdminBar();\n  }`;
 
-const newBoot = `window.addEventListener('DOMContentLoaded', async () => {\n  // La barre doit apparaître même si une initialisation IPC secondaire tarde ou échoue.\n  injectAdminBar();\n  try {\n    adminUnlocked = !!await Promise.race([\n      ipcRenderer.invoke('admin:status'),\n      new Promise((resolve) => setTimeout(() => resolve(false), 600))\n    ]);\n  } catch (_) {\n    adminUnlocked = false;\n  }\n  if (typeof window.__sebEvalProRefreshAdminBar === 'function') {\n    window.__sebEvalProRefreshAdminBar();\n  }\n  document.addEventListener('input', scheduleSave, true);\n  document.addEventListener('change', scheduleSave, true);\n  document.addEventListener('click', scheduleSave, true);\n  periodicSaveTimer = setInterval(() => saveNow(false), 1000);\n});`;
-
-if (!source.includes('// La barre doit apparaître même si une initialisation IPC secondaire tarde ou échoue.')) {
-  if (!source.includes(oldBoot)) fail('initialisation DOM de la barre Admin introuvable');
-  source = source.replace(oldBoot, newBoot);
+if (!source.includes('// La barre doit apparaître immédiatement, indépendamment du délai IPC.')) {
+  if (!source.includes(oldBootPrefix)) fail('préfixe DOM de la barre Admin introuvable');
+  source = source.replace(oldBootPrefix, newBootPrefix);
 }
 
+if (!source.includes('// La barre doit apparaître immédiatement, indépendamment du délai IPC.')) fail('garde d’affichage immédiat absente');
 if (!source.includes('injectAdminBar();\n  try {')) fail('la barre Admin n’est pas injectée avant la lecture du statut');
-if (!source.includes("window.__sebEvalProRefreshAdminBar = updateAdminButtons;")) fail('rafraîchissement Admin absent');
+if (!source.includes('window.__sebEvalProRefreshAdminBar = updateAdminButtons;')) fail('rafraîchissement Admin absent');
 
 fs.writeFileSync(file, source, 'utf8');
-console.log('IA locale: barre Administrateur rendue indépendante du délai IPC et conservée sur les navigations.');
+console.log('IA locale: barre Administrateur injectée immédiatement et statut Admin resynchronisé après IPC.');
