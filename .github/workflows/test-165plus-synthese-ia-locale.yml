@@ -23,12 +23,15 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
+          node scripts/fix-local-ai-style-audit.js
+          if ($LASTEXITCODE -ne 0) { throw 'Installation audit fidélité IA échouée.' }
           foreach ($file in @(
             'src/main.js',
             'src/preload.js',
             'src/local-ai.js',
             'scripts/build165plus-local-ai-prototype.js',
             'scripts/fix-local-ai-admin-bar.js',
+            'scripts/fix-local-ai-style-audit.js',
             'scripts/admin-bar-smoke-electron.js'
           )) {
             node --check $file
@@ -54,7 +57,8 @@ jobs:
             valid.replace('un accompagnement', 'un accompagnement continu'),
             valid.replace('Les calculs et la résolution de problèmes n’ont pas été évalués.', 'Les calculs et la résolution de problèmes nécessitent encore un accompagnement.'),
             valid.replace(/\n\n/g, ' '),
-            valid.replace('demeure difficile', 'demeure difficile dans 2 situations')
+            valid.replace('demeure difficile', 'demeure difficile dans 2 situations'),
+            '<TEXTE_SOURCE>\n' + valid + '\n</TEXTE_SOURCE>'
           ];
           for (const sample of rejects) {
             let rejected = false;
@@ -124,6 +128,7 @@ jobs:
               const norm=result.text.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
               if(/activement|accompagnement continu|supplementaire/.test(norm)) throw new Error('qualificatif non sourcé ajouté');
               if(!/(?:pas|non)[^.!?]{0,80}evalu/.test(norm)) throw new Error('non-évalué perdu');
+              if(/<\/?(?:texte_source|proposition|message_du_controle|bilan_source)>/i.test(result.text)) throw new Error('balise technique visible');
               console.log(`SEB IA smoke réel: OK - ${result.passes} passe(s), ${Math.max(1,Math.round(result.elapsedMs/1000))} s.`);
               console.log(result.text);
             } finally { service.stop(); }
@@ -170,7 +175,8 @@ jobs:
             'scripts/build165plus-natural-synthesis-v8-runner.js',
             'scripts/build165plus-natural-synthesis-v9.js',
             'scripts/build165plus-local-ai-prototype.js',
-            'scripts/fix-local-ai-admin-bar.js'
+            'scripts/fix-local-ai-admin-bar.js',
+            'scripts/fix-local-ai-style-audit.js'
           )) {
             node $script
             if ($LASTEXITCODE -ne 0) { throw "Script de préparation échoué: $script" }
@@ -178,6 +184,8 @@ jobs:
 
           node --check src/preload.js
           if ($LASTEXITCODE -ne 0) { throw 'preload.js final invalide.' }
+          node --check src/local-ai.js
+          if ($LASTEXITCODE -ne 0) { throw 'local-ai.js final invalide.' }
 
           npx electron scripts/admin-bar-smoke-electron.js
           if ($LASTEXITCODE -ne 0) { throw 'Test réel Electron de la barre Admin échoué.' }
@@ -221,7 +229,7 @@ jobs:
           $setup = "dist\SEB-eval-PRO-$version-Windows-Setup.exe"
           $uninstaller = "dist\SEB-eval-PRO-$version-Windows-Desinstallation.exe"
           $title = "SEB EvalPro - Test IA locale #${{ github.run_number }}"
-          $notes = "Prototype isolé dérivé du test sans IA #28. Reformulation IA locale en deux passes : rédaction puis contrôle de fidélité, avec une troisième passe de réparation uniquement si le garde détecte une omission ou un ajout. Les compétences citées, les éléments non évalués, la structure des paragraphes et les degrés de difficulté sont protégés automatiquement. Qwen3-1.7B Q4_K_M et llama.cpp CPU x64 restent entièrement hors ligne. Ne remplace pas le Build #165 officiel."
+          $notes = "Prototype isolé dérivé du test sans IA #28. L'IA produit d'abord un brouillon rédactionnel, puis un audit factuel séparé contrôle la fidélité sans réécrire le texte. Une réparation n'est lancée que si l'audit ou le garde déterministe détecte une dérive. Les compétences citées, éléments non évalués, paragraphes, degrés de difficulté et qualificatifs sensibles sont protégés. Qwen3-1.7B Q4_K_M et llama.cpp CPU x64 restent entièrement hors ligne. Ne remplace pas le Build #165 officiel."
           gh release create $tag $setup $uninstaller --target "${{ github.sha }}" --title $title --notes $notes --prerelease --repo "${{ github.repository }}"
           if ($LASTEXITCODE -ne 0) { throw "Publication release IA locale échouée : $LASTEXITCODE" }
 
