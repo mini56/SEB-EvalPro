@@ -27,6 +27,13 @@
       "app/**/*",
       "package.json"
     ],
+    "extraResources": [
+      {
+        "from": "ai-runtime",
+        "to": "ai",
+        "filter": ["**/*"]
+      }
+    ],
     "win": {
       "target": ["nsis"],
       "icon": "build/app-icon.ico"
