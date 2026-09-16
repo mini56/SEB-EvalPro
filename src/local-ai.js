@@ -9,7 +9,8 @@ const MODEL_FILE = 'Qwen3-1.7B-Q4_K_M.gguf';
 const MODEL_LABEL = 'Qwen3-1.7B Q4_K_M';
 const RUNTIME_LABEL = 'llama.cpp b10964';
 const MAX_INPUT_CHARS = 18000;
-const START_TIMEOUT_MS = 120000;
+const START_TIMEOUT_MS = 240000;
+const START_ATTEMPTS = 2;
 const REQUEST_TIMEOUT_MS = 300000;
 
 const PROTECTED_TERMS = [
@@ -207,7 +208,7 @@ function createLocalAiService({ app }) {
     const available = fs.existsSync(p.server) && fs.existsSync(p.model);
     return {
       available,
-      running: !!serverProcess && !serverProcess.killed,
+      running: !!serverProcess && serverProcess.exitCode == null && !serverProcess.killed,
       offline: true,
       model: MODEL_LABEL,
       runtime: RUNTIME_LABEL,
@@ -230,12 +231,17 @@ function createLocalAiService({ app }) {
     });
   }
 
-  function requestJson(method, requestPath, body, timeoutMs = 15000) {
+  function requestJson(method, requestPath, body, timeoutMs = 15000, portOverride = 0) {
     return new Promise((resolve, reject) => {
       const payload = body == null ? null : Buffer.from(JSON.stringify(body), 'utf8');
+      const port = Number(portOverride || serverPort || 0);
+      if (!port) {
+        reject(new Error('Le moteur IA local n’a pas encore de port actif.'));
+        return;
+      }
       const req = http.request({
         host: '127.0.0.1',
-        port: serverPort,
+        port,
         path: requestPath,
         method,
         headers: payload ? {
@@ -263,24 +269,48 @@ function createLocalAiService({ app }) {
     });
   }
 
-  async function waitUntilReady(deadline) {
+  function stopProcess(proc) {
+    if (!proc) return;
+    try {
+      if (proc.exitCode == null && !proc.killed) proc.kill();
+    } catch (_) {}
+    if (serverProcess === proc) {
+      serverProcess = null;
+      serverPort = 0;
+    }
+  }
+
+  async function waitUntilReady(deadline, proc, port) {
     let lastError = null;
     while (Date.now() < deadline) {
-      if (!serverProcess || serverProcess.killed) break;
+      if (!proc || proc.exitCode != null || proc.killed) {
+        const code = proc && proc.exitCode != null ? ` code ${proc.exitCode}` : '';
+        throw new Error(`Le moteur IA local s’est arrêté pendant son démarrage${code}.`);
+      }
+      if (proc.__sebSpawnError) throw proc.__sebSpawnError;
       try {
-        const health = await requestJson('GET', '/health', null, 2500);
-        if (health && String(health.status || '').toLowerCase().includes('ok')) return true;
-        if (health && (health.status === 'ok' || health.status === 'ready')) return true;
+        const health = await requestJson('GET', '/health', null, 4000, port);
+        const state = String(health?.status || '').toLowerCase();
+        if (state === 'ok' || state === 'ready' || state.includes('ok')) return true;
       } catch (error) {
         lastError = error;
       }
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      await new Promise((resolve) => setTimeout(resolve, 750));
     }
-    throw new Error('Le modèle IA local n’a pas pu démarrer.' + (lastError ? ` ${lastError.message}` : ''));
+    const tail = String(lastLogs || '').trim().split(/\r?\n/).slice(-3).join(' | ');
+    throw new Error(`Le modèle IA local met trop de temps à démarrer.${lastError ? ` ${lastError.message}` : ''}${tail ? ` Diagnostic : ${tail.slice(0, 500)}` : ''}`);
   }
 
   async function ensureStarted() {
-    if (serverProcess && !serverProcess.killed && serverPort) return true;
+    if (serverProcess && serverProcess.exitCode == null && !serverProcess.killed && serverPort) {
+      try {
+        const health = await requestJson('GET', '/health', null, 3000, serverPort);
+        const state = String(health?.status || '').toLowerCase();
+        if (state === 'ok' || state === 'ready' || state.includes('ok')) return true;
+      } catch (_) {
+        stopProcess(serverProcess);
+      }
+    }
     if (startPromise) return startPromise;
 
     startPromise = (async () => {
@@ -289,36 +319,63 @@ function createLocalAiService({ app }) {
         throw new Error('Le moteur IA local ou le modèle embarqué est introuvable.');
       }
 
-      serverPort = await findFreePort();
-      const threads = Math.max(1, Math.min(8, Math.max(1, hardwareInfo().logicalCpus - 1)));
-      const args = [
-        '--model', p.model,
-        '--host', '127.0.0.1',
-        '--port', String(serverPort),
-        '--ctx-size', '4096',
-        '--threads', String(threads),
-        '--n-gpu-layers', '0'
-      ];
+      const hw = hardwareInfo();
+      const threads = Math.max(1, Math.min(8, Math.max(1, hw.logicalCpus - 1)));
+      const ctxSize = hw.totalRamGb <= 8 ? 3072 : 4096;
+      let finalError = null;
 
-      lastLogs = '';
-      serverProcess = spawn(p.server, args, {
-        cwd: p.dir,
-        windowsHide: true,
-        stdio: ['ignore', 'pipe', 'pipe']
-      });
+      for (let attempt = 1; attempt <= START_ATTEMPTS; attempt += 1) {
+        let proc = null;
+        try {
+          const port = await findFreePort();
+          serverPort = port;
+          const args = [
+            '--model', p.model,
+            '--host', '127.0.0.1',
+            '--port', String(port),
+            '--ctx-size', String(ctxSize),
+            '--threads', String(threads),
+            '--n-gpu-layers', '0'
+          ];
 
-      const capture = (chunk) => {
-        lastLogs = (lastLogs + String(chunk || '')).slice(-8000);
-      };
-      serverProcess.stdout?.on('data', capture);
-      serverProcess.stderr?.on('data', capture);
-      serverProcess.on('exit', () => {
-        serverProcess = null;
-        serverPort = 0;
-      });
+          lastLogs = `Tentative ${attempt}/${START_ATTEMPTS} - RAM ${hw.totalRamGb} Go - ${threads} thread(s) - contexte ${ctxSize}.\n`;
+          proc = spawn(p.server, args, {
+            cwd: p.dir,
+            windowsHide: true,
+            stdio: ['ignore', 'pipe', 'pipe']
+          });
+          serverProcess = proc;
 
-      await waitUntilReady(Date.now() + START_TIMEOUT_MS);
-      return true;
+          const capture = (chunk) => {
+            lastLogs = (lastLogs + String(chunk || '')).slice(-12000);
+          };
+          proc.stdout?.on('data', capture);
+          proc.stderr?.on('data', capture);
+          proc.on('error', (error) => {
+            proc.__sebSpawnError = error;
+            capture(`\nErreur lancement : ${error.message}\n`);
+          });
+          proc.on('exit', (code, signal) => {
+            capture(`\nArrêt moteur : code=${code} signal=${signal || ''}\n`);
+            if (serverProcess === proc) {
+              serverProcess = null;
+              serverPort = 0;
+            }
+          });
+
+          await waitUntilReady(Date.now() + START_TIMEOUT_MS, proc, port);
+          return true;
+        } catch (error) {
+          finalError = error;
+          stopProcess(proc);
+          if (attempt < START_ATTEMPTS) {
+            await new Promise((resolve) => setTimeout(resolve, 1200));
+          }
+        }
+      }
+
+      const detail = String(finalError?.message || finalError || 'cause inconnue').replace(/\s+/g, ' ').trim();
+      throw new Error(`Le modèle IA local n’a pas pu démarrer après ${START_ATTEMPTS} tentatives. Réessayez avec le bouton. ${detail}`);
     })().finally(() => { startPromise = null; });
 
     return startPromise;
@@ -451,9 +508,7 @@ function createLocalAiService({ app }) {
   }
 
   function stop() {
-    try {
-      if (serverProcess && !serverProcess.killed) serverProcess.kill();
-    } catch (_) {}
+    stopProcess(serverProcess);
     serverProcess = null;
     serverPort = 0;
   }
