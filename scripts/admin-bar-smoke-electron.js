@@ -1,10 +1,30 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
+const fs = require('fs');
 
 function fail(message, details) {
   console.error('SEB EvalPro Admin smoke: ' + message);
   if (details) console.error(JSON.stringify(details, null, 2));
   app.exit(2);
+}
+
+function dumpPreloadObservers(preloadPath) {
+  try {
+    const lines = fs.readFileSync(preloadPath, 'utf8').replace(/\r\n/g, '\n').split('\n');
+    const hits = [];
+    lines.forEach((line, index) => {
+      if (/MutationObserver|\.observe\s*\(/.test(line)) hits.push(index);
+    });
+    console.log('SEB EvalPro Admin smoke: occurrences MutationObserver/.observe dans preload final = ' + hits.length);
+    for (const index of hits) {
+      const from = Math.max(0, index - 3);
+      const to = Math.min(lines.length, index + 4);
+      console.log('--- preload lignes ' + (from + 1) + '-' + to + ' ---');
+      for (let i = from; i < to; i += 1) console.log(String(i + 1).padStart(4, ' ') + ': ' + lines[i]);
+    }
+  } catch (error) {
+    console.error('SEB EvalPro Admin smoke: diagnostic preload impossible: ' + String(error && error.stack || error));
+  }
 }
 
 ipcMain.on('state:load-sync', (event) => {
@@ -29,16 +49,24 @@ ipcMain.handle('ai:status', () => ({ available: false, offline: true }));
 ipcMain.handle('ai:rewrite-synthesis', () => ({ ok: false }));
 
 app.whenReady().then(async () => {
+  const preloadPath = path.join(__dirname, '..', 'src', 'preload.js');
+  dumpPreloadObservers(preloadPath);
+
   const win = new BrowserWindow({
     show: false,
     width: 1280,
     height: 720,
     webPreferences: {
-      preload: path.join(__dirname, '..', 'src', 'preload.js'),
+      preload: preloadPath,
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false
     }
+  });
+
+  win.webContents.on('preload-error', (_event, badPreloadPath, error) => {
+    console.error('SEB EvalPro PRELOAD ERROR PATH: ' + String(badPreloadPath || ''));
+    console.error('SEB EvalPro PRELOAD ERROR: ' + String(error && error.stack || error));
   });
 
   win.webContents.on('console-message', (_event, level, message) => {
