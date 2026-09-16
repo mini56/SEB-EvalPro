@@ -42,6 +42,7 @@ jobs:
           node scripts/build165plus-institutional-synthesis-v4.js
           node scripts/build165plus-natural-synthesis-v5-runner.js
           node scripts/build165plus-natural-synthesis-v6.js
+          node scripts/build165plus-natural-synthesis-v7.js
           npx electron-builder --win --publish never
       - name: Build standalone Windows uninstaller
         shell: pwsh
@@ -68,7 +69,7 @@ jobs:
           $setup = "dist\\SEB-eval-PRO-$version-Windows-Setup.exe"
           $uninstaller = "dist\\SEB-eval-PRO-$version-Windows-Desinstallation.exe"
           $title = "SEB EvalPro 165+ - Test synthèse bilan #${{ github.run_number }}"
-          $notes = "Prototype isolé dérivé strictement du Build #165 validé. Test de la synthèse renforcée : niveaux + commentaires réels du tableau, rédaction par grands domaines, longueur non limitée à 20 lignes, déduplication stricte et bloc Ressenti stagiaire. Fonctionne sur bilan courant et anciens bilans. Ne remplace pas la version de référence."
+          $notes = "Prototype isolé dérivé strictement du Build #165 validé. Dernier test sans IA : synthèse individualisée à partir des niveaux et des observations, commentaires interprétés plutôt que recopiés, conclusion cohérente par compétence, longueur libre, déduplication stricte et bloc Ressenti stagiaire. Fonctionne sur bilan courant et anciens bilans. Ne remplace pas la version de référence."
           gh release create $tag $setup $uninstaller --target "${{ github.sha }}" --title $title --notes $notes --prerelease --repo "${{ github.repository }}"
           if ($LASTEXITCODE -ne 0) { throw "Publication release test échouée : $LASTEXITCODE" }
       - uses: actions/upload-artifact@v4
@@ -93,6 +94,7 @@ jobs:
           node scripts/build165plus-institutional-synthesis-v4.js
           node scripts/build165plus-natural-synthesis-v5-runner.js
           node scripts/build165plus-natural-synthesis-v6.js
+          node scripts/build165plus-natural-synthesis-v7.js
           npx electron-builder --linux AppImage --publish never
       - uses: actions/upload-artifact@v4
         continue-on-error: true
