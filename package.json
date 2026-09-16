@@ -22,6 +22,7 @@
     "appId": "fr.sauvegarde56.sebevalpro",
     "productName": "SEB-éval-PRO",
     "asar": true,
+    "compression": "store",
     "files": [
       "src/**/*",
       "app/**/*",
