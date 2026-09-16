@@ -9,6 +9,6 @@ const metricGood="function sebV7Metric(raw,label){const src=sebV7Raw(raw),needle
 s=s.slice(0,start)+metricGood+s.slice(end);
 const exprOld='sebV7GroupInsights(SEB_V7_GROUPS.expression,text,id,3)';
 if(!s.includes(exprOld))throw new Error('Limite observations expression V7 introuvable');
-s=s.replace(exprOld,'sebV7GroupInsights(SEB_V7_GROUPS.expression,text,id,4)');
+s=s.replace(exprOld,'sebV7GroupInsights(SEB_V7_GROUPS.expression,text,id,5)');
 fs.writeFileSync(temp,s,'utf8');
 try{require(temp)}finally{try{fs.unlinkSync(temp)}catch(_){}}
