@@ -42,7 +42,7 @@ jobs:
           node scripts/build165plus-institutional-synthesis-v4.js
           node scripts/build165plus-natural-synthesis-v5-runner.js
           node scripts/build165plus-natural-synthesis-v6.js
-          node scripts/build165plus-natural-synthesis-v7.js
+          node scripts/build165plus-natural-synthesis-v7-runner.js
           npx electron-builder --win --publish never
       - name: Build standalone Windows uninstaller
         shell: pwsh
@@ -94,7 +94,7 @@ jobs:
           node scripts/build165plus-institutional-synthesis-v4.js
           node scripts/build165plus-natural-synthesis-v5-runner.js
           node scripts/build165plus-natural-synthesis-v6.js
-          node scripts/build165plus-natural-synthesis-v7.js
+          node scripts/build165plus-natural-synthesis-v7-runner.js
           npx electron-builder --linux AppImage --publish never
       - uses: actions/upload-artifact@v4
         continue-on-error: true
