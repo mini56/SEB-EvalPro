@@ -1,0 +1,188 @@
+name: TEST 165+ Synthèse IA locale
+
+on:
+  push:
+    branches:
+      - test-165plus-synthese-ia-locale
+
+jobs:
+  build-windows-ai-test:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Check Electron IA sources
+        shell: pwsh
+        run: |
+          node --check src/main.js
+          node --check src/preload.js
+          node --check src/local-ai.js
+          node --check scripts/build165plus-local-ai-prototype.js
+
+      - name: Prepare embedded local AI runtime
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path 'ai-runtime','_ai-download','_ai-llama' | Out-Null
+
+          $llamaUrl = 'https://github.com/ggml-org/llama.cpp/releases/download/b10964/llama-b10964-bin-win-cpu-x64.zip'
+          $llamaZip = '_ai-download\llama-win-cpu-x64.zip'
+          curl.exe -L --fail --retry 3 --retry-delay 3 -o $llamaZip $llamaUrl
+          if ($LASTEXITCODE -ne 0) { throw 'Téléchargement llama.cpp échoué.' }
+          $llamaSha = (Get-FileHash $llamaZip -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($llamaSha -ne '917f39c076402c421224824607397af20f53625a60defc20e8dd22446bf4c5d7') { throw "SHA256 llama.cpp inattendu: $llamaSha" }
+          Expand-Archive -Path $llamaZip -DestinationPath '_ai-llama' -Force
+          $server = Get-ChildItem '_ai-llama' -Recurse -Filter 'llama-server.exe' | Select-Object -First 1
+          if (-not $server) { throw 'llama-server.exe introuvable dans le paquet officiel.' }
+          Copy-Item -Path (Join-Path $server.Directory.FullName '*') -Destination 'ai-runtime' -Recurse -Force
+          if (-not (Test-Path 'ai-runtime\llama-server.exe')) { throw 'llama-server.exe non copié.' }
+          if (-not (Test-Path 'ai-runtime\llama-cli.exe')) { throw 'llama-cli.exe non copié.' }
+
+          $modelUrl = 'https://huggingface.co/ggml-org/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q4_K_M.gguf?download=true'
+          $model = 'ai-runtime\Qwen3-1.7B-Q4_K_M.gguf'
+          curl.exe -L --fail --retry 3 --retry-delay 5 -o $model $modelUrl
+          if ($LASTEXITCODE -ne 0) { throw 'Téléchargement Qwen3-1.7B Q4_K_M échoué.' }
+          $modelSha = (Get-FileHash $model -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($modelSha -ne 'd2387ca2dbfee2ffabce7120d3770dadca0b293052bc2f0e138fdc940d9bc7b5') { throw "SHA256 modèle inattendu: $modelSha" }
+
+          @"
+          SEB EvalPro - Prototype IA locale
+          Modèle: ggml-org/Qwen3-1.7B-GGUF / Qwen3-1.7B-Q4_K_M.gguf
+          Licence du modèle: Apache-2.0
+          SHA256 modèle: d2387ca2dbfee2ffabce7120d3770dadca0b293052bc2f0e138fdc940d9bc7b5
+          Runtime: llama.cpp b10964 (version 0.4.1)
+          Paquet Windows CPU x64 SHA256: 917f39c076402c421224824607397af20f53625a60defc20e8dd22446bf4c5d7
+          Le programme utilise exclusivement le modèle local embarqué; aucun téléchargement n'est effectué pendant l'évaluation.
+          "@ | Set-Content -Path 'ai-runtime\SEB-EvalPro-IA-NOTICE.txt' -Encoding UTF8
+
+          Write-Host "Runtime IA local prêt. Modèle: $((Get-Item $model).Length) octets"
+
+      - name: Smoke test local AI offline
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $port = 39472
+          $args = @('--model',(Resolve-Path 'ai-runtime\Qwen3-1.7B-Q4_K_M.gguf').Path,'--host','127.0.0.1','--port',"$port",'--ctx-size','1024','--threads','2','--n-gpu-layers','0')
+          $proc = Start-Process -FilePath (Resolve-Path 'ai-runtime\llama-server.exe').Path -ArgumentList $args -PassThru -WindowStyle Hidden -RedirectStandardOutput '_ai-server-out.log' -RedirectStandardError '_ai-server-err.log'
+          try {
+            $ready = $false
+            for ($i=0; $i -lt 180; $i++) {
+              Start-Sleep -Milliseconds 500
+              if ($proc.HasExited) { throw "llama-server s'est arrêté avec le code $($proc.ExitCode)." }
+              try {
+                $health = Invoke-RestMethod -Uri "http://127.0.0.1:$port/health" -TimeoutSec 2
+                if ($health.status -eq 'ok') { $ready = $true; break }
+              } catch {}
+            }
+            if (-not $ready) { throw 'Le serveur IA local ne devient pas prêt.' }
+
+            $body = @{
+              model = 'Qwen3-1.7B-Q4_K_M.gguf'
+              messages = @(
+                @{ role='system'; content='Tu réponds en français et uniquement avec le mot OK.' },
+                @{ role='user'; content='/no_think Réponds uniquement OK.' }
+              )
+              temperature = 0.7
+              top_p = 0.8
+              max_tokens = 24
+              seed = 42
+              stream = $false
+            } | ConvertTo-Json -Depth 8
+            $reply = Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:$port/v1/chat/completions" -ContentType 'application/json; charset=utf-8' -Body $body -TimeoutSec 120
+            $text = [string]$reply.choices[0].message.content
+            if ([string]::IsNullOrWhiteSpace($text)) { throw 'Inférence locale vide.' }
+            Write-Host "Smoke inference IA locale: $text"
+          }
+          finally {
+            if ($proc -and -not $proc.HasExited) { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue }
+          }
+
+      - name: Ensure ImageMagick
+        shell: pwsh
+        run: |
+          if (-not (Get-Command magick -ErrorAction SilentlyContinue)) {
+            choco install imagemagick --no-progress -y
+          }
+
+      - name: Generate installer branding
+        shell: pwsh
+        run: ./scripts/generate-installer-branding.ps1
+
+      - name: Normalize Windows NSIS encodings
+        shell: pwsh
+        run: |
+          $utf8Bom = New-Object System.Text.UTF8Encoding($true)
+          foreach ($relativePath in @('build\\installer.nsh','build\\standalone-uninstaller.nsi')) {
+            $path = (Resolve-Path $relativePath).Path
+            $text = [System.IO.File]::ReadAllText($path)
+            [System.IO.File]::WriteAllText($path, $text, $utf8Bom)
+          }
+
+      - name: Build Windows IA test installer
+        run: |
+          npm run prepare:web
+          node scripts/build165plus-history-synthesis.js
+          node scripts/build165plus-institutional-synthesis-v4.js
+          node scripts/build165plus-natural-synthesis-v5-runner.js
+          node scripts/build165plus-natural-synthesis-v6.js
+          node scripts/build165plus-natural-synthesis-v7-runner.js
+          node scripts/build165plus-natural-synthesis-v8-runner.js
+          node scripts/build165plus-natural-synthesis-v9.js
+          node scripts/build165plus-local-ai-prototype.js
+          npx electron-builder --win --publish never
+
+      - name: Verify packaged AI files
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $unpacked = 'dist\win-unpacked\resources\ai'
+          if (-not (Test-Path "$unpacked\llama-server.exe")) { throw 'llama-server absent du paquet final.' }
+          if (-not (Test-Path "$unpacked\Qwen3-1.7B-Q4_K_M.gguf")) { throw 'modèle IA absent du paquet final.' }
+          $sha = (Get-FileHash "$unpacked\Qwen3-1.7B-Q4_K_M.gguf" -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($sha -ne 'd2387ca2dbfee2ffabce7120d3770dadca0b293052bc2f0e138fdc940d9bc7b5') { throw 'modèle IA altéré dans le paquet final.' }
+
+      - name: Build standalone Windows uninstaller
+        shell: pwsh
+        run: |
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $makensis = Get-Command makensis.exe -ErrorAction SilentlyContinue
+          if (-not $makensis) {
+            choco install nsis --no-progress -y
+            $candidate = Join-Path ${env:ProgramFiles(x86)} 'NSIS\makensis.exe'
+            if (Test-Path $candidate) { $makensis = Get-Item $candidate }
+          }
+          if (-not $makensis) { throw 'makensis.exe introuvable.' }
+          $makensisPath = if ($makensis.Source) { $makensis.Source } else { $makensis.FullName }
+          & $makensisPath "/DAPP_VERSION=$version" 'build\standalone-uninstaller.nsi'
+          if ($LASTEXITCODE -ne 0) { throw "Compilation désinstallateur échouée : $LASTEXITCODE" }
+
+      - name: Publish private local-AI test release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $tag = "seb-evalpro-ia-locale-${{ github.run_number }}"
+          $setup = "dist\SEB-eval-PRO-$version-Windows-Setup.exe"
+          $uninstaller = "dist\SEB-eval-PRO-$version-Windows-Desinstallation.exe"
+          $title = "SEB EvalPro - Test IA locale #${{ github.run_number }}"
+          $notes = "Prototype isolé dérivé du test sans IA #28. Qwen3-1.7B Q4_K_M et llama.cpp CPU x64 sont embarqués dans l'installeur : aucune connexion Internet n'est requise au moment du plateau. Le bilan affiche séparément la synthèse #28 et sa reformulation IA locale pour comparaison. L'IA ne modifie ni les résultats, ni les niveaux, ni les commentaires sources. Ne remplace pas le Build #165 officiel."
+          gh release create $tag $setup $uninstaller --target "${{ github.sha }}" --title $title --notes $notes --prerelease --repo "${{ github.repository }}"
+          if ($LASTEXITCODE -ne 0) { throw "Publication release IA locale échouée : $LASTEXITCODE" }
+
+      - uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: SEB-eval-PRO-IA-locale-Windows
+          path: |
+            dist/SEB-eval-PRO-0.1.0-Windows-Setup.exe
+            dist/SEB-eval-PRO-0.1.0-Windows-Desinstallation.exe
