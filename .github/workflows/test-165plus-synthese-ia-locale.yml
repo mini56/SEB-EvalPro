@@ -22,10 +22,18 @@ jobs:
       - name: Check Electron IA sources
         shell: pwsh
         run: |
-          node --check src/main.js
-          node --check src/preload.js
-          node --check src/local-ai.js
-          node --check scripts/build165plus-local-ai-prototype.js
+          $ErrorActionPreference = 'Stop'
+          foreach ($file in @(
+            'src/main.js',
+            'src/preload.js',
+            'src/local-ai.js',
+            'scripts/build165plus-local-ai-prototype.js',
+            'scripts/fix-local-ai-admin-bar.js',
+            'scripts/admin-bar-smoke-electron.js'
+          )) {
+            node --check $file
+            if ($LASTEXITCODE -ne 0) { throw "JavaScript invalide: $file" }
+          }
 
       - name: Prepare embedded local AI runtime
         shell: pwsh
@@ -127,17 +135,36 @@ jobs:
           }
 
       - name: Build Windows IA test installer
+        shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
+
           npm run prepare:web
-          node scripts/build165plus-history-synthesis.js
-          node scripts/build165plus-institutional-synthesis-v4.js
-          node scripts/build165plus-natural-synthesis-v5-runner.js
-          node scripts/build165plus-natural-synthesis-v6.js
-          node scripts/build165plus-natural-synthesis-v7-runner.js
-          node scripts/build165plus-natural-synthesis-v8-runner.js
-          node scripts/build165plus-natural-synthesis-v9.js
-          node scripts/build165plus-local-ai-prototype.js
+          if ($LASTEXITCODE -ne 0) { throw 'prepare:web a échoué.' }
+
+          foreach ($script in @(
+            'scripts/build165plus-history-synthesis.js',
+            'scripts/build165plus-institutional-synthesis-v4.js',
+            'scripts/build165plus-natural-synthesis-v5-runner.js',
+            'scripts/build165plus-natural-synthesis-v6.js',
+            'scripts/build165plus-natural-synthesis-v7-runner.js',
+            'scripts/build165plus-natural-synthesis-v8-runner.js',
+            'scripts/build165plus-natural-synthesis-v9.js',
+            'scripts/build165plus-local-ai-prototype.js',
+            'scripts/fix-local-ai-admin-bar.js'
+          )) {
+            node $script
+            if ($LASTEXITCODE -ne 0) { throw "Script de préparation échoué: $script" }
+          }
+
+          node --check src/preload.js
+          if ($LASTEXITCODE -ne 0) { throw 'preload.js final invalide.' }
+
+          npx electron scripts/admin-bar-smoke-electron.js
+          if ($LASTEXITCODE -ne 0) { throw 'Test réel Electron de la barre Admin échoué.' }
+
           npx electron-builder --win --publish never
+          if ($LASTEXITCODE -ne 0) { throw 'Construction Windows échouée.' }
 
       - name: Verify packaged AI files
         shell: pwsh
@@ -175,7 +202,7 @@ jobs:
           $setup = "dist\SEB-eval-PRO-$version-Windows-Setup.exe"
           $uninstaller = "dist\SEB-eval-PRO-$version-Windows-Desinstallation.exe"
           $title = "SEB EvalPro - Test IA locale #${{ github.run_number }}"
-          $notes = "Prototype isolé dérivé du test sans IA #28. Qwen3-1.7B Q4_K_M et llama.cpp CPU x64 sont embarqués dans l'installeur : aucune connexion Internet n'est requise au moment du plateau. Le bilan affiche séparément la synthèse #28 et sa reformulation IA locale pour comparaison. L'IA ne modifie ni les résultats, ni les niveaux, ni les commentaires sources. Ne remplace pas le Build #165 officiel."
+          $notes = "Prototype isolé dérivé du test sans IA #28. Qwen3-1.7B Q4_K_M et llama.cpp CPU x64 sont embarqués dans l'installeur. Test réel Electron ajouté : la Release n'est publiée que si la barre Administrateur est présente et s'affiche réellement au bord supérieur. Aucune connexion Internet n'est requise pendant le plateau. Ne remplace pas le Build #165 officiel."
           gh release create $tag $setup $uninstaller --target "${{ github.sha }}" --title $title --notes $notes --prerelease --repo "${{ github.repository }}"
           if ($LASTEXITCODE -ne 0) { throw "Publication release IA locale échouée : $LASTEXITCODE" }
 
