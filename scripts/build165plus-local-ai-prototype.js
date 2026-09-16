@@ -126,12 +126,23 @@ function sebBhInstallLocalAiComparison(){
   catch(error){status.textContent='Échec IA locale : '+String(error?.message||error)}finally{btn.disabled=false}
  });
 }
-(function sebBhWatchLocalAi(){const install=()=>setTimeout(sebBhInstallLocalAiComparison,80);if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();new MutationObserver(()=>{if(document.querySelector('#seb-bh-history-summary')&&!document.querySelector('#seb-bh-local-ai-result'))install()}).observe(document.documentElement,{childList:true,subtree:true})})();
+(function sebBhWatchLocalAi(){
+ const install=()=>setTimeout(sebBhInstallLocalAiComparison,80);
+ const start=()=>{
+  install();
+  const root=document.documentElement||document.body;
+  if(!root){setTimeout(start,50);return}
+  const observer=new MutationObserver(()=>{if(document.querySelector('#seb-bh-history-summary')&&!document.querySelector('#seb-bh-local-ai-result'))install()});
+  observer.observe(root,{childList:true,subtree:true});
+ };
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
+})();
 `;
 
   js += addon;
   try { new vm.Script(js); }
   catch (error) { fail('historique IA invalide: ' + error.message); }
+  if (js.includes('}).observe(document.documentElement')) fail('observer IA historique démarré avant DOM');
   write(historyFile, js);
 }
 
