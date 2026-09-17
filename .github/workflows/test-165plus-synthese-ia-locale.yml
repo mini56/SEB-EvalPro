@@ -248,7 +248,7 @@ jobs:
           & $makensisPath "/DAPP_VERSION=$version" 'build\standalone-uninstaller.nsi'
           if ($LASTEXITCODE -ne 0) { throw "Compilation désinstallateur échouée : $LASTEXITCODE" }
 
-      - name: Publish resilient local-AI test release
+      - name: Publish local-AI test release with direct asset recovery
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
@@ -256,54 +256,88 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
           $tag = "seb-evalpro-ia-locale-${{ github.run_number }}"
-          $setup = "dist\SEB-eval-PRO-$version-Windows-Setup.exe"
-          $uninstaller = "dist\SEB-eval-PRO-$version-Windows-Desinstallation.exe"
+          $setup = (Resolve-Path "dist\SEB-eval-PRO-$version-Windows-Setup.exe").Path
+          $uninstaller = (Resolve-Path "dist\SEB-eval-PRO-$version-Windows-Desinstallation.exe").Path
           $repo = "${{ github.repository }}"
           $title = "SEB EvalPro - Test IA locale #${{ github.run_number }}"
           $notes = "Reprise stricte depuis le build IA #9 réellement fonctionnel sur PC. Le moteur, le modèle, le démarrage, le packaging et la barre Admin restent ceux du #9. Seules la rédaction et la vérification de fidélité de la synthèse sont renforcées. Qwen3-1.7B Q4_K_M et llama.cpp CPU x64 restent entièrement hors ligne. Ne remplace pas le Build #165 officiel."
-
-          if (-not (Test-Path $setup)) { throw "Setup introuvable: $setup" }
-          if (-not (Test-Path $uninstaller)) { throw "Désinstallateur introuvable: $uninstaller" }
           $setupSize = (Get-Item $setup).Length
           Write-Host "Setup à publier: $setupSize octets"
 
-          gh release view $tag --repo $repo *> $null
-          if ($LASTEXITCODE -ne 0) {
-            gh release create $tag --target "${{ github.sha }}" --title $title --notes $notes --prerelease --repo $repo
-            if ($LASTEXITCODE -ne 0) { throw "Création release IA locale échouée : $LASTEXITCODE" }
-          } else {
-            Write-Host "Release $tag déjà présente, reprise de l'upload."
+          $allReleasesJson = gh api "repos/$repo/releases?per_page=100"
+          if ($LASTEXITCODE -ne 0) { throw 'Lecture des Releases échouée.' }
+          $release = ($allReleasesJson | ConvertFrom-Json) | Where-Object { $_.tag_name -eq $tag } | Select-Object -First 1
+          if (-not $release) {
+            $createdJson = gh api -X POST "repos/$repo/releases" -f "tag_name=$tag" -f "target_commitish=${{ github.sha }}" -f "name=$title" -f "body=$notes" -F draft=true -F prerelease=true
+            if ($LASTEXITCODE -ne 0) { throw 'Création de la Release brouillon échouée.' }
+            $release = $createdJson | ConvertFrom-Json
           }
+          $releaseId = [int64]$release.id
+          Write-Host "Release brouillon: id=$releaseId tag=$tag"
 
-          gh release upload $tag $uninstaller --clobber --repo $repo
-          if ($LASTEXITCODE -ne 0) { throw "Upload désinstallateur échoué : $LASTEXITCODE" }
-
-          $ghPath = (Get-Command gh).Source
-          $uploaded = $false
-          for ($attempt = 1; $attempt -le 3; $attempt++) {
-            Write-Host "Upload Setup tentative $attempt/3..."
-            $args = @('release','upload',$tag,$setup,'--clobber','--repo',$repo)
-            $proc = Start-Process -FilePath $ghPath -ArgumentList $args -PassThru -NoNewWindow
-            $finished = $proc.WaitForExit(900000)
-            if (-not $finished) {
-              Write-Warning "Upload Setup sans réponse après 15 minutes; arrêt de cette tentative."
-              try { $proc.Kill($true) } catch {}
-              $proc.WaitForExit()
-            } elseif ($proc.ExitCode -eq 0) {
-              $uploaded = $true
-              break
-            } else {
-              Write-Warning "Upload Setup échoué, code $($proc.ExitCode)."
+          function Remove-AssetByName([string]$assetName) {
+            $assetsJson = gh api "repos/$repo/releases/$releaseId/assets?per_page=100"
+            if ($LASTEXITCODE -ne 0) { throw 'Lecture des assets échouée.' }
+            $assets = $assetsJson | ConvertFrom-Json
+            foreach ($existing in @($assets | Where-Object { $_.name -eq $assetName })) {
+              Write-Host "Suppression asset résiduel: $($existing.name), état=$($existing.state), id=$($existing.id)"
+              gh api -X DELETE "repos/$repo/releases/assets/$($existing.id)" *> $null
+              if ($LASTEXITCODE -ne 0) { throw "Suppression asset résiduel échouée: $($existing.id)" }
             }
-            if ($attempt -lt 3) { Start-Sleep -Seconds 15 }
           }
-          if (-not $uploaded) { throw 'Upload du Setup échoué après 3 tentatives.' }
 
-          $releaseJson = gh release view $tag --repo $repo --json assets
-          if ($LASTEXITCODE -ne 0) { throw 'Lecture de la Release finale échouée.' }
-          $release = $releaseJson | ConvertFrom-Json
-          $setupName = [System.IO.Path]::GetFileName($setup)
-          $asset = $release.assets | Where-Object { $_.name -eq $setupName } | Select-Object -First 1
-          if (-not $asset) { throw 'Setup absent de la Release après upload.' }
-          if ([int64]$asset.size -ne [int64]$setupSize) { throw "Taille Setup distante incorrecte: $($asset.size) / $setupSize" }
-          Write-Host "Release $tag validée: Setup présent et taille correcte."
+          function Upload-Asset([string]$filePath, [int]$maxAttempts) {
+            $assetName = [System.IO.Path]::GetFileName($filePath)
+            $encodedName = [System.Uri]::EscapeDataString($assetName)
+            $uploadUrl = "https://uploads.github.com/repos/$repo/releases/$releaseId/assets?name=$encodedName"
+            for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+              Remove-AssetByName $assetName
+              if ($attempt -gt 1) { Start-Sleep -Seconds 30 }
+              $responseFile = Join-Path $env:RUNNER_TEMP ("seb-upload-" + $attempt + ".json")
+              Remove-Item $responseFile -Force -ErrorAction SilentlyContinue
+              Write-Host "Upload $assetName tentative $attempt/$maxAttempts via API directe..."
+              $http = & curl.exe -L --fail-with-body --connect-timeout 30 --speed-limit 32768 --speed-time 180 --max-time 1800 -X POST `
+                -H "Accept: application/vnd.github+json" `
+                -H "Authorization: Bearer $env:GH_TOKEN" `
+                -H "X-GitHub-Api-Version: 2022-11-28" `
+                -H "Content-Type: application/octet-stream" `
+                --data-binary "@$filePath" `
+                -o $responseFile -w "%{http_code}" $uploadUrl
+              $curlExit = $LASTEXITCODE
+              $http = (($http | Out-String).Trim())
+              if ($curlExit -eq 0 -and $http -eq '201' -and (Test-Path $responseFile)) {
+                $uploadedAsset = Get-Content $responseFile -Raw | ConvertFrom-Json
+                if ($uploadedAsset.state -eq 'uploaded') {
+                  Write-Host "Upload terminé: $assetName, $($uploadedAsset.size) octets, $($uploadedAsset.digest)"
+                  return $uploadedAsset
+                }
+              }
+              $body = if (Test-Path $responseFile) { Get-Content $responseFile -Raw } else { '' }
+              Write-Warning "Upload $assetName échoué/incomplet: curl=$curlExit HTTP=$http $body"
+            }
+            throw "Upload impossible après $maxAttempts tentative(s): $assetName"
+          }
+
+          $uninstallerAsset = Upload-Asset $uninstaller 3
+          $setupAsset = Upload-Asset $setup 3
+          if ([int64]$setupAsset.size -ne [int64]$setupSize) { throw "Taille Setup distante incorrecte: $($setupAsset.size) / $setupSize" }
+
+          $validated = $false
+          for ($check = 1; $check -le 30; $check++) {
+            $assetsJson = gh api "repos/$repo/releases/$releaseId/assets?per_page=100"
+            if ($LASTEXITCODE -ne 0) { throw 'Lecture des assets finaux échouée.' }
+            $assets = $assetsJson | ConvertFrom-Json
+            $finalSetup = $assets | Where-Object { $_.name -eq [System.IO.Path]::GetFileName($setup) } | Select-Object -First 1
+            if ($finalSetup -and $finalSetup.state -eq 'uploaded' -and [int64]$finalSetup.size -eq [int64]$setupSize -and -not [string]::IsNullOrWhiteSpace([string]$finalSetup.digest)) {
+              $validated = $true
+              Write-Host "Setup GitHub validé: état=uploaded, taille=$($finalSetup.size), digest=$($finalSetup.digest)"
+              break
+            }
+            Start-Sleep -Seconds 5
+          }
+          if (-not $validated) { throw 'Setup non finalisé par GitHub après upload.' }
+
+          $publishedJson = gh api -X PATCH "repos/$repo/releases/$releaseId" -F draft=false -F prerelease=true -f "name=$title" -f "body=$notes"
+          if ($LASTEXITCODE -ne 0) { throw 'Publication finale de la Release échouée.' }
+          $published = $publishedJson | ConvertFrom-Json
+          Write-Host "Release $tag publiée et validée: $($published.html_url)"
