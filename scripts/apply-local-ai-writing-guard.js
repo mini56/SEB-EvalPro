@@ -112,19 +112,26 @@ function writingBlockTemplate() {
 
     const srcParas = splitParagraphs(sourceText);
     const outParas = splitParagraphs(outputText);
-    if (srcParas.length >= 2 && srcParas.length !== outParas.length) throw new Error('La reformulation IA a modifié le nombre de paragraphes.');
-
-    for (let i = 0; i < Math.min(srcParas.length, outParas.length); i += 1) {
-      const src = normalizeForGuard(srcParas[i]);
-      const out = normalizeForGuard(outParas[i]);
-      const missing = protectedTerms.filter((item) => item[1].test(src) && !item[1].test(out)).map((item) => item[0]);
-      if (missing.length) throw new Error('Information supprimée ou déplacée au paragraphe ' + (i + 1) + ' : ' + missing.join(', ') + '.');
-      if (positiveMarkers.test(src) && !positiveMarkers.test(out)) throw new Error('Constat positif perdu au paragraphe ' + (i + 1) + '.');
-      if (negativeMarkers.test(src) && !negativeMarkers.test(out)) throw new Error('Difficulté ou besoin d’accompagnement perdu au paragraphe ' + (i + 1) + '.');
-    }
-
     const srcAll = normalizeForGuard(sourceText);
     const outAll = normalizeForGuard(outputText);
+
+    const missingGlobal = protectedTerms
+      .filter((item) => item[1].test(srcAll) && !item[1].test(outAll))
+      .map((item) => item[0]);
+    if (missingGlobal.length) throw new Error('Information supprimée : ' + missingGlobal.join(', ') + '.');
+
+    if (positiveMarkers.test(srcAll) && !positiveMarkers.test(outAll)) throw new Error('Un constat positif a été perdu.');
+    if (negativeMarkers.test(srcAll) && !negativeMarkers.test(outAll)) throw new Error('Une difficulté ou un besoin d’accompagnement a été perdu.');
+
+    if (srcParas.length === outParas.length) {
+      for (let i = 0; i < srcParas.length; i += 1) {
+        const src = normalizeForGuard(srcParas[i]);
+        const out = normalizeForGuard(outParas[i]);
+        const missing = protectedTerms.filter((item) => item[1].test(src) && !item[1].test(out)).map((item) => item[0]);
+        if (missing.length) throw new Error('Information supprimée ou déplacée au paragraphe ' + (i + 1) + ' : ' + missing.join(', ') + '.');
+      }
+    }
+
     const added = sensitiveTerms.filter((item) => !item[1].test(srcAll) && item[1].test(outAll)).map((item) => item[0]);
     if (added.length) throw new Error('Qualificatif non sourcé ajouté : ' + added.join(', ') + '.');
 
@@ -150,7 +157,8 @@ function writingBlockTemplate() {
       'Tu es un correcteur-rédacteur professionnel de bilans d’évaluation socioprofessionnelle en français.',
       'Le texte source est déjà factuellement validé. Tu ne dois pas réévaluer la personne.',
       'Améliore uniquement la rédaction : grammaire, accords, fluidité, transitions et répétitions lexicales.',
-      'Conserve toutes les informations de chaque paragraphe, dans le même paragraphe et dans le même ordre général.',
+      'Conserve toutes les informations et leur ordre logique général.',
+      'Tu peux fusionner ou scinder légèrement des paragraphes uniquement pour améliorer la lisibilité, sans déplacer les constats d’un domaine vers un autre.',
       'Ne supprime aucune compétence ni sous-compétence, même si elle semble secondaire.',
       'N’ajoute aucune qualité personnelle, aucune motivation, aucune autonomie, aucune intensité ni aucune conclusion absente du texte source.',
       'N’augmente et ne diminue jamais le degré d’une difficulté ou d’un besoin d’accompagnement.',
@@ -167,8 +175,8 @@ function writingBlockTemplate() {
     const system = [
       'Tu contrôles la fidélité factuelle d’une reformulation de bilan socioprofessionnel.',
       'Ne réécris pas le bilan.',
-      'Compare le TEXTE SOURCE et la PROPOSITION paragraphe par paragraphe.',
-      'Vérifie qu’aucune compétence, difficulté, nuance, élément non évalué, activité interrompue ou conclusion n’a été supprimé, déplacé, ajouté ou renforcé.',
+      'Compare le TEXTE SOURCE et la PROPOSITION sur les faits, les domaines et leur ordre logique. Le découpage en paragraphes peut légèrement différer.',
+      'Vérifie qu’aucune compétence, difficulté, nuance, élément non évalué, activité interrompue ou conclusion n’a été supprimé, ajouté ou renforcé.',
       'Vérifie qu’aucune qualité personnelle ou intensité absente de la source n’a été inventée.',
       'Si la proposition est fidèle, réponds exactement : OK',
       'Sinon réponds uniquement : REPAIR: suivi d’une liste très courte des écarts factuels.'
@@ -182,7 +190,7 @@ function writingBlockTemplate() {
       'Tu corriges une reformulation rejetée par un contrôle de fidélité.',
       'Le TEXTE SOURCE est l’unique référence factuelle.',
       'Corrige seulement les écarts signalés. Ne change rien d’autre inutilement.',
-      'Conserve toutes les informations, le nombre de paragraphes et leur ordre.',
+      'Conserve toutes les informations et leur ordre logique. Le nombre de paragraphes peut légèrement varier si le contenu reste fidèle.',
       'N’ajoute rien et ne change jamais le degré d’un constat.',
       'Si une formulation est incertaine, reprends la formulation source pour ce passage.',
       'Retourne uniquement le texte corrigé, sans balise ni explication.'
@@ -220,9 +228,9 @@ function writingBlockTemplate() {
         output = validateRewrite(sourceText, repaired);
       }
 
-      return { ok: true, text: output, elapsedMs: Date.now() - startedAt, model: MODEL_LABEL, runtime: RUNTIME_LABEL, offline: true, passes, guard: 'reprise-build-9-fidelite-v1' };
+      return { ok: true, text: output, elapsedMs: Date.now() - startedAt, model: MODEL_LABEL, runtime: RUNTIME_LABEL, offline: true, passes, guard: 'reprise-build-9-fidelite-v2-paragraphes-souples' };
     } catch (error) {
-      return { ok: false, error: String(error?.message || error || 'Erreur IA locale.'), details: lastLogs.slice(-1500), elapsedMs: Date.now() - startedAt, model: MODEL_LABEL, offline: true, passes, guard: 'reprise-build-9-fidelite-v1' };
+      return { ok: false, error: String(error?.message || error || 'Erreur IA locale.'), details: lastLogs.slice(-1500), elapsedMs: Date.now() - startedAt, model: MODEL_LABEL, offline: true, passes, guard: 'reprise-build-9-fidelite-v2-paragraphes-souples' };
     }
   }
 }
@@ -245,4 +253,4 @@ try { new vm.Script(source); }
 catch (error) { fail('local-ai.js invalide après patch: ' + error.message); }
 
 fs.writeFileSync(file, source, 'utf8');
-console.log('SEB EvalPro IA reprise #9: moteur intact; seules la rédaction et la fidélité sont renforcées.');
+console.log('SEB EvalPro IA reprise #9: moteur intact; contrôle des paragraphes assoupli sans relâcher la fidélité factuelle.');
