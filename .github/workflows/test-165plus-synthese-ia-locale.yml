@@ -248,7 +248,7 @@ jobs:
           & $makensisPath "/DAPP_VERSION=$version" 'build\standalone-uninstaller.nsi'
           if ($LASTEXITCODE -ne 0) { throw "Compilation désinstallateur échouée : $LASTEXITCODE" }
 
-      - name: Publish private local-AI test release
+      - name: Publish resilient local-AI test release
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
@@ -258,15 +258,52 @@ jobs:
           $tag = "seb-evalpro-ia-locale-${{ github.run_number }}"
           $setup = "dist\SEB-eval-PRO-$version-Windows-Setup.exe"
           $uninstaller = "dist\SEB-eval-PRO-$version-Windows-Desinstallation.exe"
+          $repo = "${{ github.repository }}"
           $title = "SEB EvalPro - Test IA locale #${{ github.run_number }}"
           $notes = "Reprise stricte depuis le build IA #9 réellement fonctionnel sur PC. Le moteur, le modèle, le démarrage, le packaging et la barre Admin restent ceux du #9. Seules la rédaction et la vérification de fidélité de la synthèse sont renforcées. Qwen3-1.7B Q4_K_M et llama.cpp CPU x64 restent entièrement hors ligne. Ne remplace pas le Build #165 officiel."
-          gh release create $tag $setup $uninstaller --target "${{ github.sha }}" --title $title --notes $notes --prerelease --repo "${{ github.repository }}"
-          if ($LASTEXITCODE -ne 0) { throw "Publication release IA locale échouée : $LASTEXITCODE" }
 
-      - uses: actions/upload-artifact@v4
-        continue-on-error: true
-        with:
-          name: SEB-eval-PRO-IA-locale-Windows
-          path: |
-            dist/SEB-eval-PRO-0.1.0-Windows-Setup.exe
-            dist/SEB-eval-PRO-0.1.0-Windows-Desinstallation.exe
+          if (-not (Test-Path $setup)) { throw "Setup introuvable: $setup" }
+          if (-not (Test-Path $uninstaller)) { throw "Désinstallateur introuvable: $uninstaller" }
+          $setupSize = (Get-Item $setup).Length
+          Write-Host "Setup à publier: $setupSize octets"
+
+          gh release view $tag --repo $repo *> $null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $tag --target "${{ github.sha }}" --title $title --notes $notes --prerelease --repo $repo
+            if ($LASTEXITCODE -ne 0) { throw "Création release IA locale échouée : $LASTEXITCODE" }
+          } else {
+            Write-Host "Release $tag déjà présente, reprise de l'upload."
+          }
+
+          gh release upload $tag $uninstaller --clobber --repo $repo
+          if ($LASTEXITCODE -ne 0) { throw "Upload désinstallateur échoué : $LASTEXITCODE" }
+
+          $ghPath = (Get-Command gh).Source
+          $uploaded = $false
+          for ($attempt = 1; $attempt -le 3; $attempt++) {
+            Write-Host "Upload Setup tentative $attempt/3..."
+            $args = @('release','upload',$tag,$setup,'--clobber','--repo',$repo)
+            $proc = Start-Process -FilePath $ghPath -ArgumentList $args -PassThru -NoNewWindow
+            $finished = $proc.WaitForExit(900000)
+            if (-not $finished) {
+              Write-Warning "Upload Setup sans réponse après 15 minutes; arrêt de cette tentative."
+              try { $proc.Kill($true) } catch {}
+              $proc.WaitForExit()
+            } elseif ($proc.ExitCode -eq 0) {
+              $uploaded = $true
+              break
+            } else {
+              Write-Warning "Upload Setup échoué, code $($proc.ExitCode)."
+            }
+            if ($attempt -lt 3) { Start-Sleep -Seconds 15 }
+          }
+          if (-not $uploaded) { throw 'Upload du Setup échoué après 3 tentatives.' }
+
+          $releaseJson = gh release view $tag --repo $repo --json assets
+          if ($LASTEXITCODE -ne 0) { throw 'Lecture de la Release finale échouée.' }
+          $release = $releaseJson | ConvertFrom-Json
+          $setupName = [System.IO.Path]::GetFileName($setup)
+          $asset = $release.assets | Where-Object { $_.name -eq $setupName } | Select-Object -First 1
+          if (-not $asset) { throw 'Setup absent de la Release après upload.' }
+          if ([int64]$asset.size -ne [int64]$setupSize) { throw "Taille Setup distante incorrecte: $($asset.size) / $setupSize" }
+          Write-Host "Release $tag validée: Setup présent et taille correcte."
