@@ -3,7 +3,7 @@ name: TEST 165+ Synthèse IA locale
 on:
   push:
     branches:
-      - test-165plus-synthese-ia-locale
+      - test-ia-reprise-depuis-9
 
 jobs:
   build-windows-ai-test:
@@ -19,6 +19,13 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Apply writing-only guard on working #9 engine
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          node scripts/apply-local-ai-writing-guard.js
+          if ($LASTEXITCODE -ne 0) { throw 'Patch rédactionnel isolé échoué.' }
+
       - name: Check Electron IA sources
         shell: pwsh
         run: |
@@ -29,11 +36,26 @@ jobs:
             'src/local-ai.js',
             'scripts/build165plus-local-ai-prototype.js',
             'scripts/fix-local-ai-admin-bar.js',
+            'scripts/apply-local-ai-writing-guard.js',
             'scripts/admin-bar-smoke-electron.js'
           )) {
             node --check $file
             if ($LASTEXITCODE -ne 0) { throw "JavaScript invalide: $file" }
           }
+          $ai = Get-Content 'src/local-ai.js' -Raw
+          foreach ($required in @(
+            "const START_TIMEOUT_MS = 120000;",
+            "const REQUEST_TIMEOUT_MS = 240000;",
+            "'--ctx-size', '4096'",
+            "'--n-gpu-layers', '0'",
+            'SEB_LOCAL_AI_WRITING_GUARD_FROM_WORKING_9'
+          )) {
+            if (-not $ai.Contains($required)) { throw "Socle #9 ou garde rédactionnelle absent: $required" }
+          }
+          foreach ($forbidden in @('START_ATTEMPTS','totalRamGb <= 8','ctxSize =')) {
+            if ($ai.Contains($forbidden)) { throw "Régression de démarrage postérieure au #9 détectée: $forbidden" }
+          }
+          Write-Host 'Socle moteur #9 confirmé intact; garde rédactionnelle isolée présente.'
 
       - name: Prepare embedded local AI runtime
         shell: pwsh
@@ -73,7 +95,7 @@ jobs:
 
           Write-Host "Runtime IA local prêt. Modèle: $((Get-Item $model).Length) octets"
 
-      - name: Smoke test local AI offline
+      - name: Smoke test exact #9 local AI startup
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -107,11 +129,43 @@ jobs:
             $reply = Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:$port/v1/chat/completions" -ContentType 'application/json; charset=utf-8' -Body $body -TimeoutSec 120
             $text = [string]$reply.choices[0].message.content
             if ([string]::IsNullOrWhiteSpace($text)) { throw 'Inférence locale vide.' }
-            Write-Host "Smoke inference IA locale: $text"
+            Write-Host "Smoke inference IA locale #9: $text"
           }
           finally {
             if ($proc -and -not $proc.HasExited) { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue }
           }
+
+      - name: Smoke test application service with improved writing
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          @'
+          const { createLocalAiService } = require('./src/local-ai');
+          const source = [
+            'Dans les activités de fabrication, la lecture du plan et la découpe sont maîtrisées. Le traçage, le repérage, le pliage, l’assemblage et les finitions demandent encore davantage de contrôle et de précision.',
+            'Concernant les outils numériques, le traitement de texte reste difficile. La messagerie nécessite encore un accompagnement.',
+            'En mathématiques, la compréhension d’une consigne simple constitue un point d’appui. Les calculs et la résolution de problèmes n’ont pas été évalués.'
+          ].join('\n\n');
+          (async()=>{
+            const service=createLocalAiService({app:{isPackaged:false}});
+            try {
+              const result=await service.rewrite(source);
+              if(!result?.ok) throw new Error(result?.error||'réécriture IA vide');
+              const text=String(result.text||'');
+              const norm=text.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+              for(const word of ['plan','decoup','trac','reper','pliag','assembl','finit','traitement de texte','messager','consign','calcul']){
+                if(!norm.includes(word)) throw new Error('information protégée perdue: '+word);
+              }
+              if(/activement|accompagnement continu|supplementaire/.test(norm)) throw new Error('qualificatif non sourcé ajouté');
+              if(!/(?:pas|non)[^.!?]{0,80}evalu/.test(norm)) throw new Error('non-évalué perdu');
+              if(/<\/?(?:texte_source|proposition|message_du_controle|bilan_source)>/i.test(text)) throw new Error('balise technique visible');
+              console.log(`SEB IA service #9 + rédaction: OK - ${result.passes||1} passe(s), ${Math.max(1,Math.round((result.elapsedMs||0)/1000))} s.`);
+              console.log(text);
+            } finally { service.stop(); }
+          })().then(()=>process.exit(0)).catch(e=>{console.error(e.stack||e);process.exit(2)});
+          '@ | Set-Content -Path '_local-ai-service-smoke.js' -Encoding UTF8
+          node _local-ai-service-smoke.js
+          if ($LASTEXITCODE -ne 0) { throw 'Smoke test du service IA #9 amélioré échoué.' }
 
       - name: Ensure ImageMagick
         shell: pwsh
@@ -151,7 +205,8 @@ jobs:
             'scripts/build165plus-natural-synthesis-v8-runner.js',
             'scripts/build165plus-natural-synthesis-v9.js',
             'scripts/build165plus-local-ai-prototype.js',
-            'scripts/fix-local-ai-admin-bar.js'
+            'scripts/fix-local-ai-admin-bar.js',
+            'scripts/apply-local-ai-writing-guard.js'
           )) {
             node $script
             if ($LASTEXITCODE -ne 0) { throw "Script de préparation échoué: $script" }
@@ -159,6 +214,8 @@ jobs:
 
           node --check src/preload.js
           if ($LASTEXITCODE -ne 0) { throw 'preload.js final invalide.' }
+          node --check src/local-ai.js
+          if ($LASTEXITCODE -ne 0) { throw 'local-ai.js final invalide.' }
 
           npx electron scripts/admin-bar-smoke-electron.js
           if ($LASTEXITCODE -ne 0) { throw 'Test réel Electron de la barre Admin échoué.' }
@@ -202,7 +259,7 @@ jobs:
           $setup = "dist\SEB-eval-PRO-$version-Windows-Setup.exe"
           $uninstaller = "dist\SEB-eval-PRO-$version-Windows-Desinstallation.exe"
           $title = "SEB EvalPro - Test IA locale #${{ github.run_number }}"
-          $notes = "Prototype isolé dérivé du test sans IA #28. Qwen3-1.7B Q4_K_M et llama.cpp CPU x64 sont embarqués dans l'installeur. Test réel Electron ajouté : la Release n'est publiée que si la barre Administrateur est présente et s'affiche réellement au bord supérieur. Aucune connexion Internet n'est requise pendant le plateau. Ne remplace pas le Build #165 officiel."
+          $notes = "Reprise stricte depuis le build IA #9 réellement fonctionnel sur PC. Le moteur, le modèle, le démarrage, le packaging et la barre Admin restent ceux du #9. Seules la rédaction et la vérification de fidélité de la synthèse sont renforcées. Qwen3-1.7B Q4_K_M et llama.cpp CPU x64 restent entièrement hors ligne. Ne remplace pas le Build #165 officiel."
           gh release create $tag $setup $uninstaller --target "${{ github.sha }}" --title $title --notes $notes --prerelease --repo "${{ github.repository }}"
           if ($LASTEXITCODE -ne 0) { throw "Publication release IA locale échouée : $LASTEXITCODE" }
 
