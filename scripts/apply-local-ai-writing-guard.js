@@ -54,6 +54,14 @@ function writingBlockTemplate() {
       .trim();
   }
 
+  function numericTokens(value) {
+    return (String(value || '').match(/\d+(?:[.,]\d+)?/g) || []).map((raw) => {
+      let n = raw.replace(',', '.').replace(/^0+(?=\d)/, '');
+      if (n.includes('.')) n = n.replace(/0+$/, '').replace(/\.$/, '');
+      return n || '0';
+    });
+  }
+
   function cleanModelOutput(raw) {
     let text = String(raw || '').replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
     if (text.startsWith('```')) text = text.replace(/^```(?:text|markdown)?\s*/i, '').replace(/\s*```$/i, '').trim();
@@ -82,13 +90,14 @@ function writingBlockTemplate() {
     const srcAll = normalizeForGuard(sourceText);
     const outAll = normalizeForGuard(outputText);
 
-    // Garde-fous factuels stricts uniquement. On ne bloque plus des mots de style
-    // pris isolément : l'IA doit pouvoir reformuler naturellement.
-    const sourceDigits = new Set(sourceText.match(/\d+/g) || []);
-    const outputDigits = outputText.match(/\d+/g) || [];
-    if (outputDigits.some((n) => !sourceDigits.has(n))) {
-      throw new Error('Une donnée chiffrée a été ajoutée.');
-    }
+    // Les chiffres sont des faits : l'IA peut changer la ponctuation (57% / 57 %,
+    // 42,75 / 42.75), mais elle ne doit ni en inventer ni en supprimer.
+    const sourceNumbers = new Set(numericTokens(sourceText));
+    const outputNumbers = new Set(numericTokens(outputText));
+    const addedNumbers = [...outputNumbers].filter((n) => !sourceNumbers.has(n));
+    if (addedNumbers.length) throw new Error('Une donnée chiffrée a été ajoutée : ' + addedNumbers.join(', ') + '.');
+    const missingNumbers = [...sourceNumbers].filter((n) => !outputNumbers.has(n));
+    if (missingNumbers.length) throw new Error('Une donnée chiffrée du bilan a été perdue : ' + missingNumbers.join(', ') + '.');
 
     const srcNE = /\b(?:pas|non)\b[^\n]{0,100}\bevalu/.test(srcAll);
     const outNE = /\b(?:pas|non)\b[^\n]{0,100}\bevalu/.test(outAll);
@@ -113,6 +122,7 @@ function writingBlockTemplate() {
       'Le texte source est déjà factuellement validé. Tu ne dois pas réévaluer la personne.',
       'Améliore la rédaction : grammaire, accords, fluidité, transitions, rythme des phrases et répétitions lexicales.',
       'Conserve les faits, les domaines évalués, les difficultés, les réussites, les besoins d’aide et leur ordre logique général.',
+      'Conserve exactement toutes les données chiffrées utiles du texte source : scores, pourcentages, nombres d’erreurs et autres mesures. Garde-les sous forme chiffrée et ne les remplace pas par des nombres écrits en lettres.',
       'Tu peux changer le découpage en paragraphes, utiliser des synonymes, des connecteurs, des adjectifs ou des adverbes si cela ne change pas le sens ni le degré du constat.',
       'Ne supprime aucune compétence ni sous-compétence utile au bilan.',
       'N’invente pas de motivation, de personnalité, d’autonomie, de comportement, de compétence, de difficulté ou de conclusion absente du texte source.',
@@ -130,6 +140,7 @@ function writingBlockTemplate() {
       'Tu contrôles la fidélité factuelle d’une reformulation de bilan socioprofessionnel.',
       'Ne juge pas le style mot par mot. Les synonymes, connecteurs, adjectifs, adverbes et changements de paragraphes sont autorisés s’ils ne modifient pas le sens.',
       'Compare le TEXTE SOURCE et la PROPOSITION uniquement sur les faits et le degré des constats.',
+      'Vérifie que tous les scores, pourcentages, nombres d’erreurs et autres mesures chiffrées du TEXTE SOURCE sont conservés exactement.',
       'Vérifie qu’aucune compétence, difficulté, réussite, nuance, élément non évalué, activité interrompue ou conclusion n’a été réellement supprimé, inventé ou renforcé.',
       'Ne signale pas un simple changement lexical comme une erreur.',
       'Si la proposition est fidèle sur le fond, réponds exactement : OK',
@@ -144,6 +155,7 @@ function writingBlockTemplate() {
       'Tu corriges une reformulation seulement lorsqu’un écart factuel réel a été détecté.',
       'Le TEXTE SOURCE est l’unique référence factuelle.',
       'Corrige uniquement l’écart signalé, sans appauvrir le style ni revenir inutilement mot pour mot au texte source.',
+      'Rétablis exactement tout score, pourcentage, nombre d’erreurs ou autre mesure chiffrée manquante, sans en créer de nouvelle.',
       'Les synonymes, connecteurs et variations de paragraphes restent autorisés si le sens ne change pas.',
       'N’ajoute aucun fait et ne change jamais le degré d’un constat.',
       'Retourne uniquement le texte corrigé, sans balise ni explication.'
@@ -159,6 +171,7 @@ function writingBlockTemplate() {
 
     const startedAt = Date.now();
     let passes = 0;
+    let fallback = false;
     try {
       await ensureStarted();
       const draft = await firstRewrite(sourceText);
@@ -179,7 +192,14 @@ function writingBlockTemplate() {
         const reason = [guardIssue, auditOk ? '' : audit].filter(Boolean).join(' | ');
         const repaired = await repairAfterGuard(sourceText, draft, reason);
         passes += 1;
-        output = validateRewrite(sourceText, repaired);
+        try {
+          output = validateRewrite(sourceText, repaired);
+        } catch (_) {
+          // Un garde-fou de rédaction ne doit plus empêcher l'affichage d'une synthèse.
+          // Si la réparation reste infidèle, on revient au texte déterministe factuellement validé.
+          output = sourceText;
+          fallback = true;
+        }
       }
 
       return {
@@ -190,7 +210,8 @@ function writingBlockTemplate() {
         runtime: RUNTIME_LABEL,
         offline: true,
         passes,
-        guard: 'reprise-build-9-fidelite-v3-semantique-souple'
+        fallback,
+        guard: fallback ? 'reprise-build-9-fidelite-v4-chiffres-fallback-source' : 'reprise-build-9-fidelite-v4-chiffres'
       };
     } catch (error) {
       return {
@@ -201,7 +222,7 @@ function writingBlockTemplate() {
         model: MODEL_LABEL,
         offline: true,
         passes,
-        guard: 'reprise-build-9-fidelite-v3-semantique-souple'
+        guard: 'reprise-build-9-fidelite-v4-chiffres'
       };
     }
   }
@@ -225,4 +246,4 @@ try { new vm.Script(source); }
 catch (error) { fail('local-ai.js invalide après patch: ' + error.message); }
 
 fs.writeFileSync(file, source, 'utf8');
-console.log('SEB EvalPro IA reprise #9: moteur intact; contrôle factuel recentré sur le sens, sans filtre lexical excessif.');
+console.log('SEB EvalPro IA reprise #9: moteur intact; résultats chiffrés préservés et repli déterministe si la reformulation reste infidèle.');
