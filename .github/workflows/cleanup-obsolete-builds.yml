@@ -1,0 +1,89 @@
+name: Cleanup obsolete SEB EvalPro builds
+
+on:
+  push:
+    branches:
+      - cleanup-obsolete-builds-20260917
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete obsolete local-AI releases and tags
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          repo="$GITHUB_REPOSITORY"
+          release_ids=(
+            390790360
+            390750951
+            390717858
+            390718043
+            390675911
+            390537937
+            390528470
+            390443321
+            390113934
+            390088344
+            390034944
+            390023205
+            389865314
+            389859072
+            389859417
+            389844761
+          )
+
+          deleted=0
+          for id in "${release_ids[@]}"; do
+            data="$(gh api "/repos/$repo/releases/$id" 2>/dev/null || true)"
+            if [ -z "$data" ]; then
+              echo "Release $id déjà absente."
+              continue
+            fi
+            tag="$(printf '%s' "$data" | jq -r '.tag_name')"
+            name="$(printf '%s' "$data" | jq -r '.name')"
+            echo "Suppression: $name [$tag]"
+            gh api --method DELETE "/repos/$repo/releases/$id"
+            gh api --method DELETE "/repos/$repo/git/refs/tags/$tag" >/dev/null 2>&1 || true
+            deleted=$((deleted + 1))
+          done
+          echo "Releases IA obsolètes supprimées: $deleted"
+
+      - name: Delete failed or cancelled local-AI workflow runs
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          repo="$GITHUB_REPOSITORY"
+          workflow_id=359551442
+          run_ids="$(gh api --paginate "/repos/$repo/actions/workflows/$workflow_id/runs?per_page=100" --jq '.workflow_runs[] | select(.conclusion == "failure" or .conclusion == "cancelled") | .id')"
+          deleted=0
+          for id in $run_ids; do
+            echo "Suppression run IA rouge/annulé: $id"
+            gh api --method DELETE "/repos/$repo/actions/runs/$id" || true
+            deleted=$((deleted + 1))
+          done
+          echo "Runs IA rouges/annulés traités: $deleted"
+
+      - name: Verify protected reference releases remain
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          repo="$GITHUB_REPOSITORY"
+          for tag in \
+            seb-evalpro-ia-locale-9 \
+            seb-evalpro-ia-locale-26 \
+            seb-evalpro-v0.1.0-build-165
+          do
+            gh api "/repos/$repo/releases/tags/$tag" --jq '"CONSERVÉ: " + .name + " [" + .tag_name + "]"'
+          done
+          echo "Nettoyage terminé sans toucher aux trois références conservées."
