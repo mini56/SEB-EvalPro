@@ -36,9 +36,9 @@ if (!preloadSource.includes('rewriteSynthesisLocal')) fail('pont IA locale absen
 
 // -----------------------------------------------------------------------------
 // Bilan courant : une seule zone de texte et un seul bouton visible.
-// Le bouton existant du moteur déterministe est conservé comme bouton unique :
-// son gestionnaire produit d'abord la référence factuelle, puis ce gestionnaire
-// ajoute la reformulation SEB-IA. Tous les anciens doublons sont supprimés.
+// Le moteur déterministe produit d'abord la référence factuelle, puis SEB-IA
+// tente sa reformulation. La barre sous le texte indique sans ambiguïté quelle
+// formulation est réellement affichée.
 // -----------------------------------------------------------------------------
 {
   let html = read(adminFile);
@@ -49,11 +49,14 @@ if (!preloadSource.includes('rewriteSynthesisLocal')) fail('pont IA locale absen
 
   const block = String.raw`
 <style id="seb-local-ai-unified-style">
-#seb-ai-human-check{margin:7px 0 0;font:10pt Calibri,Arial,sans-serif;color:#666}
+#seb-ai-footer{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:8px 0 0;padding:7px 9px;border-top:1px solid #c8c8c8;border-bottom:1px solid #e2e2e2;font:10pt Calibri,Arial,sans-serif}
+#seb-ai-state-group{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.seb-ai-apply-state{font-weight:700;white-space:nowrap;color:#333}
+#seb-ai-result-detail{font-weight:400;color:#666;white-space:nowrap}
+#seb-ai-human-check{margin:0 0 0 auto;color:#666}
 #seb-ai-human-check strong{color:#444}
-#seb-ai-result-status{margin:4px 0 0;font:700 10pt Calibri,Arial,sans-serif;color:#444}
 #seb-generate-synthese:disabled{opacity:.6;cursor:wait}
-@media print{#seb-ai-human-check,#seb-ai-result-status{display:none!important}}
+@media print{#seb-ai-footer{display:none!important}}
 </style>
 <script id="seb-local-ai-unified-prototype">
 (()=>{'use strict';
@@ -73,45 +76,56 @@ function elapsedLabel(ms){const n=Math.max(0,Number(ms)||0);return n<1000?'< 1 s
 function passesLabel(n){const v=Math.max(0,Number(n)||0);return v+' passe'+(v>1?'s':'')}
 function installUnifiedSynthesis(){
  const area=document.getElementById('seb-bilan-synthese-text'),host=document.getElementById('seb-bilan-synthese');
- if(!area||!host||document.getElementById('seb-ai-human-check'))return;
+ if(!area||!host||document.getElementById('seb-ai-footer'))return;
  const buttons=[...host.querySelectorAll('button')].filter(synthesisButton);
  let engine=document.getElementById('seb-generate-synthese');
  if(!engine||!host.contains(engine))engine=buttons[0]||null;
  if(!engine)return;
  for(const old of buttons){if(old!==engine)old.remove()}
  engine.id='seb-generate-synthese';engine.style.display='';engine.removeAttribute('aria-hidden');engine.textContent='Générer la synthèse';engine.dataset.sebAiUnified='1';
- const warning=document.createElement('p');warning.id='seb-ai-human-check';warning.innerHTML='<strong>SEB-IA peut faire des erreurs.</strong> Vérifiez les informations importantes.';area.insertAdjacentElement('afterend',warning);
- const aiState=document.createElement('p');aiState.id='seb-ai-result-status';aiState.setAttribute('role','status');aiState.textContent='SEB-IA : en attente de génération.';warning.insertAdjacentElement('afterend',aiState);
+
+ const footer=document.createElement('div');footer.id='seb-ai-footer';footer.setAttribute('role','status');footer.setAttribute('aria-live','polite');
+ const states=document.createElement('div');states.id='seb-ai-state-group';
+ const motorState=document.createElement('span');motorState.id='seb-motor-result-status';motorState.className='seb-ai-apply-state';motorState.textContent='Formulation MOTEUR appliquée ❌';
+ const aiState=document.createElement('span');aiState.id='seb-ai-result-status';aiState.className='seb-ai-apply-state';aiState.textContent='SEB-IA : Reformulation IA appliquée ❌';
+ const detail=document.createElement('span');detail.id='seb-ai-result-detail';detail.textContent='En attente de génération.';
+ states.append(motorState,aiState,detail);
+ const warning=document.createElement('p');warning.id='seb-ai-human-check';warning.innerHTML='<strong>SEB-IA peut faire des erreurs.</strong> Vérifiez les informations importantes.';
+ footer.append(states,warning);area.insertAdjacentElement('afterend',footer);
+
  const status=document.getElementById('seb-synthese-status');
  const setStatus=t=>{if(status)status.textContent=t};
- const setAiState=t=>{aiState.textContent=t};
+ const setApplied=(motor,ai,info)=>{
+   motorState.textContent='Formulation MOTEUR appliquée '+(motor?'✅':'❌');
+   aiState.textContent='SEB-IA : Reformulation IA appliquée '+(ai?'✅':'❌');
+   detail.textContent=info||'';
+ };
  engine.addEventListener('click',async()=>{
-  engine.disabled=true;setStatus('Génération de la synthèse de référence…');setAiState('SEB-IA : traitement en cours…');
+  engine.disabled=true;setStatus('Génération de la synthèse de référence…');setApplied(false,false,'Traitement en cours…');
   try{
-   // Les gestionnaires déterministes déjà attachés au même bouton s'exécutent
-   // dans ce clic. Ce microtask permet de lire ensuite leur texte final.
    await Promise.resolve();
    const deterministic=aiText(area.value);
-   if(!deterministic){setStatus('Aucune synthèse n’a pu être générée.');setAiState('SEB-IA : aucun texte moteur disponible.');return}
+   if(!deterministic){setStatus('Aucune synthèse n’a pu être générée.');setApplied(false,false,'Aucun texte moteur disponible.');return}
    sessionStorage.setItem(SOURCE_KEY,deterministic);
    sessionStorage.setItem(FINAL_KEY,deterministic);
+   setApplied(true,false,'SEB-IA reformule localement…');
    setStatus('SEB-IA reformule la synthèse localement…');
    try{
     const st=await window.sebEvalPro?.localAiStatus?.();
-    if(!st?.available){setStatus('Synthèse moteur conservée.');setAiState('SEB-IA : TEXTE MOTEUR CONSERVÉ — IA indisponible.');return}
+    if(!st?.available){setStatus('Synthèse moteur conservée.');setApplied(true,false,'IA indisponible.');return}
     const answer=await window.sebEvalPro.rewriteSynthesisLocal(deterministic);
-    if(!answer?.ok){setStatus('Synthèse moteur conservée.');setAiState('SEB-IA : TEXTE MOTEUR CONSERVÉ — '+(answer?.error||'reformulation indisponible.') );return}
+    if(!answer?.ok){setStatus('Synthèse moteur conservée.');setApplied(true,false,answer?.error||'Reformulation indisponible.');return}
     const finalText=stripAiWrappers(answer.text);
-    if(!finalText){setStatus('Synthèse moteur conservée.');setAiState('SEB-IA : TEXTE MOTEUR CONSERVÉ — reformulation vide.');return}
+    if(!finalText){setStatus('Synthèse moteur conservée.');setApplied(true,false,'Reformulation vide.');return}
     area.value=finalText;sessionStorage.setItem(FINAL_KEY,finalText);area.dispatchEvent(new Event('input',{bubbles:true}));window.sebEvalPro?.save?.();
     if(answer.fallback){
       setStatus('Synthèse moteur conservée après contrôle SEB-IA.');
-      setAiState('SEB-IA : TEXTE MOTEUR CONSERVÉ — contrôle de fidélité ('+passesLabel(answer.passes)+', '+elapsedLabel(answer.elapsedMs)+').');
+      setApplied(true,false,'Contrôle de fidélité — '+passesLabel(answer.passes)+', '+elapsedLabel(answer.elapsedMs)+'.');
     }else{
       setStatus('Synthèse reformulée avec SEB-IA.');
-      setAiState('SEB-IA : REFORMULATION APPLIQUÉE — '+passesLabel(answer.passes)+', '+elapsedLabel(answer.elapsedMs)+'.');
+      setApplied(false,true,passesLabel(answer.passes)+', '+elapsedLabel(answer.elapsedMs)+'.');
     }
-   }catch(error){setStatus('Synthèse moteur conservée.');setAiState('SEB-IA : TEXTE MOTEUR CONSERVÉ — '+String(error?.message||error))}
+   }catch(error){setStatus('Synthèse moteur conservée.');setApplied(true,false,String(error?.message||error))}
   }finally{engine.disabled=false}
  });
 }
@@ -125,8 +139,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 }
 
 // -----------------------------------------------------------------------------
-// Anciens bilans : même fonctionnement unifié et même indicateur explicite.
-// Le bouton déterministe existant reste le seul bouton visible.
+// Anciens bilans : même fonctionnement unifié et même barre de contrôle visible.
 // -----------------------------------------------------------------------------
 {
   let js = read(historyFile);
@@ -138,7 +151,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 // SEB_HISTORY_LOCAL_AI_UNIFIED
 function sebBhInstallUnifiedSynthesis(){
  const summary=document.querySelector('#seb-bh-history-summary');
- if(!summary||document.querySelector('#seb-bh-ai-human-check'))return;
+ if(!summary||document.querySelector('#seb-bh-ai-footer'))return;
  const host=summary.closest('section')||summary.parentElement;
  if(!host)return;
  const isSynthButton=b=>{const id=String(b?.id||'');const text=String(b?.textContent||'').trim().toLocaleLowerCase('fr-FR');return id==='seb-bh-gen-summary'||id==='seb-bh-gen-summary-engine'||(text.includes('générer')&&text.includes('synthèse'))||(text.includes('regénérer')&&text.includes('synthèse'))||(text.includes('régénérer')&&text.includes('synthèse'))};
@@ -146,32 +159,40 @@ function sebBhInstallUnifiedSynthesis(){
  let engine=document.querySelector('#seb-bh-gen-summary');if(!engine||!host.contains(engine))engine=buttons[0]||null;if(!engine)return;
  for(const old of buttons){if(old!==engine)old.remove()}
  engine.id='seb-bh-gen-summary';engine.style.display='';engine.removeAttribute('aria-hidden');engine.textContent='Générer la synthèse';engine.dataset.sebAiUnified='1';
- const warning=document.createElement('p');warning.id='seb-bh-ai-human-check';warning.style.cssText='margin:7px 0 0;font:12px Calibri,Arial,sans-serif;color:#666';warning.innerHTML='<strong>SEB-IA peut faire des erreurs.</strong> Vérifiez les informations importantes.';summary.insertAdjacentElement('afterend',warning);
- const aiState=document.createElement('p');aiState.id='seb-bh-ai-result-status';aiState.setAttribute('role','status');aiState.style.cssText='margin:4px 0 0;font:700 12px Calibri,Arial,sans-serif;color:#444';aiState.textContent='SEB-IA : en attente de génération.';warning.insertAdjacentElement('afterend',aiState);
+
+ const footer=document.createElement('div');footer.id='seb-bh-ai-footer';footer.setAttribute('role','status');footer.setAttribute('aria-live','polite');footer.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:8px 0 0;padding:7px 9px;border-top:1px solid #c8c8c8;border-bottom:1px solid #e2e2e2;font:12px Calibri,Arial,sans-serif';
+ const states=document.createElement('div');states.style.cssText='display:flex;align-items:center;gap:12px;flex-wrap:wrap';
+ const motorState=document.createElement('span');motorState.id='seb-bh-motor-result-status';motorState.style.fontWeight='700';motorState.textContent='Formulation MOTEUR appliquée ❌';
+ const aiState=document.createElement('span');aiState.id='seb-bh-ai-result-status';aiState.style.fontWeight='700';aiState.textContent='SEB-IA : Reformulation IA appliquée ❌';
+ const detail=document.createElement('span');detail.id='seb-bh-ai-result-detail';detail.style.color='#666';detail.textContent='En attente de génération.';
+ states.append(motorState,aiState,detail);
+ const warning=document.createElement('p');warning.id='seb-bh-ai-human-check';warning.style.cssText='margin:0 0 0 auto;color:#666';warning.innerHTML='<strong>SEB-IA peut faire des erreurs.</strong> Vérifiez les informations importantes.';
+ footer.append(states,warning);summary.insertAdjacentElement('afterend',footer);
+
  let status=document.querySelector('#seb-bh-summary-status')||document.querySelector('#seb-bh-synthese-status');
  const setStatus=t=>{if(status)status.textContent=t};
- const setAiState=t=>{aiState.textContent=t};
  const elapsed=ms=>{const n=Math.max(0,Number(ms)||0);return n<1000?'< 1 s':Math.round(n/1000)+' s'};
  const passes=n=>{const v=Math.max(0,Number(n)||0);return v+' passe'+(v>1?'s':'')};
+ const setApplied=(motor,ai,info)=>{motorState.textContent='Formulation MOTEUR appliquée '+(motor?'✅':'❌');aiState.textContent='SEB-IA : Reformulation IA appliquée '+(ai?'✅':'❌');detail.textContent=info||''};
  engine.addEventListener('click',async()=>{
-  engine.disabled=true;setStatus('Génération de la synthèse de référence…');setAiState('SEB-IA : traitement en cours…');
+  engine.disabled=true;setStatus('Génération de la synthèse de référence…');setApplied(false,false,'Traitement en cours…');
   try{
    await Promise.resolve();
    const deterministic=String(summary.value||'').replace(/\r\n/g,'\n').trim();
-   if(!deterministic){setStatus('Aucune synthèse n’a pu être générée.');setAiState('SEB-IA : aucun texte moteur disponible.');return}
-   setStatus('SEB-IA reformule la synthèse localement…');
+   if(!deterministic){setStatus('Aucune synthèse n’a pu être générée.');setApplied(false,false,'Aucun texte moteur disponible.');return}
+   setApplied(true,false,'SEB-IA reformule localement…');setStatus('SEB-IA reformule la synthèse localement…');
    try{
     const st=await ipcRenderer.invoke('ai:status');
-    if(!st?.available){setStatus('Synthèse moteur conservée.');setAiState('SEB-IA : TEXTE MOTEUR CONSERVÉ — IA indisponible.');return}
+    if(!st?.available){setStatus('Synthèse moteur conservée.');setApplied(true,false,'IA indisponible.');return}
     const answer=await ipcRenderer.invoke('ai:rewrite-synthesis',deterministic);
-    if(!answer?.ok){setStatus('Synthèse moteur conservée.');setAiState('SEB-IA : TEXTE MOTEUR CONSERVÉ — '+(answer?.error||'reformulation indisponible.'));return}
+    if(!answer?.ok){setStatus('Synthèse moteur conservée.');setApplied(true,false,answer?.error||'Reformulation indisponible.');return}
     let finalText=String(answer.text||'').replace(/\r\n/g,'\n').trim();
     finalText=finalText.replace(/^\s*<\/?(?:bilan_reformule|bilan_source|texte_source|proposition)>\s*/i,'').replace(/\s*<\/(?:bilan_reformule|bilan_source|texte_source|proposition)>\s*$/i,'').trim();
-    if(!finalText){setStatus('Synthèse moteur conservée.');setAiState('SEB-IA : TEXTE MOTEUR CONSERVÉ — reformulation vide.');return}
+    if(!finalText){setStatus('Synthèse moteur conservée.');setApplied(true,false,'Reformulation vide.');return}
     summary.value=finalText;summary.dispatchEvent(new Event('input',{bubbles:true}));
-    if(answer.fallback){setStatus('Synthèse moteur conservée après contrôle SEB-IA.');setAiState('SEB-IA : TEXTE MOTEUR CONSERVÉ — contrôle de fidélité ('+passes(answer.passes)+', '+elapsed(answer.elapsedMs)+').')}
-    else{setStatus('Synthèse reformulée avec SEB-IA.');setAiState('SEB-IA : REFORMULATION APPLIQUÉE — '+passes(answer.passes)+', '+elapsed(answer.elapsedMs)+'.')}
-   }catch(error){setStatus('Synthèse moteur conservée.');setAiState('SEB-IA : TEXTE MOTEUR CONSERVÉ — '+String(error?.message||error))}
+    if(answer.fallback){setStatus('Synthèse moteur conservée après contrôle SEB-IA.');setApplied(true,false,'Contrôle de fidélité — '+passes(answer.passes)+', '+elapsed(answer.elapsedMs)+'.')}
+    else{setStatus('Synthèse reformulée avec SEB-IA.');setApplied(false,true,passes(answer.passes)+', '+elapsed(answer.elapsedMs)+'.')}
+   }catch(error){setStatus('Synthèse moteur conservée.');setApplied(true,false,String(error?.message||error))}
   }finally{engine.disabled=false}
  });
 }
@@ -181,7 +202,7 @@ function sebBhInstallUnifiedSynthesis(){
   install();
   const root=document.documentElement||document.body;
   if(!root){setTimeout(start,50);return}
-  const observer=new MutationObserver(()=>{if(document.querySelector('#seb-bh-history-summary')&&!document.querySelector('#seb-bh-ai-human-check'))install()});
+  const observer=new MutationObserver(()=>{if(document.querySelector('#seb-bh-history-summary')&&!document.querySelector('#seb-bh-ai-footer'))install()});
   observer.observe(root,{childList:true,subtree:true});
  };
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
@@ -195,4 +216,4 @@ function sebBhInstallUnifiedSynthesis(){
   write(historyFile, js);
 }
 
-console.log('SEB EvalPro IA locale prototype: bouton unique « Générer la synthèse » et état explicite REFORMULATION APPLIQUÉE / TEXTE MOTEUR CONSERVÉ.');
+console.log('SEB EvalPro IA locale prototype: barre visible MOTEUR/IA avec ✅/❌ et avertissement de relecture.');
