@@ -100,6 +100,39 @@ app.whenReady().then(async () => {
 
     console.log('SEB EvalPro Admin smoke: OK - barre présente et affichable au bord supérieur.');
     console.log(JSON.stringify(result));
+
+    // Vérification réelle du correctif IA #25 : un seul bouton visible,
+    // libellé exact, et indicateur explicite du sort de la reformulation.
+    await win.loadFile(path.join(__dirname, '..', 'app', 'web', 'admin-bilan.html'));
+    await new Promise((resolve) => setTimeout(resolve, 900));
+    const synthesis = await win.webContents.executeJavaScript(`(()=>{
+      const host=document.getElementById('seb-bilan-synthese');
+      const buttons=host?[...host.querySelectorAll('button')]:[];
+      const visible=buttons.filter(b=>{const s=getComputedStyle(b);return s.display!=='none'&&s.visibility!=='hidden'&&!b.hidden});
+      const aiState=document.getElementById('seb-ai-result-status');
+      const warning=document.getElementById('seb-ai-human-check');
+      return {
+        host:!!host,
+        buttonCount:buttons.length,
+        visibleButtonCount:visible.length,
+        visibleButtonTexts:visible.map(b=>String(b.textContent||'').trim()),
+        aiState:!!aiState,
+        aiStateText:aiState?String(aiState.textContent||'').trim():'',
+        warning:!!warning
+      };
+    })()`);
+
+    if (!synthesis.host || synthesis.visibleButtonCount !== 1 || synthesis.visibleButtonTexts[0] !== 'Générer la synthèse') {
+      fail('la synthèse doit afficher un seul bouton « Générer la synthèse »', synthesis);
+      return;
+    }
+    if (!synthesis.aiState || !synthesis.warning || !/^SEB-IA\s*:/.test(synthesis.aiStateText)) {
+      fail('indicateur explicite SEB-IA absent de la synthèse', synthesis);
+      return;
+    }
+    console.log('SEB EvalPro Admin smoke: OK - bouton synthèse unique et indicateur SEB-IA présents.');
+    console.log(JSON.stringify(synthesis));
+
     win.destroy();
     app.exit(0);
   } catch (error) {
