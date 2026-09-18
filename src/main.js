@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const { createLocalAiService } = require('./local-ai');
+const { createCandidateStore } = require('./candidate-store-main');
 
 const ADMIN_PASSWORD_SHA256 = 'c800892ba3f11b33d36eedf7d3c4297f2b6c02e2c347dda8954b4c577f6666b5';
 const STATE_VERSION = 1;
@@ -16,6 +17,7 @@ let splashStartedAt = 0;
 let adminSessionUnlocked = false;
 let downloadRoutingInstalled = false;
 const localAi = createLocalAiService({ app });
+let candidateStore = null;
 
 function stateFilePath() {
   return path.join(app.getPath('userData'), 'evaluation-state.json');
@@ -25,12 +27,23 @@ function sebDocumentsRoot() {
   return path.join(app.getPath('documents'), 'SEB EvalPro');
 }
 
+function getCandidateStore() {
+  if (!candidateStore) {
+    candidateStore = createCandidateStore({
+      documentsPath: app.getPath('documents'),
+      userDataPath: app.getPath('userData')
+    });
+  }
+  return candidateStore;
+}
+
 function bilanDocumentsDir() {
   return path.join(sebDocumentsRoot(), 'Bilans');
 }
 
 function ensureSebDocumentsFolders() {
   fs.mkdirSync(bilanDocumentsDir(), { recursive: true });
+  getCandidateStore().ensureRoots();
 }
 
 function uniqueOutputPath(directory, filename) {
@@ -52,7 +65,9 @@ function installDownloadRouting() {
     if (!/\.docx?$/i.test(filename)) return;
     try {
       ensureSebDocumentsFolders();
-      item.setSavePath(uniqueOutputPath(bilanDocumentsDir(), filename));
+      const candidateExportDir = getCandidateStore().getActiveExportDir();
+      const targetDirectory = candidateExportDir || bilanDocumentsDir();
+      item.setSavePath(uniqueOutputPath(targetDirectory, filename));
     } catch (_) {}
   });
 }
@@ -90,6 +105,13 @@ function writeState(nextState) {
   fs.mkdirSync(path.dirname(target), { recursive: true });
   fs.writeFileSync(temp, JSON.stringify(safeState, null, 2), 'utf8');
   fs.renameSync(temp, target);
+
+  try {
+    getCandidateStore().saveSnapshot(safeState);
+  } catch (error) {
+    console.error('Sauvegarde du dossier candidat impossible:', error && error.message ? error.message : error);
+  }
+
   return safeState;
 }
 
@@ -296,6 +318,11 @@ ipcMain.handle('admin:lock', () => {
   return true;
 });
 
+ipcMain.handle('candidate:active', () => {
+  if (!adminSessionUnlocked) return null;
+  return getCandidateStore().getActiveCandidate();
+});
+
 ipcMain.handle('admin:open-bilan', () => {
   if (!mainWindow || !adminSessionUnlocked) return false;
   const bilanPath = existingWebPage('admin-bilan.html');
@@ -327,8 +354,10 @@ require('./session-close')({
   getMainWindow: () => mainWindow,
   getAdminUnlocked: () => adminSessionUnlocked,
   setAdminUnlocked: (value) => { adminSessionUnlocked = !!value; },
+  readState,
   writeState,
-  defaultState
+  defaultState,
+  finalizeCandidateSession: (state) => getCandidateStore().closeActiveCandidate(state)
 });
 
 app.whenReady().then(startApplication);
