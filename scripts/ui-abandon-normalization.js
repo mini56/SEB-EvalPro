@@ -15,7 +15,7 @@ if (!fs.existsSync(webDir)) fail('dossier app/web introuvable');
 if (!fs.existsSync(runtime)) fail('runtime js/seb-ui-runtime.js introuvable après préparation du web', 3);
 
 const runtimeText = fs.readFileSync(runtime, 'utf8');
-for (const required of ['seb_evalpro_abandons', 'Abandonner l’exercice', 'seb-action-btn', 'Exercices abandonnés par le stagiaire']) {
+for (const required of ['seb_evalpro_abandons', 'Abandonner l’exercice', 'seb-action-btn', 'Exercices abandonnés par le stagiaire', 'seb-evalpro-abandon-admin-password', 'verifyAdminPassword']) {
   if (!runtimeText.includes(required)) fail(`runtime incomplet : ${required}`, 4);
 }
 

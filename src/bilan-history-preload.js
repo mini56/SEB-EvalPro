@@ -130,7 +130,7 @@ function addStyle() {
     .seb-bh-card{width:min(1040px,96vw);max-height:90vh;background:#fff;border-radius:10px;box-shadow:0 16px 50px rgba(0,0,0,.4);display:flex;flex-direction:column;overflow:hidden}
     .seb-bh-head{display:flex;align-items:center;gap:10px;background:#0070c0;color:#fff;padding:13px 17px}.seb-bh-title{font-size:20px;font-weight:700;flex:1}.seb-bh-badge{background:#fff;color:#0070c0;border-radius:14px;padding:4px 9px;font-size:12px;font-weight:700}
     .seb-bh-body{padding:15px;overflow:auto;background:#f5f7fb}.seb-bh-path{font-size:12px;color:#666;margin-bottom:10px}.seb-bh-row{display:grid;grid-template-columns:1.35fr .55fr .55fr .8fr auto;gap:10px;align-items:center;padding:10px 12px;background:#fff;border:1px solid #d9dfeb;border-radius:7px;margin-bottom:8px}.seb-bh-row strong{font-size:15px}.seb-bh-row small{color:#666}.seb-bh-bad{color:#c00000;font-weight:700}
-    .seb-bh-actions{display:flex;justify-content:flex-end;gap:10px;padding:12px 16px;border-top:1px solid #ddd;background:#fff}.seb-bh-actions button,.seb-bh-row button{font:700 14px Arial,sans-serif;padding:8px 14px;border:1px solid #999;border-radius:5px;background:#f2f2f2;cursor:pointer}.seb-bh-actions .primary,.seb-bh-row .primary{background:#0070c0;color:#fff;border-color:#0070c0}
+    .seb-bh-actions{display:flex;justify-content:flex-end;gap:10px;padding:12px 16px;border-top:1px solid #ddd;background:#fff}.seb-bh-row>div:last-child{display:flex;justify-content:flex-end;gap:8px;align-items:center}.seb-bh-actions button,.seb-bh-row button{font:700 14px Arial,sans-serif;padding:8px 14px;border:1px solid #999;border-radius:5px;background:#f2f2f2;cursor:pointer}.seb-bh-actions .primary,.seb-bh-row .primary{background:#0070c0;color:#fff;border-color:#0070c0}.seb-bh-row .danger{background:#c62828;color:#fff;border-color:#c62828}.seb-bh-row .danger.confirm{background:#8b0000;border-color:#8b0000}
     .seb-bh-editor-card{width:98vw;height:94vh;background:#fff;border-radius:8px;box-shadow:0 16px 50px rgba(0,0,0,.42);display:flex;flex-direction:column;overflow:hidden}.seb-bh-editor-head{display:flex;gap:10px;align-items:center;background:#0070c0;color:#fff;padding:10px 15px}.seb-bh-editor-head strong{font-size:18px;flex:1}.seb-bh-warning{background:#fff3cd;color:#6e5200;border-radius:13px;padding:4px 9px;font-size:12px;font-weight:700}.seb-bh-editor-body{flex:1;overflow:auto;padding:16px;background:#fff}
     .seb-bh-meta{display:flex;gap:24px;flex-wrap:wrap;margin:0 0 10px;font-size:14px}.seb-bh-table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:13px}.seb-bh-table th,.seb-bh-table td{border:1px solid #000;padding:5px;vertical-align:top}.seb-bh-table th{background:#0070c0;color:#fff}.seb-bh-table th:nth-child(2){background:#ccffff;color:#000}.seb-bh-table th:nth-child(3){background:#92d050;color:#000}.seb-bh-table th:nth-child(4){background:#ed7d31}.seb-bh-table th:nth-child(5){background:#c00000}.seb-bh-section td{background:#9cc2e5;font-weight:700}.seb-bh-module{white-space:pre-line}.seb-bh-level{text-align:center;cursor:pointer;height:42px;user-select:none}.seb-bh-level.on[data-level="NE"]{background:#ccffff}.seb-bh-level.on[data-level="I"]{background:#92d050}.seb-bh-level.on[data-level="II"]{background:#ed7d31;color:#fff}.seb-bh-level.on[data-level="III"]{background:#c00000;color:#fff}.seb-bh-level.on:after{content:attr(data-level);font-weight:700;font-size:16px}.seb-bh-select,.seb-bh-comment{width:100%;font:inherit}.seb-bh-select{margin-bottom:5px}.seb-bh-comment{min-height:55px;resize:vertical;padding:5px}.seb-bh-detail{font-size:12px;color:#555;white-space:pre-line;margin-top:4px}.seb-bh-editor-foot{display:flex;align-items:center;gap:10px;padding:10px 14px;border-top:1px solid #ddd;background:#f8f8f8}.seb-bh-editor-foot .info{flex:1;font-size:13px;color:#555}.seb-bh-editor-foot button{font:700 14px Arial,sans-serif;padding:8px 14px;border:1px solid #999;border-radius:5px;background:#f2f2f2;cursor:pointer}.seb-bh-editor-foot .primary{background:#0070c0;color:#fff;border-color:#0070c0}
   `;
@@ -226,6 +226,44 @@ async function openChooser() {
           openEditor(result.filename, result.archive);
         });
         cell.appendChild(open);
+        if (Number(item.revision) > 0) {
+          const remove = document.createElement('button');
+          remove.type = 'button';
+          remove.className = 'danger';
+          remove.textContent = 'Supprimer';
+          let confirmDelete = false;
+          let resetTimer = null;
+          remove.addEventListener('click', async () => {
+            if (!confirmDelete) {
+              confirmDelete = true;
+              remove.classList.add('confirm');
+              remove.textContent = 'Confirmer';
+              resetTimer = setTimeout(() => {
+                confirmDelete = false;
+                remove.classList.remove('confirm');
+                remove.textContent = 'Supprimer';
+              }, 5000);
+              return;
+            }
+            clearTimeout(resetTimer);
+            remove.disabled = true;
+            remove.textContent = 'Suppression…';
+            const result = await ipcRenderer.invoke('bilan-history:delete-revision', item.filename);
+            if (!result || !result.ok) {
+              remove.disabled = false;
+              confirmDelete = false;
+              remove.classList.remove('confirm');
+              remove.textContent = 'Supprimer';
+              remove.title = (result && result.error) || 'Suppression impossible.';
+              return;
+            }
+            row.remove();
+            if (!list.querySelector('.seb-bh-row')) {
+              list.innerHTML = '<div style="padding:25px;text-align:center;color:#666">Aucun bilan structuré enregistré pour le moment.</div>';
+            }
+          });
+          cell.appendChild(remove);
+        }
       }
       list.appendChild(row);
     });

@@ -145,6 +145,7 @@
       #seb-evalpro-abandon-box .seb-abandon-choice{display:flex;align-items:flex-start;gap:10px;padding:8px 4px;font-size:15px}
       #seb-evalpro-abandon-box .seb-abandon-choice input{margin-top:2px;transform:scale(1.15)}
       #seb-evalpro-abandon-comment{width:100%;min-height:78px;margin-top:10px;padding:8px;border:1px solid #aaa;border-radius:7px;box-sizing:border-box;font:14px Arial,sans-serif;resize:vertical}
+      .seb-abandon-admin{margin-top:14px;padding:11px;border:1px solid #d7dce5;border-radius:7px;background:#f7f9fc}.seb-abandon-admin label{display:block;font-weight:700;color:#1a3a5f;margin-bottom:6px}.seb-abandon-admin small{display:block;color:#666;margin-top:5px}.seb-abandon-admin input{width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #999;border-radius:5px;font:16px Arial,sans-serif}
       #seb-evalpro-abandon-error{min-height:19px;margin-top:6px;color:#c62828;font-size:13px;font-weight:700}
       #seb-evalpro-abandon-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:14px}
       .seb-admin-abandon-section td{background:#f7c8c8!important;color:#7c1111!important;font-weight:700!important}
@@ -365,12 +366,13 @@
       <div id="seb-evalpro-abandon-box" role="dialog" aria-modal="true" aria-label="Abandonner l’exercice">
         <h2>Abandonner l’exercice</h2>
         <div class="seb-abandon-exercise"></div>
-        <p class="seb-abandon-help">Indiquez la ou les raisons de votre abandon. Au moins une proposition doit être cochée.</p>
+        <p class="seb-abandon-help">Indiquez la ou les raisons de votre abandon. Au moins une proposition doit être cochée. L’abandon doit ensuite être validé par un administrateur.</p>
         <label class="seb-abandon-choice"><input type="checkbox" value="Je ne comprends pas la consigne"><span>Je ne comprends pas la consigne.</span></label>
         <label class="seb-abandon-choice"><input type="checkbox" value="L’exercice est trop difficile"><span>L’exercice est trop difficile.</span></label>
         <label class="seb-abandon-choice"><input type="checkbox" value="Fatigue, gêne ou douleur"><span>Je ressens de la fatigue, une gêne ou une douleur.</span></label>
         <label class="seb-abandon-choice"><input type="checkbox" value="Autre raison" data-other="1"><span>Autre raison.</span></label>
         <textarea id="seb-evalpro-abandon-comment" placeholder="Précisez si nécessaire. Si vous cochez « Autre raison », indiquez ici la raison."></textarea>
+        <div class="seb-abandon-admin"><label for="seb-evalpro-abandon-admin-password">Validation administrateur</label><input id="seb-evalpro-abandon-admin-password" type="password" autocomplete="off" placeholder="Mot de passe administrateur"><small>L’administrateur doit valider l’abandon avant de poursuivre.</small></div>
         <div id="seb-evalpro-abandon-error" aria-live="polite"></div>
         <div id="seb-evalpro-abandon-actions">
           <button type="button" id="seb-evalpro-abandon-cancel" class="seb-action-btn seb-btn-nav">✕ Annuler</button>
@@ -382,10 +384,11 @@
 
     const error = layer.querySelector('#seb-evalpro-abandon-error');
     const comment = layer.querySelector('#seb-evalpro-abandon-comment');
+    const adminPassword = layer.querySelector('#seb-evalpro-abandon-admin-password');
     const close = function () { layer.remove(); };
 
     layer.querySelector('#seb-evalpro-abandon-cancel').addEventListener('click', close);
-    layer.querySelector('#seb-evalpro-abandon-confirm').addEventListener('click', function () {
+    layer.querySelector('#seb-evalpro-abandon-confirm').addEventListener('click', async function () {
       const checked = Array.from(layer.querySelectorAll('input[type="checkbox"]:checked'));
       if (checked.length === 0) {
         error.textContent = 'Cochez au moins une raison avant de confirmer.';
@@ -395,6 +398,21 @@
       if (otherChecked && !comment.value.trim()) {
         error.textContent = 'Précisez la raison dans la zone de commentaire.';
         comment.focus();
+        return;
+      }
+      const password = String(adminPassword?.value || '').trim();
+      if (!password) {
+        error.textContent = 'Le mot de passe administrateur est obligatoire pour valider l’abandon.';
+        adminPassword?.focus();
+        return;
+      }
+      let adminOk = false;
+      try {
+        adminOk = !!(window.sebEvalPro?.verifyAdminPassword && await window.sebEvalPro.verifyAdminPassword(password));
+      } catch (_) {}
+      if (!adminOk) {
+        error.textContent = 'Mot de passe administrateur incorrect. L’exercice reste actif.';
+        if (adminPassword) { adminPassword.value = ''; adminPassword.focus(); }
         return;
       }
       const reasons = checked.map((input) => input.value);

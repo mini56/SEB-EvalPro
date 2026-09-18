@@ -114,7 +114,7 @@ function existingWebPage(pageName) {
 }
 
 function verifyAdminPassword(password) {
-  const received = crypto.createHash('sha256').update(String(password || ''), 'utf8').digest('hex');
+  const received = crypto.createHash('sha256').update(String(password || '').trim().toUpperCase(), 'utf8').digest('hex');
   const expected = Buffer.from(ADMIN_PASSWORD_SHA256, 'utf8');
   const actual = Buffer.from(received, 'utf8');
   return expected.length === actual.length && crypto.timingSafeEqual(expected, actual);

@@ -196,7 +196,7 @@ function writingBlockTemplate() {
       offline: true,
       passes,
       reason: String(reason || 'contrôle de fidélité'),
-      guard: 'reprise-build-9-fidelite-v6-faits-chiffres-style-libre'
+      guard: 'reprise-build-9-fidelite-v7-one-pass'
     };
   }
 
@@ -209,50 +209,23 @@ function writingBlockTemplate() {
     try {
       await ensureStarted();
       const draft = await firstRewrite(sourceText);
-      passes += 1;
-
-      let guardIssue = '';
-      try { validateRewrite(sourceText, draft); }
-      catch (error) { guardIssue = error.message; }
-
-      const audit = await fidelityAudit(sourceText, draft);
-      passes += 1;
-      const auditOk = auditAccepted(audit);
-
-      if (!guardIssue && auditOk) {
+      passes = 1;
+      try {
+        const output = validateRewrite(sourceText, draft);
         return {
           ok: true,
-          text: validateRewrite(sourceText, draft),
+          text: output,
           fallback: false,
           elapsedMs: Date.now() - startedAt,
           model: MODEL_LABEL,
           runtime: RUNTIME_LABEL,
           offline: true,
           passes,
-          guard: 'reprise-build-9-fidelite-v6-faits-chiffres-style-libre'
+          guard: 'reprise-build-9-fidelite-v7-one-pass'
         };
+      } catch (error) {
+        return fallbackResult(sourceText, startedAt, passes, error.message);
       }
-
-      const reason = [guardIssue, auditOk ? '' : audit].filter(Boolean).join(' | ');
-      const repaired = await repairAfterGuard(sourceText, draft, reason);
-      passes += 1;
-      let output;
-      try { output = validateRewrite(sourceText, repaired); }
-      catch (error) { return fallbackResult(sourceText, startedAt, passes, error.message); }
-
-      // Pas de quatrième appel IA : la réparation répond déjà aux écarts factuels
-      // identifiés par l'audit et le garde déterministe refait le contrôle final.
-      return {
-        ok: true,
-        text: output,
-        fallback: false,
-        elapsedMs: Date.now() - startedAt,
-        model: MODEL_LABEL,
-        runtime: RUNTIME_LABEL,
-        offline: true,
-        passes,
-        guard: 'reprise-build-9-fidelite-v6-faits-chiffres-style-libre'
-      };
     } catch (error) {
       return {
         ok: false,
@@ -262,7 +235,7 @@ function writingBlockTemplate() {
         model: MODEL_LABEL,
         offline: true,
         passes,
-        guard: 'reprise-build-9-fidelite-v6-faits-chiffres-style-libre'
+        guard: 'reprise-build-9-fidelite-v7-one-pass'
       };
     }
   }
@@ -283,4 +256,4 @@ if (!source.includes(marker)) fail('marqueur de garde rédactionnelle absent apr
 try { new vm.Script(source); }
 catch (error) { fail('local-ai.js invalide après patch: ' + error.message); }
 fs.writeFileSync(file, source, 'utf8');
-console.log('SEB EvalPro IA reprise #9: garde v6 appliqué; faits et chiffres protégés, style libre, 3 passes IA maximum.');
+console.log('SEB EvalPro IA reprise #9: garde v7 appliqué; faits et chiffres protégés, une seule passe IA maximum.');

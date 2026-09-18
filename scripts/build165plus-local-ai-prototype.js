@@ -120,7 +120,7 @@ function installUnifiedSynthesis(){
     area.value=finalText;sessionStorage.setItem(FINAL_KEY,finalText);area.dispatchEvent(new Event('input',{bubbles:true}));window.sebEvalPro?.save?.();
     if(answer.fallback){
       setStatus('Synthèse moteur conservée après contrôle SEB-IA.');
-      setApplied(true,false,'Contrôle de fidélité — '+passesLabel(answer.passes)+', '+elapsedLabel(answer.elapsedMs)+'.');
+      setApplied(true,false,'Contrôle local — '+passesLabel(answer.passes)+', '+elapsedLabel(answer.elapsedMs)+'.');
     }else{
       setStatus('Synthèse reformulée avec SEB-IA.');
       setApplied(false,true,passesLabel(answer.passes)+', '+elapsedLabel(answer.elapsedMs)+'.');
@@ -190,7 +190,7 @@ function sebBhInstallUnifiedSynthesis(){
     finalText=finalText.replace(/^\s*<\/?(?:bilan_reformule|bilan_source|texte_source|proposition)>\s*/i,'').replace(/\s*<\/(?:bilan_reformule|bilan_source|texte_source|proposition)>\s*$/i,'').trim();
     if(!finalText){setStatus('Synthèse moteur conservée.');setApplied(true,false,'Reformulation vide.');return}
     summary.value=finalText;summary.dispatchEvent(new Event('input',{bubbles:true}));
-    if(answer.fallback){setStatus('Synthèse moteur conservée après contrôle SEB-IA.');setApplied(true,false,'Contrôle de fidélité — '+passes(answer.passes)+', '+elapsed(answer.elapsedMs)+'.')}
+    if(answer.fallback){setStatus('Synthèse moteur conservée après contrôle SEB-IA.');setApplied(true,false,'Contrôle local — '+passes(answer.passes)+', '+elapsed(answer.elapsedMs)+'.')}
     else{setStatus('Synthèse reformulée avec SEB-IA.');setApplied(false,true,passes(answer.passes)+', '+elapsed(answer.elapsedMs)+'.')}
    }catch(error){setStatus('Synthèse moteur conservée.');setApplied(true,false,String(error?.message||error))}
   }finally{engine.disabled=false}

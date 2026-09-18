@@ -213,6 +213,21 @@ module.exports = function registerBilanHistory({ app, ipcMain, getAdminUnlocked,
     }
   });
 
+  ipcMain.handle('bilan-history:delete-revision', (_event, filename) => {
+    if (!getAdminUnlocked()) return { ok: false, error: 'Accès administrateur requis.' };
+    try {
+      const loaded = readArchive(filename);
+      const revision = Number(loaded.archive && loaded.archive.revision);
+      if (!Number.isFinite(revision) || revision <= 0) {
+        throw new Error('Le bilan Original est protégé et ne peut pas être supprimé.');
+      }
+      fs.unlinkSync(loaded.full);
+      return { ok: true, filename: loaded.filename, revision, rootId: String(loaded.archive.rootId || '') };
+    } catch (error) {
+      return { ok: false, error: error && error.message ? error.message : String(error) };
+    }
+  });
+
   ipcMain.handle('bilan-history:save-revision', (_event, payload) => {
     if (!getAdminUnlocked()) return { ok: false, error: 'Accès administrateur requis.' };
     try {
