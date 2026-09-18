@@ -1,0 +1,365 @@
+name: TEST Plateaux candidats
+
+on:
+  push:
+    branches:
+      - test-plateaux-candidats
+
+jobs:
+  build-windows-plateaux-test:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Validate candidate-folder foundation
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          foreach ($file in @(
+            'src/candidate-store-main.js',
+            'src/main.js',
+            'src/preload.js',
+            'src/session-close.js',
+            'scripts/candidate-store-smoke.js'
+          )) {
+            node --check $file
+            if ($LASTEXITCODE -ne 0) { throw "JavaScript invalide: $file" }
+          }
+          node scripts/candidate-store-smoke.js
+          if ($LASTEXITCODE -ne 0) { throw 'Smoke test du dossier candidat échoué.' }
+
+      - name: Apply writing-only guard on working #9 engine
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          node scripts/apply-local-ai-writing-guard.js
+          if ($LASTEXITCODE -ne 0) { throw 'Patch rédactionnel isolé échoué.' }
+
+      - name: Check Electron IA sources
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          foreach ($file in @(
+            'src/main.js',
+            'src/preload.js',
+            'src/local-ai.js',
+            'scripts/build165plus-local-ai-prototype.js',
+            'scripts/fix-local-ai-admin-bar.js',
+            'scripts/apply-local-ai-writing-guard.js',
+            'scripts/admin-bar-smoke-electron.js',
+            'scripts/admin-mode-ui-polish.js'
+          )) {
+            node --check $file
+            if ($LASTEXITCODE -ne 0) { throw "JavaScript invalide: $file" }
+          }
+          $ai = Get-Content 'src/local-ai.js' -Raw
+          foreach ($required in @(
+            "const START_TIMEOUT_MS = 120000;",
+            "const REQUEST_TIMEOUT_MS = 240000;",
+            "'--ctx-size', '4096'",
+            "'--n-gpu-layers', '0'",
+            'SEB_LOCAL_AI_WRITING_GUARD_FROM_WORKING_9'
+          )) {
+            if (-not $ai.Contains($required)) { throw "Socle #9 ou garde rédactionnelle absent: $required" }
+          }
+          foreach ($forbidden in @('START_ATTEMPTS','totalRamGb <= 8','ctxSize =')) {
+            if ($ai.Contains($forbidden)) { throw "Régression de démarrage postérieure au #9 détectée: $forbidden" }
+          }
+          Write-Host 'Socle moteur #9 confirmé intact; garde rédactionnelle isolée présente.'
+
+      - name: Prepare embedded local AI runtime
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path 'ai-runtime','_ai-download','_ai-llama' | Out-Null
+
+          $llamaUrl = 'https://github.com/ggml-org/llama.cpp/releases/download/b10964/llama-b10964-bin-win-cpu-x64.zip'
+          $llamaZip = '_ai-download\llama-win-cpu-x64.zip'
+          curl.exe -L --fail --retry 3 --retry-delay 3 -o $llamaZip $llamaUrl
+          if ($LASTEXITCODE -ne 0) { throw 'Téléchargement llama.cpp échoué.' }
+          $llamaSha = (Get-FileHash $llamaZip -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($llamaSha -ne '917f39c076402c421224824607397af20f53625a60defc20e8dd22446bf4c5d7') { throw "SHA256 llama.cpp inattendu: $llamaSha" }
+          Expand-Archive -Path $llamaZip -DestinationPath '_ai-llama' -Force
+          $server = Get-ChildItem '_ai-llama' -Recurse -Filter 'llama-server.exe' | Select-Object -First 1
+          if (-not $server) { throw 'llama-server.exe introuvable dans le paquet officiel.' }
+          Copy-Item -Path (Join-Path $server.Directory.FullName '*') -Destination 'ai-runtime' -Recurse -Force
+          if (-not (Test-Path 'ai-runtime\llama-server.exe')) { throw 'llama-server.exe non copié.' }
+          if (-not (Test-Path 'ai-runtime\llama-cli.exe')) { throw 'llama-cli.exe non copié.' }
+
+          $modelUrl = 'https://huggingface.co/ggml-org/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q4_K_M.gguf?download=true'
+          $model = 'ai-runtime\Qwen3-1.7B-Q4_K_M.gguf'
+          curl.exe -L --fail --retry 3 --retry-delay 5 -o $model $modelUrl
+          if ($LASTEXITCODE -ne 0) { throw 'Téléchargement Qwen3-1.7B Q4_K_M échoué.' }
+          $modelSha = (Get-FileHash $model -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($modelSha -ne 'd2387ca2dbfee2ffabce7120d3770dadca0b293052bc2f0e138fdc940d9bc7b5') { throw "SHA256 modèle inattendu: $modelSha" }
+
+          @"
+          SEB EvalPro - Prototype IA locale
+          Modèle: ggml-org/Qwen3-1.7B-GGUF / Qwen3-1.7B-Q4_K_M.gguf
+          Licence du modèle: Apache-2.0
+          SHA256 modèle: d2387ca2dbfee2ffabce7120d3770dadca0b293052bc2f0e138fdc940d9bc7b5
+          Runtime: llama.cpp b10964 (version 0.4.1)
+          Paquet Windows CPU x64 SHA256: 917f39c076402c421224824607397af20f53625a60defc20e8dd22446bf4c5d7
+          Le programme utilise exclusivement le modèle local embarqué; aucun téléchargement n'est effectué pendant l'évaluation.
+          "@ | Set-Content -Path 'ai-runtime\SEB-EvalPro-IA-NOTICE.txt' -Encoding UTF8
+
+          Write-Host "Runtime IA local prêt. Modèle: $((Get-Item $model).Length) octets"
+
+      - name: Smoke test exact #9 local AI startup
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $port = 39472
+          $args = @('--model',(Resolve-Path 'ai-runtime\Qwen3-1.7B-Q4_K_M.gguf').Path,'--host','127.0.0.1','--port',"$port",'--ctx-size','1024','--threads','2','--n-gpu-layers','0')
+          $proc = Start-Process -FilePath (Resolve-Path 'ai-runtime\llama-server.exe').Path -ArgumentList $args -PassThru -WindowStyle Hidden -RedirectStandardOutput '_ai-server-out.log' -RedirectStandardError '_ai-server-err.log'
+          try {
+            $ready = $false
+            for ($i=0; $i -lt 180; $i++) {
+              Start-Sleep -Milliseconds 500
+              if ($proc.HasExited) { throw "llama-server s'est arrêté avec le code $($proc.ExitCode)." }
+              try {
+                $health = Invoke-RestMethod -Uri "http://127.0.0.1:$port/health" -TimeoutSec 2
+                if ($health.status -eq 'ok') { $ready = $true; break }
+              } catch {}
+            }
+            if (-not $ready) { throw 'Le serveur IA local ne devient pas prêt.' }
+
+            $body = @{
+              model = 'Qwen3-1.7B-Q4_K_M.gguf'
+              messages = @(
+                @{ role='system'; content='Tu réponds en français et uniquement avec le mot OK.' },
+                @{ role='user'; content='/no_think Réponds uniquement OK.' }
+              )
+              temperature = 0.7
+              top_p = 0.8
+              max_tokens = 24
+              seed = 42
+              stream = $false
+            } | ConvertTo-Json -Depth 8
+            $reply = Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:$port/v1/chat/completions" -ContentType 'application/json; charset=utf-8' -Body $body -TimeoutSec 120
+            $text = [string]$reply.choices[0].message.content
+            if ([string]::IsNullOrWhiteSpace($text)) { throw 'Inférence locale vide.' }
+            Write-Host "Smoke inference IA locale #9: $text"
+          }
+          finally {
+            if ($proc -and -not $proc.HasExited) { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue }
+          }
+
+      - name: Smoke test application service with improved writing
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          @'
+          const { createLocalAiService } = require('./src/local-ai');
+          const source = [
+            'Dans les activités de fabrication, la lecture du plan et la découpe sont maîtrisées. Le traçage, le repérage, le pliage, l’assemblage et les finitions demandent encore davantage de contrôle et de précision.',
+            'Concernant les outils numériques, le traitement de texte reste difficile. La messagerie nécessite encore un accompagnement.',
+            'En mathématiques, la compréhension d’une consigne simple constitue un point d’appui. Les calculs et la résolution de problèmes n’ont pas été évalués.'
+          ].join('\n\n');
+          (async()=>{
+            const service=createLocalAiService({app:{isPackaged:false}});
+            try {
+              const result=await service.rewrite(source);
+              if(!result?.ok) throw new Error(result?.error||'réécriture IA vide');
+              const text=String(result.text||'');
+              const norm=text.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+              for(const word of ['plan','decoup','trac','reper','pliag','assembl','finit','traitement de texte','messager','consign','calcul']){
+                if(!norm.includes(word)) throw new Error('information protégée perdue: '+word);
+              }
+              if(/activement|accompagnement continu|supplementaire/.test(norm)) throw new Error('qualificatif non sourcé ajouté');
+              if(!/(?:pas|non)[^.!?]{0,80}evalu/.test(norm)) throw new Error('non-évalué perdu');
+              if(/<\/?(?:texte_source|proposition|message_du_controle|bilan_source)>/i.test(text)) throw new Error('balise technique visible');
+              console.log(`SEB IA service #9 + rédaction: OK - ${result.passes||1} passe(s), ${Math.max(1,Math.round((result.elapsedMs||0)/1000))} s.`);
+              console.log(text);
+            } finally { service.stop(); }
+          })().then(()=>process.exit(0)).catch(e=>{console.error(e.stack||e);process.exit(2)});
+          '@ | Set-Content -Path '_local-ai-service-smoke.js' -Encoding UTF8
+          node _local-ai-service-smoke.js
+          if ($LASTEXITCODE -ne 0) { throw 'Smoke test du service IA #9 amélioré échoué.' }
+
+      - name: Ensure ImageMagick
+        shell: pwsh
+        run: |
+          if (-not (Get-Command magick -ErrorAction SilentlyContinue)) {
+            choco install imagemagick --no-progress -y
+          }
+
+      - name: Generate installer branding
+        shell: pwsh
+        run: ./scripts/generate-installer-branding.ps1
+
+      - name: Normalize Windows NSIS encodings
+        shell: pwsh
+        run: |
+          $utf8Bom = New-Object System.Text.UTF8Encoding($true)
+          foreach ($relativePath in @('build\\installer.nsh','build\\standalone-uninstaller.nsi')) {
+            $path = (Resolve-Path $relativePath).Path
+            $text = [System.IO.File]::ReadAllText($path)
+            [System.IO.File]::WriteAllText($path, $text, $utf8Bom)
+          }
+
+      - name: Build Windows Plateaux test installer
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          npm run prepare:web
+          if ($LASTEXITCODE -ne 0) { throw 'prepare:web a échoué.' }
+
+          foreach ($script in @(
+            'scripts/build165plus-history-synthesis.js',
+            'scripts/build165plus-institutional-synthesis-v4.js',
+            'scripts/build165plus-natural-synthesis-v5-runner.js',
+            'scripts/build165plus-natural-synthesis-v6.js',
+            'scripts/build165plus-natural-synthesis-v7-runner.js',
+            'scripts/build165plus-natural-synthesis-v8-runner.js',
+            'scripts/build165plus-natural-synthesis-v9.js',
+            'scripts/build165plus-local-ai-prototype.js',
+            'scripts/fix-local-ai-admin-bar.js',
+            'scripts/apply-local-ai-writing-guard.js',
+            'scripts/admin-mode-ui-polish.js'
+          )) {
+            node $script
+            if ($LASTEXITCODE -ne 0) { throw "Script de préparation échoué: $script" }
+          }
+
+          node --check src/main.js
+          if ($LASTEXITCODE -ne 0) { throw 'main.js final invalide.' }
+          node --check src/preload.js
+          if ($LASTEXITCODE -ne 0) { throw 'preload.js final invalide.' }
+          node --check src/local-ai.js
+          if ($LASTEXITCODE -ne 0) { throw 'local-ai.js final invalide.' }
+
+          npx electron scripts/admin-bar-smoke-electron.js
+          if ($LASTEXITCODE -ne 0) { throw 'Test réel Electron de la barre Admin échoué.' }
+
+          npx electron-builder --win --publish never
+          if ($LASTEXITCODE -ne 0) { throw 'Construction Windows échouée.' }
+
+      - name: Verify packaged AI files
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $unpacked = 'dist\win-unpacked\resources\ai'
+          if (-not (Test-Path "$unpacked\llama-server.exe")) { throw 'llama-server absent du paquet final.' }
+          if (-not (Test-Path "$unpacked\Qwen3-1.7B-Q4_K_M.gguf")) { throw 'modèle IA absent du paquet final.' }
+          $sha = (Get-FileHash "$unpacked\Qwen3-1.7B-Q4_K_M.gguf" -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($sha -ne 'd2387ca2dbfee2ffabce7120d3770dadca0b293052bc2f0e138fdc940d9bc7b5') { throw 'modèle IA altéré dans le paquet final.' }
+
+      - name: Build standalone Windows uninstaller
+        shell: pwsh
+        run: |
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $makensis = Get-Command makensis.exe -ErrorAction SilentlyContinue
+          if (-not $makensis) {
+            choco install nsis --no-progress -y
+            $candidate = Join-Path ${env:ProgramFiles(x86)} 'NSIS\makensis.exe'
+            if (Test-Path $candidate) { $makensis = Get-Item $candidate }
+          }
+          if (-not $makensis) { throw 'makensis.exe introuvable.' }
+          $makensisPath = if ($makensis.Source) { $makensis.Source } else { $makensis.FullName }
+          & $makensisPath "/DAPP_VERSION=$version" 'build\standalone-uninstaller.nsi'
+          if ($LASTEXITCODE -ne 0) { throw "Compilation désinstallateur échouée : $LASTEXITCODE" }
+
+      - name: Publish Plateaux test release with direct asset recovery
+        timeout-minutes: 330
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $tag = "seb-evalpro-test-plateaux-${{ github.run_number }}"
+          $setup = (Resolve-Path "dist\SEB-eval-PRO-$version-Windows-Setup.exe").Path
+          $uninstaller = (Resolve-Path "dist\SEB-eval-PRO-$version-Windows-Desinstallation.exe").Path
+          $repo = "${{ github.repository }}"
+          $title = "SEB EvalPro - Test Plateaux #${{ github.run_number }}"
+          $notes = "Test Plateaux #1, créé strictement depuis le Build #36 validé (commit 8e4dac0c). Ajoute en parallèle le dossier candidat autonome dans Documents\\SEB EvalPro\\Candidats, sans retirer la sauvegarde AppData existante. Les exports Word sont dirigés vers le dossier du candidat actif et Fermer cette session conserve désormais ce dossier. Le socle IA locale du #36 reste inchangé. Version de test uniquement."
+          $setupSize = (Get-Item $setup).Length
+          Write-Host "Setup à publier: $setupSize octets"
+
+          $allReleasesJson = gh api "repos/$repo/releases?per_page=100"
+          if ($LASTEXITCODE -ne 0) { throw 'Lecture des Releases échouée.' }
+          $release = ($allReleasesJson | ConvertFrom-Json) | Where-Object { $_.tag_name -eq $tag } | Select-Object -First 1
+          if (-not $release) {
+            $createdJson = gh api -X POST "repos/$repo/releases" -f "tag_name=$tag" -f "target_commitish=${{ github.sha }}" -f "name=$title" -f "body=$notes" -F draft=true -F prerelease=true
+            if ($LASTEXITCODE -ne 0) { throw 'Création de la Release brouillon échouée.' }
+            $release = $createdJson | ConvertFrom-Json
+          }
+          $releaseId = [int64]$release.id
+          Write-Host "Release brouillon: id=$releaseId tag=$tag"
+
+          function Remove-AssetByName([string]$assetName) {
+            $assetsJson = gh api "repos/$repo/releases/$releaseId/assets?per_page=100"
+            if ($LASTEXITCODE -ne 0) { throw 'Lecture des assets échouée.' }
+            $assets = $assetsJson | ConvertFrom-Json
+            foreach ($existing in @($assets | Where-Object { $_.name -eq $assetName })) {
+              Write-Host "Suppression asset résiduel: $($existing.name), état=$($existing.state), id=$($existing.id)"
+              gh api -X DELETE "repos/$repo/releases/assets/$($existing.id)" *> $null
+              if ($LASTEXITCODE -ne 0) { throw "Suppression asset résiduel échouée: $($existing.id)" }
+            }
+          }
+
+          function Upload-Asset([string]$filePath, [int]$maxAttempts) {
+            $assetName = [System.IO.Path]::GetFileName($filePath)
+            $encodedName = [System.Uri]::EscapeDataString($assetName)
+            $uploadUrl = "https://uploads.github.com/repos/$repo/releases/$releaseId/assets?name=$encodedName"
+            for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+              Remove-AssetByName $assetName
+              if ($attempt -gt 1) { Start-Sleep -Seconds 30 }
+              $responseFile = Join-Path $env:RUNNER_TEMP ("seb-upload-" + $attempt + ".json")
+              Remove-Item $responseFile -Force -ErrorAction SilentlyContinue
+              Write-Host "Upload $assetName tentative $attempt/$maxAttempts via API directe..."
+              $http = & curl.exe -L --fail-with-body --connect-timeout 30 --speed-limit 16384 --speed-time 600 --max-time 7200 -X POST `
+                -H "Accept: application/vnd.github+json" `
+                -H "Authorization: Bearer $env:GH_TOKEN" `
+                -H "X-GitHub-Api-Version: 2022-11-28" `
+                -H "Content-Type: application/octet-stream" `
+                --data-binary "@$filePath" `
+                -o $responseFile -w "%{http_code}" $uploadUrl
+              $curlExit = $LASTEXITCODE
+              $http = (($http | Out-String).Trim())
+              if ($curlExit -eq 0 -and $http -eq '201' -and (Test-Path $responseFile)) {
+                $uploadedAsset = Get-Content $responseFile -Raw | ConvertFrom-Json
+                if ($uploadedAsset.state -eq 'uploaded') {
+                  Write-Host "Upload terminé: $assetName, $($uploadedAsset.size) octets, $($uploadedAsset.digest)"
+                  return $uploadedAsset
+                }
+              }
+              $body = if (Test-Path $responseFile) { Get-Content $responseFile -Raw } else { '' }
+              Write-Warning "Upload $assetName échoué/incomplet: curl=$curlExit HTTP=$http $body"
+            }
+            throw "Upload impossible après $maxAttempts tentative(s): $assetName"
+          }
+
+          $uninstallerAsset = Upload-Asset $uninstaller 3
+          $setupAsset = Upload-Asset $setup 2
+          if ([int64]$setupAsset.size -ne [int64]$setupSize) { throw "Taille Setup distante incorrecte: $($setupAsset.size) / $setupSize" }
+
+          $validated = $false
+          for ($check = 1; $check -le 30; $check++) {
+            $assetsJson = gh api "repos/$repo/releases/$releaseId/assets?per_page=100"
+            if ($LASTEXITCODE -ne 0) { throw 'Lecture des assets finaux échouée.' }
+            $assets = $assetsJson | ConvertFrom-Json
+            $finalSetup = $assets | Where-Object { $_.name -eq [System.IO.Path]::GetFileName($setup) } | Select-Object -First 1
+            if ($finalSetup -and $finalSetup.state -eq 'uploaded' -and [int64]$finalSetup.size -eq [int64]$setupSize -and -not [string]::IsNullOrWhiteSpace([string]$finalSetup.digest)) {
+              $validated = $true
+              Write-Host "Setup GitHub validé: état=uploaded, taille=$($finalSetup.size), digest=$($finalSetup.digest)"
+              break
+            }
+            Start-Sleep -Seconds 5
+          }
+          if (-not $validated) { throw 'Setup non finalisé par GitHub après upload.' }
+
+          $publishedJson = gh api -X PATCH "repos/$repo/releases/$releaseId" -F draft=false -F prerelease=true -f "name=$title" -f "body=$notes"
+          if ($LASTEXITCODE -ne 0) { throw 'Publication finale de la Release échouée.' }
+          $published = $publishedJson | ConvertFrom-Json
+          Write-Host "Release $tag publiée et validée: $($published.html_url)"
