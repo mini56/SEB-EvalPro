@@ -38,10 +38,11 @@ ipcMain.on('state:load-sync', (event) => {
 });
 ipcMain.on('state:save-sync', (event) => { event.returnValue = { ok: true }; });
 ipcMain.handle('state:save', () => ({ ok: true }));
-ipcMain.handle('admin:status', () => false);
-ipcMain.handle('admin:verify', () => false);
+let smokeAdminUnlocked = true;
+ipcMain.handle('admin:status', () => smokeAdminUnlocked);
+ipcMain.handle('admin:verify', () => { smokeAdminUnlocked = true; return true; });
 ipcMain.handle('admin:verify-password', () => false);
-ipcMain.handle('admin:lock', () => true);
+ipcMain.handle('admin:lock', () => { smokeAdminUnlocked = false; return true; });
 ipcMain.handle('admin:open-bilan', () => false);
 ipcMain.handle('admin:return-evaluation', () => false);
 ipcMain.handle('admin:close-session', () => false);
@@ -93,8 +94,8 @@ app.whenReady().then(async () => {
       };
     })()`);
 
-    if (!result.bar || !result.hotzone || !result.adminButton || !result.visible) {
-      fail('barre Administrateur absente ou impossible à afficher au bord supérieur', result);
+    if (!result.bar || !result.hotzone || !result.adminButton || !result.visible || result.adminText !== 'Verrouiller') {
+      fail('barre Administrateur absente, non synchronisée ou bouton Verrouiller incorrect', result);
       return;
     }
 
@@ -134,22 +135,26 @@ app.whenReady().then(async () => {
     console.log(JSON.stringify(synthesis));
 
     const adminUi = await win.webContents.executeJavaScript(`(()=>{
-      const save=document.getElementById('save');
-      const word=document.getElementById('word');
-      const pdf=document.getElementById('pdf');
-      const css=save?getComputedStyle(save):null;
-      return {
-        save:!!save,
-        word:!!word,
-        pdf:!!pdf,
-        saveWidth:save?Math.round(save.getBoundingClientRect().width):0,
-        saveBackground:css?css.backgroundColor:'',
-        saveColor:css?css.color:'',
-        saveBorder:css?css.borderTopColor:''
-      };
+      const ids=['auto','save','word'];
+      const buttons=Object.fromEntries(ids.map(id=>{
+        const el=document.getElementById(id),css=el?getComputedStyle(el):null;
+        return [id,{
+          present:!!el,
+          width:el?Math.round(el.getBoundingClientRect().width):0,
+          background:css?css.backgroundColor:'',
+          color:css?css.color:'',
+          border:css?css.borderTopColor:''
+        }];
+      }));
+      return {buttons,pdf:!!document.getElementById('pdf')};
     })()`);
-    if (!adminUi.save || !adminUi.word || adminUi.pdf || adminUi.saveWidth < 240) {
-      fail('présentation finale du Bilan Admin incorrecte (Enregistrer/Word/PDF)', adminUi);
+    const blue='rgb(0, 112, 192)', white='rgb(255, 255, 255)';
+    const badStyle=['auto','save','word'].some(id=>{
+      const b=adminUi.buttons[id];
+      return !b.present || b.background!==white || b.color!==blue || b.border!==blue;
+    });
+    if (badStyle || adminUi.pdf || adminUi.buttons.save.width < 270) {
+      fail('présentation finale des 3 boutons du Bilan Admin incorrecte', adminUi);
       return;
     }
     console.log('SEB EvalPro Admin smoke: OK - Enregistrer agrandi, Word présent, PDF absent.');

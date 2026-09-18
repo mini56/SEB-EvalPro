@@ -125,6 +125,16 @@ function applyAdminWindowMode(unlocked) {
     );
   }
 
+  const lockReturnMarker = '// SEB_ADMIN_LOCK_RETURNS_TO_PRIVACY';
+  if (!out.includes(lockReturnMarker)) {
+    out = replaceRequired(
+      out,
+      "ipcMain.handle('admin:lock', () => {\n  adminSessionUnlocked = false;\n  applyAdminWindowMode(false);\n  return true;\n});",
+      "ipcMain.handle('admin:lock', () => {\n  " + lockReturnMarker + "\n  adminSessionUnlocked = false;\n  applyAdminWindowMode(false);\n  if (mainWindow && !mainWindow.isDestroyed()) {\n    const state = readState();\n    const target = existingWebPage(state.lastEvaluationPage || 'qcmv1.0.html');\n    setTimeout(() => {\n      if (!mainWindow || mainWindow.isDestroyed() || adminSessionUnlocked) return;\n      mainWindow.loadFile(target);\n    }, 90);\n  }\n  return true;\n});",
+      'Verrouiller doit quitter toute page Admin'
+    );
+  }
+
   for (const required of [
     marker,
     'function applyAdminWindowMode(unlocked)',
@@ -204,13 +214,62 @@ function applyAdminWindowMode(unlocked) {
 `;
     out = replaceRequired(out, cssAnchor, cssAnchor + css, 'style boutons Admin');
   }
+  const syncMarker = '// SEB_ADMIN_STATE_SYNC_AFTER_EARLY_BAR';
+  if (!out.includes(syncMarker)) {
+    const syncHelper = `
+${syncMarker}
+function sebSyncAdminBarState() {
+  const bar = document.getElementById('seb-evalpro-topbar');
+  if (!bar) return;
+  const adminButton = document.getElementById('seb-evalpro-admin');
+  const bilanButton = document.getElementById('seb-evalpro-bilan');
+  const returnButton = document.getElementById('seb-evalpro-return');
+  const closeSessionButton = document.getElementById('seb-evalpro-close-session');
+  const onBilan = isAdminBilanPage();
+  if (adminButton) {
+    adminButton.hidden = false;
+    adminButton.textContent = adminUnlocked ? 'Verrouiller' : 'Administrateur';
+  }
+  if (bilanButton) bilanButton.hidden = !adminUnlocked || onBilan;
+  if (returnButton) returnButton.hidden = !adminUnlocked || !onBilan;
+  if (closeSessionButton) closeSessionButton.hidden = !adminUnlocked;
+}
+`;
+    out = replaceRequired(out, 'function injectAdminBar() {', syncHelper + '\nfunction injectAdminBar() {', 'helper synchronisation Admin');
+
+    out = replaceRequired(
+      out,
+      "    if (adminUnlocked) {\n      await ipcRenderer.invoke('admin:lock');",
+      "    if (adminUnlocked) {\n      try { window.localStorage.setItem('seb_evalpro_privacy_screen', 'temporary'); } catch (_) {}\n      try { saveNow(true); } catch (_) {}\n      await ipcRenderer.invoke('admin:lock');",
+      'préparer écran SEB EvalPro avant verrouillage'
+    );
+
+    out = replaceRequired(
+      out,
+      "  adminUnlocked = await ipcRenderer.invoke('admin:status');\n  injectAdminBar();",
+      "  adminUnlocked = await ipcRenderer.invoke('admin:status');\n  injectAdminBar();\n  sebSyncAdminBarState();\n  setTimeout(sebSyncAdminBarState, 80);\n  setTimeout(sebSyncAdminBarState, 300);",
+      'synchronisation après lecture état Admin'
+    );
+
+    const contextAnchor = "window.addEventListener('beforeunload', () => {";
+    const pageShow = `
+window.addEventListener('pageshow', async () => {
+  try { adminUnlocked = await ipcRenderer.invoke('admin:status'); } catch (_) {}
+  sebSyncAdminBarState();
+});
+
+`;
+    out = replaceRequired(out, contextAnchor, pageShow + contextAnchor, 'synchronisation pageshow');
+  }
+
   if (!out.includes(marker)) fail('style boutons Admin non injecté');
+  if (!out.includes(syncMarker) || !out.includes("adminButton.textContent = adminUnlocked ? 'Verrouiller' : 'Administrateur'")) fail('synchronisation état Admin absente');
   checkJs(out, 'src/preload.js après style Admin');
   write(file, out);
 }
 
 // -----------------------------------------------------------------------------
-// 3) Bilan Admin : boutons blancs/bleus, Enregistrer agrandi, PDF supprimé.
+// 3) Bilan Admin : style forcé des 3 boutons, Enregistrer agrandi, PDF supprimé.
 // -----------------------------------------------------------------------------
 {
   const { file, text } = read(path.join('app', 'web', 'admin-bilan.html'));
@@ -220,31 +279,54 @@ function applyAdminWindowMode(unlocked) {
   out = out.replace(/;?\$\('#pdf'\)\.onclick=pdf/g, '');
 
   const marker = 'seb-admin-bilan-button-polish';
-  if (!out.includes(`id="${marker}"`)) {
-    const style = `
+  out = out.replace(new RegExp('<style id="' + marker + '">[\\s\\S]*?<\\/style>\\s*', 'g'), '');
+  const style = `
 <style id="${marker}">
-body button{
-  background:#fff!important;color:#0070c0!important;border:2px solid #0070c0!important;border-radius:6px!important;
-  box-shadow:0 2px 5px rgba(0,0,0,.18),inset 0 1px 0 #fff!important;font-weight:700!important;
-  cursor:pointer;transition:background .12s ease,box-shadow .12s ease,transform .12s ease
+html body .tools #auto,
+html body .tools #save,
+html body .tools #word{
+  background:#fff!important;
+  color:#0070c0!important;
+  border:2px solid #0070c0!important;
+  border-radius:6px!important;
+  padding:9px 14px!important;
+  box-shadow:0 2px 5px rgba(0,0,0,.18),inset 0 1px 0 #fff!important;
+  font-weight:700!important;
+  cursor:pointer!important;
+  transition:background .12s ease,box-shadow .12s ease,transform .12s ease!important
 }
-body button:hover{background:#f5f9fd!important;box-shadow:0 3px 7px rgba(0,0,0,.22),inset 0 1px 0 #fff!important;transform:translateY(-1px)}
-body button:active{transform:translateY(0);box-shadow:inset 0 1px 3px rgba(0,0,0,.20)!important}
-#save{min-width:270px!important;padding:12px 24px!important;font-size:12pt!important;border-width:2px!important}
+html body .tools #auto:hover,
+html body .tools #save:hover,
+html body .tools #word:hover{
+  background:#f5f9fd!important;
+  box-shadow:0 3px 7px rgba(0,0,0,.22),inset 0 1px 0 #fff!important;
+  transform:translateY(-1px)
+}
+html body .tools #auto:active,
+html body .tools #save:active,
+html body .tools #word:active{
+  transform:translateY(0);
+  box-shadow:inset 0 1px 3px rgba(0,0,0,.20)!important
+}
+html body .tools #save{
+  min-width:290px!important;
+  padding:12px 26px!important;
+  font-size:12pt!important;
+  border-width:2px!important
+}
 </style>
 `;
-    const headEnd = out.toLowerCase().indexOf('</head>');
-    if (headEnd < 0) fail('fin head admin-bilan introuvable');
-    out = out.slice(0, headEnd) + style + out.slice(headEnd);
-  }
+  const bodyEnd = out.toLowerCase().lastIndexOf('</body>');
+  if (bodyEnd < 0) fail('fin body admin-bilan introuvable');
+  out = out.slice(0, bodyEnd) + style + out.slice(bodyEnd);
 
   if (out.includes('id="pdf"') || out.includes("$('#pdf').onclick=pdf") || /function\s+pdf\s*\(/.test(out)) {
     fail('export PDF encore présent dans le bilan Admin');
   }
-  for (const required of [`id="${marker}"`, '#save{min-width:270px', 'Exporter Word', 'Enregistrer les modifications']) {
+  for (const required of [`id="${marker}"`, 'html body .tools #auto', 'html body .tools #save', 'html body .tools #word', 'min-width:290px', 'Exporter Word', 'Enregistrer les modifications']) {
     if (!out.includes(required)) fail('contrôle bilan Admin absent: ' + required);
   }
   write(file, out);
 }
 
-console.log('SEB EvalPro Admin: mode persistant + barre Windows/badge rouge + boutons blancs en relief + PDF supprimé; parcours stagiaire inchangé.');
+console.log('SEB EvalPro Admin: verrouillage retourne à l’écran SEB EvalPro, état Admin synchronisé, 3 boutons Bilan forcés au style blanc/bleu; parcours stagiaire inchangé.');
