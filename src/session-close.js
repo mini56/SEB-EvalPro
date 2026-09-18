@@ -1,6 +1,28 @@
-module.exports = function registerSessionClose({ app, ipcMain, getMainWindow, getAdminUnlocked, setAdminUnlocked, writeState, defaultState }) {
+module.exports = function registerSessionClose({
+  app,
+  ipcMain,
+  getMainWindow,
+  getAdminUnlocked,
+  setAdminUnlocked,
+  readState,
+  writeState,
+  defaultState,
+  finalizeCandidateSession
+}) {
   ipcMain.handle('admin:close-session', async () => {
     if (!getAdminUnlocked()) return false;
+
+    const currentState = typeof readState === 'function' ? readState() : defaultState();
+
+    try {
+      if (typeof finalizeCandidateSession === 'function') {
+        finalizeCandidateSession(currentState);
+      }
+    } catch (error) {
+      console.error('Fermeture du dossier candidat impossible:', error && error.message ? error.message : error);
+      return false;
+    }
+
     setAdminUnlocked(false);
 
     const mainWindow = getMainWindow();
