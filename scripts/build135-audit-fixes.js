@@ -203,14 +203,19 @@ function checkHtmlScripts(html, label) {
   let out = text;
   const oldPattern = "/^[A-Za-z0-9-]+_[A-Za-z0-9-]+_\\d{4}-\\d{2}-\\d{2}\\.docx$/i";
   const newPattern = "/^[A-Za-z0-9-]+_[A-Za-z0-9-]+_\\d{4}-\\d{2}-\\d{2}(?:_\\d+)?\\.docx$/i";
-  out = replaceCount(out, oldPattern, newPattern, 3, 'regex résultats candidat avec suffixe');
+  const candidateFolderRouting = out.includes("const candidateExportDir = getCandidateStore().getActiveExportDir();");
+  out = replaceCount(out, oldPattern, newPattern, candidateFolderRouting ? 2 : 3, 'regex résultats candidat avec suffixe');
 
-  const routing = "      item.setSavePath(isCandidateResult\n        ? path.join(bilanDocumentsDir(), filename)\n        : uniqueOutputPath(bilanDocumentsDir(), filename));";
-  if (out.includes(routing)) {
-    out = out.replace(routing, "      item.setSavePath(uniqueOutputPath(bilanDocumentsDir(), filename));");
-  }
-  if (!out.includes("item.setSavePath(uniqueOutputPath(bilanDocumentsDir(), filename));")) {
-    fail('routage DOCX candidat unique absent', 13);
+  if (!candidateFolderRouting) {
+    const routing = "      item.setSavePath(isCandidateResult\n        ? path.join(bilanDocumentsDir(), filename)\n        : uniqueOutputPath(bilanDocumentsDir(), filename));";
+    if (out.includes(routing)) {
+      out = out.replace(routing, "      item.setSavePath(uniqueOutputPath(bilanDocumentsDir(), filename));");
+    }
+    if (!out.includes("item.setSavePath(uniqueOutputPath(bilanDocumentsDir(), filename));")) {
+      fail('routage DOCX candidat unique absent', 13);
+    }
+  } else if (!out.includes("const targetDirectory = candidateExportDir || bilanDocumentsDir();")) {
+    fail('routage DOCX vers le dossier candidat absent', 13);
   }
   try { new vm.Script(out); } catch (error) { fail('src/main.js invalide : ' + error.message, 13); }
   write(file, out);
