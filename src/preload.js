@@ -137,10 +137,10 @@ function createSessionCloseDialog() {
       <div class="seb-session-close-card" role="dialog" aria-modal="true" aria-label="Fermer cette session">
         <div class="seb-session-close-title">Fermer cette session ?</div>
         <div class="seb-session-close-text">
-          L'évaluation en cours et ses données de travail seront effacées.
+          L'évaluation active sera fermée.
           Au prochain démarrage, SEB EvalPro commencera sur une nouvelle évaluation vierge.
         </div>
-        <div class="seb-session-close-warning">Les éléments non exportés ne pourront plus être récupérés.</div>
+        <div class="seb-session-close-warning">Le dossier du candidat et les données déjà sauvegardées seront conservés dans Documents\\SEB EvalPro\\Candidats.</div>
         <div class="seb-session-close-actions">
           <button type="button" id="seb-session-close-cancel">Annuler</button>
           <button type="button" id="seb-session-close-ok" class="danger">Fermer cette session</button>
@@ -183,6 +183,7 @@ function injectAdminBar() {
   bar.id = 'seb-evalpro-topbar';
   bar.innerHTML = `
     <div class="seb-evalpro-name">SEB EvalPro</div>
+    <div id="seb-evalpro-candidate-badge" class="seb-evalpro-candidate-badge" hidden></div>
     <div class="seb-evalpro-spacer"></div>
     <button id="seb-evalpro-return" type="button" hidden>Retour à l'évaluation</button>
     <button id="seb-evalpro-bilan" type="button" hidden>Bilan</button>
@@ -202,6 +203,7 @@ function injectAdminBar() {
     #seb-evalpro-topbar{position:fixed;top:0;left:0;right:0;height:${BAR_HEIGHT}px;z-index:2147483646;display:flex;align-items:center;gap:8px;padding:0 12px;box-sizing:border-box;background:#0070c0;color:#fff;font-family:Arial,sans-serif;box-shadow:0 1px 4px rgba(0,0,0,.25);transform:translateY(-100%);transition:transform .16s ease;will-change:transform}
     #seb-evalpro-topbar.seb-evalpro-visible{transform:translateY(0)}
     #seb-evalpro-topbar .seb-evalpro-name{font-size:18px;font-weight:700;white-space:nowrap}
+    #seb-evalpro-topbar .seb-evalpro-candidate-badge{font-size:13px;font-weight:700;white-space:nowrap;padding:5px 9px;border:1px solid rgba(255,255,255,.55);border-radius:4px;background:rgba(255,255,255,.14)}
     #seb-evalpro-topbar .seb-evalpro-spacer{flex:1}
     #seb-evalpro-topbar button{font-family:Arial,sans-serif;font-size:14px;padding:6px 12px;border:1px solid rgba(255,255,255,.75);border-radius:4px;background:#fff;color:#0070c0;cursor:pointer}
     #seb-evalpro-topbar button:hover{background:#f2f2f2}
@@ -213,6 +215,7 @@ function injectAdminBar() {
   document.body.prepend(hotzone);
 
   const adminButton = bar.querySelector('#seb-evalpro-admin');
+  const candidateBadge = bar.querySelector('#seb-evalpro-candidate-badge');
   const bilanButton = bar.querySelector('#seb-evalpro-bilan');
   const returnButton = bar.querySelector('#seb-evalpro-return');
   const closeSessionButton = bar.querySelector('#seb-evalpro-close-session');
@@ -243,12 +246,34 @@ function injectAdminBar() {
     if (event.clientY <= 2) showBar();
   }, true);
 
+  const refreshCandidateBadge = async () => {
+    if (!candidateBadge) return;
+    if (!adminUnlocked) {
+      candidateBadge.hidden = true;
+      candidateBadge.textContent = '';
+      return;
+    }
+    try {
+      const active = await ipcRenderer.invoke('candidate:active');
+      if (active && active.displayName) {
+        candidateBadge.textContent = `Dossier candidat : ${active.displayName}`;
+        candidateBadge.hidden = false;
+      } else {
+        candidateBadge.textContent = 'Dossier candidat : aucun';
+        candidateBadge.hidden = false;
+      }
+    } catch (_) {
+      candidateBadge.hidden = true;
+    }
+  };
+
   const updateAdminButtons = () => {
     const onBilan = isAdminBilanPage();
     bilanButton.hidden = !adminUnlocked || onBilan;
     returnButton.hidden = !adminUnlocked || !onBilan;
     closeSessionButton.hidden = !adminUnlocked;
     adminButton.textContent = adminUnlocked ? 'Verrouiller' : 'Administrateur';
+    refreshCandidateBadge();
   };
 
   adminButton.addEventListener('click', async () => {
@@ -288,6 +313,7 @@ function injectAdminBar() {
       return;
     }
 
+    saveNow(true);
     closingSession = true;
     clearTimeout(saveTimer);
     if (periodicSaveTimer) clearInterval(periodicSaveTimer);
@@ -295,19 +321,6 @@ function injectAdminBar() {
     try {
       window.sessionStorage.clear();
       window.localStorage.clear();
-    } catch (_) {}
-
-    const cleanState = {
-      version: 1,
-      sessionStorage: {},
-      localStorage: {},
-      lastPage: 'qcmv1.0.html',
-      lastEvaluationPage: 'qcmv1.0.html',
-      updatedAt: null
-    };
-
-    try {
-      ipcRenderer.sendSync('state:save-sync', cleanState);
     } catch (_) {}
 
     await ipcRenderer.invoke('admin:close-session').catch(() => false);
