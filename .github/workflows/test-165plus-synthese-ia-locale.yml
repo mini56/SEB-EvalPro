@@ -37,7 +37,8 @@ jobs:
             'scripts/build165plus-local-ai-prototype.js',
             'scripts/fix-local-ai-admin-bar.js',
             'scripts/apply-local-ai-writing-guard.js',
-            'scripts/admin-bar-smoke-electron.js'
+            'scripts/admin-bar-smoke-electron.js',
+            'scripts/admin-mode-ui-polish.js'
           )) {
             node --check $file
             if ($LASTEXITCODE -ne 0) { throw "JavaScript invalide: $file" }
@@ -206,12 +207,15 @@ jobs:
             'scripts/build165plus-natural-synthesis-v9.js',
             'scripts/build165plus-local-ai-prototype.js',
             'scripts/fix-local-ai-admin-bar.js',
-            'scripts/apply-local-ai-writing-guard.js'
+            'scripts/apply-local-ai-writing-guard.js',
+            'scripts/admin-mode-ui-polish.js'
           )) {
             node $script
             if ($LASTEXITCODE -ne 0) { throw "Script de préparation échoué: $script" }
           }
 
+          node --check src/main.js
+          if ($LASTEXITCODE -ne 0) { throw 'main.js final invalide.' }
           node --check src/preload.js
           if ($LASTEXITCODE -ne 0) { throw 'preload.js final invalide.' }
           node --check src/local-ai.js

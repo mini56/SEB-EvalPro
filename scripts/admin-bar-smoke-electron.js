@@ -133,6 +133,28 @@ app.whenReady().then(async () => {
     console.log('SEB EvalPro Admin smoke: OK - bouton synthèse unique et indicateur SEB-IA présents.');
     console.log(JSON.stringify(synthesis));
 
+    const adminUi = await win.webContents.executeJavaScript(`(()=>{
+      const save=document.getElementById('save');
+      const word=document.getElementById('word');
+      const pdf=document.getElementById('pdf');
+      const css=save?getComputedStyle(save):null;
+      return {
+        save:!!save,
+        word:!!word,
+        pdf:!!pdf,
+        saveWidth:save?Math.round(save.getBoundingClientRect().width):0,
+        saveBackground:css?css.backgroundColor:'',
+        saveColor:css?css.color:'',
+        saveBorder:css?css.borderTopColor:''
+      };
+    })()`);
+    if (!adminUi.save || !adminUi.word || adminUi.pdf || adminUi.saveWidth < 240) {
+      fail('présentation finale du Bilan Admin incorrecte (Enregistrer/Word/PDF)', adminUi);
+      return;
+    }
+    console.log('SEB EvalPro Admin smoke: OK - Enregistrer agrandi, Word présent, PDF absent.');
+    console.log(JSON.stringify(adminUi));
+
     win.destroy();
     app.exit(0);
   } catch (error) {
