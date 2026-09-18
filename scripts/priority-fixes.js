@@ -45,12 +45,14 @@ function insertBefore(text, marker, addition, label) {
       'import shell Electron'
     );
 
-    out = replaceOnce(
-      out,
-      "    const filename = path.basename(item.getFilename() || 'Evaluation.doc');\n    if (!/\\.docx?$/i.test(filename)) return;\n    try {\n      ensureSebDocumentsFolders();\n      item.setSavePath(uniqueOutputPath(bilanDocumentsDir(), filename));\n    } catch (_) {}",
-      `    const filename = path.basename(item.getFilename() || 'Evaluation.doc');\n    if (!/\\.docx?$/i.test(filename)) return;\n    try {\n      ensureSebDocumentsFolders();\n      const isCandidateResult = /^[A-Za-z0-9-]+_[A-Za-z0-9-]+_\\d{4}-\\d{2}-\\d{2}\\.docx$/i.test(filename);\n      item.setSavePath(isCandidateResult\n        ? path.join(bilanDocumentsDir(), filename)\n        : uniqueOutputPath(bilanDocumentsDir(), filename));\n    } catch (_) {}`,
-      'routage résultats candidats'
-    );
+    if (!out.includes("const candidateExportDir = getCandidateStore().getActiveExportDir();")) {
+      out = replaceOnce(
+        out,
+        "    const filename = path.basename(item.getFilename() || 'Evaluation.doc');\n    if (!/\\.docx?$/i.test(filename)) return;\n    try {\n      ensureSebDocumentsFolders();\n      item.setSavePath(uniqueOutputPath(bilanDocumentsDir(), filename));\n    } catch (_) {}",
+        `    const filename = path.basename(item.getFilename() || 'Evaluation.doc');\n    if (!/\\.docx?$/i.test(filename)) return;\n    try {\n      ensureSebDocumentsFolders();\n      const isCandidateResult = /^[A-Za-z0-9-]+_[A-Za-z0-9-]+_\\d{4}-\\d{2}-\\d{2}\\.docx$/i.test(filename);\n      item.setSavePath(isCandidateResult\n        ? path.join(bilanDocumentsDir(), filename)\n        : uniqueOutputPath(bilanDocumentsDir(), filename));\n    } catch (_) {}`,
+        'routage résultats candidats'
+      );
+    }
 
     out = replaceOnce(
       out,
