@@ -76,49 +76,30 @@ function writingBlockTemplate() {
   function validateRewrite(sourceText, outputText) {
     if (!outputText) throw new Error('L’IA locale n’a produit aucun texte.');
     const ratio = outputText.length / Math.max(1, sourceText.length);
-    if (ratio < 0.55 || ratio > 1.55) throw new Error('La reformulation IA a trop modifié la longueur du bilan.');
-    if (outputText.includes('<think>') || outputText.includes('```') || /^\s*[-*]\s+/m.test(outputText)) {
+    if (ratio < 0.55 || ratio > 1.55) {
+      throw new Error('La reformulation IA a trop modifié la longueur du bilan.');
+    }
+    if (/<think>|\`\`\`|^\s*[-*]\s+/mi.test(outputText)) {
       throw new Error('La réponse IA contient un format inattendu.');
     }
     if (/<\/?(?:TEXTE_SOURCE|PROPOSITION|MESSAGE_DU_CONTROLE|bilan_source|bilan_reformule)>/i.test(outputText)) {
       throw new Error('La réponse IA contient des balises techniques.');
     }
 
-    const srcAll = normalizeForGuard(sourceText);
-    const outAll = normalizeForGuard(outputText);
-    const srcNumbers = numberTokens(sourceText);
-    const outNumbers = numberTokens(outputText);
-    if (srcNumbers.length !== outNumbers.length || srcNumbers.some((n, i) => n !== outNumbers[i])) {
-      throw new Error('Une donnée chiffrée a été ajoutée, supprimée ou modifiée.');
+    // Validation volontairement proche du Build #9 réellement fonctionnel :
+    // on bloque les inventions factuelles évidentes sans exiger une copie
+    // mécanique du texte source, afin de laisser l'IA reformuler réellement.
+    const sourceDigits = new Set((sourceText.match(/\d+/g) || []));
+    const outputDigits = outputText.match(/\d+/g) || [];
+    if (outputDigits.some((n) => !sourceDigits.has(n))) {
+      throw new Error('La reformulation IA a ajouté une donnée chiffrée absente du texte moteur.');
     }
-    if ((sourceText.match(/%/g) || []).length !== (outputText.match(/%/g) || []).length) {
-      throw new Error('Un pourcentage a été modifié ou supprimé.');
+    if (/n[’']ayant pas été évalu|non évalu/i.test(sourceText) && !/(?:pas|non)[^.!?]{0,45}évalu/i.test(outputText)) {
+      throw new Error('La reformulation IA ne conserve pas clairement un élément non évalué.');
     }
-
-    const srcNE = /\b(?:pas|non)\b[^\n]{0,100}\bevalu/.test(srcAll);
-    const outNE = /\b(?:pas|non)\b[^\n]{0,100}\bevalu/.test(outAll);
-    if (srcNE && !outNE) throw new Error('Un élément non évalué a été perdu.');
-
-    const srcInterrupted = /(activite|exercice)[^\n]{0,100}(interromp|abandonn)|\b(interromp|abandonn)/.test(srcAll);
-    const outInterrupted = /(activite|exercice)[^\n]{0,100}(interromp|abandonn)|\b(interromp|abandonn)/.test(outAll);
-    if (srcInterrupted && !outInterrupted) throw new Error('Une activité interrompue ou abandonnée a été perdue.');
-
-    // Le garde déterministe protège uniquement les ajouts qui changent réellement
-    // le sens ou l'intensité du constat. Les corrections de grammaire, accords,
-    // synonymes et connecteurs restent libres.
-    const semanticEscalations = [
-      'activement',
-      'supplementaire',
-      'accompagnement continu',
-      'accompagnement rapproche',
-      'plus etendu',
-      'plus important',
-      'autonomie satisfaisante'
-    ];
-    for (const term of semanticEscalations) {
-      if (outAll.includes(term) && !srcAll.includes(term)) {
-        throw new Error('Une intensité absente de la source a été ajoutée : ' + term + '.');
-      }
+    if (/(?:activité|exercice)[^.!?\n]{0,100}(?:interromp|abandonn)|\b(?:interromp|abandonn)/i.test(sourceText)
+        && !/(interromp|abandonn)/i.test(outputText)) {
+      throw new Error('La reformulation IA ne conserve pas clairement une activité interrompue ou abandonnée.');
     }
     return outputText;
   }
@@ -151,40 +132,6 @@ function writingBlockTemplate() {
     return complete([{ role: 'system', content: system }, { role: 'user', content: user }], 0.25, 0.65, 1800);
   }
 
-  async function fidelityAudit(sourceText, draft) {
-    const system = [
-      'Tu contrôles uniquement la fidélité factuelle d’une reformulation de bilan socioprofessionnel.',
-      'N’évalue jamais le style, la longueur des phrases, les synonymes, les connecteurs, les accords corrigés ni le découpage des paragraphes.',
-      'Compare le TEXTE SOURCE et la PROPOSITION uniquement sur les faits, les nombres, le degré des constats et l’appartenance de chaque observation au bon domaine.',
-      'Vérifie qu’aucune compétence, difficulté, réussite, donnée chiffrée, élément non évalué, activité interrompue ou conclusion n’a été supprimé, inventé, déplacé ou renforcé.',
-      'Une correction grammaticale ou une reformulation de même sens n’est jamais un écart factuel.',
-      'En cas de simple doute stylistique, considère la proposition comme fidèle.',
-      'Si tu n’identifies aucun écart factuel certain, commence ta réponse par : OK',
-      'Sinon commence ta réponse par : REPAIR: puis donne une liste très courte des écarts factuels certains.'
-    ].join(' ');
-    const user = '/no_think\n\n<TEXTE_SOURCE>\n' + sourceText + '\n</TEXTE_SOURCE>\n\n<PROPOSITION>\n' + draft + '\n</PROPOSITION>';
-    return complete([{ role: 'system', content: system }, { role: 'user', content: user }], 0.0, 0.15, 160);
-  }
-
-  async function repairAfterGuard(sourceText, candidate, reason) {
-    const system = [
-      'Tu corriges une reformulation seulement lorsqu’un écart factuel réel a été détecté.',
-      'Le TEXTE SOURCE est l’unique référence factuelle.',
-      'Corrige uniquement l’écart signalé et les fautes de grammaire évidentes, sans appauvrir le style ni revenir inutilement mot pour mot au texte source.',
-      'Conserve exactement tous les nombres, scores, pourcentages, durées et nombres d’erreurs de la source.',
-      'Supprime toute intensité non sourcée et replace chaque observation dans son domaine d’origine si elle a été déplacée.',
-      'Les synonymes, connecteurs et variations légères de paragraphes restent autorisés si le sens ne change pas.',
-      'N’ajoute aucun fait et ne change jamais le degré d’un constat.',
-      'Retourne uniquement le texte corrigé, sans balise ni explication.'
-    ].join(' ');
-    const user = '/no_think\n\n<TEXTE_SOURCE>\n' + sourceText + '\n</TEXTE_SOURCE>\n\n<PROPOSITION>\n' + candidate + '\n</PROPOSITION>\n\n<MESSAGE_DU_CONTROLE>\n' + String(reason || '').slice(0, 1200) + '\n</MESSAGE_DU_CONTROLE>';
-    return complete([{ role: 'system', content: system }, { role: 'user', content: user }], 0.08, 0.40, 1800);
-  }
-
-  function auditAccepted(value) {
-    return /^OK\b/i.test(String(value || '').trim());
-  }
-
   function fallbackResult(sourceText, startedAt, passes, reason) {
     return {
       ok: true,
@@ -196,7 +143,7 @@ function writingBlockTemplate() {
       offline: true,
       passes,
       reason: String(reason || 'contrôle de fidélité'),
-      guard: 'reprise-build-9-fidelite-v7-one-pass'
+      guard: 'reprise-build-9-fidelite-v8-tolerant-one-pass'
     };
   }
 
@@ -221,7 +168,7 @@ function writingBlockTemplate() {
           runtime: RUNTIME_LABEL,
           offline: true,
           passes,
-          guard: 'reprise-build-9-fidelite-v7-one-pass'
+          guard: 'reprise-build-9-fidelite-v8-tolerant-one-pass'
         };
       } catch (error) {
         return fallbackResult(sourceText, startedAt, passes, error.message);
@@ -235,7 +182,7 @@ function writingBlockTemplate() {
         model: MODEL_LABEL,
         offline: true,
         passes,
-        guard: 'reprise-build-9-fidelite-v7-one-pass'
+        guard: 'reprise-build-9-fidelite-v8-tolerant-one-pass'
       };
     }
   }
@@ -256,4 +203,4 @@ if (!source.includes(marker)) fail('marqueur de garde rédactionnelle absent apr
 try { new vm.Script(source); }
 catch (error) { fail('local-ai.js invalide après patch: ' + error.message); }
 fs.writeFileSync(file, source, 'utf8');
-console.log('SEB EvalPro IA reprise #9: garde v7 appliqué; faits et chiffres protégés, une seule passe IA maximum.');
+console.log('SEB EvalPro IA reprise #9: garde v8 tolérant appliqué; une seule passe IA, validation proche du #9 fonctionnel.');
