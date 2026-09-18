@@ -25,7 +25,11 @@ function write(target, text) {
   const oldPattern = '/^[A-Za-z0-9-]+_[A-Za-z0-9-]+_\\d{4}-\\d{2}-\\d{2}\\.docx$/i';
   const newPattern = '/^Resultat_[A-Za-z0-9-]+_[A-Za-z0-9-]+_\\d{4}-\\d{2}-\\d{2}\\.docx$/i';
   const count = out.split(oldPattern).length - 1;
-  if (count < 3) fail(`motif résultat stagiaire attendu 3 fois, trouvé ${count}`, 3);
+  const candidateFolderRouting = out.includes("const candidateExportDir = getCandidateStore().getActiveExportDir();");
+  const minimumExpected = candidateFolderRouting ? 2 : 3;
+  if (count < minimumExpected) {
+    fail(`motif résultat stagiaire attendu au moins ${minimumExpected} fois, trouvé ${count}`, 3);
+  }
   out = out.split(oldPattern).join(newPattern);
   write(target, out);
 }
