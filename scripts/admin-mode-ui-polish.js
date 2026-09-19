@@ -61,6 +61,7 @@ function applyAdminWindowMode(unlocked) {
   const isUnlocked = !!unlocked;
 
   if (isUnlocked) {
+    try { mainWindow.setAlwaysOnTop(false); } catch (_) {}
     try { mainWindow.setKiosk(false); } catch (_) {}
     try { mainWindow.setFullScreen(false); } catch (_) {}
     if (process.platform === 'win32') {
@@ -72,6 +73,7 @@ function applyAdminWindowMode(unlocked) {
       try { applyAdaptiveZoom(); } catch (_) {}
     }, 120);
   } else {
+    try { mainWindow.setAlwaysOnTop(true); } catch (_) {}
     if (process.platform === 'win32') {
       try { mainWindow.setOverlayIcon(null, ''); } catch (_) {}
     }
@@ -105,15 +107,15 @@ function applyAdminWindowMode(unlocked) {
 
     out = replaceRequired(
       out,
-      "ipcMain.handle('admin:verify', (_event, password) => {\n  const ok = verifyAdminPassword(password);\n  if (ok) adminSessionUnlocked = true;\n  return ok;\n});",
+      "ipcMain.handle('admin:verify', (_event, password) => {\n  const ok = verifyAdminPassword(password);\n  if (ok) {\n    adminSessionUnlocked = true;\n    if (mainWindow && !mainWindow.isDestroyed()) {\n      mainWindow.setAlwaysOnTop(false);\n      mainWindow.setKiosk(false);\n      mainWindow.focus();\n    }\n  }\n  return ok;\n});",
       "ipcMain.handle('admin:verify', (_event, password) => {\n  const ok = verifyAdminPassword(password);\n  if (ok) {\n    adminSessionUnlocked = true;\n    applyAdminWindowMode(true);\n  }\n  return ok;\n});",
       'déverrouillage Admin persistant'
     );
 
     out = replaceRequired(
       out,
-      "ipcMain.handle('admin:lock', () => {\n  adminSessionUnlocked = false;\n  return true;\n});",
-      "ipcMain.handle('admin:lock', () => {\n  adminSessionUnlocked = false;\n  applyAdminWindowMode(false);\n  return true;\n});",
+      "ipcMain.handle('admin:lock', () => {\n  adminSessionUnlocked = false;\n  adminExportCandidateDir = null;\n  if (mainWindow && !mainWindow.isDestroyed()) {\n    mainWindow.setKiosk(true);\n    mainWindow.setFullScreen(true);\n    mainWindow.focus();\n  }\n  return true;\n});",
+      "ipcMain.handle('admin:lock', () => {\n  adminSessionUnlocked = false;\n  adminExportCandidateDir = null;\n  applyAdminWindowMode(false);\n  return true;\n});",
       'reverrouillage Admin manuel'
     );
 
@@ -129,8 +131,8 @@ function applyAdminWindowMode(unlocked) {
   if (!out.includes(lockReturnMarker)) {
     out = replaceRequired(
       out,
-      "ipcMain.handle('admin:lock', () => {\n  adminSessionUnlocked = false;\n  applyAdminWindowMode(false);\n  return true;\n});",
-      "ipcMain.handle('admin:lock', () => {\n  " + lockReturnMarker + "\n  adminSessionUnlocked = false;\n  applyAdminWindowMode(false);\n  if (mainWindow && !mainWindow.isDestroyed()) {\n    const state = readState();\n    const target = existingWebPage(state.lastEvaluationPage || 'qcmv1.0.html');\n    setTimeout(() => {\n      if (!mainWindow || mainWindow.isDestroyed() || adminSessionUnlocked) return;\n      mainWindow.loadFile(target);\n    }, 90);\n  }\n  return true;\n});",
+      "ipcMain.handle('admin:lock', () => {\n  adminSessionUnlocked = false;\n  adminExportCandidateDir = null;\n  applyAdminWindowMode(false);\n  return true;\n});",
+      "ipcMain.handle('admin:lock', () => {\n  " + lockReturnMarker + "\n  adminSessionUnlocked = false;\n  adminExportCandidateDir = null;\n  applyAdminWindowMode(false);\n  if (mainWindow && !mainWindow.isDestroyed()) {\n    const state = readState();\n    const target = existingWebPage(state.lastEvaluationPage || 'qcmv1.0.html');\n    setTimeout(() => {\n      if (!mainWindow || mainWindow.isDestroyed() || adminSessionUnlocked) return;\n      mainWindow.loadFile(target);\n    }, 90);\n  }\n  return true;\n});",
       'Verrouiller doit quitter toute page Admin'
     );
   }
