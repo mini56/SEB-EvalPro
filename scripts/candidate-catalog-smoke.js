@@ -49,6 +49,10 @@ try {
   fs.mkdirSync(path.join(replayDir, 'slides'), { recursive:true });
   fs.writeFileSync(path.join(replayDir, 'slides', '001.png'), 'fake', 'utf8');
 
+  const legacyWordName = 'Evaluation_DUPONT_Jean_2026-09-18.doc';
+  fs.mkdirSync(path.join(sebRoot, 'Bilans'), { recursive:true });
+  fs.writeFileSync(path.join(sebRoot, 'Bilans', legacyWordName), '<html><table><tr><td>ancien Word</td></tr></table></html>', 'utf8');
+
   const bilanName = 'DUPONT_JEAN_2026-09-18_BUILD-24_BILAN_R00_TEST.json';
   writeJson(path.join(bilanRoot, bilanName), {
     schemaVersion:1,
@@ -95,6 +99,8 @@ try {
   assert(fs.existsSync(legacyDir), 'Le dossier historique Admin doit rester intact.');
   assert(fs.existsSync(path.join(newDir, 'replay', replayName)), 'Le replay doit être migré dans le dossier candidat.');
   assert(fs.existsSync(path.join(newDir, 'bilan', 'historique', bilanName)), 'Le bilan doit être migré dans le dossier candidat.');
+  assert(fs.existsSync(path.join(newDir, 'bilan', 'exports', legacyWordName)), 'Un ancien Word associable sans ambiguïté doit être copié dans le dossier candidat.');
+  assert(fs.existsSync(path.join(sebRoot, 'Bilans', legacyWordName)), 'L’ancien Word global doit rester intact pendant la migration de sécurité.');
 
   const d = detail(null, 'candidate-dupont');
   assert(d && d.ok);
