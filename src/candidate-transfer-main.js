@@ -36,27 +36,31 @@ function createCandidateTransfer(options = {}) {
     }
   }
 
-  function mergeDirectory(sourceDir, targetDir) {
+  function mergeDirectory(sourceDir, targetDir, relativeDir = '') {
     ensureDir(targetDir);
     for (const entry of fs.readdirSync(sourceDir, { withFileTypes:true })) {
       const source = path.join(sourceDir, entry.name);
       const target = path.join(targetDir, entry.name);
+      const relative = path.join(relativeDir, entry.name).replace(/\\/g, '/').toLowerCase();
       if (entry.isDirectory()) {
-        mergeDirectory(source, target);
+        mergeDirectory(source, target, relative);
         continue;
       }
       if (!entry.isFile()) continue;
+      if (relative === 'manifest.json') continue;
       if (!fs.existsSync(target)) {
         fs.copyFileSync(source, target);
         continue;
       }
-      const rel = path.relative(targetDir, target).toLowerCase();
-      if (rel === 'manifest.json') continue;
-      try {
-        const srcStat = fs.statSync(source);
-        const dstStat = fs.statSync(target);
-        if (srcStat.mtimeMs > dstStat.mtimeMs + 500) fs.copyFileSync(source, target);
-      } catch (_) {}
+
+      // Les données de parcours et résultats reflètent la version importée la plus
+      // récente et peuvent donc être mises à jour. Les productions Admin et les
+      // archives immuables sont fusionnées sans écrasement.
+      const protectedArchive =
+        relative.startsWith('replay/') ||
+        relative.startsWith('bilan/historique/') ||
+        relative.startsWith('bilan/exports/');
+      if (!protectedArchive) fs.copyFileSync(source, target);
     }
 
     const sourceManifest = readJson(path.join(sourceDir, 'manifest.json'));
@@ -64,7 +68,7 @@ function createCandidateTransfer(options = {}) {
     if (sourceManifest || targetManifest) {
       const srcTime = String(sourceManifest && sourceManifest.updatedAt || '');
       const dstTime = String(targetManifest && targetManifest.updatedAt || '');
-      const newer = srcTime > dstTime ? sourceManifest : targetManifest;
+      const newer = srcTime >= dstTime ? sourceManifest : targetManifest;
       writeJson(path.join(targetDir, 'manifest.json'), {
         ...(targetManifest || {}),
         ...(newer || sourceManifest || {}),
