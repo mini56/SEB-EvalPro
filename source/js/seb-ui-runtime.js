@@ -416,6 +416,10 @@
         return;
       }
       const reasons = checked.map((input) => input.value);
+      if (context.file === 'tri_de_cheville.html') {
+        try { if (typeof window.calcMoyenne === 'function') window.calcMoyenne(); } catch (_) {}
+        try { if (typeof window.saveTriResultsToQCM === 'function') window.saveTriResultsToQCM(); } catch (_) {}
+      }
       saveAbandon(context, reasons, comment.value);
       close();
       setTimeout(function () { advanceAfterAbandon(context); }, 40);

@@ -65,19 +65,18 @@ function appendBeforeBody(text, addition, label) {
   }
 
   function fiveTrisDone(){
-    const validate = document.getElementById('resetBtn');
-    if (validate && /5\\s+tris\\s+validés/i.test(validate.textContent || '')) {
-      for (let i = 1; i <= 5; i += 1) if (!explicitError(i)) return false;
-      return true;
-    }
+    let completed = 0;
     for (let i = 1; i <= 5; i += 1) {
       const m = document.getElementById('m' + i);
       const s = document.getElementById('s' + i);
-      if (!m || !s) return false;
+      const e = document.getElementById('e' + i);
+      if (!m || !s || !e) continue;
       const hasTime = String(m.value == null ? '' : m.value).trim() !== '' || String(s.value == null ? '' : s.value).trim() !== '';
-      if (!hasTime || !explicitError(i)) return false;
+      const hasError = String(e.value == null ? '' : e.value).trim() !== '';
+      if (hasTime !== hasError) return false;
+      if (hasTime && explicitError(i)) completed += 1;
     }
-    return true;
+    return completed >= 3;
   }
 
   function autoEvalAnswered(){
@@ -111,7 +110,7 @@ function appendBeforeBody(text, addition, label) {
       event.stopPropagation();
     }
     if (!fiveTrisDone()) {
-      window.alert('Terminez et validez les 5 tris et renseignez le nombre d’erreurs de chacun (0 si aucune erreur) avant de valider l’autoévaluation.');
+      window.alert('Renseignez au moins 3 tris complets avec le temps et le nombre d’erreurs de chacun (0 si aucune erreur) avant de valider l’autoévaluation.');
       refreshNext();
       return false;
     }

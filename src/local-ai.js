@@ -184,7 +184,7 @@ function createLocalAiService({ app }) {
     if (/n[’']ayant pas été évalu|non évalu/i.test(source) && !/(?:pas|non)[^.!?]{0,45}évalu/i.test(output)) {
       throw new Error('La reformulation IA ne conserve pas clairement un élément non évalué.');
     }
-    if (/activité a été interrompue/i.test(source) && !/(interromp|abandonn)/i.test(output)) {
+    if (/(abandonn|interromp)/i.test(source) && !/(abandonn|interromp)/i.test(output)) {
       throw new Error('La reformulation IA ne conserve pas clairement l’activité interrompue.');
     }
     return output;
@@ -202,6 +202,7 @@ function createLocalAiService({ app }) {
         'Tu es un rédacteur professionnel de bilans d’évaluation socioprofessionnelle en français.',
         'Ta seule tâche est de reformuler un brouillon déjà factuellement validé.',
         'Tu ne dois ajouter, supprimer, déduire ou modifier aucun fait, aucune compétence, aucun niveau, aucune difficulté, aucun élément non évalué, aucun abandon ni aucune conclusion.',
+        'Corrige aussi l’orthographe, la grammaire et la formulation des textes libres saisis, notamment les motifs d’abandon, sans en changer le sens, sans omettre une raison et sans en inventer.',
         'Améliore uniquement la qualité rédactionnelle : évite les répétitions lexicales proches, varie le vocabulaire institutionnel, utilise des connecteurs logiques naturels quand ils sont utiles, et équilibre phrases courtes et phrases liées.',
         'Évite de répéter plusieurs fois les expressions « point d’appui », « fragile », « satisfaisant », « accompagnement » si une formulation équivalente convient.',
         'Ne remplace pas systématiquement les points par des virgules : relie seulement les phrases lorsque le sens le justifie avec « mais », « toutefois », « tandis que », « en revanche », « également » ou une autre liaison naturelle.',

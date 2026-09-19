@@ -357,33 +357,94 @@
     return typeof value === 'string' && value.trim().toLowerCase() === expected.toLowerCase();
   }
 
+  function dominantBodyFormatting(startIndex, length) {
+    const result = { chars: 0, arial: 0, size12: 0 };
+    if (!quill || length <= 0) return result;
+    const delta = quill.getContents(startIndex, length);
+    (delta?.ops || []).forEach((op) => {
+      if (typeof op.insert !== 'string') return;
+      const chars = op.insert.replace(/\n/g, '').replace(/\s/g, '').length;
+      if (!chars) return;
+      result.chars += chars;
+      if (isExactFont(op.attributes?.font, 'Arial')) result.arial += chars;
+      if (isExactSize(op.attributes?.size, '12px')) result.size12 += chars;
+    });
+    return result;
+  }
+
+  function visualBodyLineCount(bodyLines) {
+    if (!quill || !bodyLines.length) return 0;
+    let total = 0;
+    bodyLines.forEach((line) => {
+      try {
+        const info = quill.getLine(line.index);
+        const blot = info && info[0];
+        const node = blot?.domNode;
+        if (!node) { total += 1; return; }
+        const range = document.createRange();
+        range.selectNodeContents(node);
+        const rects = Array.from(range.getClientRects()).filter((rect) => rect.width > 0 && rect.height > 0);
+        const tops = [];
+        rects.forEach((rect) => {
+          if (!tops.some((top) => Math.abs(top - rect.top) < 2)) tops.push(rect.top);
+        });
+        total += Math.max(1, tops.length);
+      } catch (_) {
+        total += 1;
+      }
+    });
+    return total;
+  }
+
+  function saveCriterionOk() {
+    try {
+      const state = JSON.parse(localStorage.getItem('nwtexte_save_simulation') || 'null');
+      const candidate = JSON.parse(sessionStorage.getItem('candidat_data') || '{}');
+      const nom = String(candidate.nom || candidate.Nom || '').trim();
+      if (!state || !nom) return false;
+      const expected = nom + '_Evaluation_Bureautique_SEB';
+      return state.enregistre === true &&
+        state.dossier === 'Bureau\\SEB' &&
+        state.nomConforme === true &&
+        String(state.nom || '').toLocaleLowerCase('fr') === expected.toLocaleLowerCase('fr');
+    } catch (_) {
+      return false;
+    }
+  }
+
   function analyseDocument() {
     const allLines = lineMap();
     const nonEmpty = allLines.filter((line) => line.clean.length > 0);
     const titleLine = nonEmpty[0] || null;
     const bodyLines = nonEmpty.slice(1);
     const titleFormat = exactCommonFormat(titleLine);
-    const bodyFormats = bodyLines.map(exactCommonFormat);
     const titleValid = !!titleLine && NORMALIZED_QUESTIONS.includes(normalizeQuestion(titleLine.clean));
-    const bodyArial = bodyLines.length > 0 && bodyFormats.every((format) => isExactFont(format.font, 'Arial'));
-    const bodySize12 = bodyLines.length > 0 && bodyFormats.every((format) => isExactSize(format.size, '12px'));
+    const bodyStart = titleLine ? titleLine.index + titleLine.length + 1 : 0;
+    const bodyLength = Math.max(0, quill.getLength() - 1 - bodyStart);
+    const dominant = dominantBodyFormatting(bodyStart, bodyLength);
+    const bodyArial = dominant.chars > 0 && dominant.arial > dominant.chars / 2;
+    const bodySize12 = dominant.chars > 0 && dominant.size12 > dominant.chars / 2;
+    const visualLines = visualBodyLineCount(bodyLines);
+    const savedCorrectly = saveCriterionOk();
 
     const score = {
       titre_present: titleValid ? 1 : 0,
       titre_gras: titleValid && titleFormat.bold === true ? 1 : 0,
       titre_police: titleValid && isExactFont(titleFormat.font, 'Arial') ? 1 : 0,
       titre_taille: titleValid && isExactSize(titleFormat.size, '16px') ? 1 : 0,
-      texte_lignes: bodyLines.length >= 10 ? 1 : 0,
+      texte_lignes: visualLines >= 10 ? 1 : 0,
       texte_police: bodyArial ? 1 : 0,
       texte_taille: bodySize12 ? 1 : 0,
+      enregistrement: savedCorrectly ? 1 : 0,
       total: 0
     };
-    score.total = score.titre_present + score.titre_gras + score.titre_police + score.titre_taille + score.texte_lignes + score.texte_police + score.texte_taille;
+    score.total = score.titre_present + score.titre_gras + score.titre_police + score.titre_taille +
+      score.texte_lignes + score.texte_police + score.texte_taille + score.enregistrement;
 
     return {
       html: editorHtml(),
       texte: editorText(),
-      lignes: nonEmpty.length,
+      lignes: visualLines,
       titre: {
         present: titleValid,
         texte: titleLine ? titleLine.clean : '',
@@ -393,11 +454,17 @@
         conforme: score.titre_present === 1 && score.titre_gras === 1 && score.titre_police === 1 && score.titre_taille === 1
       },
       texte: {
-        lignes: bodyLines.length,
-        lignesMin: bodyLines.length >= 10,
+        lignes: visualLines,
+        lignesMin: visualLines >= 10,
         police: bodyArial ? 'Arial' : '',
         taille: bodySize12 ? '12px' : '',
-        conforme: score.texte_lignes === 1 && score.texte_police === 1 && score.texte_taille === 1
+        conforme: score.texte_lignes === 1 && score.texte_police === 1 && score.texte_taille === 1,
+        caracteres: dominant.chars,
+        caracteresArial: dominant.arial,
+        caracteresTaille12: dominant.size12
+      },
+      enregistrement: {
+        conforme: savedCorrectly
       },
       score
     };
