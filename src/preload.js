@@ -176,6 +176,106 @@ function createSessionCloseDialog() {
   });
 }
 
+
+function createTransferNameDialog() {
+  return new Promise((resolve) => {
+    const backdrop = document.createElement('div');
+    backdrop.id = 'seb-evalpro-transfer-dialog';
+    backdrop.innerHTML = \`
+      <div class="seb-transfer-card" role="dialog" aria-modal="true" aria-label="Nom du regroupement">
+        <div class="seb-transfer-title">Importer les dossiers candidats</div>
+        <div class="seb-transfer-text">Choisissez le nom du dossier qui regroupera les stagiaires sur le PC Admin.</div>
+        <label class="seb-transfer-label" for="seb-transfer-name">Nom du dossier</label>
+        <input id="seb-transfer-name" class="seb-transfer-input" type="text" autocomplete="off" placeholder="Ex. Lorient, Groupe A, Session septembre" />
+        <div id="seb-transfer-error" class="seb-transfer-error" aria-live="polite"></div>
+        <div class="seb-transfer-actions">
+          <button type="button" id="seb-transfer-cancel">Annuler</button>
+          <button type="button" id="seb-transfer-ok">Continuer</button>
+        </div>
+      </div>\`;
+
+    const style = document.createElement('style');
+    style.textContent = \`
+      #seb-evalpro-transfer-dialog{position:fixed;inset:0;z-index:2147483647;background:rgba(0,0,0,.42);display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif}
+      #seb-evalpro-transfer-dialog .seb-transfer-card{width:470px;max-width:calc(100vw - 40px);background:#fff;border:1px solid #aaa;border-radius:8px;padding:20px;box-shadow:0 10px 35px rgba(0,0,0,.3);box-sizing:border-box}
+      #seb-evalpro-transfer-dialog .seb-transfer-title{font-size:20px;font-weight:700;color:#0070c0;margin-bottom:10px}
+      #seb-evalpro-transfer-dialog .seb-transfer-text{font-size:14px;line-height:1.45;color:#222;margin-bottom:14px}
+      #seb-evalpro-transfer-dialog .seb-transfer-label{display:block;font-size:14px;font-weight:700;color:#222;margin-bottom:6px}
+      #seb-evalpro-transfer-dialog .seb-transfer-input{width:100%;font-size:17px;padding:9px 10px;border:1px solid #999;border-radius:4px;box-sizing:border-box}
+      #seb-evalpro-transfer-dialog .seb-transfer-error{min-height:20px;color:#c00000;font-size:13px;margin-top:6px}
+      #seb-evalpro-transfer-dialog .seb-transfer-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:10px}
+      #seb-evalpro-transfer-dialog button{font-family:Arial,sans-serif;font-size:14px;padding:8px 14px;border:2px solid #0070c0;border-radius:6px;background:#fff;color:#0070c0;font-weight:700;cursor:pointer}
+    \`;
+    backdrop.appendChild(style);
+    document.body.appendChild(backdrop);
+
+    const input = backdrop.querySelector('#seb-transfer-name');
+    const error = backdrop.querySelector('#seb-transfer-error');
+    const finish = (value) => {
+      backdrop.remove();
+      resolve(value);
+    };
+    const accept = () => {
+      const value = String(input.value || '').trim();
+      if (!value) {
+        error.textContent = 'Saisissez un nom de dossier.';
+        input.focus();
+        return;
+      }
+      finish(value);
+    };
+
+    backdrop.querySelector('#seb-transfer-cancel').addEventListener('click', () => finish(null));
+    backdrop.querySelector('#seb-transfer-ok').addEventListener('click', accept);
+    input.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') accept();
+      if (event.key === 'Escape') finish(null);
+    });
+    input.focus();
+  });
+}
+
+function showTransferMessage(title, message, isError = false) {
+  return new Promise((resolve) => {
+    const backdrop = document.createElement('div');
+    backdrop.id = 'seb-evalpro-transfer-dialog';
+    backdrop.innerHTML = \`
+      <div class="seb-transfer-card" role="dialog" aria-modal="true">
+        <div class="seb-transfer-title"></div>
+        <div class="seb-transfer-message"></div>
+        <div class="seb-transfer-actions">
+          <button type="button" id="seb-transfer-ok">OK</button>
+        </div>
+      </div>\`;
+
+    const style = document.createElement('style');
+    style.textContent = \`
+      #seb-evalpro-transfer-dialog{position:fixed;inset:0;z-index:2147483647;background:rgba(0,0,0,.42);display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif}
+      #seb-evalpro-transfer-dialog .seb-transfer-card{width:520px;max-width:calc(100vw - 40px);background:#fff;border:1px solid #aaa;border-radius:8px;padding:20px;box-shadow:0 10px 35px rgba(0,0,0,.3);box-sizing:border-box}
+      #seb-evalpro-transfer-dialog .seb-transfer-title{font-size:20px;font-weight:700;color:#0070c0;margin-bottom:12px}
+      #seb-evalpro-transfer-dialog .seb-transfer-message{font-size:14px;line-height:1.5;color:#222;white-space:pre-wrap;overflow-wrap:anywhere}
+      #seb-evalpro-transfer-dialog .seb-transfer-actions{display:flex;justify-content:flex-end;margin-top:18px}
+      #seb-evalpro-transfer-dialog button{font-family:Arial,sans-serif;font-size:14px;padding:8px 18px;border:2px solid #0070c0;border-radius:6px;background:#fff;color:#0070c0;font-weight:700;cursor:pointer}
+    \`;
+    backdrop.appendChild(style);
+    const titleNode = backdrop.querySelector('.seb-transfer-title');
+    titleNode.textContent = String(title || '');
+    if (isError) titleNode.style.color = '#c00000';
+    backdrop.querySelector('.seb-transfer-message').textContent = String(message || '');
+    document.body.appendChild(backdrop);
+
+    const finish = () => {
+      backdrop.remove();
+      resolve();
+    };
+    backdrop.querySelector('#seb-transfer-ok').addEventListener('click', finish);
+    backdrop.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === 'Escape') finish();
+    });
+    backdrop.querySelector('#seb-transfer-ok').focus();
+  });
+}
+
 function injectAdminBar() {
   if (!document.body || document.getElementById('seb-evalpro-topbar')) return;
 
@@ -187,6 +287,8 @@ function injectAdminBar() {
     <div class="seb-evalpro-spacer"></div>
     <button id="seb-evalpro-return" type="button" hidden>Retour à l'évaluation</button>
     <button id="seb-evalpro-bilan" type="button" hidden>Bilan</button>
+    <button id="seb-evalpro-export-candidates" type="button" hidden>Exporter dossiers</button>
+    <button id="seb-evalpro-import-candidates" type="button" hidden>Importer dossiers</button>
     <button id="seb-evalpro-close-session" type="button" hidden>Fermer cette session</button>
     <button id="seb-evalpro-admin" type="button">Administrateur</button>`;
 
@@ -218,6 +320,8 @@ function injectAdminBar() {
   const candidateBadge = bar.querySelector('#seb-evalpro-candidate-badge');
   const bilanButton = bar.querySelector('#seb-evalpro-bilan');
   const returnButton = bar.querySelector('#seb-evalpro-return');
+  const exportCandidatesButton = bar.querySelector('#seb-evalpro-export-candidates');
+  const importCandidatesButton = bar.querySelector('#seb-evalpro-import-candidates');
   const closeSessionButton = bar.querySelector('#seb-evalpro-close-session');
 
   const showBar = () => {
@@ -228,6 +332,7 @@ function injectAdminBar() {
   const hideBar = () => {
     if (document.getElementById('seb-evalpro-admin-dialog')) return;
     if (document.getElementById('seb-evalpro-session-close-dialog')) return;
+    if (document.getElementById('seb-evalpro-transfer-dialog')) return;
     bar.classList.remove('seb-evalpro-visible');
   };
 
@@ -271,6 +376,8 @@ function injectAdminBar() {
     const onBilan = isAdminBilanPage();
     bilanButton.hidden = !adminUnlocked || onBilan;
     returnButton.hidden = !adminUnlocked || !onBilan;
+    exportCandidatesButton.hidden = !adminUnlocked;
+    importCandidatesButton.hidden = !adminUnlocked;
     closeSessionButton.hidden = !adminUnlocked;
     adminButton.textContent = adminUnlocked ? 'Verrouiller' : 'Administrateur';
     refreshCandidateBadge();
@@ -303,6 +410,69 @@ function injectAdminBar() {
   returnButton.addEventListener('click', async () => {
     saveNow(true);
     await ipcRenderer.invoke('admin:return-evaluation');
+  });
+
+  exportCandidatesButton.addEventListener('click', async () => {
+    showBar();
+    saveNow(true);
+    exportCandidatesButton.disabled = true;
+    importCandidatesButton.disabled = true;
+    try {
+      const result = await ipcRenderer.invoke('admin:export-candidates');
+      if (!result || result.cancelled) return;
+      if (!result.ok) {
+        await showTransferMessage('Export impossible', result.error || 'Une erreur est survenue pendant l’export.', true);
+        return;
+      }
+      if (!result.total) {
+        await showTransferMessage('Export candidats', 'Aucun dossier candidat n’a été trouvé sur ce PC.');
+        return;
+      }
+      await showTransferMessage(
+        'Export terminé',
+        `${result.total} dossier(s) candidat(s) copié(s) sur la clé.\n${result.added} ajouté(s), ${result.updated} mis à jour.\n\nDossier : ${result.destinationRoot}`
+      );
+    } catch (error) {
+      await showTransferMessage('Export impossible', String(error && error.message ? error.message : error), true);
+    } finally {
+      exportCandidatesButton.disabled = false;
+      importCandidatesButton.disabled = false;
+      scheduleHideBar();
+    }
+  });
+
+  importCandidatesButton.addEventListener('click', async () => {
+    showBar();
+    const groupName = await createTransferNameDialog();
+    if (!groupName) {
+      scheduleHideBar();
+      return;
+    }
+
+    exportCandidatesButton.disabled = true;
+    importCandidatesButton.disabled = true;
+    try {
+      const result = await ipcRenderer.invoke('admin:import-candidates', groupName);
+      if (!result || result.cancelled) return;
+      if (!result.ok) {
+        await showTransferMessage('Import impossible', result.error || 'Une erreur est survenue pendant l’import.', true);
+        return;
+      }
+      if (!result.total) {
+        await showTransferMessage('Import candidats', 'Aucun dossier candidat valide n’a été trouvé sur la clé sélectionnée.');
+        return;
+      }
+      await showTransferMessage(
+        'Import terminé',
+        `${result.total} dossier(s) candidat(s) copié(s) dans « ${result.groupName} ».\n${result.added} ajouté(s), ${result.updated} mis à jour.\n\nDossier : ${result.destinationRoot}`
+      );
+    } catch (error) {
+      await showTransferMessage('Import impossible', String(error && error.message ? error.message : error), true);
+    } finally {
+      exportCandidatesButton.disabled = false;
+      importCandidatesButton.disabled = false;
+      scheduleHideBar();
+    }
   });
 
   closeSessionButton.addEventListener('click', async () => {
