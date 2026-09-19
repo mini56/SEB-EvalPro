@@ -306,14 +306,24 @@ ipcMain.on('state:load-sync', (event) => {
 
 ipcMain.on('state:save-sync', (event, payload) => {
   try {
-    event.returnValue = { ok: true, state: writeState(payload || {}) };
+    const state = writeState(payload || {});
+    event.returnValue = lastCandidateSaveError
+      ? { ok: false, state, error: 'Sauvegarde du dossier candidat impossible : ' + lastCandidateSaveError }
+      : { ok: true, state };
   } catch (error) {
     event.returnValue = { ok: false, error: error.message };
   }
 });
 
 ipcMain.handle('state:save', (_event, payload) => {
-  return writeState(payload || {});
+  try {
+    const state = writeState(payload || {});
+    return lastCandidateSaveError
+      ? { ok: false, state, error: 'Sauvegarde du dossier candidat impossible : ' + lastCandidateSaveError }
+      : { ok: true, state };
+  } catch (error) {
+    return { ok: false, error: error && error.message ? error.message : String(error) };
+  }
 });
 
 ipcMain.handle('admin:verify', (_event, password) => {
