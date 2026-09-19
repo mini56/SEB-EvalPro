@@ -5,79 +5,90 @@ const path = require('path');
 const { createCandidateTransfer } = require('../src/candidate-transfer-main');
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'seb-evalpro-candidate-transfer-'));
-const documentsPath = path.join(root, 'Documents');
+const pc1Documents = path.join(root, 'PC1', 'Documents');
+const pc2Documents = path.join(root, 'PC2', 'Documents');
+const adminDocuments = path.join(root, 'ADMIN', 'Documents');
 const usbRoot = path.join(root, 'USB');
 const fixedNow = new Date('2026-09-19T06:00:00.000Z');
 
-function makeCandidate(parent, folderName, candidateId, marker) {
+function makeCandidate(parent, folderName, candidateId, marker, candidat) {
   const dir = path.join(parent, folderName);
   fs.mkdirSync(path.join(dir, 'donnees'), { recursive: true });
+  fs.mkdirSync(path.join(dir, 'resultats'), { recursive: true });
+  fs.mkdirSync(path.join(dir, 'replay'), { recursive: true });
+  fs.mkdirSync(path.join(dir, 'bilan', 'historique'), { recursive: true });
   fs.mkdirSync(path.join(dir, 'bilan', 'exports'), { recursive: true });
   fs.writeFileSync(path.join(dir, 'manifest.json'), JSON.stringify({
     schemaVersion: 1,
     candidateId,
     folderName,
-    status: 'SESSION_FERMEE'
+    status: 'SESSION_FERMEE',
+    updatedAt: fixedNow.toISOString(),
+    candidat
   }, null, 2), 'utf8');
   fs.writeFileSync(path.join(dir, 'donnees', 'marker.txt'), marker, 'utf8');
   return dir;
 }
 
 try {
-  const transfer = createCandidateTransfer({
-    documentsPath,
-    now: () => new Date(fixedNow)
+  const pc1 = createCandidateTransfer({ documentsPath: pc1Documents, now: () => new Date(fixedNow) });
+  fs.mkdirSync(pc1.paths.candidatesRoot, { recursive: true });
+
+  makeCandidate(pc1.paths.candidatesRoot, 'OLD_DUPONT_FOLDER', 'candidate-1', 'pc1-v1', {
+    nom: 'DUPONT', 'prénom': 'Jean', lieu: 'Lorient', groupe: '7', date: '2026-09-18'
+  });
+  makeCandidate(pc1.paths.candidatesRoot, 'OLD_MARTIN_FOLDER', 'candidate-2', 'pc1-v1', {
+    nom: 'MARTIN', 'prénom': 'Léa', lieu: 'Lorient', groupe: '7', date: '2026-09-18'
   });
 
-  fs.mkdirSync(transfer.paths.localCandidatesRoot, { recursive: true });
-  makeCandidate(transfer.paths.localCandidatesRoot, 'DUPONT_Jean_Lorient_2026-09-18_A1B2C3', 'candidate-1', 'pc1-v1');
-  makeCandidate(transfer.paths.localCandidatesRoot, 'MARTIN_Lea_Lorient_2026-09-18_D4E5F6', 'candidate-2', 'pc1-v1');
-
-  const firstExport = transfer.exportAll(usbRoot);
+  fs.mkdirSync(usbRoot, { recursive: true });
+  const firstExport = pc1.exportAll(usbRoot);
   assert.strictEqual(firstExport.total, 2);
   assert.strictEqual(firstExport.added, 2);
   assert.strictEqual(firstExport.updated, 0);
-  assert.strictEqual(firstExport.destinationRoot, path.join(usbRoot, 'SEB EvalPro', 'Candidats'));
+  assert.strictEqual(firstExport.destinationRoot, path.resolve(usbRoot));
 
-  fs.writeFileSync(
-    path.join(transfer.paths.localCandidatesRoot, 'DUPONT_Jean_Lorient_2026-09-18_A1B2C3', 'donnees', 'marker.txt'),
-    'pc1-v2',
-    'utf8'
-  );
-  const secondExport = transfer.exportAll(usbRoot);
+  const usbCandidates1 = pc1.listCandidateRecords(usbRoot, false);
+  assert.strictEqual(usbCandidates1.length, 2);
+  assert(usbCandidates1.some((r) => r.folderName === 'DUPONT_Jean_Lorient_7'));
+  assert(usbCandidates1.some((r) => r.folderName === 'MARTIN_Lea_Lorient_7'));
+
+  fs.writeFileSync(path.join(pc1.paths.candidatesRoot, 'OLD_DUPONT_FOLDER', 'donnees', 'marker.txt'), 'pc1-v2', 'utf8');
+  const secondExport = pc1.exportAll(usbRoot);
   assert.strictEqual(secondExport.total, 2);
   assert.strictEqual(secondExport.added, 0);
-  assert.strictEqual(secondExport.updated, 2, 'Un second passage ne doit pas créer de doublons.');
+  assert.strictEqual(secondExport.updated, 2, 'Un second export ne doit pas créer de doublons.');
 
-  const usbCandidates = transfer.listCandidateRecords(firstExport.destinationRoot);
-  assert.strictEqual(usbCandidates.length, 2);
-  const dupontUsb = usbCandidates.find((item) => item.candidateId === 'candidate-1');
+  const dupontUsb = pc1.listCandidateRecords(usbRoot, false).find((item) => item.candidateId === 'candidate-1');
   assert.strictEqual(fs.readFileSync(path.join(dupontUsb.candidateDir, 'donnees', 'marker.txt'), 'utf8'), 'pc1-v2');
 
-  const anotherPcDocuments = path.join(root, 'AnotherPC', 'Documents');
-  const anotherTransfer = createCandidateTransfer({ documentsPath: anotherPcDocuments, now: () => new Date(fixedNow) });
-  fs.mkdirSync(anotherTransfer.paths.localCandidatesRoot, { recursive: true });
-  makeCandidate(anotherTransfer.paths.localCandidatesRoot, 'LE_GOFF_Anne_Vannes_2026-09-18_112233', 'candidate-3', 'pc2-v1');
-  const anotherExport = anotherTransfer.exportAll(usbRoot);
+  const pc2 = createCandidateTransfer({ documentsPath: pc2Documents, now: () => new Date(fixedNow) });
+  fs.mkdirSync(pc2.paths.candidatesRoot, { recursive: true });
+  makeCandidate(pc2.paths.candidatesRoot, 'ANY_OLD_NAME', 'candidate-3', 'pc2-v1', {
+    nom: 'LE GOFF', 'prénom': 'Anne', lieu: 'Vannes', groupe: '4', date: '2026-09-18'
+  });
+  const anotherExport = pc2.exportAll(usbRoot);
   assert.strictEqual(anotherExport.total, 1);
-  assert.strictEqual(transfer.listCandidateRecords(firstExport.destinationRoot).length, 3, 'La même clé doit accumuler les candidats de plusieurs PC.');
+  assert.strictEqual(pc1.listCandidateRecords(usbRoot, false).length, 3, 'La même clé doit accumuler les candidats de plusieurs PC.');
 
-  const imported = transfer.importAll(usbRoot, 'Lorient');
+  const admin = createCandidateTransfer({ documentsPath: adminDocuments, now: () => new Date(fixedNow) });
+  const imported = admin.importAll(usbRoot);
   assert.strictEqual(imported.total, 3);
   assert.strictEqual(imported.added, 3);
-  assert.strictEqual(imported.destinationRoot, path.join(documentsPath, 'SEB EvalPro', 'Admin', 'Lorient'));
-  assert.strictEqual(transfer.listCandidateRecords(imported.destinationRoot).length, 3);
+  assert.strictEqual(imported.destinationRoot, path.join(adminDocuments, 'SEB EvalPro', 'Candidats'));
+  assert.strictEqual(admin.listCandidateRecords(imported.destinationRoot, false).length, 3);
 
-  const importedAgain = transfer.importAll(usbRoot, 'Lorient');
+  const dupontAdmin = admin.listCandidateRecords(imported.destinationRoot, false).find((item) => item.candidateId === 'candidate-1');
+  fs.writeFileSync(path.join(dupontAdmin.candidateDir, 'bilan', 'historique', 'admin-only.json'), '{"admin":true}', 'utf8');
+
+  const importedAgain = admin.importAll(usbRoot);
   assert.strictEqual(importedAgain.total, 3);
   assert.strictEqual(importedAgain.added, 0);
-  assert.strictEqual(importedAgain.updated, 3, 'Un nouvel import du même groupe doit mettre à jour sans dupliquer.');
-  assert.strictEqual(transfer.listCandidateRecords(importedAgain.destinationRoot).length, 3);
+  assert.strictEqual(importedAgain.updated, 3, 'Un nouvel import doit fusionner sans dupliquer.');
+  assert.strictEqual(admin.listCandidateRecords(importedAgain.destinationRoot, false).length, 3);
+  assert(fs.existsSync(path.join(dupontAdmin.candidateDir, 'bilan', 'historique', 'admin-only.json')), 'Les données créées sur le PC Admin doivent être conservées.');
 
-  const accented = transfer.sanitizeGroupName('  Session été / A  ');
-  assert.strictEqual(accented, 'Session été _ A');
-
-  console.log('Candidate Transfer Test #1: OK');
+  console.log('Candidate Transfer Test #2: OK');
   console.log(firstExport.destinationRoot);
   console.log(imported.destinationRoot);
 } finally {
