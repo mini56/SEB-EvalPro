@@ -40,8 +40,12 @@ function insertBefore(text, marker, addition, label) {
   if (!out.includes('// SEB_PRIORITY_FIXES_MAIN')) {
     out = replaceOnce(
       out,
-      "const { app, BrowserWindow, ipcMain, screen } = require('electron');",
-      "const { app, BrowserWindow, ipcMain, screen, shell } = require('electron');\n// SEB_PRIORITY_FIXES_MAIN",
+      /const \\{([^}]+)\\} = require\\('electron'\\);/,
+      (all, names) => {
+        const parts = names.split(',').map((value) => value.trim()).filter(Boolean);
+        if (!parts.includes('shell')) parts.push('shell');
+        return "const { " + parts.join(', ') + " } = require('electron');\\n// SEB_PRIORITY_FIXES_MAIN";
+      },
       'import shell Electron'
     );
 
