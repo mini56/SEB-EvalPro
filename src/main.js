@@ -247,7 +247,9 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false
+      sandbox: false,
+      devTools: false,
+      navigateOnDragDrop: false
     }
   });
 
@@ -284,6 +286,19 @@ function createWindow() {
   mainWindow.on('resize', applyAdaptiveZoom);
 
   mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+
+  // SEB_RUNTIME_OFFLINE : le plateau candidat ne doit jamais dépendre d'Internet.
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    try {
+      if (new URL(url).protocol !== 'file:') event.preventDefault();
+    } catch (_) {
+      event.preventDefault();
+    }
+  });
+  mainWindow.webContents.session.webRequest.onBeforeRequest(
+    { urls: ['http://*/*', 'https://*/*'] },
+    (_details, callback) => callback({ cancel: true })
+  );
 
   mainWindow.on('closed', () => {
     mainWindow = null;
