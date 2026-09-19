@@ -1,5 +1,6 @@
 const { ipcRenderer } = require('electron');
 const bilanHistory = require('./bilan-history-preload');
+const replayPreload = require('./replay-preload');
 
 let installed = false;
 
@@ -101,6 +102,7 @@ async function openCandidateDetail(candidateId, onChanged) {
     alert((result && result.error) || 'Impossible d’ouvrir ce candidat.');
     return;
   }
+
   const item = result.candidate;
   const overlay = document.createElement('div');
   overlay.id = 'seb-candidate-detail';
@@ -113,13 +115,15 @@ async function openCandidateDetail(candidateId, onChanged) {
       </div>
       <div class="seb-cc-body">
         <div class="seb-cc-section"><h3>Bilan et révisions</h3><div id="seb-cc-detail-bilans"></div></div>
+        <div class="seb-cc-section"><h3>Replay du parcours</h3><div id="seb-cc-detail-replays"></div></div>
+        <div class="seb-cc-section"><h3>Fichiers résultat / Word / PDF</h3><div id="seb-cc-detail-exports"></div></div>
       </div>
       <div class="seb-cc-detail-actions">
-        <button type="button" id="seb-cc-replay" class="primary" ${item.replayCount ? '' : 'disabled'}>Rejouer le parcours</button>
         <button type="button" id="seb-cc-detail-close">Fermer</button>
       </div>
     </div>`;
   document.body.appendChild(overlay);
+
   const bilans = overlay.querySelector('#seb-cc-detail-bilans');
   if (!result.bilans || !result.bilans.length) {
     bilans.innerHTML = '<div class="seb-cc-empty">Aucun bilan enregistré pour ce candidat.</div>';
@@ -128,12 +132,19 @@ async function openCandidateDetail(candidateId, onChanged) {
       const row = document.createElement('div');
       row.className = 'seb-cc-bilan-row';
       const when = b.createdAt ? new Date(b.createdAt).toLocaleString('fr-FR') : '';
-      row.innerHTML = `<div><strong>${b.revision === 0 ? 'Bilan original' : 'Révision ' + b.revision}</strong></div><div>Build #${escapeHtml(b.originalBuild)}</div><div><small>${escapeHtml(when)}</small></div><div></div>`;
+      const integrity = b.integrityOk ? '' : '<small style="color:#c00000;font-weight:700">⚠ intégrité à vérifier</small>';
+      row.innerHTML = `<div><strong>${b.revision === 0 ? 'Bilan original' : 'Révision ' + b.revision}</strong>${integrity}</div><div>Build #${escapeHtml(b.originalBuild)}</div><div><small>${escapeHtml(when)}</small></div><div></div>`;
       const open = document.createElement('button');
-      open.type = 'button'; open.className = 'primary'; open.textContent = 'Ouvrir';
+      open.type = 'button';
+      open.className = 'primary';
+      open.textContent = 'Ouvrir';
       open.addEventListener('click', async () => {
         const loaded = await ipcRenderer.invoke('candidate-catalog:load-bilan', candidateId, b.filename);
-        if (!loaded || !loaded.ok) { alert((loaded && loaded.error) || 'Ouverture impossible.'); return; }
+        if (!loaded || !loaded.ok) {
+          alert((loaded && loaded.error) || 'Ouverture impossible.');
+          return;
+        }
+        await ipcRenderer.invoke('candidate:set-admin-export-context', candidateId).catch(() => false);
         if (typeof bilanHistory.openEditor === 'function') bilanHistory.openEditor(loaded.filename, loaded.archive);
         else alert('Éditeur de bilan indisponible.');
       });
@@ -141,23 +152,53 @@ async function openCandidateDetail(candidateId, onChanged) {
       bilans.appendChild(row);
     });
   }
+
+  const replays = overlay.querySelector('#seb-cc-detail-replays');
+  if (!Array.isArray(result.replays) || !result.replays.length) {
+    replays.innerHTML = '<div class="seb-cc-empty">Aucun replay enregistré pour ce candidat.</div>';
+  } else {
+    result.replays.forEach((filename, index) => {
+      const row = document.createElement('div');
+      row.className = 'seb-cc-bilan-row';
+      row.innerHTML = `<div><strong>Parcours ${index + 1}</strong><small>${escapeHtml(filename)}</small></div><div></div><div></div><div></div>`;
+      const open = document.createElement('button');
+      open.type = 'button';
+      open.className = 'primary';
+      open.textContent = 'Rejouer';
+      open.addEventListener('click', async () => {
+        if (typeof replayPreload.openCandidateReplay !== 'function') {
+          alert('Lecteur de replay indisponible.');
+          return;
+        }
+        await replayPreload.openCandidateReplay(candidateId, filename);
+      });
+      row.lastElementChild.appendChild(open);
+      replays.appendChild(row);
+    });
+  }
+
+  const exports = overlay.querySelector('#seb-cc-detail-exports');
+  if (!Array.isArray(result.exports) || !result.exports.length) {
+    exports.innerHTML = '<div class="seb-cc-empty">Aucun fichier Word/PDF enregistré pour ce candidat.</div>';
+  } else {
+    result.exports.forEach((filename) => {
+      const row = document.createElement('div');
+      row.className = 'seb-cc-bilan-row';
+      row.innerHTML = `<div><strong>${escapeHtml(filename)}</strong><small>Ouverture côté Administrateur : lecture et impression possibles avec le logiciel Windows associé.</small></div><div></div><div></div><div></div>`;
+      const open = document.createElement('button');
+      open.type = 'button';
+      open.className = 'primary';
+      open.textContent = 'Ouvrir';
+      open.addEventListener('click', async () => {
+        const opened = await ipcRenderer.invoke('candidate-catalog:open-export', candidateId, filename);
+        if (!opened || !opened.ok) alert((opened && opened.error) || 'Ouverture du fichier impossible.');
+      });
+      row.lastElementChild.appendChild(open);
+      exports.appendChild(row);
+    });
+  }
+
   overlay.querySelector('#seb-cc-detail-close').addEventListener('click', () => overlay.remove());
-  const replay = overlay.querySelector('#seb-cc-replay');
-  if (replay) replay.addEventListener('click', () => {
-    const query = [item.nom, item.prenom].filter(Boolean).join(' ');
-    overlay.remove();
-    const button = document.getElementById('seb-evalpro-replay');
-    if (!button) return;
-    button.click();
-    const fill = () => {
-      const chooser = document.getElementById('seb-replay-chooser');
-      if (!chooser) { setTimeout(fill, 50); return; }
-      enhanceChooser('seb-replay-chooser', 'seb-replay-list', '.seb-replay-row');
-      const search = chooser.querySelector('.seb-list-search');
-      if (search) { search.value = query; search.dispatchEvent(new Event('input', { bubbles:true })); search.focus(); }
-    };
-    setTimeout(fill, 30);
-  });
 }
 
 function openCatalog() {
@@ -200,26 +241,7 @@ function openCatalog() {
         const open = document.createElement('button');
         open.type='button'; open.className='primary'; open.textContent='Ouvrir';
         open.addEventListener('click', () => openCandidateDetail(item.candidateId, render));
-        const remove = document.createElement('button');
-        remove.type='button'; remove.className='danger'; remove.textContent='Supprimer';
-        let confirm = false; let timer = null;
-        remove.addEventListener('click', async () => {
-          if (!confirm) {
-            confirm = true; remove.classList.add('confirm'); remove.textContent='Confirmer';
-            timer = setTimeout(() => { confirm=false; remove.classList.remove('confirm'); remove.textContent='Supprimer'; }, 5000);
-            return;
-          }
-          clearTimeout(timer); remove.disabled=true; remove.textContent='Suppression…';
-          const deleted = await ipcRenderer.invoke('candidate-catalog:delete', item.candidateId);
-          if (!deleted || !deleted.ok) {
-            remove.disabled=false; confirm=false; remove.classList.remove('confirm'); remove.textContent='Supprimer';
-            alert((deleted && deleted.error) || 'Suppression impossible.');
-            return;
-          }
-          items = items.filter((x) => x.candidateId !== item.candidateId);
-          render();
-        });
-        actions.append(open, remove);
+        actions.append(open);
         list.appendChild(row);
       });
     };
