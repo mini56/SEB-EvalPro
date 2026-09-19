@@ -166,6 +166,7 @@ function applyAdminWindowMode(unlocked) {
     #seb-evalpro-topbar button,
     #seb-evalpro-admin-dialog button,
     #seb-evalpro-session-close-dialog button,
+    #seb-evalpro-transfer-dialog button,
     #seb-evalpro-results-dialog button,
     #seb-replay-chooser button,
     #seb-replay-viewer button,
@@ -178,6 +179,7 @@ function applyAdminWindowMode(unlocked) {
     #seb-evalpro-topbar button:hover,
     #seb-evalpro-admin-dialog button:hover,
     #seb-evalpro-session-close-dialog button:hover,
+    #seb-evalpro-transfer-dialog button:hover,
     #seb-evalpro-results-dialog button:hover,
     #seb-replay-chooser button:hover,
     #seb-replay-viewer button:hover,
@@ -188,6 +190,7 @@ function applyAdminWindowMode(unlocked) {
     #seb-evalpro-topbar button:active,
     #seb-evalpro-admin-dialog button:active,
     #seb-evalpro-session-close-dialog button:active,
+    #seb-evalpro-transfer-dialog button:active,
     #seb-evalpro-results-dialog button:active,
     #seb-replay-chooser button:active,
     #seb-replay-viewer button:active,
@@ -206,6 +209,7 @@ function applyAdminWindowMode(unlocked) {
     #seb-evalpro-topbar button:disabled,
     #seb-evalpro-admin-dialog button:disabled,
     #seb-evalpro-session-close-dialog button:disabled,
+    #seb-evalpro-transfer-dialog button:disabled,
     #seb-evalpro-results-dialog button:disabled,
     #seb-replay-chooser button:disabled,
     #seb-replay-viewer button:disabled,
@@ -224,6 +228,8 @@ function sebSyncAdminBarState() {
   const adminButton = document.getElementById('seb-evalpro-admin');
   const bilanButton = document.getElementById('seb-evalpro-bilan');
   const returnButton = document.getElementById('seb-evalpro-return');
+  const exportCandidatesButton = document.getElementById('seb-evalpro-export-candidates');
+  const importCandidatesButton = document.getElementById('seb-evalpro-import-candidates');
   const closeSessionButton = document.getElementById('seb-evalpro-close-session');
   const onBilan = isAdminBilanPage();
   if (adminButton) {
@@ -232,6 +238,8 @@ function sebSyncAdminBarState() {
   }
   if (bilanButton) bilanButton.hidden = !adminUnlocked || onBilan;
   if (returnButton) returnButton.hidden = !adminUnlocked || !onBilan;
+  if (exportCandidatesButton) exportCandidatesButton.hidden = !adminUnlocked;
+  if (importCandidatesButton) importCandidatesButton.hidden = !adminUnlocked;
   if (closeSessionButton) closeSessionButton.hidden = !adminUnlocked;
 }
 `;
@@ -263,7 +271,7 @@ window.addEventListener('pageshow', async () => {
   }
 
   if (!out.includes(marker)) fail('style boutons Admin non injecté');
-  if (!out.includes(syncMarker) || !out.includes("adminButton.textContent = adminUnlocked ? 'Verrouiller' : 'Administrateur'")) fail('synchronisation état Admin absente');
+  if (!out.includes(syncMarker) || !out.includes("adminButton.textContent = adminUnlocked ? 'Verrouiller' : 'Administrateur'") || !out.includes("exportCandidatesButton.hidden = !adminUnlocked")) fail('synchronisation état Admin absente');
   checkJs(out, 'src/preload.js après style Admin');
   write(file, out);
 }
