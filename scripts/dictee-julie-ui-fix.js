@@ -236,7 +236,10 @@ const runtime = String.raw`
 })();
 </script>`;
 
-html = html.replace(/<\/body>/i, `${runtime}\n</body>`);
+const abandonLoader = html.includes('id="seb-ui-runtime-loader"')
+  ? ''
+  : '\n<script id="seb-ui-runtime-loader" src="js/seb-ui-runtime.js"></script>';
+html = html.replace(/<\/body>/i, `${runtime}${abandonLoader}\n</body>`);
 fs.writeFileSync(target, html, 'utf8');
 
 if (!html.includes(marker)) fail('correctif final UI absent');
@@ -245,5 +248,6 @@ if (html.includes('SpeechSynthesisUtterance') || html.includes('speechSynthesis'
 if (!html.includes('seb-dictee-left-actions')) fail('déplacement Vérifier/Suivant absent');
 if (!html.includes('alignPrivacyButtonWithAbandon')) fail('alignement écran accueil/Abandonner absent');
 if (!html.includes("document.getElementById('seb-evalpro-abandon-fixed')")) fail('priorité au bouton Abandon unifié absente');
+if (!html.includes('id="seb-ui-runtime-loader"') || !html.includes('src="js/seb-ui-runtime.js"')) fail('mécanisme d’abandon unifié non chargé dans la Dictée');
 
 console.log('SEB EvalPro dictée: WAV fixe utilisé; texte vitesse supprimé; Vérifier/Suivant à gauche; écran d’accueil aligné avec Abandonner.');

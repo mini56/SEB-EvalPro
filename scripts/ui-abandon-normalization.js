@@ -35,7 +35,7 @@ for (const name of pages) {
   patched += 1;
 }
 
-for (const requiredPage of ['qcmv1.0.html', 'brique.html', 'dictee.html', 'tri_de_cheville.html', 'nwtexte.html', 'nvmail.html', 'admin-bilan.html']) {
+for (const requiredPage of ['qcmv1.0.html', 'brique.html', 'tri_de_cheville.html', 'nwtexte.html', 'nvmail.html', 'admin-bilan.html']) {
   const file = path.join(webDir, requiredPage);
   if (!fs.existsSync(file)) fail(`page obligatoire introuvable : ${requiredPage}`, 7);
   const html = fs.readFileSync(file, 'utf8');
