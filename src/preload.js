@@ -10,6 +10,7 @@ let saveTimer = null;
 let periodicSaveTimer = null;
 let barHideTimer = null;
 let closingSession = false;
+let lastSaveErrorShown = '';
 
 function objectToStorage(storage, values) {
   if (!storage || !values || typeof values !== 'object') return;
@@ -56,14 +57,31 @@ function buildSnapshot() {
   };
 }
 
+function handleSaveResult(result) {
+  if (!result || result.ok !== false || !result.error) return;
+  const message = String(result.error);
+  if (message === lastSaveErrorShown) return;
+  lastSaveErrorShown = message;
+  if (document && document.body) {
+    showTransferMessage(
+      'Attention — sauvegarde',
+      message + '\n\nLes données déjà enregistrées restent conservées. Vérifiez le support de stockage avant de poursuivre.',
+      true
+    ).catch(() => {});
+  }
+}
+
 function saveNow(sync = false) {
   if (closingSession) return;
   const snapshot = buildSnapshot();
   restoredState = snapshot;
   if (sync) {
-    ipcRenderer.sendSync('state:save-sync', snapshot);
+    const result = ipcRenderer.sendSync('state:save-sync', snapshot);
+    handleSaveResult(result);
   } else {
-    ipcRenderer.invoke('state:save', snapshot).catch(() => {});
+    ipcRenderer.invoke('state:save', snapshot).then(handleSaveResult).catch((error) => {
+      handleSaveResult({ ok:false, error:String(error && error.message ? error.message : error) });
+    });
   }
 }
 
@@ -430,7 +448,7 @@ function injectAdminBar() {
       }
       await showTransferMessage(
         'Export terminé',
-        `${result.total} dossier(s) candidat(s) copié(s) sur la clé.\n${result.added} ajouté(s), ${result.updated} mis à jour.\n\nDossier : ${result.destinationRoot}`
+        `Copie des fichiers terminée.\nVous pouvez retirer la clé USB en toute sécurité.\n\n${result.added} dossier(s) copié(s), ${result.skipped || 0} déjà présent(s) et ignoré(s).\n${result.verifiedFiles || 0} fichier(s) vérifié(s).\n\nClé : ${result.destinationRoot}`
       );
     } catch (error) {
       await showTransferMessage('Export impossible', String(error && error.message ? error.message : error), true);
@@ -443,16 +461,10 @@ function injectAdminBar() {
 
   importCandidatesButton.addEventListener('click', async () => {
     showBar();
-    const groupName = await createTransferNameDialog();
-    if (!groupName) {
-      scheduleHideBar();
-      return;
-    }
-
     exportCandidatesButton.disabled = true;
     importCandidatesButton.disabled = true;
     try {
-      const result = await ipcRenderer.invoke('admin:import-candidates', groupName);
+      const result = await ipcRenderer.invoke('admin:import-candidates');
       if (!result || result.cancelled) return;
       if (!result.ok) {
         await showTransferMessage('Import impossible', result.error || 'Une erreur est survenue pendant l’import.', true);
@@ -464,7 +476,7 @@ function injectAdminBar() {
       }
       await showTransferMessage(
         'Import terminé',
-        `${result.total} dossier(s) candidat(s) copié(s) dans « ${result.groupName} ».\n${result.added} ajouté(s), ${result.updated} mis à jour.\n\nDossier : ${result.destinationRoot}`
+        `${result.total} dossier(s) candidat(s) détecté(s).\n${result.added} ajouté(s), ${result.skipped || 0} déjà présent(s) et ignoré(s).\n${result.verifiedFiles || 0} fichier(s) vérifié(s).\n\nDossier SEB EvalPro : ${result.destinationRoot}`
       );
     } catch (error) {
       await showTransferMessage('Import impossible', String(error && error.message ? error.message : error), true);
