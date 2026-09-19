@@ -128,30 +128,29 @@ function createCandidateStore(options = {}) {
     atomicWriteJson(manifestPath(candidateDir), manifest);
   }
 
-  function buildFolderName(identity, shortId) {
+  function buildFolderName(identity) {
     return [
       sanitizeSegment(identity.nom).toUpperCase(),
       sanitizeSegment(identity.prenom),
       sanitizeSegment(identity.lieu),
-      identity.folderDate,
-      shortId
+      sanitizeSegment(identity.groupe)
     ].join('_');
   }
 
   function allocateCandidate(identity) {
     ensureRoots();
 
-    let candidateId;
-    let shortId;
-    let folderName;
-    let candidateDir;
-
-    do {
-      candidateId = crypto.randomUUID();
-      shortId = candidateId.replace(/-/g, '').slice(0, 6).toUpperCase();
-      folderName = buildFolderName(identity, shortId);
+    const candidateId = crypto.randomUUID();
+    const shortId = candidateId.replace(/-/g, '').slice(0, 6).toUpperCase();
+    const baseFolderName = buildFolderName(identity);
+    let folderName = baseFolderName;
+    let candidateDir = path.join(candidatesRoot, folderName);
+    let index = 2;
+    while (fs.existsSync(candidateDir)) {
+      folderName = `${baseFolderName}_${index}`;
       candidateDir = path.join(candidatesRoot, folderName);
-    } while (fs.existsSync(candidateDir));
+      index += 1;
+    }
 
     for (const relative of [
       'donnees',
