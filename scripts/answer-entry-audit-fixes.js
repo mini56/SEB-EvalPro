@@ -93,9 +93,8 @@ function appendBeforeBody(text, block, label) {
 }
 
 // -----------------------------------------------------------------------------
-// 2. Briques et Tri : aucune donnée d'une évaluation en cours ne doit être
-//    effacée au simple rechargement/ouverture de la page. Le nettoyage reste
-//    assuré au démarrage d'une nouvelle évaluation par le QCM.
+// 2. Briques et Tri : conserver la reprise. Les clés sont nettoyées par le
+//    démarrage d'une nouvelle évaluation, jamais au chargement de la page.
 // -----------------------------------------------------------------------------
 for (const spec of [
   { file: 'app/web/brique.html', keys: ['eval_brique', 'eval_brique_auto'], label: 'Briques' },
@@ -103,31 +102,22 @@ for (const spec of [
 ]) {
   const loaded = read(spec.file);
   let out = loaded.text;
-  const keyA = spec.keys[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const keyB = spec.keys[1].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const destructive = new RegExp(
-    "\\s*// Fonction pour effacer les données de cette page à son ouverture\\s*" +
-    "function clearPageData\\(\\) \\{\\s*" +
-    "sessionStorage\\.removeItem\\([\\\"']" + keyA + "[\\\"']\\);\\s*" +
-    "sessionStorage\\.removeItem\\([\\\"']" + keyB + "[\\\"']\\);[\\s\\S]*?" +
-    "window\\.addEventListener\\([\\\"']DOMContentLoaded[\\\"'], clearPageData\\);",
-    'g'
-  );
-  out = out.replace(destructive, '\n// SEB EvalPro : reprise conservée, aucun effacement au chargement.\n');
-  if (new RegExp("sessionStorage\\.removeItem\\([\\\"']" + keyA + "[\\\"']\\)").test(out)) {
-    fail(spec.label + ': effacement destructif encore présent', 5);
+  for (const key of spec.keys) {
+    const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    out = out.replace(new RegExp("\\s*sessionStorage\\.removeItem\\([\\\"']" + escaped + "[\\\"']\\);?", 'g'), '');
   }
-  if (new RegExp("sessionStorage\\.removeItem\\([\\\"']" + keyB + "[\\\"']\\)").test(out)) {
-    fail(spec.label + ': effacement destructif autoévaluation encore présent', 5);
+  out = out.replace(/\\s*window\\.addEventListener\\([\"']DOMContentLoaded[\"'],\\s*clearPageData\\s*\\);?/g, '');
+  for (const key of spec.keys) {
+    if (out.includes("removeItem('" + key + "')") || out.includes('removeItem("' + key + '")')) {
+      fail(spec.label + ': effacement destructif encore présent pour ' + key, 5);
+    }
   }
   write(loaded.file, out);
 }
 {
   const qcm = read('app/web/qcmv1.0.html').text;
   for (const key of ['eval_brique','eval_brique_auto','tri_cheville_data','autoEvaltri_resultats']) {
-    if (!qcm.includes("'" + key + "'") && !qcm.includes('"' + key + '"')) {
-      fail('nouvelle évaluation: clé de nettoyage absente ' + key, 5);
-    }
+    if (!qcm.includes(key)) fail('nouvelle évaluation: clé de nettoyage absente ' + key, 5);
   }
 }
 
