@@ -111,6 +111,30 @@ function selectCandidate(records, candidate) {
   return matches.length === 1 ? matches[0] : null;
 }
 
+function compact(value) {
+  return normalize(value).replace(/[^a-z0-9]+/g, '');
+}
+
+function selectCandidateFromFilename(records, filename) {
+  const key = compact(path.basename(String(filename || ''), path.extname(String(filename || ''))));
+  if (!key) return null;
+  const matches = (records || []).filter((record) => {
+    const c = candidateObject(record && (record.candidate || (record.manifest && record.manifest.candidat)));
+    const nom = compact(c.nom);
+    const prenom = compact(c.prenom);
+    return !!nom && !!prenom && key.includes(nom) && key.includes(prenom);
+  });
+  if (matches.length === 1) return matches[0];
+  if (matches.length < 2) return null;
+
+  const dated = matches.filter((record) => {
+    const c = candidateObject(record && (record.candidate || (record.manifest && record.manifest.candidat)));
+    const date = compact(c.date);
+    return !!date && key.includes(date);
+  });
+  return dated.length === 1 ? dated[0] : null;
+}
+
 function findCandidateDir(documentsPath, candidate) {
   const root = path.join(documentsPath, 'SEB EvalPro');
   const current = listCandidateDirs(path.join(root, 'Candidats'), false);
@@ -196,6 +220,7 @@ module.exports = {
   uniqueFolderPath,
   listCandidateDirs,
   selectCandidate,
+  selectCandidateFromFilename,
   findCandidateDir,
   copyDirectoryAtomically,
   copyFileIfMissing,
