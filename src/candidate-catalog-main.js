@@ -9,6 +9,7 @@ const {
   uniqueFolderPath,
   listCandidateDirs,
   selectCandidate,
+  selectCandidateFromFilename,
   copyFileIfMissing,
   copyDirectoryIfMissing,
   copyDirectoryAtomically
@@ -21,6 +22,7 @@ module.exports = function registerCandidateCatalog({ app, ipcMain, getAdminUnloc
   const legacyAdminRoot = path.join(root, 'Admin');
   const globalReplayRoot = path.join(root, 'parcours');
   const globalBilanRoot = path.join(root, 'Bilans', 'Historique');
+  const globalExportsRoot = path.join(root, 'Bilans');
   const BILAN_TYPE = 'SEB_EVALPRO_BILAN_ARCHIVE';
 
   function writeJson(target, value) {
@@ -110,6 +112,7 @@ module.exports = function registerCandidateCatalog({ app, ipcMain, getAdminUnloc
     // Le sens inverse est volontairement interdit : le dossier candidat est la référence.
     let replayCopied = 0;
     let bilanCopied = 0;
+    let exportCopied = 0;
     let ambiguous = 0;
 
     for (const entry of fs.readdirSync(globalReplayRoot, { withFileTypes:true })) {
@@ -137,7 +140,18 @@ module.exports = function registerCandidateCatalog({ app, ipcMain, getAdminUnloc
       if (copyFileIfMissing(source, target)) bilanCopied += 1;
     }
 
-    return { replayCopied, bilanCopied, ambiguous };
+    ensureDir(globalExportsRoot);
+    for (const entry of fs.readdirSync(globalExportsRoot, { withFileTypes:true })) {
+      if (!entry.isFile() || !/\.(doc|docx|pdf)$/i.test(entry.name)) continue;
+      const match = selectCandidateFromFilename(records, entry.name);
+      if (!match) { ambiguous += 1; continue; }
+      if (copyFileIfMissing(
+        path.join(globalExportsRoot, entry.name),
+        path.join(match.candidateDir, 'bilan', 'exports', entry.name)
+      )) exportCopied += 1;
+    }
+
+    return { replayCopied, bilanCopied, exportCopied, ambiguous };
   }
 
   function synchronize() {
