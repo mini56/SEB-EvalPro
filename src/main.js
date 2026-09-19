@@ -20,6 +20,8 @@ let downloadRoutingInstalled = false;
 const localAi = createLocalAiService({ app });
 let candidateStore = null;
 let candidateTransfer = null;
+let adminExportCandidateDir = null;
+let lastCandidateSaveError = '';
 
 function stateFilePath() {
   return path.join(app.getPath('userData'), 'evaluation-state.json');
@@ -77,7 +79,7 @@ function installDownloadRouting() {
     try {
       ensureSebDocumentsFolders();
       const candidateExportDir = getCandidateStore().getActiveExportDir();
-      const targetDirectory = candidateExportDir || bilanDocumentsDir();
+      const targetDirectory = candidateExportDir || adminExportCandidateDir || bilanDocumentsDir();
       item.setSavePath(uniqueOutputPath(targetDirectory, filename));
     } catch (_) {}
   });
@@ -119,8 +121,10 @@ function writeState(nextState) {
 
   try {
     getCandidateStore().saveSnapshot(safeState);
+    lastCandidateSaveError = '';
   } catch (error) {
-    console.error('Sauvegarde du dossier candidat impossible:', error && error.message ? error.message : error);
+    lastCandidateSaveError = error && error.message ? error.message : String(error);
+    console.error('Sauvegarde du dossier candidat impossible:', lastCandidateSaveError);
   }
 
   return safeState;
@@ -326,6 +330,21 @@ ipcMain.handle('admin:status', () => adminSessionUnlocked);
 
 ipcMain.handle('admin:lock', () => {
   adminSessionUnlocked = false;
+  adminExportCandidateDir = null;
+  return true;
+});
+
+ipcMain.handle('candidate:set-admin-export-context', (_event, candidateId) => {
+  if (!adminSessionUnlocked) return false;
+  const root = path.join(sebDocumentsRoot(), 'Candidats');
+  const record = getCandidateTransfer().listCandidateRecords(root, false)
+    .find((item) => String(item.candidateId) === String(candidateId || ''));
+  if (!record) {
+    adminExportCandidateDir = null;
+    return false;
+  }
+  adminExportCandidateDir = path.join(record.candidateDir, 'bilan', 'exports');
+  fs.mkdirSync(adminExportCandidateDir, { recursive:true });
   return true;
 });
 
@@ -352,18 +371,18 @@ ipcMain.handle('admin:export-candidates', async () => {
   }
 });
 
-ipcMain.handle('admin:import-candidates', async (_event, groupName) => {
+ipcMain.handle('admin:import-candidates', async () => {
   if (!mainWindow || !adminSessionUnlocked) return { ok: false, error: 'Accès administrateur requis.' };
   try {
     const selection = await dialog.showOpenDialog(mainWindow, {
-      title: 'Choisir la clé USB contenant SEB EvalPro\\Candidats',
+      title: 'Choisir la racine de la clé USB contenant les dossiers candidats',
       buttonLabel: 'Importer',
       properties: ['openDirectory']
     });
     if (selection.canceled || !selection.filePaths || !selection.filePaths[0]) {
       return { ok: false, cancelled: true };
     }
-    const result = getCandidateTransfer().importAll(selection.filePaths[0], groupName);
+    const result = getCandidateTransfer().importAll(selection.filePaths[0]);
     return { ok: true, ...result };
   } catch (error) {
     return { ok: false, error: error && error.message ? error.message : String(error) };
