@@ -322,6 +322,29 @@ html, body {
 // Version complète avec validation stricte
 // ============================================
 
+// SEB_SIGNATURE_CANDIDAT_NORMALISEE
+function normaliserIdentiteMail(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLocaleLowerCase('fr-FR')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function signatureCandidatValide(message, prenomCandidat, nomCandidat) {
+  const messageNormalise = normaliserIdentiteMail(message);
+  const prenomNormalise = normaliserIdentiteMail(prenomCandidat);
+  const nomNormalise = normaliserIdentiteMail(nomCandidat);
+  if (!messageNormalise || !prenomNormalise || !nomNormalise) return false;
+
+  const prenomNom = (prenomNormalise + ' ' + nomNormalise).trim();
+  const nomPrenom = (nomNormalise + ' ' + prenomNormalise).trim();
+
+  return messageNormalise.includes(prenomNom) || messageNormalise.includes(nomPrenom);
+}
+
 function evaluerFormulaire(event) {
   event.preventDefault();
   
@@ -388,17 +411,9 @@ function evaluerFormulaire(event) {
   }
   
   // ============================================
-  // CRITÈRE 5 : Signature (format : Prénom NOM)
+  // CRITÈRE 5 : Signature (Prénom NOM ou NOM Prénom, casse libre)
   // ============================================
-  let signatureOK = false;
-  if (prenomCandidat && nomCandidat && message) {
-    const prenomMajuscule = prenomCandidat.charAt(0).toUpperCase() + prenomCandidat.slice(1).toLowerCase();
-    const nomMajuscules = nomCandidat.toUpperCase();
-    
-    const hasPrenom = message.includes(prenomMajuscule);
-    const hasNom = message.includes(nomMajuscules);
-    signatureOK = hasPrenom && hasNom;
-  }
+  const signatureOK = signatureCandidatValide(message, prenomCandidat, nomCandidat);
   
   if (signatureOK) {
     score++;
@@ -487,19 +502,9 @@ function saveEmailAnswers(to, cc, subject, message, file) {
   
   const score_file = (file === 'Rapport_stage.docx') ? 1 : 0;
   
-  // Validation de la signature (prénom + NOM en majuscules)
-  let score_signature = 0;
-  if (prenomCandidat && nomCandidat && message) {
-    const prenomMajuscule = prenomCandidat.charAt(0).toUpperCase() + prenomCandidat.slice(1).toLowerCase();
-    const nomMajuscules = nomCandidat.toUpperCase();
-    
-    const hasPrenom = message.includes(prenomMajuscule);
-    const hasNom = message.includes(nomMajuscules);
-    
-    if (hasPrenom && hasNom) {
-      score_signature = 1;
-    }
-  }
+  // Validation de la signature : nom et prénom saisis en première page,
+  // acceptés dans les deux ordres et sans tenir compte des majuscules/minuscules.
+  const score_signature = signatureCandidatValide(message, prenomCandidat, nomCandidat) ? 1 : 0;
   
   // Validation du numéro de téléphone (10 chiffres avec différents séparateurs)
   let score_telephone = 0;

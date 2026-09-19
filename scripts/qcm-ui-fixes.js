@@ -34,6 +34,18 @@ function replaceRequired(state, search, replacement, label) {
     'imageqcm/avatar_transparant.png',
     'image consigne de nvmail'
   );
+  for (const required of [
+    'SEB_SIGNATURE_CANDIDAT_NORMALISEE',
+    'function signatureCandidatValide',
+    "messageNormalise.includes(prenomNom) || messageNormalise.includes(nomPrenom)",
+    'const score_signature = signatureCandidatValide(message, prenomCandidat, nomCandidat) ? 1 : 0'
+  ]) {
+    if (!state.html.includes(required)) {
+      console.error('SEB EvalPro UI: contrôle signature candidat absent: ' + required);
+      process.exit(4);
+    }
+  }
+
   fs.writeFileSync(state.target, state.html, 'utf8');
 }
 
