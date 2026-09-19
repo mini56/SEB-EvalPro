@@ -369,7 +369,7 @@ function createReplayChooserDialog() {
   });
 }
 
-function createVisualReplayViewer(filename, archive, legacy, warning) {
+function createVisualReplayViewer(filename, archive, legacy, warning, candidateId = '') {
   return new Promise((resolve) => {
     addReplayStyle();
     const old = document.getElementById('seb-replay-viewer');
@@ -428,7 +428,11 @@ function createVisualReplayViewer(filename, archive, legacy, warning) {
       next.disabled = index >= slides.length - 1;
       stage.innerHTML = '<div class="seb-visual-loading">Chargement de la page figée…</div>';
       let result = null;
-      try { result = await ipcRenderer.invoke('admin:get-parcours-slide', filename, slide.file); } catch (_) {}
+      try {
+        result = candidateId
+          ? await ipcRenderer.invoke('admin:get-candidate-parcours-slide', candidateId, filename, slide.file)
+          : await ipcRenderer.invoke('admin:get-parcours-slide', filename, slide.file);
+      } catch (_) {}
       if (myToken !== renderToken) return;
       if (!result || !result.ok || !result.dataUrl) {
         stage.innerHTML = `<div class="seb-visual-warning">${(result && result.error) || 'Impossible de charger cette diapositive.'}</div>`;
@@ -455,6 +459,16 @@ function createVisualReplayViewer(filename, archive, legacy, warning) {
   });
 }
 
+async function openCandidateReplay(candidateId, filename) {
+  const loaded = await ipcRenderer.invoke('admin:load-candidate-parcours', candidateId, filename);
+  if (!loaded || !loaded.ok) {
+    alert((loaded && loaded.error) || 'Impossible d’ouvrir ce replay.');
+    return false;
+  }
+  await createVisualReplayViewer(filename, loaded.archive, !!loaded.legacy, loaded.warning || '', String(candidateId || ''));
+  return true;
+}
+
 function install() {
   if (installed) return;
   installed = true;
@@ -464,4 +478,4 @@ function install() {
   installArchiveWatcher();
 }
 
-module.exports = { install };
+module.exports = { install, openCandidateReplay };
