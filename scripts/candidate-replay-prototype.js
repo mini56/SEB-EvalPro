@@ -96,7 +96,9 @@ function write(file, text) {
     'admin:get-parcours-slide'
   ];
   const requiredBilanMain = [
-    "path.join(app.getPath('documents'), 'SEB EvalPro', 'Bilans', 'Historique')",
+    "SEB_CANDIDATE_AUTONOMOUS_BILAN",
+    "path.join(candidateDir, 'bilan', 'historique')",
+    "legacyHistoryDir = path.join(root, 'Bilans', 'Historique')",
     "ipcMain.handle('bilan-history:save-current'",
     "ipcMain.handle('bilan-history:list'",
     "ipcMain.handle('bilan-history:load'",
