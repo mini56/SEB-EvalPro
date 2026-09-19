@@ -26,11 +26,16 @@ jobs:
           foreach ($file in @(
             'src/candidate-store-main.js',
             'src/candidate-transfer-main.js',
+            'src/candidate-folder-utils.js',
+            'src/candidate-catalog-main.js',
+            'src/candidate-catalog-preload.js',
             'src/main.js',
             'src/preload.js',
             'src/session-close.js',
             'scripts/candidate-store-smoke.js',
-            'scripts/candidate-transfer-smoke.js'
+            'scripts/candidate-transfer-smoke.js',
+            'scripts/candidate-catalog-smoke.js',
+            'scripts/candidate-autonomous-final.js'
           )) {
             node --check $file
             if ($LASTEXITCODE -ne 0) { throw "JavaScript invalide: $file" }
@@ -39,6 +44,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Smoke test du dossier candidat échoué.' }
           node scripts/candidate-transfer-smoke.js
           if ($LASTEXITCODE -ne 0) { throw 'Smoke test export/import USB échoué.' }
+          node scripts/candidate-catalog-smoke.js
+          if ($LASTEXITCODE -ne 0) { throw 'Smoke test migration/catalogue candidats échoué.' }
 
       - name: Apply writing-only guard on working #9 engine
         shell: pwsh
@@ -286,7 +293,7 @@ jobs:
           $uninstaller = (Resolve-Path "dist\SEB-eval-PRO-$version-Windows-Desinstallation.exe").Path
           $repo = "${{ github.repository }}"
           $title = "SEB EvalPro - Test Plateaux #${{ github.run_number }}"
-          $notes = "Test Plateaux, créé strictement depuis le Build #36 validé (commit 8e4dac0c). Le dossier candidat autonome et la reprise validés sont conservés. Ajoute dans le mode Admin l'export groupé de tous les dossiers candidats vers SEB EvalPro\\Candidats sur une clé USB, puis l'import groupé vers Documents\\SEB EvalPro\\Admin\\<nom libre>. Les candidats sont reconnus par leur identifiant unique pour éviter les doublons lors des passages successifs sur plusieurs PC. Le socle IA locale du #36 reste inchangé. Version de test uniquement."
+          $notes = "Test Plateaux #${{ github.run_number }}. Nouveau modèle candidat autonome : un dossier Nom_Prenom_Ville_Groupe contient les données, résultats, replay/parcours, bilan, révisions et exports. Export USB simplifié : choisir uniquement la racine de la clé, les dossiers candidats y sont copiés directement. Import Admin simplifié : choisir la racine de la clé, les dossiers valides sont copiés automatiquement dans Documents\\SEB EvalPro\\Candidats, sans nom de regroupement à saisir. Mode Admin : bouton Ouvrir un candidat avec recherche instantanée, scroll, bilan/révisions, ouverture et suppression sécurisée vers Corbeille. Les anciens dossiers Admin et les anciens parcours/bilans globaux sont repris par copie non destructive lorsque l'identité correspond avec certitude. Les fenêtres de listes, notamment Rejouer un parcours, disposent aussi d'une recherche. Version de test uniquement."
           $setupSize = (Get-Item $setup).Length
           Write-Host "Setup à publier: $setupSize octets"
 
