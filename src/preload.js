@@ -72,17 +72,22 @@ function handleSaveResult(result) {
 }
 
 function saveNow(sync = false) {
-  if (closingSession) return;
+  if (closingSession) return null;
   const snapshot = buildSnapshot();
   restoredState = snapshot;
   if (sync) {
     const result = ipcRenderer.sendSync('state:save-sync', snapshot);
     handleSaveResult(result);
-  } else {
-    ipcRenderer.invoke('state:save', snapshot).then(handleSaveResult).catch((error) => {
-      handleSaveResult({ ok:false, error:String(error && error.message ? error.message : error) });
-    });
+    return result;
   }
+  return ipcRenderer.invoke('state:save', snapshot).then((result) => {
+    handleSaveResult(result);
+    return result;
+  }).catch((error) => {
+    const result = { ok:false, error:String(error && error.message ? error.message : error) };
+    handleSaveResult(result);
+    return result;
+  });
 }
 
 function scheduleSave() {
@@ -495,17 +500,31 @@ function injectAdminBar() {
       return;
     }
 
-    saveNow(true);
+    const saved = saveNow(true);
+    if (saved && saved.ok === false) {
+      await showTransferMessage(
+        'Fermeture impossible',
+        'La dernière sauvegarde du parcours n’a pas pu être confirmée. La session reste ouverte afin de ne perdre aucune donnée.',
+        true
+      );
+      scheduleHideBar();
+      return;
+    }
+
+    const closed = await ipcRenderer.invoke('admin:close-session').catch(() => false);
+    if (!closed) {
+      await showTransferMessage(
+        'Fermeture impossible',
+        'Le dossier candidat n’a pas pu être finalisé. La session reste ouverte et les données affichées sont conservées.',
+        true
+      );
+      scheduleHideBar();
+      return;
+    }
+
     closingSession = true;
     clearTimeout(saveTimer);
     if (periodicSaveTimer) clearInterval(periodicSaveTimer);
-
-    try {
-      window.sessionStorage.clear();
-      window.localStorage.clear();
-    } catch (_) {}
-
-    await ipcRenderer.invoke('admin:close-session').catch(() => false);
   });
 
   updateAdminButtons();
