@@ -7,6 +7,7 @@
     'stock.html',
     'planning.html',
     'genrenombres.html',
+    'dictee.html',
     'tri_de_cheville.html',
     'nwtexte.html',
     'nvmail.html',
@@ -19,6 +20,7 @@
     'stock.html': 'planning.html',
     'planning.html': 'genrenombres.html',
     'genrenombres.html': 'tri_de_cheville.html',
+    'dictee.html': 'tri_de_cheville.html',
     'tri_de_cheville.html': 'nwtexte.html',
     'nwtexte.html': 'nvmail.html',
     'nvmail.html': 'autoeval2.html',
@@ -31,6 +33,7 @@
     'stock.html': 'Gestion logistique — Ranger le stock produit',
     'planning.html': 'Planification — Le restaurant',
     'genrenombres.html': 'Genre et nombre',
+    'dictee.html': 'Dictée',
     'tri_de_cheville.html': 'Tri de chevilles',
     'nwtexte.html': 'Traitement de texte',
     'nvmail.html': 'Messagerie électronique',
@@ -210,7 +213,7 @@
 
   function isPassButton(button) {
     const label = stripActionIcon(button.textContent).toLowerCase();
-    return /^(passer|passez)\b/.test(label) || /abandonner l['’]exercice/.test(label);
+    return /^(passer|passez)\b/.test(label) || /^abandonner\b/.test(label) || /abandonner l['’]exercice/.test(label);
   }
 
   function headingLabel(scope, fallback) {
@@ -419,6 +422,17 @@
       if (context.file === 'tri_de_cheville.html') {
         try { if (typeof window.calcMoyenne === 'function') window.calcMoyenne(); } catch (_) {}
         try { if (typeof window.saveTriResultsToQCM === 'function') window.saveTriResultsToQCM(); } catch (_) {}
+      }
+      if (context.file === 'dictee.html') {
+        try {
+          let state = {};
+          try { state = JSON.parse(sessionStorage.getItem('dictee_data') || '{}') || {}; } catch (_) {}
+          state.status = 'abandoned';
+          state.scoreSur20 = 0;
+          state.abandonne = true;
+          sessionStorage.setItem('dictee_data', JSON.stringify(state));
+          if (window.sebEvalPro && typeof window.sebEvalPro.save === 'function') window.sebEvalPro.save();
+        } catch (_) {}
       }
       saveAbandon(context, reasons, comment.value);
       close();

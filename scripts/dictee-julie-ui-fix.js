@@ -52,8 +52,9 @@ const runtime = String.raw`
   }
 
   function findActionButtons() {
+    const unifiedAbandon = document.getElementById('seb-evalpro-abandon-fixed');
     return {
-      abandon: findButton(text => text === 'abandonner' || text.startsWith('abandonner ')),
+      abandon: unifiedAbandon || findButton(text => text === 'abandonner' || text.startsWith('abandonner ')),
       verify: findButton(text => text === 'verifier' || text.startsWith('verifier ') || text.includes(' verifier')),
       next: findButton(text => text === 'suivant' || text.startsWith('suivant ')),
       play: findButton(text => text === 'lecture' || text.startsWith('lecture ') || text === 'lire' || text.startsWith('lire ') || text.includes('ecouter')),
@@ -243,5 +244,6 @@ if (!html.includes('dictee-reclamation-client.wav')) fail('WAV fixe absent de di
 if (html.includes('SpeechSynthesisUtterance') || html.includes('speechSynthesis')) fail('dépendance synthèse vocale encore présente dans la dictée');
 if (!html.includes('seb-dictee-left-actions')) fail('déplacement Vérifier/Suivant absent');
 if (!html.includes('alignPrivacyButtonWithAbandon')) fail('alignement écran accueil/Abandonner absent');
+if (!html.includes("document.getElementById('seb-evalpro-abandon-fixed')")) fail('priorité au bouton Abandon unifié absente');
 
 console.log('SEB EvalPro dictée: WAV fixe utilisé; texte vitesse supprimé; Vérifier/Suivant à gauche; écran d’accueil aligné avec Abandonner.');

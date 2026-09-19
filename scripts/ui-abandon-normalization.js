@@ -15,7 +15,7 @@ if (!fs.existsSync(webDir)) fail('dossier app/web introuvable');
 if (!fs.existsSync(runtime)) fail('runtime js/seb-ui-runtime.js introuvable après préparation du web', 3);
 
 const runtimeText = fs.readFileSync(runtime, 'utf8');
-for (const required of ['seb_evalpro_abandons', 'Abandonner l’exercice', 'seb-action-btn', 'Exercices abandonnés par le stagiaire', 'seb-evalpro-abandon-admin-password', 'verifyAdminPassword']) {
+for (const required of ['seb_evalpro_abandons', 'Abandonner l’exercice', 'seb-action-btn', 'Exercices abandonnés par le stagiaire', 'seb-evalpro-abandon-admin-password', 'verifyAdminPassword', "'dictee.html'", "state.status = 'abandoned'", 'state.scoreSur20 = 0']) {
   if (!runtimeText.includes(required)) fail(`runtime incomplet : ${required}`, 4);
 }
 
@@ -35,7 +35,7 @@ for (const name of pages) {
   patched += 1;
 }
 
-for (const requiredPage of ['qcmv1.0.html', 'brique.html', 'tri_de_cheville.html', 'nwtexte.html', 'nvmail.html', 'admin-bilan.html']) {
+for (const requiredPage of ['qcmv1.0.html', 'brique.html', 'dictee.html', 'tri_de_cheville.html', 'nwtexte.html', 'nvmail.html', 'admin-bilan.html']) {
   const file = path.join(webDir, requiredPage);
   if (!fs.existsSync(file)) fail(`page obligatoire introuvable : ${requiredPage}`, 7);
   const html = fs.readFileSync(file, 'utf8');
