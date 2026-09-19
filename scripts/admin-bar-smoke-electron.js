@@ -84,6 +84,8 @@ app.whenReady().then(async () => {
       const admin=document.getElementById('seb-evalpro-admin');
       const openCandidate=document.getElementById('seb-evalpro-open-candidate');
       const oldBilan=document.getElementById('seb-evalpro-old-bilan');
+      const oldReplay=document.getElementById('seb-evalpro-replay');
+      const oldResults=document.getElementById('seb-evalpro-results');
       document.dispatchEvent(new MouseEvent('mousemove',{bubbles:true,clientY:0,clientX:20}));
       await new Promise(r=>setTimeout(r,120));
       return {
@@ -93,18 +95,20 @@ app.whenReady().then(async () => {
         openCandidate:!!openCandidate,
         openCandidateVisible:!!openCandidate && !openCandidate.hidden && getComputedStyle(openCandidate).display!=='none',
         oldBilanVisible:!!oldBilan && !oldBilan.hidden && getComputedStyle(oldBilan).display!=='none',
+        oldReplayVisible:!!oldReplay && !oldReplay.hidden && getComputedStyle(oldReplay).display!=='none',
+        oldResultsVisible:!!oldResults && !oldResults.hidden && getComputedStyle(oldResults).display!=='none',
         visible:!!bar && bar.classList.contains('seb-evalpro-visible'),
         transform:bar ? getComputedStyle(bar).transform : '',
         adminText:admin ? String(admin.textContent||'').trim() : ''
       };
     })()`);
 
-    if (!result.bar || !result.hotzone || !result.adminButton || !result.openCandidate || !result.openCandidateVisible || result.oldBilanVisible || !result.visible || result.adminText !== 'Verrouiller') {
-      fail('barre Admin ou bouton Ouvrir un candidat incorrect, ou ancien bilan encore visible', result);
+    if (!result.bar || !result.hotzone || !result.adminButton || !result.openCandidate || !result.openCandidateVisible || result.oldBilanVisible || result.oldReplayVisible || result.oldResultsVisible || !result.visible || result.adminText !== 'Verrouiller') {
+      fail('barre Admin incorrecte ou ancien accès global bilan/replay/résultats encore visible', result);
       return;
     }
 
-    console.log('SEB EvalPro Admin smoke: OK - barre présente, Ouvrir un candidat visible et ancien bilan masqué.');
+    console.log('SEB EvalPro Admin smoke: OK - Ouvrir un candidat visible; anciens accès globaux bilan/replay/résultats masqués.');
     console.log(JSON.stringify(result));
 
     // Vérification réelle du correctif IA #25 : un seul bouton visible,
