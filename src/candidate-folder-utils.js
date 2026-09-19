@@ -92,26 +92,23 @@ function listCandidateDirs(root, recursive = false) {
 function scoreCandidateMatch(record, candidate) {
   const a = candidateObject(record && (record.candidate || (record.manifest && record.manifest.candidat)));
   const b = candidateObject(candidate);
-  if (!normalize(a.nom) || !normalize(a.prenom)) return -1;
-  if (normalize(a.nom) !== normalize(b.nom) || normalize(a.prenom) !== normalize(b.prenom)) return -1;
-  let score = 10;
-  for (const key of ['date', 'lieu', 'groupe']) {
+
+  // Association volontairement stricte : aucun replay/bilan historique ne doit
+  // pouvoir être rattaché au mauvais candidat.
+  for (const key of ['nom', 'prenom', 'lieu', 'groupe']) {
     const av = normalize(a[key]);
     const bv = normalize(b[key]);
-    if (av && bv) score += av === bv ? 3 : -2;
+    if (!av || !bv || av !== bv) return -1;
   }
-  return score;
+  const ad = normalize(a.date);
+  const bd = normalize(b.date);
+  if (ad && bd && ad !== bd) return -1;
+  return 100;
 }
 
 function selectCandidate(records, candidate) {
-  const scored = (records || [])
-    .map((record) => ({ record, score: scoreCandidateMatch(record, candidate) }))
-    .filter((item) => item.score >= 10)
-    .sort((a, b) => b.score - a.score);
-  if (!scored.length) return null;
-  if (scored.length === 1) return scored[0].record;
-  if (scored[0].score > scored[1].score) return scored[0].record;
-  return null;
+  const matches = (records || []).filter((record) => scoreCandidateMatch(record, candidate) === 100);
+  return matches.length === 1 ? matches[0] : null;
 }
 
 function findCandidateDir(documentsPath, candidate) {
