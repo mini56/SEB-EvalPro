@@ -1,18 +1,15 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { findCandidateDir, listCandidateDirs, copyFileIfMissing, ensureDir } = require('./candidate-folder-utils');
 
 module.exports = function registerBilanHistory({ app, ipcMain, getAdminUnlocked, buildNumber }) {
   const CURRENT_BUILD = String(buildNumber || 'DEV');
   const TYPE = 'SEB_EVALPRO_BILAN_ARCHIVE';
-
-  function historyDir() {
-    return path.join(app.getPath('documents'), 'SEB EvalPro', 'Bilans', 'Historique');
-  }
-
-  function ensureDir() {
-    fs.mkdirSync(historyDir(), { recursive: true });
-  }
+  const documentsPath = app.getPath('documents');
+  const root = path.join(documentsPath, 'SEB EvalPro');
+  const candidatesRoot = path.join(root, 'Candidats');
+  const legacyHistoryDir = path.join(root, 'Bilans', 'Historique');
 
   function safePart(value, fallback = 'INCONNU') {
     let text = String(value || '').trim();
@@ -22,9 +19,9 @@ module.exports = function registerBilanHistory({ app, ipcMain, getAdminUnlocked,
   }
 
   function stableJson(value) {
-    if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
+    if (Array.isArray(value)) return '[' + value.map(stableJson).join(',') + ']';
     if (value && typeof value === 'object') {
-      return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableJson(value[key])}`).join(',')}}`;
+      return '{' + Object.keys(value).sort().map((key) => JSON.stringify(key) + ':' + stableJson(value[key])).join(',') + '}';
     }
     return JSON.stringify(value);
   }
@@ -44,53 +41,13 @@ module.exports = function registerBilanHistory({ app, ipcMain, getAdminUnlocked,
     return sha(archivePayloadForHash(archive)) === String(archive.integritySha256);
   }
 
-  function readArchive(filename) {
-    const safe = path.basename(String(filename || ''));
-    if (!safe.toLowerCase().endsWith('.json')) throw new Error('Archive de bilan invalide.');
-    const full = path.join(historyDir(), safe);
-    if (!fs.existsSync(full)) throw new Error('Archive de bilan introuvable.');
-    const archive = JSON.parse(fs.readFileSync(full, 'utf8'));
-    if (!verify(archive)) throw new Error('Archive de bilan modifiée ou corrompue.');
-    return { archive, filename: safe, full };
-  }
-
-  function listArchivesRaw() {
-    ensureDir();
-    return fs.readdirSync(historyDir(), { withFileTypes: true })
-      .filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith('.json'))
-      .map((entry) => {
-        try {
-          const archive = JSON.parse(fs.readFileSync(path.join(historyDir(), entry.name), 'utf8'));
-          return { filename: entry.name, archive, integrityOk: verify(archive) };
-        } catch (_) {
-          return { filename: entry.name, archive: null, integrityOk: false };
-        }
-      });
-  }
-
-  function nextRevision(rootId) {
-    let max = -1;
-    for (const item of listArchivesRaw()) {
-      if (!item.integrityOk || !item.archive || item.archive.rootId !== rootId) continue;
-      const rev = Number(item.archive.revision);
-      if (Number.isFinite(rev)) max = Math.max(max, rev);
-    }
-    return max + 1;
-  }
-
-  function latestForRoot(rootId) {
-    return listArchivesRaw()
-      .filter((item) => item.integrityOk && item.archive && item.archive.rootId === rootId)
-      .sort((a, b) => Number(b.archive.revision || 0) - Number(a.archive.revision || 0))[0] || null;
-  }
-
   function normalizeCandidate(candidate) {
     const c = candidate && typeof candidate === 'object' ? candidate : {};
     return {
       nom: String(c.nom || '').trim(),
       prenom: String(c.prenom || c['prénom'] || '').trim(),
       date: String(c.date || '').trim(),
-      lieu: String(c.lieu || '').trim(),
+      lieu: String(c.lieu || c.ville || '').trim(),
       groupe: String(c.groupe || '').trim()
     };
   }
@@ -122,8 +79,113 @@ module.exports = function registerBilanHistory({ app, ipcMain, getAdminUnlocked,
     };
   }
 
+  function candidateHistoryDir(candidate) {
+    const candidateDir = findCandidateDir(documentsPath, candidate);
+    if (!candidateDir) throw new Error('Dossier candidat introuvable : bilan non enregistré.');
+    const dir = path.join(candidateDir, 'bilan', 'historique');
+    ensureDir(dir);
+    return dir;
+  }
+
+  function candidateLocations(filename = '') {
+    const safe = filename ? path.basename(String(filename)) : '';
+    const out = [];
+    for (const record of listCandidateDirs(candidatesRoot, false)) {
+      const dir = path.join(record.candidateDir, 'bilan', 'historique');
+      if (!fs.existsSync(dir)) continue;
+      if (safe) {
+        const full = path.join(dir, safe);
+        if (fs.existsSync(full)) out.push({ full, filename:safe, record });
+      } else {
+        for (const entry of fs.readdirSync(dir, { withFileTypes:true })) {
+          if (!entry.isFile() || !entry.name.toLowerCase().endsWith('.json')) continue;
+          out.push({ full:path.join(dir, entry.name), filename:entry.name, record });
+        }
+      }
+    }
+    return out;
+  }
+
+  function migrateLegacyArchive(filename) {
+    const safe = path.basename(String(filename || ''));
+    const legacy = path.join(legacyHistoryDir, safe);
+    if (!safe.toLowerCase().endsWith('.json') || !fs.existsSync(legacy)) return null;
+    let archive = null;
+    try { archive = JSON.parse(fs.readFileSync(legacy, 'utf8')); } catch (_) { return null; }
+    if (!verify(archive)) return { full:legacy, filename:safe, archive, legacy:true, integrityOk:false };
+    const candidateDir = findCandidateDir(documentsPath, normalizeCandidate(archive.candidate));
+    if (!candidateDir) return { full:legacy, filename:safe, archive, legacy:true, integrityOk:true };
+    const target = path.join(candidateDir, 'bilan', 'historique', safe);
+    ensureDir(path.dirname(target));
+    copyFileIfMissing(legacy, target);
+    return { full:target, filename:safe, archive, legacy:false, integrityOk:true };
+  }
+
+  function readArchive(filename) {
+    const safe = path.basename(String(filename || ''));
+    if (!safe.toLowerCase().endsWith('.json')) throw new Error('Archive de bilan invalide.');
+    const locations = candidateLocations(safe);
+    if (locations.length > 1) throw new Error('Plusieurs archives portent le même nom : ouverture refusée par sécurité.');
+    let full = locations.length === 1 ? locations[0].full : '';
+    if (!full) {
+      const migrated = migrateLegacyArchive(safe);
+      full = migrated && migrated.full ? migrated.full : '';
+    }
+    if (!full || !fs.existsSync(full)) throw new Error('Archive de bilan introuvable.');
+    const archive = JSON.parse(fs.readFileSync(full, 'utf8'));
+    if (!verify(archive)) throw new Error('ATTENTION : archive de bilan modifiée ou corrompue. Ouverture refusée.');
+    return { archive, filename:safe, full };
+  }
+
+  function listArchivesRaw() {
+    ensureDir(candidatesRoot);
+    const seen = new Set();
+    const items = [];
+
+    for (const location of candidateLocations()) {
+      try {
+        const archive = JSON.parse(fs.readFileSync(location.full, 'utf8'));
+        items.push({ filename:location.filename, archive, integrityOk:verify(archive), full:location.full });
+      } catch (_) {
+        items.push({ filename:location.filename, archive:null, integrityOk:false, full:location.full });
+      }
+      seen.add(location.filename);
+    }
+
+    ensureDir(legacyHistoryDir);
+    for (const entry of fs.readdirSync(legacyHistoryDir, { withFileTypes:true })) {
+      if (!entry.isFile() || !entry.name.toLowerCase().endsWith('.json') || seen.has(entry.name)) continue;
+      const migrated = migrateLegacyArchive(entry.name);
+      if (!migrated) continue;
+      try {
+        const archive = migrated.archive || JSON.parse(fs.readFileSync(migrated.full, 'utf8'));
+        items.push({ filename:entry.name, archive, integrityOk:verify(archive), full:migrated.full });
+      } catch (_) {
+        items.push({ filename:entry.name, archive:null, integrityOk:false, full:migrated.full });
+      }
+      seen.add(entry.name);
+    }
+    return items;
+  }
+
+  function nextRevision(rootId) {
+    let max = -1;
+    for (const item of listArchivesRaw()) {
+      if (!item.integrityOk || !item.archive || item.archive.rootId !== rootId) continue;
+      const rev = Number(item.archive.revision);
+      if (Number.isFinite(rev)) max = Math.max(max, rev);
+    }
+    return max + 1;
+  }
+
+  function latestForRoot(rootId) {
+    return listArchivesRaw()
+      .filter((item) => item.integrityOk && item.archive && item.archive.rootId === rootId)
+      .sort((a, b) => Number(b.archive.revision || 0) - Number(a.archive.revision || 0))[0] || null;
+  }
+
   function writeArchive({ rootId, revision, parentFilename, originalBuild, candidate, document, source }) {
-    ensureDir();
+    const targetHistory = candidateHistoryDir(candidate);
     const createdAt = new Date().toISOString();
     const body = {
       schemaVersion: 1,
@@ -148,39 +210,40 @@ module.exports = function registerBilanHistory({ app, ipcMain, getAdminUnlocked,
     const base = [safePart(candidate.nom, 'NOM'), safePart(candidate.prenom, 'PRENOM'), datePart, `BUILD-${safePart(body.originalBuild, 'DEV')}`].join('_');
     const stamp = createdAt.replace(/[-:.TZ]/g, '').slice(0, 14);
     const filename = `${base}_BILAN_R${String(revision).padStart(2, '0')}_${stamp}_${body.documentSha256.slice(0, 10)}.json`;
-    const target = path.join(historyDir(), filename);
-    const temp = `${target}.tmp`;
+    const target = path.join(targetHistory, filename);
+    const temp = target + '.tmp';
     fs.writeFileSync(temp, JSON.stringify(body, null, 2), 'utf8');
     fs.renameSync(temp, target);
-    return { filename, archive: body };
+    // SEB_CANDIDATE_AUTONOMOUS_BILAN : aucune écriture opérationnelle dans l'ancien historique global.
+    return { filename, archive:body };
   }
 
   ipcMain.handle('bilan-history:save-current', (_event, payload) => {
-    if (!getAdminUnlocked()) return { ok: false, error: 'Accès administrateur requis.' };
+    if (!getAdminUnlocked()) return { ok:false, error:'Accès administrateur requis.' };
     try {
       const candidate = normalizeCandidate(payload && payload.candidate);
       if (!candidate.nom && !candidate.prenom) throw new Error('Candidat non identifié.');
       const document = normalizeDocument(payload && payload.document);
       const sessionToken = safePart(payload && payload.sessionToken, '');
-      const rootId = sessionToken || sha({ candidate, originalBuild: String((payload && payload.originalBuild) || CURRENT_BUILD) }).slice(0, 24);
+      const rootId = sessionToken || sha({ candidate, originalBuild:String((payload && payload.originalBuild) || CURRENT_BUILD) }).slice(0,24);
       const latest = latestForRoot(rootId);
       const documentSha256 = sha(document);
       if (latest && latest.archive.documentSha256 === documentSha256) {
-        return { ok: true, unchanged: true, filename: latest.filename, revision: latest.archive.revision, rootId };
+        return { ok:true, unchanged:true, filename:latest.filename, revision:latest.archive.revision, rootId };
       }
       const revision = nextRevision(rootId);
       const result = writeArchive({
         rootId,
         revision,
         parentFilename: latest ? latest.filename : '',
-        originalBuild: String((payload && payload.originalBuild) || CURRENT_BUILD),
+        originalBuild:String((payload && payload.originalBuild) || CURRENT_BUILD),
         candidate,
         document,
         source: revision === 0 ? 'CURRENT_BILAN_ORIGINAL' : 'CURRENT_BILAN_SAVE'
       });
-      return { ok: true, filename: result.filename, revision, rootId, originalBuild: result.archive.originalBuild };
+      return { ok:true, filename:result.filename, revision, rootId, originalBuild:result.archive.originalBuild };
     } catch (error) {
-      return { ok: false, error: error && error.message ? error.message : String(error) };
+      return { ok:false, error:error && error.message ? error.message : String(error) };
     }
   });
 
@@ -189,47 +252,45 @@ module.exports = function registerBilanHistory({ app, ipcMain, getAdminUnlocked,
     return listArchivesRaw().map((item) => {
       const a = item.archive || {};
       return {
-        filename: item.filename,
-        integrityOk: item.integrityOk,
-        candidate: a.candidate || {},
-        originalBuild: String(a.originalBuild || '?'),
-        editedWithBuild: String(a.editedWithBuild || '?'),
-        revision: Number(a.revision || 0),
-        rootId: String(a.rootId || ''),
-        createdAt: String(a.createdAt || ''),
-        autonomous: a.autonomous === true,
-        editable: a.editable === true
+        filename:item.filename,
+        integrityOk:item.integrityOk,
+        candidate:a.candidate || {},
+        originalBuild:String(a.originalBuild || '?'),
+        editedWithBuild:String(a.editedWithBuild || '?'),
+        revision:Number(a.revision || 0),
+        rootId:String(a.rootId || ''),
+        createdAt:String(a.createdAt || ''),
+        autonomous:a.autonomous === true,
+        editable:a.editable === true
       };
-    }).sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+    }).sort((a,b) => String(b.createdAt).localeCompare(String(a.createdAt)));
   });
 
   ipcMain.handle('bilan-history:load', (_event, filename) => {
-    if (!getAdminUnlocked()) return { ok: false, error: 'Accès administrateur requis.' };
+    if (!getAdminUnlocked()) return { ok:false, error:'Accès administrateur requis.' };
     try {
       const loaded = readArchive(filename);
-      return { ok: true, filename: loaded.filename, archive: loaded.archive };
+      return { ok:true, filename:loaded.filename, archive:loaded.archive };
     } catch (error) {
-      return { ok: false, error: error && error.message ? error.message : String(error) };
+      return { ok:false, error:error && error.message ? error.message : String(error) };
     }
   });
 
   ipcMain.handle('bilan-history:delete-revision', (_event, filename) => {
-    if (!getAdminUnlocked()) return { ok: false, error: 'Accès administrateur requis.' };
+    if (!getAdminUnlocked()) return { ok:false, error:'Accès administrateur requis.' };
     try {
       const loaded = readArchive(filename);
       const revision = Number(loaded.archive && loaded.archive.revision);
-      if (!Number.isFinite(revision) || revision <= 0) {
-        throw new Error('Le bilan Original est protégé et ne peut pas être supprimé.');
-      }
+      if (!Number.isFinite(revision) || revision <= 0) throw new Error('Le bilan Original est protégé et ne peut pas être supprimé.');
       fs.unlinkSync(loaded.full);
-      return { ok: true, filename: loaded.filename, revision, rootId: String(loaded.archive.rootId || '') };
+      return { ok:true, filename:loaded.filename, revision, rootId:String(loaded.archive.rootId || '') };
     } catch (error) {
-      return { ok: false, error: error && error.message ? error.message : String(error) };
+      return { ok:false, error:error && error.message ? error.message : String(error) };
     }
   });
 
   ipcMain.handle('bilan-history:save-revision', (_event, payload) => {
-    if (!getAdminUnlocked()) return { ok: false, error: 'Accès administrateur requis.' };
+    if (!getAdminUnlocked()) return { ok:false, error:'Accès administrateur requis.' };
     try {
       const loaded = readArchive(payload && payload.sourceFilename);
       const source = loaded.archive;
@@ -237,21 +298,21 @@ module.exports = function registerBilanHistory({ app, ipcMain, getAdminUnlocked,
       const documentSha256 = sha(document);
       const latest = latestForRoot(source.rootId);
       if (latest && latest.archive.documentSha256 === documentSha256) {
-        return { ok: true, unchanged: true, filename: latest.filename, revision: latest.archive.revision, rootId: source.rootId };
+        return { ok:true, unchanged:true, filename:latest.filename, revision:latest.archive.revision, rootId:source.rootId };
       }
       const revision = nextRevision(source.rootId);
       const result = writeArchive({
-        rootId: source.rootId,
+        rootId:source.rootId,
         revision,
-        parentFilename: loaded.filename,
-        originalBuild: source.originalBuild,
-        candidate: normalizeCandidate(source.candidate),
+        parentFilename:loaded.filename,
+        originalBuild:source.originalBuild,
+        candidate:normalizeCandidate(source.candidate),
         document,
-        source: 'HISTORICAL_REVISION'
+        source:'HISTORICAL_REVISION'
       });
-      return { ok: true, filename: result.filename, revision, rootId: source.rootId, originalBuild: source.originalBuild };
+      return { ok:true, filename:result.filename, revision, rootId:source.rootId, originalBuild:source.originalBuild };
     } catch (error) {
-      return { ok: false, error: error && error.message ? error.message : String(error) };
+      return { ok:false, error:error && error.message ? error.message : String(error) };
     }
   });
 };
