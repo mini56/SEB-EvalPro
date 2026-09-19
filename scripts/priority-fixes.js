@@ -58,12 +58,23 @@ function insertBefore(text, marker, addition, label) {
       );
     }
 
-    out = replaceOnce(
-      out,
-      "      sandbox: false\n    }",
-      "      sandbox: false,\n      spellcheck: false\n    }",
-      'désactivation orthographe Electron'
-    );
+    if (!out.includes('spellcheck: false')) {
+      if (out.includes("      sandbox: false,\n")) {
+        out = replaceOnce(
+          out,
+          "      sandbox: false,\n",
+          "      sandbox: false,\n      spellcheck: false,\n",
+          'désactivation orthographe Electron avec protections supplémentaires'
+        );
+      } else {
+        out = replaceOnce(
+          out,
+          "      sandbox: false\n    }",
+          "      sandbox: false,\n      spellcheck: false\n    }",
+          'désactivation orthographe Electron'
+        );
+      }
+    }
 
     const handlers = `\nipcMain.handle('admin:list-results', () => {\n  if (!adminSessionUnlocked) return [];\n  try {\n    ensureSebDocumentsFolders();\n    return fs.readdirSync(bilanDocumentsDir(), { withFileTypes: true })\n      .filter((entry) => entry.isFile() && /^[A-Za-z0-9-]+_[A-Za-z0-9-]+_\\d{4}-\\d{2}-\\d{2}\\.docx$/i.test(entry.name))\n      .map((entry) => {\n        const fullPath = path.join(bilanDocumentsDir(), entry.name);\n        const stat = fs.statSync(fullPath);\n        return { name: entry.name, modifiedAt: stat.mtime.toISOString() };\n      })\n      .sort((a, b) => String(b.modifiedAt).localeCompare(String(a.modifiedAt)));\n  } catch (_) {\n    return [];\n  }\n});\n\nipcMain.handle('admin:open-result', async (_event, requestedName) => {\n  if (!adminSessionUnlocked) return { ok: false, error: 'Accès administrateur requis.' };\n  const name = path.basename(String(requestedName || ''));\n  if (!/^[A-Za-z0-9-]+_[A-Za-z0-9-]+_\\d{4}-\\d{2}-\\d{2}\\.docx$/i.test(name)) {\n    return { ok: false, error: 'Nom de fichier invalide.' };\n  }\n  const fullPath = path.join(bilanDocumentsDir(), name);\n  if (!fs.existsSync(fullPath)) return { ok: false, error: 'Fichier introuvable.' };\n  const error = await shell.openPath(fullPath);\n  return error ? { ok: false, error } : { ok: true };\n});\n\n`;
     out = insertBefore(out, "ipcMain.handle('admin:open-bilan'", handlers, 'handlers résultats stagiaires');
