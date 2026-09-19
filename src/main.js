@@ -22,6 +22,7 @@ let candidateStore = null;
 let candidateTransfer = null;
 let adminExportCandidateDir = null;
 let lastCandidateSaveError = '';
+let allowApplicationExit = false;
 
 function stateFilePath() {
   return path.join(app.getPath('userData'), 'evaluation-state.json');
@@ -300,6 +301,17 @@ function createWindow() {
     (_details, callback) => callback({ cancel: true })
   );
 
+  // SEB_CANDIDATE_CLOSE_GUARD : Alt+F4 / fermeture fenêtre refusés.
+  // Une fermeture réelle ne devient possible que par le flux Admin qui appelle app.quit().
+  mainWindow.on('close', (event) => {
+    if (allowApplicationExit) return;
+    event.preventDefault();
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    mainWindow.setKiosk(true);
+    mainWindow.setFullScreen(true);
+    mainWindow.focus();
+  });
+
   mainWindow.on('closed', () => {
     mainWindow = null;
     adminSessionUnlocked = false;
@@ -454,6 +466,7 @@ require('./session-close')({
 app.whenReady().then(startApplication);
 
 app.on('before-quit', () => {
+  allowApplicationExit = true;
   localAi.stop();
 });
 
