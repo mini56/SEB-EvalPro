@@ -265,7 +265,8 @@ for (const spec of [
   }
   if (/spellcheck="true"/.test(out)) fail('Traitement de texte: correcteur natif encore actif', 9);
   if (!out.includes('seb-no-live-text-correction')) fail('Traitement de texte: garde anti-correction absente', 9);
-  if (!out.includes("scores['page7']") && !out.includes('scores[\'page7\']')) fail('Traitement de texte: notation Page 7 absente', 9);
+  const engine = read('app/web/js/nwtexte-quill-engine.js').text;
+  if (!engine.includes('scores.page7 = analyse.score.total;') || !engine.includes("sessionStorage.setItem('scores_data'")) fail('Traitement de texte: notation Page 7 absente du moteur Quill', 9);
   write(file, out);
 }
 
