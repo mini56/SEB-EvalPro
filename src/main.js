@@ -1,9 +1,10 @@
-const { app, BrowserWindow, ipcMain, screen } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const { createLocalAiService } = require('./local-ai');
 const { createCandidateStore } = require('./candidate-store-main');
+const { createCandidateTransfer } = require('./candidate-transfer-main');
 
 const ADMIN_PASSWORD_SHA256 = 'c800892ba3f11b33d36eedf7d3c4297f2b6c02e2c347dda8954b4c577f6666b5';
 const STATE_VERSION = 1;
@@ -18,6 +19,7 @@ let adminSessionUnlocked = false;
 let downloadRoutingInstalled = false;
 const localAi = createLocalAiService({ app });
 let candidateStore = null;
+let candidateTransfer = null;
 
 function stateFilePath() {
   return path.join(app.getPath('userData'), 'evaluation-state.json');
@@ -35,6 +37,15 @@ function getCandidateStore() {
     });
   }
   return candidateStore;
+}
+
+function getCandidateTransfer() {
+  if (!candidateTransfer) {
+    candidateTransfer = createCandidateTransfer({
+      documentsPath: app.getPath('documents')
+    });
+  }
+  return candidateTransfer;
 }
 
 function bilanDocumentsDir() {
@@ -321,6 +332,42 @@ ipcMain.handle('admin:lock', () => {
 ipcMain.handle('candidate:active', () => {
   if (!adminSessionUnlocked) return null;
   return getCandidateStore().getActiveCandidate();
+});
+
+ipcMain.handle('admin:export-candidates', async () => {
+  if (!mainWindow || !adminSessionUnlocked) return { ok: false, error: 'Accès administrateur requis.' };
+  try {
+    const selection = await dialog.showOpenDialog(mainWindow, {
+      title: 'Choisir la clé USB ou son dossier racine',
+      buttonLabel: 'Exporter ici',
+      properties: ['openDirectory', 'createDirectory']
+    });
+    if (selection.canceled || !selection.filePaths || !selection.filePaths[0]) {
+      return { ok: false, cancelled: true };
+    }
+    const result = getCandidateTransfer().exportAll(selection.filePaths[0]);
+    return { ok: true, ...result };
+  } catch (error) {
+    return { ok: false, error: error && error.message ? error.message : String(error) };
+  }
+});
+
+ipcMain.handle('admin:import-candidates', async (_event, groupName) => {
+  if (!mainWindow || !adminSessionUnlocked) return { ok: false, error: 'Accès administrateur requis.' };
+  try {
+    const selection = await dialog.showOpenDialog(mainWindow, {
+      title: 'Choisir la clé USB contenant SEB EvalPro\\Candidats',
+      buttonLabel: 'Importer',
+      properties: ['openDirectory']
+    });
+    if (selection.canceled || !selection.filePaths || !selection.filePaths[0]) {
+      return { ok: false, cancelled: true };
+    }
+    const result = getCandidateTransfer().importAll(selection.filePaths[0], groupName);
+    return { ok: true, ...result };
+  } catch (error) {
+    return { ok: false, error: error && error.message ? error.message : String(error) };
+  }
 });
 
 ipcMain.handle('admin:open-bilan', () => {
