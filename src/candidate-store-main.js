@@ -62,6 +62,21 @@ function createCandidateStore(options = {}) {
     return now().toISOString().slice(0, 10);
   }
 
+  function defaultCandidateState(candidate) {
+    return {
+      version: 1,
+      sessionStorage: {
+        candidat_data: JSON.stringify(candidate || {}),
+        reponses_data: '{}',
+        scores_data: '{}'
+      },
+      localStorage: {},
+      lastPage: 'qcmv1.0.html',
+      lastEvaluationPage: 'qcmv1.0.html',
+      updatedAt: now().toISOString()
+    };
+  }
+
   function parseStorageJson(state, key) {
     const raw = state && state.sessionStorage ? state.sessionStorage[key] : null;
     if (!raw) return null;
@@ -176,6 +191,17 @@ function createCandidateStore(options = {}) {
     };
 
     writeManifest(candidateDir, manifest);
+
+    // Les fichiers de base existent dès la création du dossier candidat.
+    atomicWriteJson(path.join(candidateDir, 'donnees', 'candidat.json'), identity.original);
+    atomicWriteJson(path.join(candidateDir, 'donnees', 'evaluation-state.json'), defaultCandidateState(identity.original));
+    atomicWriteJson(path.join(candidateDir, 'donnees', 'progression.json'), {
+      lastPage: null,
+      lastEvaluationPage: null,
+      updatedAt: createdAt
+    });
+    atomicWriteJson(path.join(candidateDir, 'resultats', 'reponses.json'), {});
+    atomicWriteJson(path.join(candidateDir, 'resultats', 'scores.json'), {});
 
     const pointer = {
       schemaVersion: 1,
