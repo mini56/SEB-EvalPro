@@ -267,9 +267,9 @@ function checkHtmlScripts(html, label) {
     '.seb-visual-stage img{display:block;max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain;background:#fff;box-shadow:0 2px 14px rgba(0,0,0,.35);user-select:none;-webkit-user-drag:none}',
     '.seb-visual-stage img{display:block;max-width:100%;max-height:none;width:auto;height:auto;object-fit:initial;background:#fff;box-shadow:0 2px 14px rgba(0,0,0,.35);user-select:none;-webkit-user-drag:none}'
   );
-  out = replaceOnce(out, 'module.exports = { install };', 'module.exports = { install, ensureFinalArchive };', 'export ensureFinalArchive');
+  out = replaceOnce(out, 'module.exports = { install, openCandidateReplay };', 'module.exports = { install, openCandidateReplay, ensureFinalArchive };', 'export ensureFinalArchive sans perdre openCandidateReplay');
 
-  for (const required of ['seb_evalpro_results_seen', 'ensureFinalArchive', 'module.exports = { install, ensureFinalArchive };', 'max-height:none']) {
+  for (const required of ['seb_evalpro_results_seen', 'ensureFinalArchive', 'module.exports = { install, openCandidateReplay, ensureFinalArchive };', 'max-height:none']) {
     if (!out.includes(required)) fail('replay-preload incomplet : ' + required, 15);
   }
   try { new vm.Script(out); } catch (error) { fail('src/replay-preload.js invalide : ' + error.message, 15); }
