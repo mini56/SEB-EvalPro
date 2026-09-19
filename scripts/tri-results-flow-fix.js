@@ -39,15 +39,15 @@ if (!html.includes(oldStartListener)) fail('contrôle du bouton Démarrer introu
 html = html.replace(oldStartListener, newStartListener);
 
 // Consignes alignées sur le fonctionnement actuel : le temps est repris automatiquement
-// au clic sur « Valider le tri » et les résultats ne sont révélés qu'après les 5 tris.
+// au clic sur « Valider le tri » et les résultats sont disponibles dès 3 tris complets (jusqu’à 5).
 const consigneRegex = /(<div id="consigne">[\s\S]*?<ul>)[\s\S]*?(<\/ul>)/;
 if (!consigneRegex.test(html)) fail('bloc de consignes introuvable', 8);
 html = html.replace(consigneRegex, `$1
             <li>Pour chaque boîte de chevilles, cliquez sur <strong>Démarrer</strong> au moment où vous commencez le tri.</li>
             <li>Lorsque le tri est terminé, cliquez sur <strong>Valider le tri</strong>. Votre temps est enregistré automatiquement. Renseignez ensuite le <strong>nombre d’erreurs</strong> correspondant au tri effectué, même s’il est égal à <strong>0</strong>.</li>
             <li>Le tri suivant ne peut pas démarrer tant que le nombre d’erreurs du tri précédent n’a pas été renseigné.</li>
-            <li>Répétez l’opération pour les <strong>5 boîtes de chevilles</strong>.</li>
-            <li>Lorsque les 5 tris sont terminés et les 5 nombres d’erreurs renseignés, cliquez sur <strong>Voir les résultats</strong> pour afficher votre moyenne, le nombre total d’erreurs et compléter votre autoévaluation personnelle.</li>
+            <li>Effectuez entre <strong>3 et 5 tris</strong> selon le temps disponible pour le plateau.</li>
+            <li>À partir de 3 tris complets, avec le nombre d’erreurs renseigné pour chacun, cliquez sur <strong>Voir les résultats</strong> pour afficher votre moyenne, le nombre total d’erreurs et compléter votre autoévaluation personnelle.</li>
           $2`);
 
 const calcRegex = /<button id="calc" type="button" onclick="calcMoyenne\(\);?">Calculer<\/button>/;
@@ -82,19 +82,21 @@ if (!html.includes('id="seb-tri-results-flow"')) {
   }
 
   function fiveTrisDone(){
-    const validate = document.getElementById('resetBtn');
-    if (validate && /5\\s+tris\\s+validés/i.test(validate.textContent || '')) {
-      for (let i = 1; i <= 5; i += 1) if (!explicitError(i)) return false;
-      return true;
-    }
+    let completed = 0;
     for (let i = 1; i <= 5; i += 1) {
       const m = document.getElementById('m' + i);
       const s = document.getElementById('s' + i);
-      if (!m || !s) return false;
-      if ((m.value === '' || m.value == null) && (s.value === '' || s.value == null)) return false;
-      if (!explicitError(i)) return false;
+      const e = document.getElementById('e' + i);
+      if (!m || !s || !e) continue;
+      const hasTime = String(m.value == null ? '' : m.value).trim() !== '' || String(s.value == null ? '' : s.value).trim() !== '';
+      const hasError = String(e.value == null ? '' : e.value).trim() !== '';
+      if (hasTime !== hasError) return false;
+      if (hasTime) {
+        if (!explicitError(i)) return false;
+        completed += 1;
+      }
     }
-    return true;
+    return completed >= 3;
   }
 
   function resultsWereAlreadyShown(){
@@ -111,7 +113,7 @@ if (!html.includes('id="seb-tri-results-flow"')) {
 
   window.sebEvalProShowTriResults = function(){
     if (!fiveTrisDone()) {
-      window.alert('Terminez et validez les 5 tris, puis renseignez le nombre d’erreurs de chacun des 5 tris (0 si aucune erreur) avant d’afficher les résultats.');
+      window.alert('Renseignez au moins 3 tris complets avec le temps et le nombre d’erreurs de chacun (0 si aucune erreur) avant d’afficher les résultats.');
       return;
     }
 
