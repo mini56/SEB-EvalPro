@@ -9,6 +9,7 @@ const {
   uniqueFolderPath,
   listCandidateDirs,
   selectCandidate,
+  selectCandidateFromFilename,
   copyFileIfMissing,
   copyDirectoryIfMissing
 } = require('./candidate-folder-utils');
@@ -23,6 +24,7 @@ function createCandidateTransfer(options = {}) {
   const legacyAdminRoot = path.join(sebRoot, 'Admin');
   const globalReplayRoot = path.join(sebRoot, 'parcours');
   const globalBilanRoot = path.join(sebRoot, 'Bilans', 'Historique');
+  const globalExportsRoot = path.join(sebRoot, 'Bilans');
   const requiredDirs = ['donnees', 'resultats', 'replay', path.join('bilan','historique'), path.join('bilan','exports')];
   const requiredFiles = [
     'manifest.json',
@@ -219,6 +221,19 @@ function createCandidateTransfer(options = {}) {
       const match = selectCandidate(records, archive.candidate);
       if (!match) continue;
       copyFileIfMissing(source, path.join(match.candidateDir, 'bilan', 'historique', entry.name));
+    }
+
+    // Ancien Word/PDF global -> dossier candidat uniquement si l'association
+    // Nom + Prénom (et date si nécessaire) est unique. Sinon on ne devine pas.
+    ensureDir(globalExportsRoot);
+    for (const entry of fs.readdirSync(globalExportsRoot, { withFileTypes:true })) {
+      if (!entry.isFile() || !/\.(doc|docx|pdf)$/i.test(entry.name)) continue;
+      const match = selectCandidateFromFilename(records, entry.name);
+      if (!match) continue;
+      copyFileIfMissing(
+        path.join(globalExportsRoot, entry.name),
+        path.join(match.candidateDir, 'bilan', 'exports', entry.name)
+      );
     }
   }
 
