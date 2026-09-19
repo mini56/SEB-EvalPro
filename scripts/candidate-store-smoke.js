@@ -52,8 +52,8 @@ try {
     lastPage: 'page3.html',
     lastEvaluationPage: 'page3.html'
   });
-  assert.strictEqual(second.candidateId, first.candidateId, 'Une reprise doit réutiliser le même candidat.');
-  assert.strictEqual(second.candidateDir, first.candidateDir, 'Une reprise ne doit pas créer un doublon.');
+  assert.strictEqual(second.candidateId, first.candidateId, 'Les sauvegardes successives du parcours actif doivent garder le même candidat.');
+  assert.strictEqual(second.candidateDir, first.candidateDir, 'Une sauvegarde suivante ne doit pas créer de doublon.');
 
   const active = store.getActiveCandidate();
   assert(active && active.displayName === 'Jean DUPONT');
