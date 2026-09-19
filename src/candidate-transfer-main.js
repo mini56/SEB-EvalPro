@@ -24,6 +24,14 @@ function createCandidateTransfer(options = {}) {
   const globalReplayRoot = path.join(sebRoot, 'parcours');
   const globalBilanRoot = path.join(sebRoot, 'Bilans', 'Historique');
   const requiredDirs = ['donnees', 'resultats', 'replay', path.join('bilan','historique'), path.join('bilan','exports')];
+  const requiredFiles = [
+    'manifest.json',
+    path.join('donnees', 'candidat.json'),
+    path.join('donnees', 'evaluation-state.json'),
+    path.join('donnees', 'progression.json'),
+    path.join('resultats', 'reponses.json'),
+    path.join('resultats', 'scores.json')
+  ];
 
   function writeJson(target, value) {
     ensureDir(path.dirname(target));
@@ -55,8 +63,13 @@ function createCandidateTransfer(options = {}) {
     if (![c.nom, c.prenom || c['prénom'], c.lieu || c.ville, c.groupe].every((v) => normalize(v))) return false;
     const manifest = readJson(path.join(record.candidateDir, 'manifest.json'));
     if (!manifest || String(manifest.candidateId || '') !== String(record.candidateId)) return false;
-    return requiredDirs.every((rel) => {
+    const dirsOk = requiredDirs.every((rel) => {
       try { return fs.statSync(path.join(record.candidateDir, rel)).isDirectory(); }
+      catch (_) { return false; }
+    });
+    if (!dirsOk) return false;
+    return requiredFiles.every((rel) => {
+      try { return fs.statSync(path.join(record.candidateDir, rel)).isFile(); }
       catch (_) { return false; }
     });
   }
