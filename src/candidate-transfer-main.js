@@ -44,6 +44,40 @@ function createCandidateTransfer(options = {}) {
     for (const rel of requiredDirs) ensureDir(path.join(dir, rel));
   }
 
+  function basicRecordValid(record) {
+    if (!record || !record.candidateDir || !record.candidateId) return false;
+    const c = record.candidate || {};
+    if (![c.nom, c.prenom || c['prénom'], c.lieu || c.ville, c.groupe].every((v) => normalize(v))) return false;
+    const manifest = readJson(path.join(record.candidateDir, 'manifest.json'));
+    return !!manifest && String(manifest.candidateId || '') === String(record.candidateId);
+  }
+
+  function completeLegacySkeleton(dir, record) {
+    ensureCandidateShape(dir);
+    const c = (record && record.candidate) || {};
+    const candidateFile = path.join(dir, 'donnees', 'candidat.json');
+    const stateFile = path.join(dir, 'donnees', 'evaluation-state.json');
+    const progressionFile = path.join(dir, 'donnees', 'progression.json');
+    const responsesFile = path.join(dir, 'resultats', 'reponses.json');
+    const scoresFile = path.join(dir, 'resultats', 'scores.json');
+    if (!fs.existsSync(candidateFile)) writeJson(candidateFile, c);
+    if (!fs.existsSync(stateFile)) writeJson(stateFile, {
+      version:1,
+      sessionStorage:{
+        candidat_data:JSON.stringify(c),
+        reponses_data:'{}',
+        scores_data:'{}'
+      },
+      localStorage:{},
+      lastPage:'qcmv1.0.html',
+      lastEvaluationPage:'qcmv1.0.html',
+      migratedPlaceholder:true
+    });
+    if (!fs.existsSync(progressionFile)) writeJson(progressionFile, { lastPage:null, lastEvaluationPage:null, migratedPlaceholder:true });
+    if (!fs.existsSync(responsesFile)) writeJson(responsesFile, {});
+    if (!fs.existsSync(scoresFile)) writeJson(scoresFile, {});
+  }
+
   function identityKey(candidate) {
     const c = candidate || {};
     return [c.nom, c.prenom || c['prénom'], c.lieu || c.ville, c.groupe].map(normalize).join('|');
@@ -58,11 +92,7 @@ function createCandidateTransfer(options = {}) {
   }
 
   function candidateShapeValid(record) {
-    if (!record || !record.candidateDir || !record.candidateId) return false;
-    const c = record.candidate || {};
-    if (![c.nom, c.prenom || c['prénom'], c.lieu || c.ville, c.groupe].every((v) => normalize(v))) return false;
-    const manifest = readJson(path.join(record.candidateDir, 'manifest.json'));
-    if (!manifest || String(manifest.candidateId || '') !== String(record.candidateId)) return false;
+    if (!basicRecordValid(record)) return false;
     const dirsOk = requiredDirs.every((rel) => {
       try { return fs.statSync(path.join(record.candidateDir, rel)).isDirectory(); }
       catch (_) { return false; }
@@ -134,12 +164,12 @@ function createCandidateTransfer(options = {}) {
     const current = listCandidateDirs(candidatesRoot, false);
     let added = 0;
     for (const legacy of listCandidateDirs(legacyAdminRoot, true)) {
-      if (!candidateShapeValid(legacy)) continue;
+      if (!basicRecordValid(legacy)) continue;
       if (current.some((r) => sameCandidate(r, legacy))) continue;
       const base = standardFolderName(legacy.candidate);
       const target = fs.existsSync(path.join(candidatesRoot, base)) ? uniqueFolderPath(candidatesRoot, base) : path.join(candidatesRoot, base);
       copyVerifiedAtomic(legacy.candidateDir, target);
-      ensureCandidateShape(target);
+      completeLegacySkeleton(target, legacy);
       const manifest = readJson(path.join(target, 'manifest.json')) || {};
       writeJson(path.join(target, 'manifest.json'), { ...manifest, folderName:path.basename(target), migratedFrom:legacy.candidateDir });
       const migrated = listCandidateDirs(candidatesRoot, false).find((r) => String(r.candidateId) === String(legacy.candidateId));
