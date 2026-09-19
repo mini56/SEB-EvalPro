@@ -227,6 +227,7 @@ function finishStartup() {
     mainWindow.show();
     mainWindow.setKiosk(true);
     mainWindow.setFullScreen(true);
+    mainWindow.setAlwaysOnTop(true);
     applyAdaptiveZoom();
     mainWindow.focus();
     if (splashWindow && !splashWindow.isDestroyed()) splashWindow.close();
@@ -310,6 +311,7 @@ function createWindow() {
     if (!mainWindow || mainWindow.isDestroyed()) return;
     mainWindow.setKiosk(true);
     mainWindow.setFullScreen(true);
+    mainWindow.setAlwaysOnTop(true);
     mainWindow.focus();
   });
 
@@ -359,6 +361,7 @@ ipcMain.handle('admin:verify', (_event, password) => {
   if (ok) {
     adminSessionUnlocked = true;
     if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.setAlwaysOnTop(false);
       mainWindow.setKiosk(false);
       mainWindow.focus();
     }
