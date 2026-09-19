@@ -1,5 +1,7 @@
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
+const { shell } = require('electron');
 const {
   readJson,
   ensureDir,
@@ -9,19 +11,17 @@ const {
   selectCandidate,
   copyFileIfMissing,
   copyDirectoryIfMissing,
-  readDeletedIds,
-  markDeleted,
-  unmarkDeleted
+  copyDirectoryAtomically
 } = require('./candidate-folder-utils');
 
-module.exports = function registerCandidateCatalog({ app, ipcMain, getAdminUnlocked, getActiveCandidate }) {
+module.exports = function registerCandidateCatalog({ app, ipcMain, getAdminUnlocked }) {
   const documentsPath = app.getPath('documents');
   const root = path.join(documentsPath, 'SEB EvalPro');
   const candidatesRoot = path.join(root, 'Candidats');
   const legacyAdminRoot = path.join(root, 'Admin');
   const globalReplayRoot = path.join(root, 'parcours');
   const globalBilanRoot = path.join(root, 'Bilans', 'Historique');
-  const trashRoot = path.join(root, 'Corbeille', 'Candidats');
+  const BILAN_TYPE = 'SEB_EVALPRO_BILAN_ARCHIVE';
 
   function writeJson(target, value) {
     ensureDir(path.dirname(target));
@@ -38,22 +38,21 @@ module.exports = function registerCandidateCatalog({ app, ipcMain, getAdminUnloc
 
   function migrateLegacyCandidateFolders() {
     ensureDir(candidatesRoot);
-    const deleted = readDeletedIds(documentsPath);
     const current = listCandidateDirs(candidatesRoot, false);
-    const byId = new Map(current.map((r) => [r.candidateId, r]));
     let copied = 0;
     for (const legacy of listCandidateDirs(legacyAdminRoot, true)) {
-      if (deleted.has(legacy.candidateId) || byId.has(legacy.candidateId)) continue;
+      if (current.some((r) => String(r.candidateId) === String(legacy.candidateId))) continue;
+      if (selectCandidate(current, legacy.candidate)) continue;
       const base = standardFolderName(legacy.candidate);
       const target = fs.existsSync(path.join(candidatesRoot, base))
         ? uniqueFolderPath(candidatesRoot, base)
         : path.join(candidatesRoot, base);
-      fs.cpSync(legacy.candidateDir, target, { recursive:true, force:false, errorOnExist:true, preserveTimestamps:true });
+      copyDirectoryAtomically(legacy.candidateDir, target);
       ensureCandidateShape(target);
       const manifest = readJson(path.join(target, 'manifest.json')) || {};
       writeJson(path.join(target, 'manifest.json'), { ...manifest, folderName:path.basename(target), migratedFrom:legacy.candidateDir });
-      const record = { ...legacy, candidateDir:target, folderName:path.basename(target), manifest:{...manifest,folderName:path.basename(target)} };
-      byId.set(legacy.candidateId, record);
+      const migrated = listCandidateDirs(candidatesRoot, false).find((r) => String(r.candidateId) === String(legacy.candidateId));
+      if (migrated) current.push(migrated);
       copied += 1;
     }
     return copied;
@@ -81,10 +80,12 @@ module.exports = function registerCandidateCatalog({ app, ipcMain, getAdminUnloc
     const records = listCandidateDirs(candidatesRoot, false);
     records.forEach((record) => ensureCandidateShape(record.candidateDir));
 
-    // Ancien stockage global -> dossier candidat autonome.
+    // Sécurité de migration uniquement : ancien stockage global -> dossier candidat.
+    // Le sens inverse est volontairement interdit : le dossier candidat est la référence.
     let replayCopied = 0;
     let bilanCopied = 0;
     let ambiguous = 0;
+
     for (const entry of fs.readdirSync(globalReplayRoot, { withFileTypes:true })) {
       const source = path.join(globalReplayRoot, entry.name);
       const candidate = replayCandidate(source);
@@ -110,27 +111,6 @@ module.exports = function registerCandidateCatalog({ app, ipcMain, getAdminUnloc
       if (copyFileIfMissing(source, target)) bilanCopied += 1;
     }
 
-    // Dossier candidat -> anciens emplacements globaux, uniquement comme miroir
-    // de compatibilité pour les fenêtres Replay/Bilan déjà existantes.
-    for (const record of records) {
-      const replayDir = path.join(record.candidateDir, 'replay');
-      if (fs.existsSync(replayDir)) {
-        for (const entry of fs.readdirSync(replayDir, { withFileTypes:true })) {
-          const source = path.join(replayDir, entry.name);
-          const target = path.join(globalReplayRoot, entry.name);
-          if (entry.isDirectory()) copyDirectoryIfMissing(source, target);
-          else if (entry.isFile() && entry.name.toLowerCase().endsWith('.json')) copyFileIfMissing(source, target);
-        }
-      }
-      const historyDir = path.join(record.candidateDir, 'bilan', 'historique');
-      if (fs.existsSync(historyDir)) {
-        for (const entry of fs.readdirSync(historyDir, { withFileTypes:true })) {
-          if (!entry.isFile() || !entry.name.toLowerCase().endsWith('.json')) continue;
-          copyFileIfMissing(path.join(historyDir, entry.name), path.join(globalBilanRoot, entry.name));
-        }
-      }
-    }
-
     return { replayCopied, bilanCopied, ambiguous };
   }
 
@@ -140,6 +120,25 @@ module.exports = function registerCandidateCatalog({ app, ipcMain, getAdminUnloc
     return { migratedCandidates, ...artifacts };
   }
 
+  function stableJson(value) {
+    if (Array.isArray(value)) return '[' + value.map(stableJson).join(',') + ']';
+    if (value && typeof value === 'object') {
+      return '{' + Object.keys(value).sort().map((key) => JSON.stringify(key) + ':' + stableJson(value[key])).join(',') + '}';
+    }
+    return JSON.stringify(value);
+  }
+
+  function sha(value) {
+    return crypto.createHash('sha256').update(stableJson(value), 'utf8').digest('hex');
+  }
+
+  function verifyBilan(archive) {
+    if (!archive || archive.type !== BILAN_TYPE || !archive.integritySha256) return false;
+    const clone = { ...archive };
+    delete clone.integritySha256;
+    return sha(clone) === String(archive.integritySha256);
+  }
+
   function bilanEntries(candidateDir) {
     const dir = path.join(candidateDir, 'bilan', 'historique');
     if (!fs.existsSync(dir)) return [];
@@ -147,17 +146,17 @@ module.exports = function registerCandidateCatalog({ app, ipcMain, getAdminUnloc
       .filter((e) => e.isFile() && e.name.toLowerCase().endsWith('.json'))
       .map((entry) => {
         const archive = readJson(path.join(dir, entry.name));
-        if (!archive) return null;
+        if (!archive) return {
+          filename:entry.name, revision:0, createdAt:'', originalBuild:'?', integrityOk:false
+        };
         return {
           filename: entry.name,
           revision: Number(archive.revision || 0),
           createdAt: String(archive.createdAt || ''),
           originalBuild: String(archive.originalBuild || '?'),
-          integrityOk: !!archive.integritySha256,
-          archive
+          integrityOk: verifyBilan(archive)
         };
       })
-      .filter(Boolean)
       .sort((a,b) => (a.revision - b.revision) || String(a.createdAt).localeCompare(String(b.createdAt)));
   }
 
@@ -172,7 +171,10 @@ module.exports = function registerCandidateCatalog({ app, ipcMain, getAdminUnloc
   function exportEntries(candidateDir) {
     const dir = path.join(candidateDir, 'bilan', 'exports');
     if (!fs.existsSync(dir)) return [];
-    return fs.readdirSync(dir, { withFileTypes:true }).filter((e) => e.isFile()).map((e) => e.name);
+    return fs.readdirSync(dir, { withFileTypes:true })
+      .filter((e) => e.isFile() && /\.(doc|docx|pdf)$/i.test(e.name))
+      .map((e) => e.name)
+      .sort((a,b) => a.localeCompare(b, 'fr', { sensitivity:'base' }));
   }
 
   function serialize(record) {
@@ -214,10 +216,13 @@ module.exports = function registerCandidateCatalog({ app, ipcMain, getAdminUnloc
     synchronize();
     const record = findById(candidateId);
     if (!record) return { ok:false, error:'Candidat introuvable.' };
-    const bilans = bilanEntries(record.candidateDir).map((b) => ({
-      filename:b.filename, revision:b.revision, createdAt:b.createdAt, originalBuild:b.originalBuild, integrityOk:b.integrityOk
-    }));
-    return { ok:true, candidate:serialize(record), bilans, replays:replayEntries(record.candidateDir), exports:exportEntries(record.candidateDir) };
+    return {
+      ok:true,
+      candidate:serialize(record),
+      bilans:bilanEntries(record.candidateDir),
+      replays:replayEntries(record.candidateDir),
+      exports:exportEntries(record.candidateDir)
+    };
   });
 
   ipcMain.handle('candidate-catalog:load-bilan', (_event, candidateId, filename) => {
@@ -229,25 +234,21 @@ module.exports = function registerCandidateCatalog({ app, ipcMain, getAdminUnloc
     const full = path.join(record.candidateDir, 'bilan', 'historique', safe);
     if (!safe.toLowerCase().endsWith('.json') || !fs.existsSync(full)) return { ok:false, error:'Bilan introuvable.' };
     const archive = readJson(full);
-    if (!archive) return { ok:false, error:'Bilan illisible.' };
-    copyFileIfMissing(full, path.join(globalBilanRoot, safe));
+    if (!archive) return { ok:false, corruption:true, error:'ATTENTION : ce bilan est illisible. Il peut y avoir une corruption de données. Le fichier n’a pas été ouvert.' };
+    if (!verifyBilan(archive)) return { ok:false, corruption:true, error:'ATTENTION : le contrôle d’intégrité a échoué. Il peut y avoir une corruption de données. Le bilan n’a pas été ouvert.' };
     return { ok:true, filename:safe, archive };
   });
 
-  ipcMain.handle('candidate-catalog:delete', (_event, candidateId) => {
+  ipcMain.handle('candidate-catalog:open-export', async (_event, candidateId, filename) => {
     if (!getAdminUnlocked()) return { ok:false, error:'Accès administrateur requis.' };
     const record = findById(candidateId);
     if (!record) return { ok:false, error:'Candidat introuvable.' };
-    const active = typeof getActiveCandidate === 'function' ? getActiveCandidate() : null;
-    if (active && String(active.candidateId) === String(record.candidateId)) {
-      return { ok:false, error:'Ce candidat est la session active. Fermez d’abord sa session avant de le supprimer de la liste.' };
-    }
-    ensureDir(trashRoot);
-    const stamp = new Date().toISOString().replace(/[-:.TZ]/g,'').slice(0,14);
-    const target = uniqueFolderPath(trashRoot, `${record.folderName}_${stamp}`);
-    fs.renameSync(record.candidateDir, target);
-    markDeleted(documentsPath, record.candidateId);
-    return { ok:true, movedTo:target };
+    const safe = path.basename(String(filename || ''));
+    if (!/\.(doc|docx|pdf)$/i.test(safe)) return { ok:false, error:'Type de fichier non autorisé.' };
+    const full = path.join(record.candidateDir, 'bilan', 'exports', safe);
+    if (!fs.existsSync(full)) return { ok:false, error:'Fichier résultat introuvable.' };
+    const error = await shell.openPath(full);
+    return error ? { ok:false, error } : { ok:true };
   });
 
   ipcMain.handle('candidate-catalog:sync', () => {
