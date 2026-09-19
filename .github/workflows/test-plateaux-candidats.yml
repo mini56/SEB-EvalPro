@@ -25,16 +25,20 @@ jobs:
           $ErrorActionPreference = 'Stop'
           foreach ($file in @(
             'src/candidate-store-main.js',
+            'src/candidate-transfer-main.js',
             'src/main.js',
             'src/preload.js',
             'src/session-close.js',
-            'scripts/candidate-store-smoke.js'
+            'scripts/candidate-store-smoke.js',
+            'scripts/candidate-transfer-smoke.js'
           )) {
             node --check $file
             if ($LASTEXITCODE -ne 0) { throw "JavaScript invalide: $file" }
           }
           node scripts/candidate-store-smoke.js
           if ($LASTEXITCODE -ne 0) { throw 'Smoke test du dossier candidat échoué.' }
+          node scripts/candidate-transfer-smoke.js
+          if ($LASTEXITCODE -ne 0) { throw 'Smoke test export/import USB échoué.' }
 
       - name: Apply writing-only guard on working #9 engine
         shell: pwsh
@@ -282,7 +286,7 @@ jobs:
           $uninstaller = (Resolve-Path "dist\SEB-eval-PRO-$version-Windows-Desinstallation.exe").Path
           $repo = "${{ github.repository }}"
           $title = "SEB EvalPro - Test Plateaux #${{ github.run_number }}"
-          $notes = "Test Plateaux #1, créé strictement depuis le Build #36 validé (commit 8e4dac0c). Ajoute en parallèle le dossier candidat autonome dans Documents\\SEB EvalPro\\Candidats, sans retirer la sauvegarde AppData existante. Les exports Word sont dirigés vers le dossier du candidat actif et Fermer cette session conserve désormais ce dossier. Le socle IA locale du #36 reste inchangé. Version de test uniquement."
+          $notes = "Test Plateaux, créé strictement depuis le Build #36 validé (commit 8e4dac0c). Le dossier candidat autonome et la reprise validés sont conservés. Ajoute dans le mode Admin l'export groupé de tous les dossiers candidats vers SEB EvalPro\\Candidats sur une clé USB, puis l'import groupé vers Documents\\SEB EvalPro\\Admin\\<nom libre>. Les candidats sont reconnus par leur identifiant unique pour éviter les doublons lors des passages successifs sur plusieurs PC. Le socle IA locale du #36 reste inchangé. Version de test uniquement."
           $setupSize = (Get-Item $setup).Length
           Write-Host "Setup à publier: $setupSize octets"
 
