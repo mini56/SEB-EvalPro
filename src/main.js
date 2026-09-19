@@ -355,7 +355,13 @@ ipcMain.handle('state:save', (_event, payload) => {
 
 ipcMain.handle('admin:verify', (_event, password) => {
   const ok = verifyAdminPassword(password);
-  if (ok) adminSessionUnlocked = true;
+  if (ok) {
+    adminSessionUnlocked = true;
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.setKiosk(false);
+      mainWindow.focus();
+    }
+  }
   return ok;
 });
 
@@ -368,6 +374,11 @@ ipcMain.handle('admin:status', () => adminSessionUnlocked);
 ipcMain.handle('admin:lock', () => {
   adminSessionUnlocked = false;
   adminExportCandidateDir = null;
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.setKiosk(true);
+    mainWindow.setFullScreen(true);
+    mainWindow.focus();
+  }
   return true;
 });
 
