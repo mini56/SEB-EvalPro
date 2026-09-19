@@ -36,7 +36,7 @@ try {
 
   const first = store.saveSnapshot(state);
   assert(first, 'Le dossier candidat doit être créé.');
-  assert(/^DUPONT_Jean_Lorient_2026-09-18_[A-F0-9]{6}$/.test(first.folderName), first.folderName);
+  assert.strictEqual(first.folderName, 'DUPONT_Jean_Lorient_7');
   assert(fs.existsSync(path.join(first.candidateDir, 'manifest.json')));
   assert(fs.existsSync(path.join(first.candidateDir, 'donnees', 'candidat.json')));
   assert(fs.existsSync(path.join(first.candidateDir, 'donnees', 'evaluation-state.json')));
