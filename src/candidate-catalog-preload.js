@@ -44,9 +44,14 @@ function addStyle() {
   document.head.appendChild(style);
 }
 
-function hideOldBilanButton() {
-  const old = document.getElementById('seb-evalpro-old-bilan');
-  if (old) { old.hidden = true; old.style.display = 'none'; }
+function hideLegacyAdminEntryPoints() {
+  for (const id of ['seb-evalpro-old-bilan', 'seb-evalpro-replay', 'seb-evalpro-results']) {
+    const old = document.getElementById(id);
+    if (old) {
+      old.hidden = true;
+      old.style.display = 'none';
+    }
+  }
 }
 
 function enhanceChooser(dialogId, listId, rowSelector) {
@@ -76,7 +81,7 @@ function enhanceChooser(dialogId, listId, rowSelector) {
 
 function installGenericSearchObserver() {
   const apply = () => {
-    hideOldBilanButton();
+    hideLegacyAdminEntryPoints();
     enhanceChooser('seb-replay-chooser', 'seb-replay-list', '.seb-replay-row');
     enhanceChooser('seb-bilan-history-chooser', 'seb-bh-list', '.seb-bh-row');
   };
@@ -295,7 +300,7 @@ function install() {
   addStyle();
   installGenericSearchObserver();
   if (!ensureButton()) setTimeout(ensureButton, 150);
-  const observer = new MutationObserver(() => { ensureButton(); refreshButton(); hideOldBilanButton(); });
+  const observer = new MutationObserver(() => { ensureButton(); refreshButton(); hideLegacyAdminEntryPoints(); });
   observer.observe(document.documentElement, { childList:true, subtree:true });
   document.addEventListener('click', (event) => {
     const admin = event.target && event.target.closest ? event.target.closest('#seb-evalpro-admin') : null;
