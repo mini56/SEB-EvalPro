@@ -1,15 +1,16 @@
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const {
   readJson,
   ensureDir,
+  normalize,
   standardFolderName,
   uniqueFolderPath,
   listCandidateDirs,
   selectCandidate,
   copyFileIfMissing,
-  copyDirectoryIfMissing,
-  unmarkDeleted
+  copyDirectoryIfMissing
 } = require('./candidate-folder-utils');
 
 function createCandidateTransfer(options = {}) {
@@ -22,6 +23,7 @@ function createCandidateTransfer(options = {}) {
   const legacyAdminRoot = path.join(sebRoot, 'Admin');
   const globalReplayRoot = path.join(sebRoot, 'parcours');
   const globalBilanRoot = path.join(sebRoot, 'Bilans', 'Historique');
+  const requiredDirs = ['donnees', 'resultats', 'replay', path.join('bilan','historique'), path.join('bilan','exports')];
 
   function writeJson(target, value) {
     ensureDir(path.dirname(target));
@@ -31,66 +33,104 @@ function createCandidateTransfer(options = {}) {
   }
 
   function ensureCandidateShape(dir) {
-    for (const rel of ['donnees','resultats','replay',path.join('bilan','historique'),path.join('bilan','exports')]) {
-      ensureDir(path.join(dir, rel));
-    }
+    for (const rel of requiredDirs) ensureDir(path.join(dir, rel));
   }
 
-  function mergeDirectory(sourceDir, targetDir, relativeDir = '') {
-    ensureDir(targetDir);
-    for (const entry of fs.readdirSync(sourceDir, { withFileTypes:true })) {
-      const source = path.join(sourceDir, entry.name);
-      const target = path.join(targetDir, entry.name);
-      const relative = path.join(relativeDir, entry.name).replace(/\\/g, '/').toLowerCase();
-      if (entry.isDirectory()) {
-        mergeDirectory(source, target, relative);
-        continue;
-      }
-      if (!entry.isFile()) continue;
-      if (relative === 'manifest.json') continue;
-      if (!fs.existsSync(target)) {
-        fs.copyFileSync(source, target);
-        continue;
-      }
+  function identityKey(candidate) {
+    const c = candidate || {};
+    return [c.nom, c.prenom || c['prénom'], c.lieu || c.ville, c.groupe].map(normalize).join('|');
+  }
 
-      // Les données de parcours et résultats reflètent la version importée la plus
-      // récente et peuvent donc être mises à jour. Les productions Admin et les
-      // archives immuables sont fusionnées sans écrasement.
-      const protectedArchive =
-        relative.startsWith('replay/') ||
-        relative.startsWith('bilan/historique/') ||
-        relative.startsWith('bilan/exports/');
-      if (!protectedArchive) fs.copyFileSync(source, target);
+  function sameCandidate(a, b) {
+    if (!a || !b) return false;
+    if (a.candidateId && b.candidateId && String(a.candidateId) === String(b.candidateId)) return true;
+    const ka = identityKey(a.candidate);
+    const kb = identityKey(b.candidate);
+    return !!ka && ka === kb && ka.split('|').every(Boolean);
+  }
+
+  function candidateShapeValid(record) {
+    if (!record || !record.candidateDir || !record.candidateId) return false;
+    const c = record.candidate || {};
+    if (![c.nom, c.prenom || c['prénom'], c.lieu || c.ville, c.groupe].every((v) => normalize(v))) return false;
+    const manifest = readJson(path.join(record.candidateDir, 'manifest.json'));
+    if (!manifest || String(manifest.candidateId || '') !== String(record.candidateId)) return false;
+    return requiredDirs.every((rel) => {
+      try { return fs.statSync(path.join(record.candidateDir, rel)).isDirectory(); }
+      catch (_) { return false; }
+    });
+  }
+
+  function hashFile(file) {
+    return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+  }
+
+  function inventory(root) {
+    const out = [];
+    function walk(dir) {
+      const entries = fs.readdirSync(dir, { withFileTypes:true }).sort((a,b) => a.name.localeCompare(b.name));
+      for (const entry of entries) {
+        const full = path.join(dir, entry.name);
+        const rel = path.relative(root, full).replace(/\\/g, '/');
+        if (entry.isDirectory()) {
+          out.push({ type:'dir', rel });
+          walk(full);
+        } else if (entry.isFile()) {
+          const stat = fs.statSync(full);
+          out.push({ type:'file', rel, size:stat.size, sha256:hashFile(full) });
+        }
+      }
     }
+    walk(root);
+    return out;
+  }
 
-    const sourceManifest = readJson(path.join(sourceDir, 'manifest.json'));
-    const targetManifest = readJson(path.join(targetDir, 'manifest.json'));
-    if (sourceManifest || targetManifest) {
-      const srcTime = String(sourceManifest && sourceManifest.updatedAt || '');
-      const dstTime = String(targetManifest && targetManifest.updatedAt || '');
-      const newer = srcTime >= dstTime ? sourceManifest : targetManifest;
-      writeJson(path.join(targetDir, 'manifest.json'), {
-        ...(targetManifest || {}),
-        ...(newer || sourceManifest || {}),
-        candidateId: String((targetManifest && targetManifest.candidateId) || (sourceManifest && sourceManifest.candidateId) || ''),
-        folderName: path.basename(targetDir)
-      });
+  function verifyExactCopy(sourceDir, copiedDir) {
+    const source = inventory(sourceDir);
+    const copy = inventory(copiedDir);
+    if (source.length !== copy.length) throw new Error('Vérification USB échouée : nombre de fichiers ou dossiers différent.');
+    for (let i = 0; i < source.length; i += 1) {
+      const a = source[i], b = copy[i];
+      if (a.type !== b.type || a.rel !== b.rel) throw new Error('Vérification USB échouée : contenu différent (' + a.rel + ').');
+      if (a.type === 'file' && (a.size !== b.size || a.sha256 !== b.sha256)) {
+        throw new Error('Vérification USB échouée : fichier altéré ou incomplet (' + a.rel + ').');
+      }
+    }
+    return { entries:source.length, files:source.filter((e) => e.type === 'file').length };
+  }
+
+  function copyVerifiedAtomic(sourceDir, targetDir) {
+    ensureDir(path.dirname(targetDir));
+    if (fs.existsSync(targetDir)) throw new Error('Le dossier destination existe déjà : aucune donnée ne sera écrasée.');
+    const token = String(process.pid) + '-' + Date.now() + '-' + Math.random().toString(16).slice(2,8);
+    const temp = path.join(path.dirname(targetDir), '.' + path.basename(targetDir) + '.seb-copy-' + token);
+    try {
+      fs.cpSync(sourceDir, temp, { recursive:true, force:false, errorOnExist:true, preserveTimestamps:true });
+      const verified = verifyExactCopy(sourceDir, temp);
+      fs.renameSync(temp, targetDir);
+      verifyExactCopy(sourceDir, targetDir);
+      return verified;
+    } catch (error) {
+      try { if (fs.existsSync(temp)) fs.rmSync(temp, { recursive:true, force:true }); } catch (_) {}
+      throw error;
     }
   }
 
   function migrateLegacyAdmin() {
     ensureDir(candidatesRoot);
-    const byId = new Map(listCandidateDirs(candidatesRoot, false).map((r) => [r.candidateId, r]));
+    const current = listCandidateDirs(candidatesRoot, false);
     let added = 0;
     for (const legacy of listCandidateDirs(legacyAdminRoot, true)) {
-      if (byId.has(legacy.candidateId)) continue;
+      if (!candidateShapeValid(legacy)) continue;
+      if (current.some((r) => sameCandidate(r, legacy))) continue;
       const base = standardFolderName(legacy.candidate);
       const target = fs.existsSync(path.join(candidatesRoot, base)) ? uniqueFolderPath(candidatesRoot, base) : path.join(candidatesRoot, base);
-      fs.cpSync(legacy.candidateDir, target, { recursive:true, force:false, errorOnExist:true, preserveTimestamps:true });
+      copyVerifiedAtomic(legacy.candidateDir, target);
       ensureCandidateShape(target);
       const manifest = readJson(path.join(target, 'manifest.json')) || {};
       writeJson(path.join(target, 'manifest.json'), { ...manifest, folderName:path.basename(target), migratedFrom:legacy.candidateDir });
-      byId.set(legacy.candidateId, { ...legacy, candidateDir:target, folderName:path.basename(target) });
+      const migrated = listCandidateDirs(candidatesRoot, false).find((r) => String(r.candidateId) === String(legacy.candidateId));
+      if (migrated) current.push(migrated);
       added += 1;
     }
     return added;
@@ -139,70 +179,42 @@ function createCandidateTransfer(options = {}) {
     }
   }
 
-  function mirrorCandidateArtifactsToLegacy(record) {
-    ensureDir(globalReplayRoot);
-    ensureDir(globalBilanRoot);
-    const replayDir = path.join(record.candidateDir, 'replay');
-    if (fs.existsSync(replayDir)) {
-      for (const entry of fs.readdirSync(replayDir, { withFileTypes:true })) {
-        const source = path.join(replayDir, entry.name);
-        const target = path.join(globalReplayRoot, entry.name);
-        if (entry.isDirectory()) copyDirectoryIfMissing(source, target);
-        else if (entry.isFile() && entry.name.toLowerCase().endsWith('.json')) copyFileIfMissing(source, target);
-      }
-    }
-    const historyDir = path.join(record.candidateDir, 'bilan', 'historique');
-    if (fs.existsSync(historyDir)) {
-      for (const entry of fs.readdirSync(historyDir, { withFileTypes:true })) {
-        if (!entry.isFile() || !entry.name.toLowerCase().endsWith('.json')) continue;
-        copyFileIfMissing(path.join(historyDir, entry.name), path.join(globalBilanRoot, entry.name));
-      }
-    }
-  }
-
   function prepareCandidates() {
     const migrated = migrateLegacyAdmin();
     syncGlobalArtifactsIntoCandidates();
     return migrated;
   }
 
-  function copyToRoot(sourceRecord, destinationRoot) {
-    ensureDir(destinationRoot);
-    const desiredName = standardFolderName(sourceRecord.candidate);
-    let target = path.join(destinationRoot, desiredName);
-    const existingRecords = listCandidateDirs(destinationRoot, false);
-    const sameId = existingRecords.find((r) => r.candidateId === sourceRecord.candidateId);
-
-    if (sameId) {
-      target = sameId.candidateDir;
-      mergeDirectory(sourceRecord.candidateDir, target);
-      return { updated:true, target };
-    }
-
-    if (fs.existsSync(target)) target = uniqueFolderPath(destinationRoot, desiredName);
-    fs.cpSync(sourceRecord.candidateDir, target, { recursive:true, force:false, errorOnExist:true, preserveTimestamps:true });
-    ensureCandidateShape(target);
-    const manifest = readJson(path.join(target, 'manifest.json')) || {};
-    writeJson(path.join(target, 'manifest.json'), { ...manifest, folderName:path.basename(target) });
-    return { updated:false, target };
+  function chooseTargetName(record, destinationRoot) {
+    const base = standardFolderName(record.candidate);
+    return fs.existsSync(path.join(destinationRoot, base)) ? uniqueFolderPath(destinationRoot, base) : path.join(destinationRoot, base);
   }
 
   function exportAll(selectedUsbPath) {
     const destinationRoot = path.resolve(String(selectedUsbPath || ''));
     if (!destinationRoot) throw new Error('Clé USB non sélectionnée.');
     prepareCandidates();
+    ensureDir(destinationRoot);
     if (path.resolve(candidatesRoot) === destinationRoot) throw new Error('La destination d’export ne peut pas être le dossier local des candidats.');
 
-    const sourceRecords = listCandidateDirs(candidatesRoot, false);
-    let added = 0;
-    let updated = 0;
+    const sourceRecords = listCandidateDirs(candidatesRoot, false).filter(candidateShapeValid);
+    const existing = listCandidateDirs(destinationRoot, false);
+    let added = 0, skipped = 0, verifiedFiles = 0;
     const copied = [];
     for (const source of sourceRecords) {
-      const result = copyToRoot(source, destinationRoot);
-      if (result.updated) updated += 1; else added += 1;
-      copied.push({ candidateId:source.candidateId, folderName:path.basename(result.target), candidateDir:result.target });
+      if (existing.some((r) => sameCandidate(r, source))) {
+        skipped += 1;
+        continue;
+      }
+      const target = chooseTargetName(source, destinationRoot);
+      const checked = copyVerifiedAtomic(source.candidateDir, target);
+      verifiedFiles += checked.files;
+      const imported = listCandidateDirs(destinationRoot, false).find((r) => sameCandidate(r, source));
+      if (imported) existing.push(imported);
+      added += 1;
+      copied.push({ candidateId:source.candidateId, folderName:path.basename(target), candidateDir:target });
     }
-    return { total:sourceRecords.length, added, updated, skipped:0, copied, destinationRoot, exportedAt:now().toISOString() };
+    return { total:sourceRecords.length, added, updated:0, skipped, verifiedFiles, copied, destinationRoot, exportedAt:now().toISOString(), verified:true };
   }
 
   function importAll(selectedUsbPath) {
@@ -211,38 +223,28 @@ function createCandidateTransfer(options = {}) {
     ensureDir(candidatesRoot);
     prepareCandidates();
 
-    const sourceRecords = listCandidateDirs(sourceRoot, false);
-    if (!sourceRecords.length) {
-      return { total:0, added:0, updated:0, skipped:0, copied:[], sourceRoot, destinationRoot:candidatesRoot, importedAt:now().toISOString() };
-    }
-
-    let added = 0;
-    let updated = 0;
+    const sourceRecords = listCandidateDirs(sourceRoot, false).filter(candidateShapeValid);
+    const destinationRecords = listCandidateDirs(candidatesRoot, false);
+    let added = 0, skipped = 0, verifiedFiles = 0;
     const copied = [];
+
     for (const source of sourceRecords) {
-      const destinationRecords = listCandidateDirs(candidatesRoot, false);
-      const existing = destinationRecords.find((r) => r.candidateId === source.candidateId);
-      let target;
-      if (existing) {
-        target = existing.candidateDir;
-        mergeDirectory(source.candidateDir, target);
-        updated += 1;
-      } else {
-        const base = standardFolderName(source.candidate);
-        target = fs.existsSync(path.join(candidatesRoot, base)) ? uniqueFolderPath(candidatesRoot, base) : path.join(candidatesRoot, base);
-        fs.cpSync(source.candidateDir, target, { recursive:true, force:false, errorOnExist:true, preserveTimestamps:true });
-        ensureCandidateShape(target);
-        const manifest = readJson(path.join(target, 'manifest.json')) || {};
-        writeJson(path.join(target, 'manifest.json'), { ...manifest, folderName:path.basename(target), importedAt:now().toISOString() });
-        added += 1;
+      if (destinationRecords.some((r) => sameCandidate(r, source))) {
+        skipped += 1;
+        continue;
       }
-      unmarkDeleted(documentsPath, source.candidateId);
-      const imported = listCandidateDirs(candidatesRoot, false).find((r) => r.candidateId === source.candidateId);
-      if (imported) mirrorCandidateArtifactsToLegacy(imported);
+      const target = chooseTargetName(source, candidatesRoot);
+      const checked = copyVerifiedAtomic(source.candidateDir, target);
+      verifiedFiles += checked.files;
+      const manifest = readJson(path.join(target, 'manifest.json')) || {};
+      writeJson(path.join(target, 'manifest.json'), { ...manifest, folderName:path.basename(target), importedAt:now().toISOString() });
+      const imported = listCandidateDirs(candidatesRoot, false).find((r) => sameCandidate(r, source));
+      if (imported) destinationRecords.push(imported);
+      added += 1;
       copied.push({ candidateId:source.candidateId, folderName:path.basename(target), candidateDir:target });
     }
 
-    return { total:sourceRecords.length, added, updated, skipped:0, copied, sourceRoot, destinationRoot:candidatesRoot, importedAt:now().toISOString() };
+    return { total:sourceRecords.length, added, updated:0, skipped, verifiedFiles, copied, sourceRoot, destinationRoot:candidatesRoot, importedAt:now().toISOString(), verified:true };
   }
 
   return {
@@ -250,6 +252,7 @@ function createCandidateTransfer(options = {}) {
     importAll,
     listCandidateRecords: listCandidateDirs,
     prepareCandidates,
+    verifyExactCopy,
     paths: { sebRoot, candidatesRoot, legacyAdminRoot }
   };
 }
