@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { findCandidateDir, listCandidateDirs, selectCandidate } = require('./candidate-folder-utils');
 
 module.exports = function registerCandidateReplay({ app, ipcMain, getAdminUnlocked, buildNumber }) {
   const BUILD = String(buildNumber || 'DEV');
@@ -257,7 +258,12 @@ module.exports = function registerCandidateReplay({ app, ipcMain, getAdminUnlock
         return { ok: false, error: 'Candidat non identifié : archive non créée.' };
       }
 
-      ensureParcoursDir();
+      const candidateDir = findCandidateDir(app.getPath('documents'), candidate);
+      if (!candidateDir) {
+        return { ok: false, error: 'Dossier candidat introuvable : replay non créé.' };
+      }
+      const candidateReplayRoot = path.join(candidateDir, 'replay');
+      ensureDir(candidateReplayRoot);
       const pending = readPendingIndex(token);
       const pendingSlides = Object.values(pending.pages || {}).sort((a, b) => Number(a.order) - Number(b.order));
       if (!pendingSlides.length) {
@@ -268,7 +274,7 @@ module.exports = function registerCandidateReplay({ app, ipcMain, getAdminUnlock
       const datePart = safePart(candidate.date || new Date().toISOString().slice(0, 10), 'DATE');
       const base = [safePart(candidate.nom, 'NOM'), safePart(candidate.prenom, 'PRENOM'), datePart, `BUILD-${safePart(BUILD, 'DEV')}`, snapshotSha256.slice(0, 12)].join('_');
       const folderName = base;
-      const targetFolder = path.join(parcoursDir(), folderName);
+      const targetFolder = path.join(candidateReplayRoot, folderName);
       const manifestPath = path.join(targetFolder, 'manifest.json');
 
       if (fs.existsSync(manifestPath)) {
@@ -322,11 +328,103 @@ module.exports = function registerCandidateReplay({ app, ipcMain, getAdminUnlock
       manifest.integritySha256 = computeArchiveIntegrity(manifest);
       fs.writeFileSync(path.join(tempFolder, 'manifest.json'), JSON.stringify(manifest, null, 2), 'utf8');
       fs.renameSync(tempFolder, targetFolder);
+      // SEB_CANDIDATE_AUTONOMOUS_REPLAY: le dossier candidat est la source unique du replay.
 
       try { fs.rmSync(pendingDir(token), { recursive: true, force: true }); } catch (_) {}
       return { ok: true, filename: folderName, build: BUILD, integritySha256: manifest.integritySha256, slides: slides.length };
     } catch (error) {
       return { ok: false, error: error && error.message ? error.message : String(error) };
+    }
+  });
+
+  function candidateRecordById(candidateId) {
+    const root = path.join(app.getPath('documents'), 'SEB EvalPro', 'Candidats');
+    return listCandidateDirs(root, false).find((record) => String(record.candidateId) === String(candidateId || '')) || null;
+  }
+
+  function loadCandidateArchive(candidateId, requestedName) {
+    const record = candidateRecordById(candidateId);
+    if (!record) return { ok:false, error:'Candidat introuvable.' };
+    const name = path.basename(String(requestedName || ''));
+    if (!name) return { ok:false, error:'Archive invalide.' };
+    const fullPath = path.join(record.candidateDir, 'replay', name);
+    if (!fs.existsSync(fullPath)) return { ok:false, error:'Replay introuvable dans le dossier de ce candidat.' };
+    try {
+      const stat = fs.statSync(fullPath);
+      if (stat.isFile() && name.toLowerCase().endsWith('.json')) {
+        const archive = JSON.parse(fs.readFileSync(fullPath, 'utf8'));
+        if (!verifyLegacyArchive(archive)) {
+          return { ok:false, corruption:true, error:'ATTENTION : le replay est modifié ou corrompu. Il n’a pas été ouvert.' };
+        }
+        if (!selectCandidate([record], archive.candidate || {})) {
+          return { ok:false, corruption:true, error:'ATTENTION : ce replay ne correspond pas à ce candidat. Ouverture refusée.' };
+        }
+        return {
+          ok:true,
+          legacy:true,
+          archive:{
+            build:String(archive.build || '?'),
+            archivedAt:String(archive.archivedAt || ''),
+            candidate:archive.candidate || {},
+            slides:[]
+          },
+          warning:'Ancien prototype : aucune capture visuelle autonome n’était enregistrée.'
+        };
+      }
+      if (!stat.isDirectory()) return { ok:false, error:'Format de replay non reconnu.' };
+      const manifest = readManifest(fullPath);
+      if (!verifyArchiveDirectory(fullPath, manifest)) {
+        return { ok:false, corruption:true, error:'ATTENTION : le replay est modifié ou corrompu. Il n’a pas été ouvert.' };
+      }
+      if (!selectCandidate([record], manifest.candidate || {})) {
+        return { ok:false, corruption:true, error:'ATTENTION : ce replay ne correspond pas à ce candidat. Ouverture refusée.' };
+      }
+      return {
+        ok:true,
+        legacy:false,
+        archive:{
+          schemaVersion:manifest.schemaVersion,
+          type:manifest.type,
+          readOnly:true,
+          archiveMode:manifest.archiveMode,
+          futureVersionIndependent:manifest.futureVersionIndependent,
+          build:manifest.build,
+          archivedAt:manifest.archivedAt,
+          candidate:manifest.candidate,
+          integritySha256:manifest.integritySha256,
+          slides:manifest.slides
+        }
+      };
+    } catch (error) {
+      return { ok:false, error:error && error.message ? error.message : String(error) };
+    }
+  }
+
+  ipcMain.handle('admin:load-candidate-parcours', (_event, candidateId, requestedName) => {
+    if (!getAdminUnlocked()) return { ok:false, error:'Accès administrateur requis.' };
+    return loadCandidateArchive(candidateId, requestedName);
+  });
+
+  ipcMain.handle('admin:get-candidate-parcours-slide', (_event, candidateId, requestedName, requestedFile) => {
+    if (!getAdminUnlocked()) return { ok:false, error:'Accès administrateur requis.' };
+    const loaded = loadCandidateArchive(candidateId, requestedName);
+    if (!loaded || !loaded.ok || loaded.legacy) return loaded && !loaded.ok ? loaded : { ok:false, error:'Replay visuel indisponible.' };
+    const record = candidateRecordById(candidateId);
+    const name = path.basename(String(requestedName || ''));
+    const file = path.basename(String(requestedFile || ''));
+    if (!record || !name || !file || !file.toLowerCase().endsWith('.png')) return { ok:false, error:'Diapositive invalide.' };
+    try {
+      const folder = path.join(record.candidateDir, 'replay', name);
+      const manifest = readManifest(folder);
+      if (!verifyArchiveDirectory(folder, manifest)) return { ok:false, corruption:true, error:'ATTENTION : replay corrompu.' };
+      if (!selectCandidate([record], manifest.candidate || {})) return { ok:false, corruption:true, error:'ATTENTION : replay d’un autre candidat refusé.' };
+      const slide = (manifest.slides || []).find((item) => String(item.file) === file);
+      if (!slide) return { ok:false, error:'Diapositive absente du manifeste.' };
+      const buffer = fs.readFileSync(path.join(folder, 'slides', file));
+      if (sha256Buffer(buffer) !== String(slide.sha256 || '')) return { ok:false, corruption:true, error:'ATTENTION : diapositive corrompue.' };
+      return { ok:true, dataUrl:`data:image/png;base64,${buffer.toString('base64')}`, slide };
+    } catch (error) {
+      return { ok:false, error:error && error.message ? error.message : String(error) };
     }
   });
 
