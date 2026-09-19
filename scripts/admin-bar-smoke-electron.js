@@ -82,24 +82,29 @@ app.whenReady().then(async () => {
       const bar=document.getElementById('seb-evalpro-topbar');
       const hot=document.getElementById('seb-evalpro-top-hotzone');
       const admin=document.getElementById('seb-evalpro-admin');
+      const openCandidate=document.getElementById('seb-evalpro-open-candidate');
+      const oldBilan=document.getElementById('seb-evalpro-old-bilan');
       document.dispatchEvent(new MouseEvent('mousemove',{bubbles:true,clientY:0,clientX:20}));
-      await new Promise(r=>setTimeout(r,80));
+      await new Promise(r=>setTimeout(r,120));
       return {
         bar:!!bar,
         hotzone:!!hot,
         adminButton:!!admin,
+        openCandidate:!!openCandidate,
+        openCandidateVisible:!!openCandidate && !openCandidate.hidden && getComputedStyle(openCandidate).display!=='none',
+        oldBilanVisible:!!oldBilan && !oldBilan.hidden && getComputedStyle(oldBilan).display!=='none',
         visible:!!bar && bar.classList.contains('seb-evalpro-visible'),
         transform:bar ? getComputedStyle(bar).transform : '',
         adminText:admin ? String(admin.textContent||'').trim() : ''
       };
     })()`);
 
-    if (!result.bar || !result.hotzone || !result.adminButton || !result.visible || result.adminText !== 'Verrouiller') {
-      fail('barre Administrateur absente, non synchronisée ou bouton Verrouiller incorrect', result);
+    if (!result.bar || !result.hotzone || !result.adminButton || !result.openCandidate || !result.openCandidateVisible || result.oldBilanVisible || !result.visible || result.adminText !== 'Verrouiller') {
+      fail('barre Admin ou bouton Ouvrir un candidat incorrect, ou ancien bilan encore visible', result);
       return;
     }
 
-    console.log('SEB EvalPro Admin smoke: OK - barre présente et affichable au bord supérieur.');
+    console.log('SEB EvalPro Admin smoke: OK - barre présente, Ouvrir un candidat visible et ancien bilan masqué.');
     console.log(JSON.stringify(result));
 
     // Vérification réelle du correctif IA #25 : un seul bouton visible,
