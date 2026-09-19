@@ -36,6 +36,32 @@ module.exports = function registerCandidateCatalog({ app, ipcMain, getAdminUnloc
     }
   }
 
+  function completeLegacySkeleton(dir, record) {
+    ensureCandidateShape(dir);
+    const c = (record && record.candidate) || {};
+    const defaults = [
+      [path.join(dir, 'donnees', 'candidat.json'), c],
+      [path.join(dir, 'donnees', 'evaluation-state.json'), {
+        version:1,
+        sessionStorage:{
+          candidat_data:JSON.stringify(c),
+          reponses_data:'{}',
+          scores_data:'{}'
+        },
+        localStorage:{},
+        lastPage:'qcmv1.0.html',
+        lastEvaluationPage:'qcmv1.0.html',
+        migratedPlaceholder:true
+      }],
+      [path.join(dir, 'donnees', 'progression.json'), { lastPage:null, lastEvaluationPage:null, migratedPlaceholder:true }],
+      [path.join(dir, 'resultats', 'reponses.json'), {}],
+      [path.join(dir, 'resultats', 'scores.json'), {}]
+    ];
+    for (const [file, value] of defaults) {
+      if (!fs.existsSync(file)) writeJson(file, value);
+    }
+  }
+
   function migrateLegacyCandidateFolders() {
     ensureDir(candidatesRoot);
     const current = listCandidateDirs(candidatesRoot, false);
@@ -48,7 +74,7 @@ module.exports = function registerCandidateCatalog({ app, ipcMain, getAdminUnloc
         ? uniqueFolderPath(candidatesRoot, base)
         : path.join(candidatesRoot, base);
       copyDirectoryAtomically(legacy.candidateDir, target);
-      ensureCandidateShape(target);
+      completeLegacySkeleton(target, legacy);
       const manifest = readJson(path.join(target, 'manifest.json')) || {};
       writeJson(path.join(target, 'manifest.json'), { ...manifest, folderName:path.basename(target), migratedFrom:legacy.candidateDir });
       const migrated = listCandidateDirs(candidatesRoot, false).find((r) => String(r.candidateId) === String(legacy.candidateId));
