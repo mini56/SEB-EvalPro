@@ -1,193 +1,252 @@
 const fs = require('fs');
 const path = require('path');
+const {
+  readJson,
+  ensureDir,
+  standardFolderName,
+  uniqueFolderPath,
+  listCandidateDirs,
+  selectCandidate,
+  copyFileIfMissing,
+  copyDirectoryIfMissing,
+  unmarkDeleted
+} = require('./candidate-folder-utils');
 
 function createCandidateTransfer(options = {}) {
   const documentsPath = options.documentsPath;
   const now = typeof options.now === 'function' ? options.now : () => new Date();
-
   if (!documentsPath) throw new Error('documentsPath requis');
 
   const sebRoot = path.join(documentsPath, 'SEB EvalPro');
-  const localCandidatesRoot = path.join(sebRoot, 'Candidats');
-  const adminRoot = path.join(sebRoot, 'Admin');
+  const candidatesRoot = path.join(sebRoot, 'Candidats');
+  const legacyAdminRoot = path.join(sebRoot, 'Admin');
+  const globalReplayRoot = path.join(sebRoot, 'parcours');
+  const globalBilanRoot = path.join(sebRoot, 'Bilans', 'Historique');
 
-  function ensureDirectory(directory) {
-    fs.mkdirSync(directory, { recursive: true });
-    return directory;
+  function writeJson(target, value) {
+    ensureDir(path.dirname(target));
+    const temp = target + '.tmp';
+    fs.writeFileSync(temp, JSON.stringify(value, null, 2), 'utf8');
+    fs.renameSync(temp, target);
   }
 
-  function readJson(target) {
-    try {
-      return JSON.parse(fs.readFileSync(target, 'utf8'));
-    } catch (_) {
-      return null;
+  function ensureCandidateShape(dir) {
+    for (const rel of ['donnees','resultats','replay',path.join('bilan','historique'),path.join('bilan','exports')]) {
+      ensureDir(path.join(dir, rel));
     }
   }
 
-  function sanitizeGroupName(value) {
-    const cleaned = String(value || '')
-      .trim()
-      .replace(/[<>:"/\\|?*\u0000-\u001F]/g, '_')
-      .replace(/[. ]+$/g, '')
-      .replace(/\s+/g, ' ');
-    if (!cleaned || cleaned === '.' || cleaned === '..') {
-      throw new Error('Nom de regroupement invalide.');
+  function mergeDirectory(sourceDir, targetDir) {
+    ensureDir(targetDir);
+    for (const entry of fs.readdirSync(sourceDir, { withFileTypes:true })) {
+      const source = path.join(sourceDir, entry.name);
+      const target = path.join(targetDir, entry.name);
+      if (entry.isDirectory()) {
+        mergeDirectory(source, target);
+        continue;
+      }
+      if (!entry.isFile()) continue;
+      if (!fs.existsSync(target)) {
+        fs.copyFileSync(source, target);
+        continue;
+      }
+      const rel = path.relative(targetDir, target).toLowerCase();
+      if (rel === 'manifest.json') continue;
+      try {
+        const srcStat = fs.statSync(source);
+        const dstStat = fs.statSync(target);
+        if (srcStat.mtimeMs > dstStat.mtimeMs + 500) fs.copyFileSync(source, target);
+      } catch (_) {}
     }
-    return cleaned;
-  }
 
-  function portableCandidatesRoot(selectedPath) {
-    const selected = path.resolve(String(selectedPath || ''));
-    const base = path.basename(selected).toLocaleLowerCase('fr-FR');
-    if (base === 'candidats') return selected;
-    if (base === 'seb evalpro') return path.join(selected, 'Candidats');
-    return path.join(selected, 'SEB EvalPro', 'Candidats');
-  }
-
-  function listCandidateRecords(root) {
-    if (!root || !fs.existsSync(root)) return [];
-    const entries = fs.readdirSync(root, { withFileTypes: true });
-    const records = [];
-    for (const entry of entries) {
-      if (!entry.isDirectory()) continue;
-      const candidateDir = path.join(root, entry.name);
-      const manifest = readJson(path.join(candidateDir, 'manifest.json'));
-      const candidateId = String(manifest && manifest.candidateId || '').trim();
-      if (!candidateId) continue;
-      records.push({
-        candidateId,
-        folderName: entry.name,
-        candidateDir,
-        manifest
+    const sourceManifest = readJson(path.join(sourceDir, 'manifest.json'));
+    const targetManifest = readJson(path.join(targetDir, 'manifest.json'));
+    if (sourceManifest || targetManifest) {
+      const srcTime = String(sourceManifest && sourceManifest.updatedAt || '');
+      const dstTime = String(targetManifest && targetManifest.updatedAt || '');
+      const newer = srcTime > dstTime ? sourceManifest : targetManifest;
+      writeJson(path.join(targetDir, 'manifest.json'), {
+        ...(targetManifest || {}),
+        ...(newer || sourceManifest || {}),
+        candidateId: String((targetManifest && targetManifest.candidateId) || (sourceManifest && sourceManifest.candidateId) || ''),
+        folderName: path.basename(targetDir)
       });
     }
-    return records;
   }
 
-  function uniqueFolderPath(parent, folderName) {
-    let target = path.join(parent, folderName);
-    let index = 2;
-    while (fs.existsSync(target)) {
-      target = path.join(parent, `${folderName}_${index}`);
-      index += 1;
+  function migrateLegacyAdmin() {
+    ensureDir(candidatesRoot);
+    const byId = new Map(listCandidateDirs(candidatesRoot, false).map((r) => [r.candidateId, r]));
+    let added = 0;
+    for (const legacy of listCandidateDirs(legacyAdminRoot, true)) {
+      if (byId.has(legacy.candidateId)) continue;
+      const base = standardFolderName(legacy.candidate);
+      const target = fs.existsSync(path.join(candidatesRoot, base)) ? uniqueFolderPath(candidatesRoot, base) : path.join(candidatesRoot, base);
+      fs.cpSync(legacy.candidateDir, target, { recursive:true, force:false, errorOnExist:true, preserveTimestamps:true });
+      ensureCandidateShape(target);
+      const manifest = readJson(path.join(target, 'manifest.json')) || {};
+      writeJson(path.join(target, 'manifest.json'), { ...manifest, folderName:path.basename(target), migratedFrom:legacy.candidateDir });
+      byId.set(legacy.candidateId, { ...legacy, candidateDir:target, folderName:path.basename(target) });
+      added += 1;
     }
-    return target;
+    return added;
   }
 
-  function replaceDirectorySafely(sourceDir, targetDir) {
-    ensureDirectory(path.dirname(targetDir));
-    const token = `${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
-    const tempDir = path.join(path.dirname(targetDir), `.${path.basename(targetDir)}.seb-copy-${token}`);
-    const backupDir = path.join(path.dirname(targetDir), `.${path.basename(targetDir)}.seb-backup-${token}`);
-
-    fs.cpSync(sourceDir, tempDir, {
-      recursive: true,
-      force: true,
-      errorOnExist: false,
-      preserveTimestamps: true
-    });
-
-    let hadTarget = false;
+  function replayCandidate(source) {
     try {
-      if (fs.existsSync(targetDir)) {
-        fs.renameSync(targetDir, backupDir);
-        hadTarget = true;
+      const stat = fs.statSync(source);
+      if (stat.isDirectory()) {
+        const m = readJson(path.join(source, 'manifest.json'));
+        return m && m.candidate ? m.candidate : null;
       }
-      fs.renameSync(tempDir, targetDir);
-      if (hadTarget) fs.rmSync(backupDir, { recursive: true, force: true });
-    } catch (error) {
-      try {
-        if (fs.existsSync(tempDir)) fs.rmSync(tempDir, { recursive: true, force: true });
-      } catch (_) {}
-      try {
-        if (hadTarget && !fs.existsSync(targetDir) && fs.existsSync(backupDir)) {
-          fs.renameSync(backupDir, targetDir);
-        }
-      } catch (_) {}
-      throw error;
+      if (stat.isFile() && source.toLowerCase().endsWith('.json')) {
+        const a = readJson(source);
+        return a && a.candidate ? a.candidate : null;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  function syncGlobalArtifactsIntoCandidates() {
+    ensureDir(globalReplayRoot);
+    ensureDir(globalBilanRoot);
+    const records = listCandidateDirs(candidatesRoot, false);
+    records.forEach((r) => ensureCandidateShape(r.candidateDir));
+
+    for (const entry of fs.readdirSync(globalReplayRoot, { withFileTypes:true })) {
+      const source = path.join(globalReplayRoot, entry.name);
+      const candidate = replayCandidate(source);
+      if (!candidate) continue;
+      const match = selectCandidate(records, candidate);
+      if (!match) continue;
+      const target = path.join(match.candidateDir, 'replay', entry.name);
+      if (entry.isDirectory()) copyDirectoryIfMissing(source, target);
+      else if (entry.isFile() && entry.name.toLowerCase().endsWith('.json')) copyFileIfMissing(source, target);
+    }
+
+    for (const entry of fs.readdirSync(globalBilanRoot, { withFileTypes:true })) {
+      if (!entry.isFile() || !entry.name.toLowerCase().endsWith('.json')) continue;
+      const source = path.join(globalBilanRoot, entry.name);
+      const archive = readJson(source);
+      if (!archive || !archive.candidate) continue;
+      const match = selectCandidate(records, archive.candidate);
+      if (!match) continue;
+      copyFileIfMissing(source, path.join(match.candidateDir, 'bilan', 'historique', entry.name));
     }
   }
 
-  function copyCandidates(sourceRoot, destinationRoot) {
-    ensureDirectory(destinationRoot);
-    const sourceRecords = listCandidateRecords(sourceRoot);
-    const destinationRecords = listCandidateRecords(destinationRoot);
-    const byId = new Map(destinationRecords.map((record) => [record.candidateId, record]));
+  function mirrorCandidateArtifactsToLegacy(record) {
+    ensureDir(globalReplayRoot);
+    ensureDir(globalBilanRoot);
+    const replayDir = path.join(record.candidateDir, 'replay');
+    if (fs.existsSync(replayDir)) {
+      for (const entry of fs.readdirSync(replayDir, { withFileTypes:true })) {
+        const source = path.join(replayDir, entry.name);
+        const target = path.join(globalReplayRoot, entry.name);
+        if (entry.isDirectory()) copyDirectoryIfMissing(source, target);
+        else if (entry.isFile() && entry.name.toLowerCase().endsWith('.json')) copyFileIfMissing(source, target);
+      }
+    }
+    const historyDir = path.join(record.candidateDir, 'bilan', 'historique');
+    if (fs.existsSync(historyDir)) {
+      for (const entry of fs.readdirSync(historyDir, { withFileTypes:true })) {
+        if (!entry.isFile() || !entry.name.toLowerCase().endsWith('.json')) continue;
+        copyFileIfMissing(path.join(historyDir, entry.name), path.join(globalBilanRoot, entry.name));
+      }
+    }
+  }
+
+  function prepareCandidates() {
+    const migrated = migrateLegacyAdmin();
+    syncGlobalArtifactsIntoCandidates();
+    return migrated;
+  }
+
+  function copyToRoot(sourceRecord, destinationRoot) {
+    ensureDir(destinationRoot);
+    const desiredName = standardFolderName(sourceRecord.candidate);
+    let target = path.join(destinationRoot, desiredName);
+    const existingRecords = listCandidateDirs(destinationRoot, false);
+    const sameId = existingRecords.find((r) => r.candidateId === sourceRecord.candidateId);
+
+    if (sameId) {
+      target = sameId.candidateDir;
+      mergeDirectory(sourceRecord.candidateDir, target);
+      return { updated:true, target };
+    }
+
+    if (fs.existsSync(target)) target = uniqueFolderPath(destinationRoot, desiredName);
+    fs.cpSync(sourceRecord.candidateDir, target, { recursive:true, force:false, errorOnExist:true, preserveTimestamps:true });
+    ensureCandidateShape(target);
+    const manifest = readJson(path.join(target, 'manifest.json')) || {};
+    writeJson(path.join(target, 'manifest.json'), { ...manifest, folderName:path.basename(target) });
+    return { updated:false, target };
+  }
+
+  function exportAll(selectedUsbPath) {
+    const destinationRoot = path.resolve(String(selectedUsbPath || ''));
+    if (!destinationRoot) throw new Error('Clé USB non sélectionnée.');
+    prepareCandidates();
+    if (path.resolve(candidatesRoot) === destinationRoot) throw new Error('La destination d’export ne peut pas être le dossier local des candidats.');
+
+    const sourceRecords = listCandidateDirs(candidatesRoot, false);
+    let added = 0;
+    let updated = 0;
+    const copied = [];
+    for (const source of sourceRecords) {
+      const result = copyToRoot(source, destinationRoot);
+      if (result.updated) updated += 1; else added += 1;
+      copied.push({ candidateId:source.candidateId, folderName:path.basename(result.target), candidateDir:result.target });
+    }
+    return { total:sourceRecords.length, added, updated, skipped:0, copied, destinationRoot, exportedAt:now().toISOString() };
+  }
+
+  function importAll(selectedUsbPath) {
+    const sourceRoot = path.resolve(String(selectedUsbPath || ''));
+    if (!sourceRoot || !fs.existsSync(sourceRoot)) throw new Error('Clé USB non sélectionnée ou inaccessible.');
+    ensureDir(candidatesRoot);
+    prepareCandidates();
+
+    const sourceRecords = listCandidateDirs(sourceRoot, false);
+    if (!sourceRecords.length) {
+      return { total:0, added:0, updated:0, skipped:0, copied:[], sourceRoot, destinationRoot:candidatesRoot, importedAt:now().toISOString() };
+    }
 
     let added = 0;
     let updated = 0;
     const copied = [];
-
     for (const source of sourceRecords) {
-      const existing = byId.get(source.candidateId);
-      const targetDir = existing
-        ? existing.candidateDir
-        : (fs.existsSync(path.join(destinationRoot, source.folderName))
-          ? uniqueFolderPath(destinationRoot, source.folderName)
-          : path.join(destinationRoot, source.folderName));
-
-      replaceDirectorySafely(source.candidateDir, targetDir);
-
-      if (existing) updated += 1;
-      else added += 1;
-
-      const record = {
-        candidateId: source.candidateId,
-        folderName: path.basename(targetDir),
-        candidateDir: targetDir
-      };
-      byId.set(source.candidateId, record);
-      copied.push(record);
+      const destinationRecords = listCandidateDirs(candidatesRoot, false);
+      const existing = destinationRecords.find((r) => r.candidateId === source.candidateId);
+      let target;
+      if (existing) {
+        target = existing.candidateDir;
+        mergeDirectory(source.candidateDir, target);
+        updated += 1;
+      } else {
+        const base = standardFolderName(source.candidate);
+        target = fs.existsSync(path.join(candidatesRoot, base)) ? uniqueFolderPath(candidatesRoot, base) : path.join(candidatesRoot, base);
+        fs.cpSync(source.candidateDir, target, { recursive:true, force:false, errorOnExist:true, preserveTimestamps:true });
+        ensureCandidateShape(target);
+        const manifest = readJson(path.join(target, 'manifest.json')) || {};
+        writeJson(path.join(target, 'manifest.json'), { ...manifest, folderName:path.basename(target), importedAt:now().toISOString() });
+        added += 1;
+      }
+      unmarkDeleted(documentsPath, source.candidateId);
+      const imported = listCandidateDirs(candidatesRoot, false).find((r) => r.candidateId === source.candidateId);
+      if (imported) mirrorCandidateArtifactsToLegacy(imported);
+      copied.push({ candidateId:source.candidateId, folderName:path.basename(target), candidateDir:target });
     }
 
-    return {
-      total: sourceRecords.length,
-      added,
-      updated,
-      copied
-    };
-  }
-
-  function exportAll(selectedUsbPath) {
-    ensureDirectory(localCandidatesRoot);
-    const destinationRoot = portableCandidatesRoot(selectedUsbPath);
-    const result = copyCandidates(localCandidatesRoot, destinationRoot);
-    return {
-      ...result,
-      destinationRoot,
-      exportedAt: now().toISOString()
-    };
-  }
-
-  function importAll(selectedUsbPath, groupName) {
-    const label = sanitizeGroupName(groupName);
-    const sourceRoot = portableCandidatesRoot(selectedUsbPath);
-    if (!fs.existsSync(sourceRoot)) {
-      throw new Error('Aucun dossier SEB EvalPro\\Candidats trouvé sur la clé sélectionnée.');
-    }
-
-    const destinationRoot = ensureDirectory(path.join(adminRoot, label));
-    const result = copyCandidates(sourceRoot, destinationRoot);
-    return {
-      ...result,
-      sourceRoot,
-      destinationRoot,
-      groupName: label,
-      importedAt: now().toISOString()
-    };
+    return { total:sourceRecords.length, added, updated, skipped:0, copied, sourceRoot, destinationRoot:candidatesRoot, importedAt:now().toISOString() };
   }
 
   return {
     exportAll,
     importAll,
-    listCandidateRecords,
-    sanitizeGroupName,
-    portableCandidatesRoot,
-    paths: {
-      sebRoot,
-      localCandidatesRoot,
-      adminRoot
-    }
+    listCandidateRecords: listCandidateDirs,
+    prepareCandidates,
+    paths: { sebRoot, candidatesRoot, legacyAdminRoot }
   };
 }
 
