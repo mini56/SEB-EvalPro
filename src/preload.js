@@ -181,7 +181,7 @@ function createTransferNameDialog() {
   return new Promise((resolve) => {
     const backdrop = document.createElement('div');
     backdrop.id = 'seb-evalpro-transfer-dialog';
-    backdrop.innerHTML = \`
+    backdrop.innerHTML = `
       <div class="seb-transfer-card" role="dialog" aria-modal="true" aria-label="Nom du regroupement">
         <div class="seb-transfer-title">Importer les dossiers candidats</div>
         <div class="seb-transfer-text">Choisissez le nom du dossier qui regroupera les stagiaires sur le PC Admin.</div>
@@ -192,10 +192,10 @@ function createTransferNameDialog() {
           <button type="button" id="seb-transfer-cancel">Annuler</button>
           <button type="button" id="seb-transfer-ok">Continuer</button>
         </div>
-      </div>\`;
+      </div>`;
 
     const style = document.createElement('style');
-    style.textContent = \`
+    style.textContent = `
       #seb-evalpro-transfer-dialog{position:fixed;inset:0;z-index:2147483647;background:rgba(0,0,0,.42);display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif}
       #seb-evalpro-transfer-dialog .seb-transfer-card{width:470px;max-width:calc(100vw - 40px);background:#fff;border:1px solid #aaa;border-radius:8px;padding:20px;box-shadow:0 10px 35px rgba(0,0,0,.3);box-sizing:border-box}
       #seb-evalpro-transfer-dialog .seb-transfer-title{font-size:20px;font-weight:700;color:#0070c0;margin-bottom:10px}
@@ -205,7 +205,7 @@ function createTransferNameDialog() {
       #seb-evalpro-transfer-dialog .seb-transfer-error{min-height:20px;color:#c00000;font-size:13px;margin-top:6px}
       #seb-evalpro-transfer-dialog .seb-transfer-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:10px}
       #seb-evalpro-transfer-dialog button{font-family:Arial,sans-serif;font-size:14px;padding:8px 14px;border:2px solid #0070c0;border-radius:6px;background:#fff;color:#0070c0;font-weight:700;cursor:pointer}
-    \`;
+    `;
     backdrop.appendChild(style);
     document.body.appendChild(backdrop);
 
@@ -239,24 +239,24 @@ function showTransferMessage(title, message, isError = false) {
   return new Promise((resolve) => {
     const backdrop = document.createElement('div');
     backdrop.id = 'seb-evalpro-transfer-dialog';
-    backdrop.innerHTML = \`
+    backdrop.innerHTML = `
       <div class="seb-transfer-card" role="dialog" aria-modal="true">
         <div class="seb-transfer-title"></div>
         <div class="seb-transfer-message"></div>
         <div class="seb-transfer-actions">
           <button type="button" id="seb-transfer-ok">OK</button>
         </div>
-      </div>\`;
+      </div>`;
 
     const style = document.createElement('style');
-    style.textContent = \`
+    style.textContent = `
       #seb-evalpro-transfer-dialog{position:fixed;inset:0;z-index:2147483647;background:rgba(0,0,0,.42);display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif}
       #seb-evalpro-transfer-dialog .seb-transfer-card{width:520px;max-width:calc(100vw - 40px);background:#fff;border:1px solid #aaa;border-radius:8px;padding:20px;box-shadow:0 10px 35px rgba(0,0,0,.3);box-sizing:border-box}
       #seb-evalpro-transfer-dialog .seb-transfer-title{font-size:20px;font-weight:700;color:#0070c0;margin-bottom:12px}
       #seb-evalpro-transfer-dialog .seb-transfer-message{font-size:14px;line-height:1.5;color:#222;white-space:pre-wrap;overflow-wrap:anywhere}
       #seb-evalpro-transfer-dialog .seb-transfer-actions{display:flex;justify-content:flex-end;margin-top:18px}
       #seb-evalpro-transfer-dialog button{font-family:Arial,sans-serif;font-size:14px;padding:8px 18px;border:2px solid #0070c0;border-radius:6px;background:#fff;color:#0070c0;font-weight:700;cursor:pointer}
-    \`;
+    `;
     backdrop.appendChild(style);
     const titleNode = backdrop.querySelector('.seb-transfer-title');
     titleNode.textContent = String(title || '');
