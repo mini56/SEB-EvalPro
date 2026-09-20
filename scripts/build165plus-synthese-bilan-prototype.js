@@ -68,8 +68,13 @@ document.addEventListener('DOMContentLoaded',()=>{try{const c=JSON.parse(session
 {
   let js = read(historyFile);
   const start = `function candidateFromPage() {\n  return {\n    nom: textOf(document.getElementById('nom')),\n    prenom: textOf(document.getElementById('prenom')),\n    date: textOf(document.getElementById('date')),\n    lieu: '',\n    groupe: ''\n  };\n}`;
-  if (!js.includes(start)) fail('candidateFromPage historique introuvable');
-  js = js.replace(start, `function candidateFromPage() {\n  let stored = {};\n  try { stored = JSON.parse(window.sessionStorage.getItem('candidat_data') || '{}') || {}; } catch (_) {}\n  return {\n    nom: textOf(document.getElementById('nom')),\n    prenom: textOf(document.getElementById('prenom')),\n    date: textOf(document.getElementById('date')),\n    civilite: ['M.','Mme','Autre'].includes(String(stored.civilite || '')) ? String(stored.civilite) : '',\n    lieu: '',\n    groupe: ''\n  };\n}`);
+  if (js.includes(start)) {
+    js = js.replace(start, `function candidateFromPage() {\n  let stored = {};\n  try { stored = JSON.parse(window.sessionStorage.getItem('candidat_data') || '{}') || {}; } catch (_) {}\n  return {\n    nom: textOf(document.getElementById('nom')),\n    prenom: textOf(document.getElementById('prenom')),\n    date: textOf(document.getElementById('date')),\n    civilite: ['M.','Mme','Autre'].includes(String(stored.civilite || '')) ? String(stored.civilite) : '',\n    lieu: '',\n    groupe: ''\n  };\n}`);
+  } else {
+    const currentAnchor = `    date: String(stored.date || textOf(document.getElementById('date')) || '').trim(),\n    lieu: String(stored.lieu || stored.ville || '').trim(),`;
+    if (!js.includes(currentAnchor)) fail('candidateFromPage historique nouvelle architecture introuvable');
+    js = js.replace(currentAnchor, `    date: String(stored.date || textOf(document.getElementById('date')) || '').trim(),\n    civilite: ['M.','Mme','Autre'].includes(String(stored.civilite || '')) ? String(stored.civilite) : '',\n    lieu: String(stored.lieu || stored.ville || '').trim(),`);
+  }
 
   const captureReturn = `    note: textOf(document.querySelector('.note')),\n    headers: headers.length ? headers : ['Modules', 'NE', 'I', 'II', 'III', 'Commentaires'],\n    rows\n  };`;
   if (!js.includes(captureReturn)) fail('capture bilan historique introuvable');
