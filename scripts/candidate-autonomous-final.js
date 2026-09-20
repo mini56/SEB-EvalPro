@@ -84,7 +84,7 @@ function parseJs(text, label) {
     'adminCandidateResultsWorkspace',
     'showReadOnlyCandidateResults',
     "candidate-catalog:results-workspace-load-sync"
-  ]) if (!preload.includes(token)) fail('résultats candidat Admin incomplets: ' + token, 7);
+  ]) if (!out.includes(token)) fail('résultats candidat Admin incomplets: ' + token, 7);
 
   for (const token of [
     'Copie des fichiers terminée.',
