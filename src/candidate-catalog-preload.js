@@ -319,12 +319,9 @@ function openCatalog(initialCandidateId = '') {
     search.addEventListener('input', render);
     const closeButton = overlay.querySelector('#seb-cc-close');
     const close = () => { overlay.remove(); resolve(); };
-    if (isCandidateAdminHost()) {
-      closeButton.hidden = true;
-    } else {
-      closeButton.addEventListener('click', close);
-      overlay.addEventListener('keydown', (event) => { if (event.key === 'Escape') close(); });
-    }
+    closeButton.hidden = false;
+    closeButton.addEventListener('click', close);
+    overlay.addEventListener('keydown', (event) => { if (event.key === 'Escape') close(); });
     const selectedId = String(initialCandidateId || '').trim();
     if (selectedId && items.some((item) => String(item.candidateId) === selectedId)) {
       await openCandidateDetail(selectedId, render);
@@ -345,6 +342,10 @@ function ensureButton() {
     button.textContent = 'Ouvrir un candidat';
     button.hidden = true;
     button.addEventListener('click', async () => {
+      if (isCandidateAdminHost()) {
+        await openCatalog();
+        return;
+      }
       if (typeof beforeAdminNavigate === 'function') {
         const saved = beforeAdminNavigate();
         if (saved && saved.ok === false) {
@@ -376,7 +377,7 @@ async function refreshButton() {
     const unlocked = await ipcRenderer.invoke('admin:status');
     const onBilan = /\/(?:admin-bilan|bilan)\.html$/i.test(decodeURIComponent(window.location.pathname));
     const results = ipcRenderer.sendSync('candidate-catalog:results-workspace-load-sync');
-    button.hidden = !unlocked || isCandidateAdminHost() || onBilan || !!(results && results.ok);
+    button.hidden = !unlocked || onBilan || !!(results && results.ok);
   } catch (_) { button.hidden = true; }
 }
 

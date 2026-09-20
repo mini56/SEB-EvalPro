@@ -248,8 +248,15 @@ function parseJs(text, label) {
     "admin:open-candidate-browser",
     "isCandidateAdminHost",
     "requestedCandidateId",
-    "openCatalog(initialCandidateId = '')"
+    "openCatalog(initialCandidateId = '')",
+    "closeButton.addEventListener('click', close)",
+    "if (isCandidateAdminHost()) {\n        await openCatalog();",
+    "button.hidden = !unlocked || onBilan || !!(results && results.ok);"
   ]) if (!catalogPreload.includes(token)) fail('accès/navigation exacte candidat incomplet: ' + token, 7);
+
+  if (catalogPreload.includes("closeButton.hidden = true")) {
+    fail('bouton Fermer du catalogue Admin encore neutralisé', 7);
+  }
 
   if (catalogPreload.includes("bilan.textContent='Faire le bilan'")) {
     fail('Faire le bilan encore proposé directement depuis la liste candidats', 7);
