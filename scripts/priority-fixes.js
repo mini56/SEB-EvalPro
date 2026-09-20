@@ -93,6 +93,8 @@ function insertBefore(text, marker, addition, label) {
       'marqueur preload'
     );
 
+    const hasCandidateFolderResults = out.includes("candidate-catalog:results-workspace-load-sync") || out.includes("adminCandidateResultsWorkspace");
+    if (!hasCandidateFolderResults) {
     out = replaceOnce(
       out,
       "    <button id=\"seb-evalpro-return\" type=\"button\" hidden>Retour à l'évaluation</button>\n    <button id=\"seb-evalpro-bilan\" type=\"button\" hidden>Bilan</button>",
@@ -123,6 +125,7 @@ function insertBefore(text, marker, addition, label) {
       "  resultsButton.addEventListener('click', async () => {\n    showBar();\n    await createCandidateResultsDialog();\n    scheduleHideBar();\n  });\n\n  bilanButton.addEventListener('click', async () => {",
       'action bouton résultats'
     );
+    }
 
     out = replaceOnce(
       out,

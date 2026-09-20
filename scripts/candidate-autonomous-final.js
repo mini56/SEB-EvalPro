@@ -232,6 +232,10 @@ function parseJs(text, label) {
     fail('référence PDF encore active dans le catalogue candidat', 7);
   }
 
+  if (preload.includes('id="seb-evalpro-results"')) {
+    fail('ancien bouton global Résultats stagiaires encore injecté malgré les résultats par dossier candidat', 7);
+  }
+
   for (const token of [
     'SEB_CANDIDATE_AUTONOMOUS_REPLAY',
     "admin:load-candidate-parcours",
