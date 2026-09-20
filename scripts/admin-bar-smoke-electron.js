@@ -38,6 +38,7 @@ ipcMain.on('state:load-sync', (event) => {
 });
 ipcMain.on('state:save-sync', (event) => { event.returnValue = { ok: true }; });
 ipcMain.on('candidate-catalog:workspace-load-sync', (event) => { event.returnValue = { ok:false }; });
+ipcMain.on('candidate-catalog:results-workspace-load-sync', (event) => { event.returnValue = { ok:false }; });
 ipcMain.handle('state:save', () => ({ ok: true }));
 let smokeAdminUnlocked = true;
 ipcMain.handle('admin:status', () => smokeAdminUnlocked);
@@ -45,6 +46,7 @@ ipcMain.handle('admin:verify', () => { smokeAdminUnlocked = true; return true; }
 ipcMain.handle('admin:verify-password', () => false);
 ipcMain.handle('admin:lock', () => { smokeAdminUnlocked = false; return true; });
 ipcMain.handle('admin:open-bilan', () => false);
+ipcMain.handle('admin:open-candidate-results', () => false);
 ipcMain.handle('admin:return-evaluation', () => false);
 ipcMain.handle('admin:close-session', () => false);
 ipcMain.handle('ai:status', () => ({ available: false, offline: true }));

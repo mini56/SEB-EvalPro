@@ -21,6 +21,7 @@ const localAi = createLocalAiService({ app });
 let candidateStore = null;
 let candidateTransfer = null;
 let adminExportCandidateDir = null;
+let adminCandidateResultsMode = false;
 let lastCandidateSaveError = '';
 let allowApplicationExit = false;
 
@@ -293,6 +294,10 @@ function createWindow() {
   mainWindow.once('ready-to-show', finishStartup);
 
   mainWindow.webContents.on('did-navigate', (_event, url) => {
+    if (adminCandidateResultsMode) {
+      applyAdaptiveZoom();
+      return;
+    }
     const current = readState();
     const page = safePageName(url);
     current.lastPage = page;
@@ -464,14 +469,23 @@ ipcMain.handle('admin:import-candidates', async () => {
 
 ipcMain.handle('admin:open-bilan', () => {
   if (!mainWindow || !adminSessionUnlocked) return false;
+  adminCandidateResultsMode = false;
   const bilanPath = existingWebPage('admin-bilan.html');
   if (!fs.existsSync(bilanPath)) return false;
   mainWindow.loadFile(bilanPath);
   return true;
 });
 
+ipcMain.handle('admin:open-candidate-results', () => {
+  if (!mainWindow || !adminSessionUnlocked) return false;
+  adminCandidateResultsMode = true;
+  mainWindow.loadFile(existingWebPage('qcmv1.0.html'));
+  return true;
+});
+
 ipcMain.handle('admin:return-evaluation', () => {
   if (!mainWindow || !adminSessionUnlocked) return false;
+  adminCandidateResultsMode = false;
   const state = readState();
   mainWindow.loadFile(existingWebPage(state.lastEvaluationPage || 'qcmv1.0.html'));
   return true;

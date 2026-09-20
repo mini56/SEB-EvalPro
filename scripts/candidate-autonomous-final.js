@@ -81,6 +81,12 @@ function parseJs(text, label) {
   out = out.replace("ipcRenderer.invoke('admin:import-candidates', groupName)", "ipcRenderer.invoke('admin:import-candidates')");
 
   for (const token of [
+    'adminCandidateResultsWorkspace',
+    'showReadOnlyCandidateResults',
+    "candidate-catalog:results-workspace-load-sync"
+  ]) if (!preload.includes(token)) fail('résultats candidat Admin incomplets: ' + token, 7);
+
+  for (const token of [
     'Copie des fichiers terminée.',
     'Vous pouvez retirer la clé USB en toute sécurité.',
     'déjà présent(s) et ignoré(s)',
@@ -199,6 +205,8 @@ function parseJs(text, label) {
     "candidate-catalog:begin-bilan",
     "candidate-catalog:workspace-load-sync",
     "candidate-catalog:workspace-save-sync",
+    "candidate-catalog:begin-results",
+    "candidate-catalog:results-workspace-load-sync",
     "seb_evalpro_admin_candidate_id",
     "cleanupDuplicateWordExports",
     "verifyBilan",
@@ -214,6 +222,9 @@ function parseJs(text, label) {
     "openCandidateReplay(candidateId, filename)",
     "candidate-catalog:open-export",
     "Faire le bilan",
+    "Résultats du candidat",
+    "Ouvrir les résultats",
+    "beginCandidateResults",
     "Document Word du bilan"
   ]) if (!catalogPreload.includes(token)) fail('accès exact candidat incomplet: ' + token, 7);
 
@@ -243,7 +254,9 @@ function parseJs(text, label) {
     'SEB_CANDIDATE_CLOSE_GUARD',
     'candidate:set-admin-export-context',
     'isCurrentCandidateWord',
-    'cleanupNumberedCandidateWordCopies'
+    'cleanupNumberedCandidateWordCopies',
+    'admin:open-candidate-results',
+    'adminCandidateResultsMode'
   ]) if (!main.includes(token)) fail('confinement/offline incomplet: ' + token, 7);
 
   for (const token of [

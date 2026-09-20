@@ -96,6 +96,9 @@ try {
   const detail = handlers.get('candidate-catalog:detail');
   const loadBilan = handlers.get('candidate-catalog:load-bilan');
   const beginBilan = handlers.get('candidate-catalog:begin-bilan');
+  const beginResults = handlers.get('candidate-catalog:begin-results');
+  const endResults = handlers.get('candidate-catalog:end-results');
+  const loadResultsWorkspaceSync = listeners.get('candidate-catalog:results-workspace-load-sync');
   const saveWorkspace = handlers.get('candidate-catalog:workspace-save');
   const endBilan = handlers.get('candidate-catalog:end-bilan');
   const loadWorkspaceSync = listeners.get('candidate-catalog:workspace-load-sync');
@@ -103,7 +106,7 @@ try {
   const sync = handlers.get('candidate-catalog:sync');
   const saveCurrentBilan = handlers.get('bilan-history:save-current');
   const saveBilanRevision = handlers.get('bilan-history:save-revision');
-  assert(list && detail && loadBilan && beginBilan && saveWorkspace && endBilan && loadWorkspaceSync && saveWorkspaceSync && sync && saveCurrentBilan && saveBilanRevision, 'Handlers catalogue/bilan absents.');
+  assert(list && detail && loadBilan && beginBilan && beginResults && endResults && loadResultsWorkspaceSync && saveWorkspace && endBilan && loadWorkspaceSync && saveWorkspaceSync && sync && saveCurrentBilan && saveBilanRevision, 'Handlers catalogue/bilan/résultats absents.');
   assert.strictEqual(handlers.has('candidate-catalog:delete'), false, 'Aucun handler ne doit permettre de supprimer un candidat.');
 
   const first = list();
@@ -119,6 +122,29 @@ try {
   assert(fs.existsSync(path.join(newDir, 'bilan', 'historique', bilanName)), 'Le bilan doit être migré dans le dossier candidat.');
   assert(fs.existsSync(path.join(newDir, 'bilan', 'exports', legacyWordName)), 'Un ancien Word associable sans ambiguïté doit être copié dans le dossier candidat.');
   assert(fs.existsSync(path.join(sebRoot, 'Bilans', legacyWordName)), 'L’ancien Word global doit rester intact pendant la migration de sécurité.');
+
+  writeJson(path.join(newDir, 'resultats', 'reponses.json'), { page2_q1:'1020', page2_q2:'1250' });
+  writeJson(path.join(newDir, 'resultats', 'scores.json'), { page2_q1:1, page2_q2:1 });
+  const stateBeforeResults = fs.readFileSync(path.join(newDir, 'donnees', 'evaluation-state.json'), 'utf8');
+
+  const preparedResults = beginResults(null, 'candidate-dupont');
+  assert(preparedResults && preparedResults.ok, 'Les résultats du candidat doivent pouvoir être ouverts indépendamment d’une session active.');
+  const resultsEvent = { returnValue:null };
+  loadResultsWorkspaceSync(resultsEvent);
+  assert(resultsEvent.returnValue && resultsEvent.returnValue.ok && resultsEvent.returnValue.readOnly === true, 'Le workspace Résultats doit être disponible en lecture seule.');
+  assert.strictEqual(resultsEvent.returnValue.candidateId, 'candidate-dupont', 'Les résultats doivent appartenir au candidat sélectionné.');
+  const resultsCandidate = JSON.parse(resultsEvent.returnValue.state.sessionStorage.candidat_data);
+  const resultsResponses = JSON.parse(resultsEvent.returnValue.state.sessionStorage.reponses_data);
+  const resultsScores = JSON.parse(resultsEvent.returnValue.state.sessionStorage.scores_data);
+  assert.strictEqual(resultsCandidate.nom, 'DUPONT');
+  assert.strictEqual(resultsCandidate['prénom'], 'Jean');
+  assert.strictEqual(resultsResponses.page2_q1, '1020');
+  assert.strictEqual(resultsScores.page2_q1, 1);
+  assert.strictEqual(endResults(), true, 'La fermeture du workspace Résultats doit réussir.');
+  const resultsAfterEnd = { returnValue:null };
+  loadResultsWorkspaceSync(resultsAfterEnd);
+  assert(resultsAfterEnd.returnValue && resultsAfterEnd.returnValue.ok === false, 'Le workspace Résultats fermé ne doit plus exposer de candidat.');
+  assert.strictEqual(fs.readFileSync(path.join(newDir, 'donnees', 'evaluation-state.json'), 'utf8'), stateBeforeResults, 'Ouvrir les résultats ne doit jamais modifier l’état du candidat.');
 
   const d = detail(null, 'candidate-dupont');
   assert(d && d.ok);

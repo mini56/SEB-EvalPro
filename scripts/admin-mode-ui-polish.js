@@ -234,15 +234,17 @@ function sebSyncAdminBarState() {
   const importCandidatesButton = document.getElementById('seb-evalpro-import-candidates');
   const closeSessionButton = document.getElementById('seb-evalpro-close-session');
   const onBilan = isAdminBilanPage();
+  const onCandidateResults = !!adminCandidateResultsWorkspace;
+  const onAdminDetail = onBilan || onCandidateResults;
   if (adminButton) {
     adminButton.hidden = false;
     adminButton.textContent = adminUnlocked ? 'Verrouiller' : 'Administrateur';
   }
-  if (bilanButton) bilanButton.hidden = !adminUnlocked || onBilan;
-  if (returnButton) returnButton.hidden = !adminUnlocked || !onBilan;
+  if (bilanButton) bilanButton.hidden = !adminUnlocked || onAdminDetail;
+  if (returnButton) returnButton.hidden = !adminUnlocked || !onAdminDetail;
   if (exportCandidatesButton) exportCandidatesButton.hidden = !adminUnlocked;
   if (importCandidatesButton) importCandidatesButton.hidden = !adminUnlocked;
-  if (closeSessionButton) closeSessionButton.hidden = !adminUnlocked || !!adminCandidateWorkspace;
+  if (closeSessionButton) closeSessionButton.hidden = !adminUnlocked || !!adminCandidateWorkspace || onCandidateResults;
 }
 `;
     out = replaceRequired(out, 'function injectAdminBar() {', syncHelper + '\nfunction injectAdminBar() {', 'helper synchronisation Admin');

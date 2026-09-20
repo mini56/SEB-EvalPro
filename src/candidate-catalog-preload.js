@@ -117,6 +117,7 @@ async function openCandidateDetail(candidateId, onChanged) {
       <div class="seb-cc-body">
         <div class="seb-cc-section"><h3>Bilan et révisions</h3><div id="seb-cc-detail-bilans"></div></div>
         <div class="seb-cc-section"><h3>Replay du parcours</h3><div id="seb-cc-detail-replays"></div></div>
+        <div class="seb-cc-section"><h3>Résultats du candidat</h3><div id="seb-cc-detail-results"></div></div>
         <div class="seb-cc-section"><h3>Document Word du bilan</h3><div id="seb-cc-detail-exports"></div></div>
       </div>
       <div class="seb-cc-detail-actions">
@@ -179,6 +180,22 @@ async function openCandidateDetail(candidateId, onChanged) {
     });
   }
 
+  const results = overlay.querySelector('#seb-cc-detail-results');
+  if (results) {
+    const row = document.createElement('div');
+    row.className = 'seb-cc-bilan-row';
+    row.innerHTML = '<div><strong>Page Résultats</strong><small>Lecture seule des réponses et scores enregistrés pour ce candidat.</small></div><div></div><div></div><div></div>';
+    const openResults = document.createElement('button');
+    openResults.type = 'button';
+    openResults.className = 'primary';
+    openResults.textContent = 'Ouvrir les résultats';
+    openResults.addEventListener('click', async () => {
+      await beginCandidateResults(candidateId, overlay);
+    });
+    row.lastElementChild.appendChild(openResults);
+    results.appendChild(row);
+  }
+
   const exports = overlay.querySelector('#seb-cc-detail-exports');
   if (!Array.isArray(result.exports) || !result.exports.length) {
     exports.innerHTML = '<div class="seb-cc-empty">Aucun document Word enregistré pour ce candidat.</div>';
@@ -204,6 +221,24 @@ async function openCandidateDetail(candidateId, onChanged) {
     await beginCandidateBilan(candidateId, overlay);
   });
   overlay.querySelector('#seb-cc-detail-close').addEventListener('click', () => overlay.remove());
+}
+
+async function beginCandidateResults(candidateId, detailOverlay = null) {
+  const prepared = await ipcRenderer.invoke('candidate-catalog:begin-results', candidateId);
+  if (!prepared || !prepared.ok) {
+    alert((prepared && prepared.error) || 'Impossible de préparer les résultats de ce candidat.');
+    return false;
+  }
+  if (detailOverlay) detailOverlay.remove();
+  const catalog = document.getElementById('seb-candidate-catalog');
+  if (catalog) catalog.remove();
+  const opened = await ipcRenderer.invoke('admin:open-candidate-results');
+  if (!opened) {
+    await ipcRenderer.invoke('candidate-catalog:end-results').catch(() => false);
+    alert('Impossible d’ouvrir la page Résultats.');
+    return false;
+  }
+  return true;
 }
 
 async function beginCandidateBilan(candidateId, detailOverlay = null) {

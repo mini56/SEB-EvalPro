@@ -25,6 +25,7 @@ module.exports = function registerCandidateCatalog({ app, ipcMain, getAdminUnloc
   const globalExportsRoot = path.join(root, 'Bilans');
   const BILAN_TYPE = 'SEB_EVALPRO_BILAN_ARCHIVE';
   let adminBilanWorkspace = null;
+  let adminResultsWorkspace = null;
 
   function writeJson(target, value) {
     ensureDir(path.dirname(target));
@@ -265,13 +266,17 @@ module.exports = function registerCandidateCatalog({ app, ipcMain, getAdminUnloc
 
   function candidateWorkspaceState(record) {
     const candidateFile = readJson(path.join(record.candidateDir, 'donnees', 'candidat.json')) || record.candidate || {};
+    const candidateForStorage = { ...candidateFile };
+    if (!candidateForStorage.prenom && candidateForStorage['prénom']) candidateForStorage.prenom = candidateForStorage['prénom'];
+    if (!candidateForStorage['prénom'] && candidateForStorage.prenom) candidateForStorage['prénom'] = candidateForStorage.prenom;
+    if (!candidateForStorage.lieu && candidateForStorage.ville) candidateForStorage.lieu = candidateForStorage.ville;
     const saved = readJson(path.join(record.candidateDir, 'donnees', 'evaluation-state.json')) || {};
     const responses = readJson(path.join(record.candidateDir, 'resultats', 'reponses.json'));
     const scores = readJson(path.join(record.candidateDir, 'resultats', 'scores.json'));
     const sessionStorage = { ...(saved.sessionStorage && typeof saved.sessionStorage === 'object' ? saved.sessionStorage : {}) };
     const localStorage = { ...(saved.localStorage && typeof saved.localStorage === 'object' ? saved.localStorage : {}) };
 
-    sessionStorage.candidat_data = JSON.stringify(candidateFile);
+    sessionStorage.candidat_data = JSON.stringify(candidateForStorage);
     sessionStorage.seb_evalpro_admin_candidate_id = String(record.candidateId || '');
     if (responses && typeof responses === 'object') sessionStorage.reponses_data = JSON.stringify(responses);
     if (scores && typeof scores === 'object') sessionStorage.scores_data = JSON.stringify(scores);
@@ -305,6 +310,7 @@ module.exports = function registerCandidateCatalog({ app, ipcMain, getAdminUnloc
     synchronize();
     const record = findById(candidateId);
     if (!record) return { ok:false, error:'Candidat introuvable.' };
+    adminResultsWorkspace = null;
     const state = candidateWorkspaceState(record);
     adminBilanWorkspace = {
       candidateId: record.candidateId,
@@ -353,6 +359,40 @@ module.exports = function registerCandidateCatalog({ app, ipcMain, getAdminUnloc
 
   ipcMain.handle('candidate-catalog:end-bilan', () => {
     adminBilanWorkspace = null;
+    return true;
+  });
+
+  ipcMain.handle('candidate-catalog:begin-results', (_event, candidateId) => {
+    if (!getAdminUnlocked()) return { ok:false, error:'Accès administrateur requis.' };
+    synchronize();
+    const record = findById(candidateId);
+    if (!record) return { ok:false, error:'Candidat introuvable.' };
+    adminBilanWorkspace = null;
+    adminResultsWorkspace = {
+      candidateId:record.candidateId,
+      candidateDir:record.candidateDir,
+      candidate:clone(record.candidate || {}),
+      state:candidateWorkspaceState(record)
+    };
+    return { ok:true, candidate:serialize(record) };
+  });
+
+  ipcMain.on('candidate-catalog:results-workspace-load-sync', (event) => {
+    if (!getAdminUnlocked() || !adminResultsWorkspace) {
+      event.returnValue = { ok:false };
+      return;
+    }
+    event.returnValue = {
+      ok:true,
+      readOnly:true,
+      candidateId:adminResultsWorkspace.candidateId,
+      candidate:clone(adminResultsWorkspace.candidate),
+      state:clone(adminResultsWorkspace.state)
+    };
+  });
+
+  ipcMain.handle('candidate-catalog:end-results', () => {
+    adminResultsWorkspace = null;
     return true;
   });
 

@@ -12,6 +12,7 @@ let barHideTimer = null;
 let closingSession = false;
 let lastSaveErrorShown = '';
 let adminCandidateWorkspace = null;
+let adminCandidateResultsWorkspace = null;
 
 function objectToStorage(storage, values) {
   if (!storage || !values || typeof values !== 'object') return;
@@ -74,6 +75,10 @@ function handleSaveResult(result) {
 
 function saveNow(sync = false) {
   if (closingSession) return null;
+  if (adminCandidateResultsWorkspace) {
+    const readOnlyResult = { ok:true, readOnly:true };
+    return sync ? readOnlyResult : Promise.resolve(readOnlyResult);
+  }
   const snapshot = buildSnapshot();
   restoredState = snapshot;
   const candidateWorkspace = !!adminCandidateWorkspace && isAdminBilanPage();
@@ -98,7 +103,7 @@ function saveNow(sync = false) {
 }
 
 function scheduleSave() {
-  if (closingSession) return;
+  if (closingSession || adminCandidateResultsWorkspace) return;
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => saveNow(false), 250);
 }
@@ -396,6 +401,13 @@ function injectAdminBar() {
         candidateBadge.hidden = false;
         return;
       }
+      if (adminCandidateResultsWorkspace && adminCandidateResultsWorkspace.candidate) {
+        const selected = adminCandidateResultsWorkspace.candidate;
+        const selectedName = [selected.prenom || selected['prénom'], selected.nom].filter(Boolean).join(' ').trim();
+        candidateBadge.textContent = 'Résultats candidat : ' + (selectedName || 'candidat sélectionné');
+        candidateBadge.hidden = false;
+        return;
+      }
       const active = await ipcRenderer.invoke('candidate:active');
       if (active && active.displayName) {
         candidateBadge.textContent = `Dossier candidat : ${active.displayName}`;
@@ -411,11 +423,13 @@ function injectAdminBar() {
 
   const updateAdminButtons = () => {
     const onBilan = isAdminBilanPage();
-    bilanButton.hidden = !adminUnlocked || onBilan;
-    returnButton.hidden = !adminUnlocked || !onBilan;
+    const onCandidateResults = !!adminCandidateResultsWorkspace;
+    const onAdminDetail = onBilan || onCandidateResults;
+    bilanButton.hidden = !adminUnlocked || onAdminDetail;
+    returnButton.hidden = !adminUnlocked || !onAdminDetail;
     exportCandidatesButton.hidden = !adminUnlocked;
     importCandidatesButton.hidden = !adminUnlocked;
-    closeSessionButton.hidden = !adminUnlocked || !!adminCandidateWorkspace;
+    closeSessionButton.hidden = !adminUnlocked || !!adminCandidateWorkspace || onCandidateResults;
     adminButton.textContent = adminUnlocked ? 'Verrouiller' : 'Administrateur';
     refreshCandidateBadge();
   };
@@ -446,6 +460,12 @@ function injectAdminBar() {
 
   returnButton.addEventListener('click', async () => {
     saveNow(true);
+    if (adminCandidateResultsWorkspace) {
+      await ipcRenderer.invoke('candidate-catalog:end-results').catch(() => false);
+      adminCandidateResultsWorkspace = null;
+      await ipcRenderer.invoke('admin:return-evaluation');
+      return;
+    }
     if (adminCandidateWorkspace) {
       await ipcRenderer.invoke('candidate-catalog:end-bilan').catch(() => false);
       await ipcRenderer.invoke('candidate:set-admin-export-context', '').catch(() => false);
@@ -559,21 +579,54 @@ try {
       try { window.sessionStorage.clear(); } catch (_) {}
       try { window.localStorage.clear(); } catch (_) {}
     }
+  } else {
+    const resultsWorkspace = ipcRenderer.sendSync('candidate-catalog:results-workspace-load-sync');
+    if (resultsWorkspace && resultsWorkspace.ok) {
+      adminCandidateResultsWorkspace = resultsWorkspace;
+      restoredState = resultsWorkspace.state || {};
+      try { window.sessionStorage.clear(); } catch (_) {}
+      try { window.localStorage.clear(); } catch (_) {}
+    }
   }
-  if (!adminCandidateWorkspace) {
+  if (!adminCandidateWorkspace && !adminCandidateResultsWorkspace) {
     restoredState = ipcRenderer.sendSync('state:load-sync') || {};
   }
   objectToStorage(window.sessionStorage, restoredState.sessionStorage);
   objectToStorage(window.localStorage, restoredState.localStorage);
 } catch (_) {}
 
+function showReadOnlyCandidateResults() {
+  if (!adminCandidateResultsWorkspace) return;
+  const page = document.getElementById('pageFinale');
+  if (!page) return;
+  let notice = document.getElementById('seb-admin-results-readonly');
+  if (!notice) {
+    notice = document.createElement('div');
+    notice.id = 'seb-admin-results-readonly';
+    notice.textContent = 'Résultats enregistrés — lecture seule';
+    notice.style.cssText = 'margin:8px 0 14px;padding:8px 12px;border:1px solid #9cc2e5;border-radius:6px;background:#f7fbff;color:#1f4e79;font:700 14px Arial,sans-serif;';
+    const heading = page.querySelector('h2');
+    if (heading) heading.insertAdjacentElement('afterend', notice);
+    else page.prepend(notice);
+  }
+  const runner = document.createElement('script');
+  runner.textContent = "(function(){document.querySelectorAll('.page').forEach(function(p){p.classList.remove('visible');});var page=document.getElementById('pageFinale');if(page)page.classList.add('visible');if(typeof afficherResultat==='function')afficherResultat();window.scrollTo(0,0);})();";
+  (document.documentElement || document.body).appendChild(runner);
+  runner.remove();
+  page.querySelectorAll('input,select,textarea,button').forEach((control) => { control.disabled = true; });
+}
+
 window.addEventListener('DOMContentLoaded', async () => {
   adminUnlocked = await ipcRenderer.invoke('admin:status');
   injectAdminBar();
-  document.addEventListener('input', scheduleSave, true);
-  document.addEventListener('change', scheduleSave, true);
-  document.addEventListener('click', scheduleSave, true);
-  periodicSaveTimer = setInterval(() => saveNow(false), 1000);
+  if (adminCandidateResultsWorkspace) {
+    showReadOnlyCandidateResults();
+  } else {
+    document.addEventListener('input', scheduleSave, true);
+    document.addEventListener('change', scheduleSave, true);
+    document.addEventListener('click', scheduleSave, true);
+    periodicSaveTimer = setInterval(() => saveNow(false), 1000);
+  }
 });
 
 window.addEventListener('beforeunload', () => {
