@@ -110,20 +110,13 @@ function insertBefore(text, marker, addition, label) {
 }
 
 // -----------------------------------------------------------------------------
-// 1 + 6 : page finale candidat DOCX réel + comparaison tolérante des heures.
+// Page 3 : comparaison tolérante des heures.
+// L'ancien DOCX automatique "Resultat_..." est retiré : la vraie page Résultats
+// est désormais disponible en lecture seule depuis le dossier candidat.
 // -----------------------------------------------------------------------------
 {
   const { target, text } = read('app/web/qcmv1.0.html');
   let out = text;
-
-  if (!out.includes('id="seb-result-docx-lib"')) {
-    out = replaceOnce(
-      out,
-      '</head>',
-      '<script src="js/docx.js" id="seb-result-docx-lib"></script>\n</head>',
-      'chargement bibliothèque DOCX résultats'
-    );
-  }
 
   if (!out.includes('function normalizeSebTime')) {
     const helper = `\nfunction normalizeSebTime(value) {\n  let s = String(value || '').trim().toLowerCase();\n  if (!s) return '';\n  try { s = s.normalize('NFD').replace(/[\\u0300-\\u036f]/g, ''); } catch (_) {}\n  s = s.replace(/heures?/g, 'h').replace(/heurs?/g, 'h').replace(/hrs?/g, 'h');\n  s = s.replace(/minutes?/g, '').replace(/mins?/g, '').replace(/mn/g, '');\n  s = s.replace(/\\s+/g, ' ').trim();\n  let match = s.match(/^(\\d{1,2})\\s*(?:h|:)\\s*(\\d{1,2})\\s*$/);\n  if (!match) match = s.match(/^(\\d{1,2})\\s+(\\d{1,2})\\s*$/);\n  if (!match) return s.replace(/\\s+/g, '');\n  const h = Number(match[1]), m = Number(match[2]);\n  if (!Number.isInteger(h) || !Number.isInteger(m) || h < 0 || h > 23 || m < 0 || m > 59) return '';\n  return String(h) + 'h' + String(m).padStart(2, '0');\n}\n\n`;
@@ -135,18 +128,6 @@ function insertBefore(text, marker, addition, label) {
     "    scores[`page${pageNum}_q${i}`] =\n      (bonnes && bonnes[i] && val.toString().toUpperCase() === bonnes[i].toString().toUpperCase())\n        ? 1 : 0;",
     "    scores[`page${pageNum}_q${i}`] =\n      (bonnes && bonnes[i] && (pageNum == 3\n        ? normalizeSebTime(val) === normalizeSebTime(bonnes[i])\n        : val.toString().toUpperCase() === bonnes[i].toString().toUpperCase()))\n        ? 1 : 0;",
     'comparaison heures page 3'
-  );
-
-  if (!out.includes('async function sauvegarderResultatStagiaireDocx')) {
-    const saveFn = `\nasync function sauvegarderResultatStagiaireDocx() {\n  try {\n    if (!window.docx || !window.docx.Document || !window.docx.Packer) {\n      console.warn('SEB EvalPro : bibliothèque DOCX indisponible pour le résultat stagiaire.');\n      return;\n    }\n    const resultat = document.getElementById('resultat');\n    if (!resultat || !resultat.innerText.trim()) return;\n    const candidat = JSON.parse(sessionStorage.getItem('candidat_data') || '{}');\n    const safePart = (value, upper) => {\n      let s = String(value || '').trim();\n      try { s = s.normalize('NFD').replace(/[\\u0300-\\u036f]/g, ''); } catch (_) {}\n      s = s.replace(/[^A-Za-z0-9-]+/g, '_').replace(/^_+|_+$/g, '') || 'CANDIDAT';\n      return upper ? s.toUpperCase() : s;\n    };\n    const nom = safePart(candidat.nom, true);\n    const prenom = safePart(candidat['prénom'] || candidat.prenom, false);\n    const date = /^\\d{4}-\\d{2}-\\d{2}$/.test(String(candidat.date || candidat.dateTest || ''))\n      ? String(candidat.date || candidat.dateTest)\n      : new Date().toISOString().slice(0, 10);\n    const filename = nom + '_' + prenom + '_' + date + '.docx';\n    const { Document, Packer, Paragraph, TextRun } = window.docx;\n    const lines = resultat.innerText.replace(/\\r/g, '').split('\\n');\n    const children = [\n      new Paragraph({ children: [new TextRun({ text: 'Résultats de l’évaluation SEB EvalPro', bold: true, size: 28 })] }),\n      new Paragraph({ text: '' })\n    ];\n    lines.forEach((line) => {\n      children.push(new Paragraph({ children: [new TextRun({ text: line || ' ', size: 20 })] }));\n    });\n    const documentWord = new Document({\n      sections: [{\n        properties: {\n          page: {\n            size: { width: 11906, height: 16838 },\n            margin: { top: 1134, right: 1134, bottom: 1134, left: 1134 }\n          }\n        },\n        children\n      }]\n    });\n    const blob = await Packer.toBlob(documentWord);\n    const url = URL.createObjectURL(blob);\n    const link = document.createElement('a');\n    link.href = url;\n    link.download = filename;\n    link.style.display = 'none';\n    document.body.appendChild(link);\n    link.click();\n    link.remove();\n    setTimeout(() => URL.revokeObjectURL(url), 3000);\n    console.log('SEB EvalPro : résultat stagiaire enregistré automatiquement :', filename);\n  } catch (error) {\n    console.error('SEB EvalPro : échec enregistrement résultat stagiaire DOCX', error);\n  }\n}\n\n`;
-    out = insertBefore(out, 'function afficherResultat() {', saveFn, 'fonction sauvegarde résultat stagiaire');
-  }
-
-  out = replaceOnce(
-    out,
-    "} catch (e) {\n    console.warn(\"Erreur tri de chevilles :\", e);\n}\n\n}\n/*-------------------------------------------------------------------------------------------------------------------------------*/",
-    "} catch (e) {\n    console.warn(\"Erreur tri de chevilles :\", e);\n}\n\n  // Le résultat complet visible par le stagiaire est archivé automatiquement en DOCX.\n  setTimeout(() => sauvegarderResultatStagiaireDocx(), 150);\n}\n/*-------------------------------------------------------------------------------------------------------------------------------*/",
-    'déclenchement sauvegarde résultat final'
   );
 
   write(target, out);
@@ -233,7 +214,6 @@ function insertBefore(text, marker, addition, label) {
     [main.includes('spellcheck: false'), 'spellcheck Electron'],
     [main.includes("admin:open-candidate-results"), 'accès admin résultats candidat'],
     [preload.includes('adminCandidateResultsWorkspace') && preload.includes('showReadOnlyCandidateResults'), 'accès résultats candidat Admin'],
-    [qcm.includes('sauvegarderResultatStagiaireDocx') && qcm.includes("Packer.toBlob"), 'DOCX résultat stagiaire'],
     [qcm.includes('normalizeSebTime(val) === normalizeSebTime(bonnes[i])'), 'normalisation heures page 3'],
     [stock.includes('data-seb-example') || stock.includes('sebExample'), 'marquage exemple stock'],
     [stock.includes('stockTotal", 33'), 'total stock 33'],
@@ -246,4 +226,4 @@ function insertBefore(text, marker, addition, label) {
   if (failed.length) fail(`contrôles finaux échoués: ${failed.join(', ')}`, 8);
 }
 
-console.log('SEB EvalPro priorités: résultats stagiaires DOCX + accès admin, bilan Word portrait sans répétition/PDF, stock, orthographe et heures corrigés.');
+console.log('SEB EvalPro priorités: Résultats par dossier candidat, bilan Word portrait sans PDF, stock, orthographe et heures corrigés.');

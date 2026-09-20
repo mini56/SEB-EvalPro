@@ -179,6 +179,7 @@ function parseJs(text, label) {
   const localAi = read('src/local-ai.js').text;
   const installer = read('build/installer.nsh').text;
   const priorityFixes = read('scripts/priority-fixes.js').text;
+  const packageText = read('package.json').text;
 
   for (const token of [
     'copyVerifiedAtomic',
@@ -300,8 +301,17 @@ function parseJs(text, label) {
     'admin:list-results',
     'admin:open-result',
     'seb-evalpro-results',
-    'createCandidateResultsDialog'
+    'createCandidateResultsDialog',
+    'sauvegarderResultatStagiaireDocx',
+    'seb-result-docx-lib'
   ]) if (priorityFixes.includes(forbidden)) fail('ancien flux Résultats global encore présent dans priority-fixes: ' + forbidden, 7);
+
+  if (packageText.includes('result-docx-style-fix.js')) {
+    fail('ancien script result-docx-style-fix encore exécuté par prepare:web', 7);
+  }
+  if (qcm.includes('sauvegarderResultatStagiaireDocx') || qcm.includes('seb-result-docx-lib')) {
+    fail('ancien DOCX automatique Résultat encore généré', 7);
+  }
 
   if (/https:\/\/cdnjs\.cloudflare\.com/i.test(qcm)) fail('CDN jsPDF encore présent', 7);
   if (/url\(\s*['"]?https?:\/\//i.test(carre)) fail('image Internet encore présente dans carre.html', 7);

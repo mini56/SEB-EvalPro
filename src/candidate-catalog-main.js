@@ -444,7 +444,7 @@ module.exports = function registerCandidateCatalog({ app, ipcMain, getAdminUnloc
     if (!fs.existsSync(dir)) return [];
     cleanupDuplicateWordExports(candidateDir);
     return fs.readdirSync(dir, { withFileTypes:true })
-      .filter((e) => e.isFile() && /\.(doc|docx)$/i.test(e.name))
+      .filter((e) => e.isFile() && /^Evaluation_.+\.docx?$/i.test(e.name))
       .map((e) => e.name)
       .sort((a,b) => a.localeCompare(b, 'fr', { sensitivity:'base' }));
   }
@@ -652,7 +652,7 @@ module.exports = function registerCandidateCatalog({ app, ipcMain, getAdminUnloc
     const record = findById(candidateId);
     if (!record) return { ok:false, error:'Candidat introuvable.' };
     const safe = path.basename(String(filename || ''));
-    if (!/\.(doc|docx)$/i.test(safe)) return { ok:false, error:'Type de fichier non autorisé.' };
+    if (!/^Evaluation_.+\.docx?$/i.test(safe)) return { ok:false, error:'Type de fichier non autorisé.' };
     const full = path.join(record.candidateDir, 'bilan', 'exports', safe);
     if (!fs.existsSync(full)) return { ok:false, error:'Fichier résultat introuvable.' };
     const error = await shell.openPath(full);

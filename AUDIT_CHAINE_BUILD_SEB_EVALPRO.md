@@ -53,3 +53,11 @@ Les scripts de correction d'exercices (QCM, dictée, briques, tri, calculatrice,
 - Toute évolution de `main.js` ou `preload.js` doit être compatible avec les scripts cœur ci-dessus avant de déclencher un build.
 - Aucun ancien stockage global Résultats/Bilans ne doit redevenir une source opérationnelle. Les anciens emplacements ne servent qu'à la migration de sécurité.
 - Ne jamais supprimer un script d'exercice sans vérifier que son résultat est déjà intégré durablement dans la source ou couvert par un test équivalent.
+
+
+## Script retiré de la chaîne après audit
+
+- `scripts/result-docx-style-fix.js` est conservé uniquement comme historique, mais n'est plus exécuté par `prepare:web`.
+- Il appartenait à l'ancien flux global « Résultats stagiaires » et produisait automatiquement un second Word `Resultat_...`.
+- Le résultat officiel est maintenant la page Résultats enregistrée dans le dossier candidat, ouverte en lecture seule.
+- La rubrique « Document Word du bilan » n'affiche désormais que les fichiers `Evaluation_....doc/docx`.
