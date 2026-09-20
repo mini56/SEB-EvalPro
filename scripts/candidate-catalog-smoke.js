@@ -169,7 +169,11 @@ try {
   assert(afterBilan && afterBilan.ok);
   assert.strictEqual(afterBilan.bilans.filter((b) => b.integrityOk).length, 2, 'Le catalogue doit voir le bilan original et sa révision.');
   assert.strictEqual(afterBilan.candidate.revisionCount, 1, 'Le catalogue doit annoncer une révision.');
-  assert.deepStrictEqual(afterBilan.exports.filter((name) => /^Evaluation_DUPONT_JEAN_2026-09-18/i.test(name)), [wordBase], 'Un seul Word courant doit rester visible.');
+  assert.deepStrictEqual(
+    afterBilan.exports.filter((name) => /^Evaluation_DUPONT_JEAN_2026-09-18/i.test(name)).map((name) => name.toLowerCase()),
+    [wordBase.toLowerCase()],
+    'Un seul Word courant doit rester visible, sans dépendre de la casse du nom de fichier Windows.'
+  );
   assert.strictEqual(fs.existsSync(path.join(newDir, 'bilan', 'exports', 'Evaluation_DUPONT_JEAN_2026-09-18_2.doc')), false, 'Le doublon Word _2 doit être nettoyé.');
   assert.strictEqual(fs.existsSync(path.join(newDir, 'bilan', 'exports', 'Evaluation_DUPONT_JEAN_2026-09-18_R01.doc')), false, 'L’ancien Word de révision doit être nettoyé.');
 
