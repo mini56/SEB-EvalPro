@@ -66,7 +66,11 @@ try {
   });
 
   const handlers = new Map();
-  const ipcMain = { handle(name, fn) { handlers.set(name, fn); } };
+  const listeners = new Map();
+  const ipcMain = {
+    handle(name, fn) { handlers.set(name, fn); },
+    on(name, fn) { listeners.set(name, fn); }
+  };
   const app = {
     getPath(name) {
       if (name === 'documents') return documentsPath;
@@ -84,8 +88,13 @@ try {
   const list = handlers.get('candidate-catalog:list');
   const detail = handlers.get('candidate-catalog:detail');
   const loadBilan = handlers.get('candidate-catalog:load-bilan');
+  const beginBilan = handlers.get('candidate-catalog:begin-bilan');
+  const saveWorkspace = handlers.get('candidate-catalog:workspace-save');
+  const endBilan = handlers.get('candidate-catalog:end-bilan');
+  const loadWorkspaceSync = listeners.get('candidate-catalog:workspace-load-sync');
+  const saveWorkspaceSync = listeners.get('candidate-catalog:workspace-save-sync');
   const sync = handlers.get('candidate-catalog:sync');
-  assert(list && detail && loadBilan && sync, 'Handlers catalogue absents.');
+  assert(list && detail && loadBilan && beginBilan && saveWorkspace && endBilan && loadWorkspaceSync && saveWorkspaceSync && sync, 'Handlers catalogue/bilan absents.');
   assert.strictEqual(handlers.has('candidate-catalog:delete'), false, 'Aucun handler ne doit permettre de supprimer un candidat.');
 
   const first = list();
@@ -106,6 +115,38 @@ try {
   assert(d && d.ok);
   assert.strictEqual(d.bilans.length, 1);
   assert.strictEqual(d.bilans[0].integrityOk, false, 'Un bilan corrompu doit être signalé.');
+
+  const prepared = beginBilan(null, 'candidate-dupont');
+  assert(prepared && prepared.ok, 'Le candidat doit pouvoir ouvrir un espace de bilan même sans dépendre d’une session active.');
+
+  const loadEvent = { returnValue:null };
+  loadWorkspaceSync(loadEvent);
+  assert(loadEvent.returnValue && loadEvent.returnValue.ok, 'Les données du candidat sélectionné doivent être chargées pour le bilan.');
+  assert.strictEqual(loadEvent.returnValue.candidateId, 'candidate-dupont');
+  const loadedCandidate = JSON.parse(loadEvent.returnValue.state.sessionStorage.candidat_data);
+  assert.strictEqual(loadedCandidate.nom, 'DUPONT');
+  assert.strictEqual(loadedCandidate.prenom || loadedCandidate['prénom'], 'Jean');
+
+  const modifiedState = {
+    ...loadEvent.returnValue.state,
+    sessionStorage:{
+      ...loadEvent.returnValue.state.sessionStorage,
+      admin_bilan_state:JSON.stringify({ rows:{ test:{ level:'I' } } })
+    }
+  };
+  const savedAsync = saveWorkspace(null, modifiedState);
+  assert(savedAsync && savedAsync.ok, 'La sauvegarde du bilan sélectionné doit être acceptée.');
+  const persisted = JSON.parse(fs.readFileSync(path.join(newDir, 'donnees', 'evaluation-state.json'), 'utf8'));
+  assert.strictEqual(persisted.sessionStorage.admin_bilan_state, modifiedState.sessionStorage.admin_bilan_state, 'Le bilan doit être sauvegardé dans le dossier du candidat sélectionné.');
+
+  const saveEvent = { returnValue:null };
+  saveWorkspaceSync(saveEvent, modifiedState);
+  assert(saveEvent.returnValue && saveEvent.returnValue.ok, 'La sauvegarde synchrone du bilan sélectionné doit être acceptée.');
+
+  assert.strictEqual(endBilan(), true, 'La fermeture de l’espace bilan doit réussir.');
+  const afterEnd = { returnValue:null };
+  loadWorkspaceSync(afterEnd);
+  assert(afterEnd.returnValue && afterEnd.returnValue.ok === false, 'L’espace bilan fermé ne doit plus exposer de candidat sélectionné.');
 
   const corrupt = loadBilan(null, 'candidate-dupont', bilanName);
   assert(corrupt && corrupt.ok === false && corrupt.corruption === true, 'Un bilan corrompu doit être refusé avec avertissement.');
