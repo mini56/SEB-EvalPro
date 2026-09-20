@@ -30,13 +30,15 @@ const replayMain = read('src/replay-main.js');
 const replayPreload = read('src/replay-preload.js');
 const historyMain = read('src/bilan-history-main.js');
 const historyPreload = read('src/bilan-history-preload.js');
+const preload = read('src/preload.js');
 
 const required = [
   [admin, "const bl=be<=2?'I':be<=4?'II':'III'", 'barème Briques'],
   [admin, "apply('mail',e<=1?'I':e<=3?'II':'III'", 'barème Messagerie'],
   [admin, 'Math.round(pr/27*100)', 'Maths /27'],
   [qcm, 'const scoreMax = 7;', 'traitement de texte /7'],
-  [qcm, 'seb_evalpro_candidate_result_saved', 'DOCX candidat unique par session'],
+  [preload, 'showReadOnlyCandidateResults', 'Résultats candidat par dossier'],
+  [preload, 'seb-admin-results-close', 'sortie de la page Résultats candidat'],
   [paronymes, 'data-correct="true">Aplanir</td>', 'Paronymes Raboter -> Aplanir'],
   [replayMain, 'captureBeyondViewport: true', 'Replay pleine page'],
   [replayMain, 'SEB_ADMIN_CAPTURE_ADMINMODE_GUARD', 'barrière backend Admin'],

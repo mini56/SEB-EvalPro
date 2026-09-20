@@ -99,7 +99,8 @@ function checkHtmlScripts(html, label) {
 
 // -----------------------------------------------------------------------------
 // 2. Résultats candidat : traitement de texte /7, dénominateurs cohérents,
-//    carré résilient, code Brique masqué et un seul DOCX par session.
+//    carré résilient et code Brique masqué. La page Résultats est désormais
+//    consultée directement depuis le dossier candidat, sans DOCX automatique.
 // -----------------------------------------------------------------------------
 {
   const { file, text } = read('app/web/qcmv1.0.html');
@@ -124,31 +125,11 @@ function checkHtmlScripts(html, label) {
 
   out = out.replace(/\s*<span><strong>🔑 Code :<\/strong> \$\{evalBrique\.code \|\| ["']—["']\}<\/span>/g, '');
 
-  const saveStart = out.indexOf('async function sauvegarderResultatStagiaireDocx() {');
-  if (saveStart < 0) fail('sauvegarde DOCX candidat introuvable', 9);
-  const saveEnd = out.indexOf('\n  } catch (error) {', saveStart);
-  if (saveEnd < 0) fail('fin sauvegarde DOCX candidat introuvable', 9);
-  let saveBlock = out.slice(saveStart, saveEnd);
-  if (!saveBlock.includes("seb_evalpro_candidate_result_saved")) {
-    saveBlock = saveBlock.replace(
-      "async function sauvegarderResultatStagiaireDocx() {\n  try {",
-      "async function sauvegarderResultatStagiaireDocx() {\n  try {\n    if (sessionStorage.getItem('seb_evalpro_candidate_result_saved') === '1') return;"
-    );
-    saveBlock = replaceOnce(
-      saveBlock,
-      '    link.click();\n    link.remove();',
-      "    link.click();\n    sessionStorage.setItem('seb_evalpro_candidate_result_saved', '1');\n    link.remove();",
-      'marqueur DOCX candidat enregistré'
-    );
-    out = out.slice(0, saveStart) + saveBlock + out.slice(saveEnd);
-  }
-
   for (const required of [
     'const scoreMax = 7;',
     'totalQuestions += denom4 || 3;',
     'totalQuestions += repTxt.length || 15;',
-    "sessionStorage.getItem('carre_magique_erreurs') ?? sessionStorage.getItem('puzzleErrors')",
-    'seb_evalpro_candidate_result_saved'
+    "sessionStorage.getItem('carre_magique_erreurs') ?? sessionStorage.getItem('puzzleErrors')"
   ]) {
     if (!out.includes(required)) fail('Résultats candidat incomplets : ' + required, 10);
   }
@@ -196,27 +177,20 @@ function checkHtmlScripts(html, label) {
 }
 
 // -----------------------------------------------------------------------------
-// 5. DOCX candidat : pas d'écrasement entre deux évaluations le même jour.
+// 5. Word du bilan : routage vers le dossier candidat sélectionné.
+// L'ancien DOCX automatique de la page Résultats n'existe plus.
 // -----------------------------------------------------------------------------
 {
   const { file, text } = read('src/main.js');
-  let out = text;
-  const oldPattern = "/^[A-Za-z0-9-]+_[A-Za-z0-9-]+_\\d{4}-\\d{2}-\\d{2}\\.docx$/i";
-  const newPattern = "/^[A-Za-z0-9-]+_[A-Za-z0-9-]+_\\d{4}-\\d{2}-\\d{2}(?:_\\d+)?\\.docx$/i";
-  const candidateFolderRouting = out.includes("const candidateExportDir = getCandidateStore().getActiveExportDir();");
-  out = replaceCount(out, oldPattern, newPattern, candidateFolderRouting ? 2 : 3, 'regex résultats candidat avec suffixe');
-
-  if (!candidateFolderRouting) {
-    const routing = "      item.setSavePath(isCandidateResult\n        ? path.join(bilanDocumentsDir(), filename)\n        : uniqueOutputPath(bilanDocumentsDir(), filename));";
-    if (out.includes(routing)) {
-      out = out.replace(routing, "      item.setSavePath(uniqueOutputPath(bilanDocumentsDir(), filename));");
-    }
-    if (!out.includes("item.setSavePath(uniqueOutputPath(bilanDocumentsDir(), filename));")) {
-      fail('routage DOCX candidat unique absent', 13);
-    }
-  } else if (!out.includes("const targetDirectory = adminExportCandidateDir || candidateExportDir || bilanDocumentsDir();")) {
-    fail('routage DOCX vers le dossier candidat/admin absent', 13);
+  const out = text;
+  for (const required of [
+    "const candidateExportDir = getCandidateStore().getActiveExportDir();",
+    "const targetDirectory = adminExportCandidateDir || candidateExportDir || bilanDocumentsDir();",
+    "const isCurrentCandidateWord = !!adminExportCandidateDir && /^Evaluation_.+\\.docx?$/i.test(filename);"
+  ]) {
+    if (!out.includes(required)) fail('routage Word bilan candidat absent : ' + required, 13);
   }
+  if (out.includes('Resultat_')) fail('ancien routage DOCX de résultats encore présent dans main.js', 13);
   try { new vm.Script(out); } catch (error) { fail('src/main.js invalide : ' + error.message, 13); }
   write(file, out);
 }
@@ -323,4 +297,4 @@ function checkHtmlScripts(html, label) {
   if (full.value !== 75 || full.total !== 75) fail('Expression complète doit rester sur 75', 17);
 }
 
-console.log('SEB EvalPro Build #135 : audit corrigé — Maths /27, traitement de texte /7, Briques/Messagerie, Expression sans points fantômes, résultats robustes, Carré repris, Paronymes corrigé, DOCX non écrasé, replay pleine page et fermeture protégée.');
+console.log('SEB EvalPro Build #135 : audit corrigé — Maths /27, traitement de texte /7, Briques/Messagerie, Expression sans points fantômes, résultats robustes, Carré repris, Paronymes corrigé, Word bilan routé par candidat, replay pleine page et fermeture protégée.');

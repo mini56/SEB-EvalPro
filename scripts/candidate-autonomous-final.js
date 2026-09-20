@@ -180,6 +180,9 @@ function parseJs(text, label) {
   const installer = read('build/installer.nsh').text;
   const priorityFixes = read('scripts/priority-fixes.js').text;
   const packageText = read('package.json').text;
+  const build135Audit = read('scripts/build135-audit-fixes.js').text;
+  const build135Runner = read('scripts/build135-runner.js').text;
+  const cleanRegressionGuard = read('scripts/build159-clean-regression-guard.js').text;
 
   for (const token of [
     'copyVerifiedAtomic',
@@ -311,6 +314,16 @@ function parseJs(text, label) {
   }
   if (qcm.includes('sauvegarderResultatStagiaireDocx') || qcm.includes('seb-result-docx-lib')) {
     fail('ancien DOCX automatique Résultat encore généré', 7);
+  }
+
+  for (const [label, source] of [
+    ['build135-audit', build135Audit],
+    ['build135-runner', build135Runner],
+    ['build159-clean-regression-guard', cleanRegressionGuard]
+  ]) {
+    for (const forbidden of ['sauvegarderResultatStagiaireDocx', 'seb_evalpro_candidate_result_saved']) {
+      if (source.includes(forbidden)) fail(label + ' dépend encore de l’ancien DOCX Résultat: ' + forbidden, 7);
+    }
   }
 
   if (/https:\/\/cdnjs\.cloudflare\.com/i.test(qcm)) fail('CDN jsPDF encore présent', 7);

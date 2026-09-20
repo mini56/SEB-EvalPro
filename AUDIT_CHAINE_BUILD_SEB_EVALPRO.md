@@ -61,3 +61,12 @@ Les scripts de correction d'exercices (QCM, dictée, briques, tri, calculatrice,
 - Il appartenait à l'ancien flux global « Résultats stagiaires » et produisait automatiquement un second Word `Resultat_...`.
 - Le résultat officiel est maintenant la page Résultats enregistrée dans le dossier candidat, ouverte en lecture seule.
 - La rubrique « Document Word du bilan » n'affiche désormais que les fichiers `Evaluation_....doc/docx`.
+
+
+## Adaptation des gardes #135 / #159
+
+- `build135-audit-fixes.js` conserve ses contrôles fonctionnels (barèmes, résultats, Carré, Paronymes, replay, fermeture protégée), sans réclamer l'ancien DOCX automatique de la page Résultats.
+- `build135-runner.js` ne réécrit plus les anciennes regex de ce DOCX ; sa partie Word des bilans/révisions reste active.
+- Le contrôle Word #135 vérifie désormais le routage `Evaluation_...` vers le dossier du candidat actif ou du candidat sélectionné en Admin.
+- `build159-clean-regression-guard.js` vérifie la vraie page Résultats par dossier candidat et son bouton de sortie.
+- `candidate-autonomous-final.js` interdit à ces gardes de redépendre de l'ancien mécanisme.
