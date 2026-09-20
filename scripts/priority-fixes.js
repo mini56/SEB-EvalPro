@@ -76,8 +76,9 @@ function insertBefore(text, marker, addition, label) {
       }
     }
 
-    const handlers = `\nipcMain.handle('admin:list-results', () => {\n  if (!adminSessionUnlocked) return [];\n  try {\n    ensureSebDocumentsFolders();\n    return fs.readdirSync(bilanDocumentsDir(), { withFileTypes: true })\n      .filter((entry) => entry.isFile() && /^[A-Za-z0-9-]+_[A-Za-z0-9-]+_\\d{4}-\\d{2}-\\d{2}\\.docx$/i.test(entry.name))\n      .map((entry) => {\n        const fullPath = path.join(bilanDocumentsDir(), entry.name);\n        const stat = fs.statSync(fullPath);\n        return { name: entry.name, modifiedAt: stat.mtime.toISOString() };\n      })\n      .sort((a, b) => String(b.modifiedAt).localeCompare(String(a.modifiedAt)));\n  } catch (_) {\n    return [];\n  }\n});\n\nipcMain.handle('admin:open-result', async (_event, requestedName) => {\n  if (!adminSessionUnlocked) return { ok: false, error: 'Accès administrateur requis.' };\n  const name = path.basename(String(requestedName || ''));\n  if (!/^[A-Za-z0-9-]+_[A-Za-z0-9-]+_\\d{4}-\\d{2}-\\d{2}\\.docx$/i.test(name)) {\n    return { ok: false, error: 'Nom de fichier invalide.' };\n  }\n  const fullPath = path.join(bilanDocumentsDir(), name);\n  if (!fs.existsSync(fullPath)) return { ok: false, error: 'Fichier introuvable.' };\n  const error = await shell.openPath(fullPath);\n  return error ? { ok: false, error } : { ok: true };\n});\n\n`;
-    out = insertBefore(out, "ipcMain.handle('admin:open-bilan'", handlers, 'handlers résultats stagiaires');
+    if (!out.includes("admin:open-candidate-results")) {
+      fail('flux Résultats candidat par dossier absent de main.js', 5);
+    }
   }
   write(target, out);
 }
@@ -93,38 +94,9 @@ function insertBefore(text, marker, addition, label) {
       'marqueur preload'
     );
 
-    const hasCandidateFolderResults = out.includes("candidate-catalog:results-workspace-load-sync") || out.includes("adminCandidateResultsWorkspace");
+    const hasCandidateFolderResults = out.includes("candidate-catalog:results-workspace-load-sync") && out.includes("adminCandidateResultsWorkspace");
     if (!hasCandidateFolderResults) {
-    out = replaceOnce(
-      out,
-      "    <button id=\"seb-evalpro-return\" type=\"button\" hidden>Retour à l'évaluation</button>\n    <button id=\"seb-evalpro-bilan\" type=\"button\" hidden>Bilan</button>",
-      "    <button id=\"seb-evalpro-return\" type=\"button\" hidden>Retour à l'évaluation</button>\n    <button id=\"seb-evalpro-results\" type=\"button\" hidden>Résultats stagiaires</button>\n    <button id=\"seb-evalpro-bilan\" type=\"button\" hidden>Bilan</button>",
-      'bouton résultats stagiaires'
-    );
-
-    const dialogFn = `\nfunction createCandidateResultsDialog() {\n  return new Promise(async (resolve) => {\n    const backdrop = document.createElement('div');\n    backdrop.id = 'seb-evalpro-results-dialog';\n    backdrop.innerHTML = \`\n      <div class="seb-results-card" role="dialog" aria-modal="true" aria-label="Résultats stagiaires">\n        <div class="seb-results-title">Résultats stagiaires enregistrés</div>\n        <div class="seb-results-path">Documents\\SEB EvalPro\\Bilans</div>\n        <div id="seb-results-list" class="seb-results-list">Chargement…</div>\n        <div class="seb-results-actions"><button type="button" id="seb-results-close">Fermer</button></div>\n      </div>\` ;\n    const style = document.createElement('style');\n    style.textContent = \`\n      #seb-evalpro-results-dialog{position:fixed;inset:0;z-index:2147483647;background:rgba(0,0,0,.42);display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif}\n      #seb-evalpro-results-dialog .seb-results-card{width:720px;max-width:calc(100vw - 40px);max-height:80vh;background:#fff;border:1px solid #aaa;border-radius:8px;padding:18px;box-shadow:0 10px 35px rgba(0,0,0,.3);box-sizing:border-box;display:flex;flex-direction:column}\n      #seb-evalpro-results-dialog .seb-results-title{font-size:20px;font-weight:700;color:#0070c0;margin-bottom:4px}\n      #seb-evalpro-results-dialog .seb-results-path{font-size:12px;color:#666;margin-bottom:12px}\n      #seb-evalpro-results-dialog .seb-results-list{overflow:auto;border:1px solid #ccc;min-height:180px;max-height:50vh;background:#fafafa}\n      #seb-evalpro-results-dialog .seb-result-row{display:flex;align-items:center;gap:10px;padding:9px 10px;border-bottom:1px solid #ddd;background:#fff}\n      #seb-evalpro-results-dialog .seb-result-row:last-child{border-bottom:0}\n      #seb-evalpro-results-dialog .seb-result-name{flex:1;font-weight:700;word-break:break-all}\n      #seb-evalpro-results-dialog .seb-result-date{font-size:12px;color:#666;white-space:nowrap}\n      #seb-evalpro-results-dialog button{font-family:Arial,sans-serif;font-size:14px;padding:7px 12px;border:1px solid #999;border-radius:4px;background:#f2f2f2;cursor:pointer}\n      #seb-evalpro-results-dialog .seb-result-open{background:#0070c0;color:#fff;border-color:#0070c0}\n      #seb-evalpro-results-dialog .seb-results-actions{display:flex;justify-content:flex-end;margin-top:12px}\n      #seb-evalpro-results-dialog .seb-results-empty{padding:30px;text-align:center;color:#555}\n    \`;\n    backdrop.appendChild(style);\n    document.body.appendChild(backdrop);\n    const finish = () => { backdrop.remove(); resolve(); };\n    backdrop.querySelector('#seb-results-close').addEventListener('click', finish);\n    backdrop.addEventListener('keydown', (event) => { if (event.key === 'Escape') finish(); });\n    const list = backdrop.querySelector('#seb-results-list');\n    let files = [];\n    try { files = await ipcRenderer.invoke('admin:list-results'); } catch (_) {}\n    list.innerHTML = '';\n    if (!Array.isArray(files) || files.length === 0) {\n      list.innerHTML = '<div class="seb-results-empty">Aucun résultat stagiaire enregistré.</div>';\n    } else {\n      files.forEach((file) => {\n        const row = document.createElement('div');\n        row.className = 'seb-result-row';\n        const name = document.createElement('div');\n        name.className = 'seb-result-name';\n        name.textContent = file.name;\n        const date = document.createElement('div');\n        date.className = 'seb-result-date';\n        const parsed = new Date(file.modifiedAt);\n        date.textContent = Number.isNaN(parsed.getTime()) ? '' : parsed.toLocaleString('fr-FR');\n        const open = document.createElement('button');\n        open.type = 'button';\n        open.className = 'seb-result-open';\n        open.textContent = 'Ouvrir';\n        open.addEventListener('click', async () => {\n          const result = await ipcRenderer.invoke('admin:open-result', file.name);\n          if (!result?.ok) alert(result?.error || 'Impossible d’ouvrir ce document.');\n        });\n        row.append(name, date, open);\n        list.appendChild(row);\n      });\n    }\n    backdrop.tabIndex = -1;\n    backdrop.focus();\n  });\n}\n\n`;
-    out = insertBefore(out, 'function injectAdminBar()', dialogFn, 'dialog résultats stagiaires');
-
-    out = replaceOnce(
-      out,
-      "  const bilanButton = bar.querySelector('#seb-evalpro-bilan');\n  const returnButton = bar.querySelector('#seb-evalpro-return');",
-      "  const bilanButton = bar.querySelector('#seb-evalpro-bilan');\n  const resultsButton = bar.querySelector('#seb-evalpro-results');\n  const returnButton = bar.querySelector('#seb-evalpro-return');",
-      'référence bouton résultats'
-    );
-
-    out = replaceOnce(
-      out,
-      "    bilanButton.hidden = !adminUnlocked || onBilan;\n    returnButton.hidden = !adminUnlocked || !onBilan;",
-      "    bilanButton.hidden = !adminUnlocked || onBilan;\n    resultsButton.hidden = !adminUnlocked;\n    returnButton.hidden = !adminUnlocked || !onBilan;",
-      'visibilité bouton résultats'
-    );
-
-    out = replaceOnce(
-      out,
-      "  bilanButton.addEventListener('click', async () => {",
-      "  resultsButton.addEventListener('click', async () => {\n    showBar();\n    await createCandidateResultsDialog();\n    scheduleHideBar();\n  });\n\n  bilanButton.addEventListener('click', async () => {",
-      'action bouton résultats'
-    );
+      fail('flux Résultats candidat par dossier absent de preload.js', 5);
     }
 
     out = replaceOnce(
@@ -259,8 +231,8 @@ function insertBefore(text, marker, addition, label) {
 
   const checks = [
     [main.includes('spellcheck: false'), 'spellcheck Electron'],
-    [(main.includes("admin:list-results") && main.includes("admin:open-result")) || main.includes("admin:open-candidate-results"), 'accès admin résultats'],
-    [preload.includes('Résultats stagiaires') || (preload.includes('adminCandidateResultsWorkspace') && preload.includes('showReadOnlyCandidateResults')), 'accès résultats candidat Admin'],
+    [main.includes("admin:open-candidate-results"), 'accès admin résultats candidat'],
+    [preload.includes('adminCandidateResultsWorkspace') && preload.includes('showReadOnlyCandidateResults'), 'accès résultats candidat Admin'],
     [qcm.includes('sauvegarderResultatStagiaireDocx') && qcm.includes("Packer.toBlob"), 'DOCX résultat stagiaire'],
     [qcm.includes('normalizeSebTime(val) === normalizeSebTime(bonnes[i])'), 'normalisation heures page 3'],
     [stock.includes('data-seb-example') || stock.includes('sebExample'), 'marquage exemple stock'],

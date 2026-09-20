@@ -72,6 +72,17 @@ try {
   assert(manifest.closedAt, 'La date de fermeture doit être enregistrée.');
   assert(fs.existsSync(first.candidateDir), 'Le dossier candidat ne doit jamais être supprimé à la fermeture.');
 
+  const reopened = store.saveSnapshot({
+    ...state,
+    lastPage:'pageFinale.html',
+    lastEvaluationPage:'pageFinale.html'
+  });
+  assert(reopened, 'Une sauvegarde tardive du même candidat doit retrouver son dossier existant.');
+  assert.strictEqual(reopened.candidateId, first.candidateId, 'Une fermeture suivie d’une sauvegarde ne doit jamais recréer le même candidat.');
+  assert.strictEqual(reopened.candidateDir, first.candidateDir, 'Le même candidat doit toujours conserver un seul dossier.');
+  const candidateFolders = fs.readdirSync(store.paths.candidatesRoot, { withFileTypes:true }).filter((entry) => entry.isDirectory());
+  assert.strictEqual(candidateFolders.length, 1, 'Aucun dossier _2/_3 ne doit être créé pour la même identité candidat.');
+
   console.log('Candidate Store Test #1: OK');
   console.log(first.folderName);
 } finally {

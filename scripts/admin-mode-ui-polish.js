@@ -244,7 +244,7 @@ function sebSyncAdminBarState() {
   if (returnButton) returnButton.hidden = !adminUnlocked || !onAdminDetail;
   if (exportCandidatesButton) exportCandidatesButton.hidden = !adminUnlocked;
   if (importCandidatesButton) importCandidatesButton.hidden = !adminUnlocked;
-  if (closeSessionButton) closeSessionButton.hidden = !adminUnlocked || !!adminCandidateWorkspace || onCandidateResults;
+  if (closeSessionButton) closeSessionButton.hidden = !adminUnlocked;
 }
 `;
     out = replaceRequired(out, 'function injectAdminBar() {', syncHelper + '\nfunction injectAdminBar() {', 'helper synchronisation Admin');

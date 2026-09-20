@@ -53,6 +53,41 @@ Var SebBrandingFinishDialog
 Var SebBrandingFinishImage
 Var SebBrandingFinishHandle
 
+!macro customInstall
+  # L'IA locale llama.cpp nécessite le runtime Microsoft Visual C++ x64.
+  # Le Setup embarque le redistribuable officiel Microsoft et ne le lance
+  # que si le runtime v14 x64 n'est pas déjà installé.
+  StrCpy $0 0
+  SetRegView 32
+  ReadRegDWORD $0 HKLM "SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64" "Installed"
+  StrCmp $0 1 seb_vc_runtime_ready
+  SetRegView 64
+  ReadRegDWORD $0 HKLM "SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64" "Installed"
+  StrCmp $0 1 seb_vc_runtime_ready
+
+  InitPluginsDir
+  File /oname=$PLUGINSDIR\vc_redist.x64.exe "${BUILD_RESOURCES_DIR}\vc_redist.x64.exe"
+  DetailPrint "Installation du composant Microsoft Visual C++ x64 requis par l'IA locale..."
+  ClearErrors
+  ExecShellWait "runas" "$PLUGINSDIR\vc_redist.x64.exe" "/install /quiet /norestart" SW_HIDE
+  IfErrors seb_vc_runtime_failed
+
+  StrCpy $0 0
+  SetRegView 32
+  ReadRegDWORD $0 HKLM "SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64" "Installed"
+  StrCmp $0 1 seb_vc_runtime_ready
+  SetRegView 64
+  ReadRegDWORD $0 HKLM "SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64" "Installed"
+  StrCmp $0 1 seb_vc_runtime_ready
+
+seb_vc_runtime_failed:
+  MessageBox MB_ICONSTOP|MB_OK "Le composant Microsoft Visual C++ x64 requis par l'IA locale n'a pas pu être installé.$\r$\n$\r$\nRelancez le Setup SEB EvalPro et acceptez la demande Windows d'administration."
+  Abort
+
+seb_vc_runtime_ready:
+  SetRegView lastused
+!macroend
+
 !macro preInit
   InitPluginsDir
   File /oname=$PLUGINSDIR\seb-eval-pro-branding.bmp "${BUILD_RESOURCES_DIR}\installerBranding.bmp"

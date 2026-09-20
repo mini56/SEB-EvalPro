@@ -27,8 +27,8 @@ function addStyle() {
     .seb-cc-search-wrap{padding:12px 16px;border-bottom:1px solid #ddd;background:#f7f9fc}
     .seb-cc-search,.seb-list-search{width:100%;box-sizing:border-box;font:16px Arial,sans-serif;padding:10px 12px;border:1px solid #9aa7b8;border-radius:6px;background:#fff}
     .seb-cc-body{padding:12px 16px;overflow-y:auto;min-height:260px;max-height:68vh;background:#f5f7fb}
-    .seb-cc-row{display:grid;grid-template-columns:1.3fr 1.2fr .72fr .9fr auto;gap:10px;align-items:center;padding:11px 12px;background:#fff;border:1px solid #d8dde8;border-radius:7px;margin-bottom:8px}
-    .seb-cc-row strong{font-size:15px;color:#222}.seb-cc-row small{display:block;color:#666;margin-top:3px}.seb-cc-status{font-size:12px;font-weight:700}
+    .seb-cc-row{display:grid;grid-template-columns:1.35fr 1.2fr .95fr auto;gap:10px;align-items:center;padding:11px 12px;background:#fff;border:1px solid #d8dde8;border-radius:7px;margin-bottom:8px}
+    .seb-cc-row strong{font-size:15px;color:#222}.seb-cc-row small{display:block;color:#666;margin-top:3px}
     .seb-cc-bilan{font-size:13px;line-height:1.35}.seb-cc-actions{display:flex;gap:7px;justify-content:flex-end}
     .seb-cc-actions button,.seb-cc-foot button,.seb-cc-bilan-row button,.seb-cc-detail-actions button{font:700 14px Arial,sans-serif;padding:8px 12px;border:2px solid #0070c0!important;border-radius:6px;background:#fff!important;color:#0070c0!important;cursor:pointer}
     .seb-cc-actions .primary,.seb-cc-bilan-row .primary,.seb-cc-detail-actions .primary{background:#fff!important;color:#0070c0!important;border-color:#0070c0!important}
@@ -85,10 +85,6 @@ function installGenericSearchObserver() {
   new MutationObserver(apply).observe(document.documentElement, { childList:true, subtree:true });
 }
 
-function statusLabel(item) {
-  return item.status === 'SESSION_FERMEE' ? 'Session fermée' : (item.status === 'EN_COURS' ? 'En cours' : (item.status || ''));
-}
-
 function bilanLabel(item) {
   if (!item.bilanCount) return 'Bilan : non enregistré';
   if (item.revisionCount) return `Bilan disponible<br><b>${item.revisionCount} révision(s)</b>`;
@@ -109,7 +105,7 @@ async function openCandidateDetail(candidateId, onChanged) {
   overlay.id = 'seb-candidate-detail';
   overlay.innerHTML = `
     <div class="seb-cc-card">
-      <div class="seb-cc-head"><div class="seb-cc-title">${escapeHtml(item.nom)} ${escapeHtml(item.prenom)}</div><div class="seb-cc-badge">${escapeHtml(statusLabel(item))}</div></div>
+      <div class="seb-cc-head"><div class="seb-cc-title">${escapeHtml(item.nom)} ${escapeHtml(item.prenom)}</div><div class="seb-cc-badge">DOSSIER CANDIDAT</div></div>
       <div class="seb-cc-meta">
         <div><b>Ville :</b> ${escapeHtml(item.lieu)}</div><div><b>Groupe :</b> ${escapeHtml(item.groupe)}</div><div><b>Date :</b> ${escapeHtml(item.date)}</div>
         <div><b>Bilans :</b> ${item.bilanCount}</div><div><b>Révisions :</b> ${item.revisionCount}</div><div><b>Parcours :</b> ${item.replayCount}</div>
@@ -284,7 +280,7 @@ function openCatalog() {
 
     const render = () => {
       const q = norm(search.value);
-      const shown = items.filter((item) => !q || norm([item.nom,item.prenom,item.lieu,item.groupe,item.date,statusLabel(item)].join(' ')).includes(q));
+      const shown = items.filter((item) => !q || norm([item.nom,item.prenom,item.lieu,item.groupe,item.date].join(' ')).includes(q));
       list.innerHTML = '';
       if (!shown.length) {
         list.innerHTML = '<div class="seb-cc-empty">Aucun candidat correspondant.</div>';
@@ -296,7 +292,6 @@ function openCatalog() {
         row.innerHTML = `
           <div><strong>${escapeHtml(item.nom)} ${escapeHtml(item.prenom)}</strong><small>${escapeHtml(item.date)}</small></div>
           <div><b>${escapeHtml(item.lieu)}</b><small>Groupe : ${escapeHtml(item.groupe)}</small></div>
-          <div class="seb-cc-status">${escapeHtml(statusLabel(item))}</div>
           <div class="seb-cc-bilan">${bilanLabel(item)}</div>
           <div class="seb-cc-actions"></div>`;
         const actions = row.querySelector('.seb-cc-actions');

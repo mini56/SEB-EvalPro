@@ -176,6 +176,9 @@ function parseJs(text, label) {
   const preload = read('src/preload.js').text;
   const qcm = read('source/qcmv1.0.html').text;
   const carre = read('source/carre.html').text;
+  const localAi = read('src/local-ai.js').text;
+  const installer = read('build/installer.nsh').text;
+  const priorityFixes = read('scripts/priority-fixes.js').text;
 
   for (const token of [
     'copyVerifiedAtomic',
@@ -195,8 +198,11 @@ function parseJs(text, label) {
 
   for (const token of [
     "sanitizeSegment(identity.groupe)",
-    "const baseFolderName = buildFolderName(identity)"
-  ]) if (!store.includes(token)) fail('nommage dossier candidat incomplet: ' + token, 7);
+    "const baseFolderName = buildFolderName(identity)",
+    "function candidateIdentityKey(candidate)",
+    "function existingCandidateForIdentity(identity)",
+    "return activateExistingCandidate(existing, identity)"
+  ]) if (!store.includes(token)) fail('unicité dossier candidat incomplète: ' + token, 7);
 
   for (const token of [
     "candidate-catalog:list",
@@ -210,12 +216,18 @@ function parseJs(text, label) {
     "seb_evalpro_admin_candidate_id",
     "cleanupDuplicateWordExports",
     "verifyBilan",
-    "syncLegacyArtifacts"
+    "syncLegacyArtifacts",
+    "consolidateDuplicateCandidateFolders",
+    "'Corbeille', 'Doublons'",
+    "consolidatedDuplicates"
   ]) if (!catalogMain.includes(token)) fail('catalogue backend incomplet: ' + token, 7);
 
   if (catalogMain.includes("candidate-catalog:delete")) fail('suppression d’un dossier candidat encore possible', 7);
   if (catalogPreload.includes("candidate-catalog:delete") || catalogPreload.includes("remove.textContent='Supprimer'")) {
     fail('bouton suppression candidat encore présent', 7);
+  }
+  if (catalogPreload.includes('function statusLabel') || catalogPreload.includes('Session fermée') || catalogPreload.includes('>En cours<')) {
+    fail('statut technique candidat encore affiché dans le catalogue', 7);
   }
 
   for (const token of [
@@ -266,8 +278,30 @@ function parseJs(text, label) {
   for (const token of [
     'Copie des fichiers terminée.',
     'Vous pouvez retirer la clé USB en toute sécurité.',
-    'déjà présent(s) et ignoré(s)'
-  ]) if (!preload.includes(token)) fail('retour USB incomplet: ' + token, 7);
+    'déjà présent(s) et ignoré(s)',
+    "closeSessionButton.hidden = !adminUnlocked;",
+    'seb-admin-results-close',
+    'Fermer les résultats'
+  ]) if (!preload.includes(token)) fail('interface Admin/candidat incomplète: ' + token, 7);
+
+  for (const token of [
+    'Microsoft Visual C++ x64',
+    '3221225781',
+    "serverProcess.on('error'"
+  ]) if (!localAi.includes(token)) fail('diagnostic runtime IA incomplet: ' + token, 7);
+
+  for (const token of [
+    'vc_redist.x64.exe',
+    'ExecShellWait "runas"',
+    'VC\\Runtimes\\x64'
+  ]) if (!installer.includes(token)) fail('prérequis Visual C++ absent du Setup: ' + token, 7);
+
+  for (const forbidden of [
+    'admin:list-results',
+    'admin:open-result',
+    'seb-evalpro-results',
+    'createCandidateResultsDialog'
+  ]) if (priorityFixes.includes(forbidden)) fail('ancien flux Résultats global encore présent dans priority-fixes: ' + forbidden, 7);
 
   if (/https:\/\/cdnjs\.cloudflare\.com/i.test(qcm)) fail('CDN jsPDF encore présent', 7);
   if (/url\(\s*['"]?https?:\/\//i.test(carre)) fail('image Internet encore présente dans carre.html', 7);
@@ -281,7 +315,9 @@ function parseJs(text, label) {
     ['replay-preload', replayPreload],
     ['bilan-history-main', bilan],
     ['main', main],
-    ['preload', preload]
+    ['preload', preload],
+    ['local-ai', localAi],
+    ['priority-fixes', priorityFixes]
   ]) parseJs(source, label);
 }
 

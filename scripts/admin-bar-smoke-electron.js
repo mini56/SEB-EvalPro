@@ -86,6 +86,7 @@ app.whenReady().then(async () => {
       const hot=document.getElementById('seb-evalpro-top-hotzone');
       const admin=document.getElementById('seb-evalpro-admin');
       const openCandidate=document.getElementById('seb-evalpro-open-candidate');
+      const closeSession=document.getElementById('seb-evalpro-close-session');
       const oldBilan=document.getElementById('seb-evalpro-old-bilan');
       const oldReplay=document.getElementById('seb-evalpro-replay');
       const oldResults=document.getElementById('seb-evalpro-results');
@@ -97,6 +98,7 @@ app.whenReady().then(async () => {
         adminButton:!!admin,
         openCandidate:!!openCandidate,
         openCandidateVisible:!!openCandidate && !openCandidate.hidden && getComputedStyle(openCandidate).display!=='none',
+        closeSessionVisible:!!closeSession && !closeSession.hidden && getComputedStyle(closeSession).display!=='none',
         oldBilanVisible:!!oldBilan && !oldBilan.hidden && getComputedStyle(oldBilan).display!=='none',
         oldReplayVisible:!!oldReplay && !oldReplay.hidden && getComputedStyle(oldReplay).display!=='none',
         oldResultsVisible:!!oldResults && !oldResults.hidden && getComputedStyle(oldResults).display!=='none',
@@ -106,12 +108,12 @@ app.whenReady().then(async () => {
       };
     })()`);
 
-    if (!result.bar || !result.hotzone || !result.adminButton || !result.openCandidate || !result.openCandidateVisible || !result.oldBilanVisible || !result.oldReplayVisible || result.oldResultsVisible || !result.visible || result.adminText !== 'Verrouiller') {
-      fail('barre Admin incorrecte ou accès historique Bilan/Replay indisponible', result);
+    if (!result.bar || !result.hotzone || !result.adminButton || !result.openCandidate || !result.openCandidateVisible || !result.closeSessionVisible || !result.oldBilanVisible || !result.oldReplayVisible || result.oldResultsVisible || !result.visible || result.adminText !== 'Verrouiller') {
+      fail('barre Admin incorrecte, fermeture session masquée ou accès historique Bilan/Replay indisponible', result);
       return;
     }
 
-    console.log('SEB EvalPro Admin smoke: OK - Ouvrir un candidat visible; accès historiques Bilan/Replay conservés.');
+    console.log('SEB EvalPro Admin smoke: OK - Ouvrir un candidat et Fermer cette session visibles; accès historiques Bilan/Replay conservés.');
     console.log(JSON.stringify(result));
 
     // Vérification réelle du correctif IA #25 : un seul bouton visible,

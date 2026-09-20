@@ -207,6 +207,26 @@ jobs:
         shell: pwsh
         run: ./scripts/generate-installer-branding.ps1
 
+      - name: Prepare Microsoft Visual C++ x64 runtime
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path 'build' | Out-Null
+          $vcUrl = 'https://aka.ms/vc14/vc_redist.x64.exe'
+          $vcPath = 'build\vc_redist.x64.exe'
+          curl.exe -L --fail --retry 3 --retry-delay 3 -o $vcPath $vcUrl
+          if ($LASTEXITCODE -ne 0) { throw 'Téléchargement Microsoft Visual C++ x64 échoué.' }
+          if (-not (Test-Path $vcPath)) { throw 'vc_redist.x64.exe absent après téléchargement.' }
+          $size = (Get-Item $vcPath).Length
+          if ($size -lt 5000000) { throw "vc_redist.x64.exe anormalement petit: $size octets" }
+          $signature = Get-AuthenticodeSignature $vcPath
+          if ($signature.Status -ne 'Valid') { throw "Signature vc_redist.x64.exe invalide: $($signature.Status)" }
+          if (-not $signature.SignerCertificate -or $signature.SignerCertificate.Subject -notmatch 'Microsoft') {
+            throw 'vc_redist.x64.exe n’est pas signé par Microsoft.'
+          }
+          $sha = (Get-FileHash $vcPath -Algorithm SHA256).Hash.ToLowerInvariant()
+          Write-Host "Microsoft Visual C++ x64 prêt: $size octets, SHA256=$sha"
+
       - name: Normalize Windows NSIS encodings
         shell: pwsh
         run: |
@@ -293,7 +313,7 @@ jobs:
           $uninstaller = (Resolve-Path "dist\SEB-eval-PRO-$version-Windows-Desinstallation.exe").Path
           $repo = "${{ github.repository }}"
           $title = "SEB EvalPro - Test Plateaux #${{ github.run_number }}"
-          $notes = "Test Plateaux #${{ github.run_number }}. Modèle candidat autonome renforcé : le dossier Nom_Prenom_Ville_Groupe est la source opérationnelle unique pour données, résultats, replay, bilan, révisions et exports Word. Aucun dossier candidat n'est supprimable. Export USB à la racine avec copie temporaire, contrôle complet des fichiers et validation seulement après vérification; un candidat déjà présent est ignoré sans écrasement ni fusion. Import Admin depuis la racine de la clé selon la même règle. Ouvrir un candidat donne accès au bilan, aux révisions, au replay exact du candidateId et aux fichiers Word lisibles/imprimables. Les anciens dossiers Admin/parcours/bilans restent uniquement des sources de migration automatique non destructive. Bilans/replays corrompus sont refusés avec avertissement. Runtime candidat hors ligne, DevTools désactivé et fermeture fenêtre bloquée; le kiosk n'est relâché qu'après authentification Admin. Version de test uniquement."
+          $notes = "Test Plateaux #${{ github.run_number }}. Dossier candidat unique renforcé : une même identité Nom/Prénom/Ville/Groupe réutilise le même dossier et les doublons historiques sont consolidés sans destruction puis archivés dans Corbeille\\Doublons. La fiche candidat donne accès au bilan, aux révisions, au replay, aux résultats en lecture seule et au document Word courant. Les statuts techniques En cours / Session fermée ne sont plus affichés. Le mode Admin conserve toujours l’action Fermer cette session et la page Résultats possède Fermer les résultats. Le Setup embarque le Microsoft Visual C++ Redistributable x64 requis par l’IA locale et l’installe automatiquement s’il manque. Export/import USB restent vérifiés et sans écrasement. Runtime candidat hors ligne et DevTools désactivé. Version de test uniquement."
           $setupSize = (Get-Item $setup).Length
           Write-Host "Setup à publier: $setupSize octets"
 

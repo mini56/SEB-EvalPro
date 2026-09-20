@@ -123,7 +123,52 @@ try {
   assert(fs.existsSync(path.join(newDir, 'bilan', 'exports', legacyWordName)), 'Un ancien Word associable sans ambiguïté doit être copié dans le dossier candidat.');
   assert(fs.existsSync(path.join(sebRoot, 'Bilans', legacyWordName)), 'L’ancien Word global doit rester intact pendant la migration de sécurité.');
 
-  writeJson(path.join(newDir, 'resultats', 'reponses.json'), { page2_q1:'1020', page2_q2:'1250' });
+  const duplicateDir = path.join(sebRoot, 'Candidats', 'DUPONT_Jean_Lorient_7_2');
+  for (const rel of ['donnees','resultats','replay',path.join('bilan','historique'),path.join('bilan','exports')]) {
+    fs.mkdirSync(path.join(duplicateDir, rel), { recursive:true });
+  }
+  writeJson(path.join(duplicateDir, 'manifest.json'), {
+    schemaVersion:1,
+    candidateId:'candidate-dupont-duplicate',
+    folderName:path.basename(duplicateDir),
+    status:'EN_COURS',
+    createdAt:'2026-09-19T08:00:00.000Z',
+    updatedAt:'2026-09-19T08:00:00.000Z',
+    candidat:{ ...candidate, 'prénom':candidate.prenom }
+  });
+  writeJson(path.join(duplicateDir, 'donnees', 'candidat.json'), { ...candidate, 'prénom':candidate.prenom });
+  writeJson(path.join(duplicateDir, 'donnees', 'evaluation-state.json'), {
+    version:1,
+    sessionStorage:{
+      candidat_data:JSON.stringify({ ...candidate, 'prénom':candidate.prenom }),
+      reponses_data:JSON.stringify({ duplicate_only:'OK' }),
+      scores_data:JSON.stringify({ duplicate_only:1 }),
+      admin_bilan_state:JSON.stringify({ duplicate_only:true })
+    },
+    localStorage:{ duplicate_local:'OK' },
+    lastPage:'pageFinale.html',
+    lastEvaluationPage:'pageFinale.html',
+    updatedAt:'2026-09-19T08:00:00.000Z'
+  });
+  writeJson(path.join(duplicateDir, 'donnees', 'progression.json'), { lastPage:'pageFinale.html', lastEvaluationPage:'pageFinale.html' });
+  writeJson(path.join(duplicateDir, 'resultats', 'reponses.json'), { duplicate_only:'OK' });
+  writeJson(path.join(duplicateDir, 'resultats', 'scores.json'), { duplicate_only:1 });
+  writeJson(path.join(duplicateDir, 'replay', 'DUPLICATE_ONLY.json'), { candidate, source:'duplicate' });
+
+  const consolidated = sync();
+  assert(consolidated && consolidated.ok && consolidated.consolidatedDuplicates === 1, 'Le catalogue doit consolider automatiquement un doublon du même candidat.');
+  assert.strictEqual(fs.existsSync(duplicateDir), false, 'Le doublon ne doit plus rester dans Candidats.');
+  const duplicateArchiveRoot = path.join(sebRoot, 'Corbeille', 'Doublons');
+  assert(fs.existsSync(duplicateArchiveRoot), 'Le doublon doit être archivé sans destruction.');
+  assert(fs.readdirSync(duplicateArchiveRoot).some((name) => name.startsWith('DUPONT_Jean_Lorient_7_2__')), 'Le dossier doublon complet doit être conservé dans Corbeille\\Doublons.');
+  const mergedDuplicateResponses = JSON.parse(fs.readFileSync(path.join(newDir, 'resultats', 'reponses.json'), 'utf8'));
+  assert.strictEqual(mergedDuplicateResponses.duplicate_only, 'OK', 'Les réponses présentes uniquement dans le doublon doivent être récupérées.');
+  const mergedState = JSON.parse(fs.readFileSync(path.join(newDir, 'donnees', 'evaluation-state.json'), 'utf8'));
+  assert(mergedState.sessionStorage && mergedState.sessionStorage.admin_bilan_state, 'Les données de bilan présentes dans le doublon doivent être conservées.');
+  assert(fs.existsSync(path.join(newDir, 'replay', 'DUPLICATE_ONLY.json')), 'Le replay du doublon doit être récupéré dans le dossier unique.');
+  assert.strictEqual(list().length, 1, 'Après consolidation, un candidat ne doit apparaître qu’une seule fois.');
+
+  writeJson(path.join(newDir, 'resultats', 'reponses.json'), { duplicate_only:'OK', page2_q1:'1020', page2_q2:'1250' });
   writeJson(path.join(newDir, 'resultats', 'scores.json'), { page2_q1:1, page2_q2:1 });
   const stateBeforeResults = fs.readFileSync(path.join(newDir, 'donnees', 'evaluation-state.json'), 'utf8');
 

@@ -62,6 +62,23 @@ function createCandidateStore(options = {}) {
     return now().toISOString().slice(0, 10);
   }
 
+  function normalizeIdentityPart(value) {
+    let text = String(value == null ? '' : value).trim();
+    try { text = text.normalize('NFD').replace(/[\u0300-\u036f]/g, ''); } catch (_) {}
+    return text.toLocaleLowerCase('fr-FR').replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+
+  function candidateIdentityKey(candidate) {
+    const c = candidate || {};
+    const parts = [
+      c.nom,
+      c.prenom || c['prénom'],
+      c.lieu || c.ville,
+      c.groupe
+    ].map(normalizeIdentityPart);
+    return parts.every(Boolean) ? parts.join('|') : '';
+  }
+
   function defaultCandidateState(candidate) {
     return {
       version: 1,
@@ -101,9 +118,7 @@ function createCandidateStore(options = {}) {
     if (!nom || !prenom || !lieu || !groupe) return null;
 
     const folderDate = normalizeDate(date);
-    const identityKey = [nom, prenom, lieu, groupe, date]
-      .map((value) => String(value || '').trim().toLocaleLowerCase('fr-FR'))
-      .join('|');
+    const identityKey = candidateIdentityKey({ nom, prenom, lieu, groupe });
 
     return {
       nom,
@@ -150,6 +165,49 @@ function createCandidateStore(options = {}) {
       sanitizeSegment(identity.lieu),
       sanitizeSegment(identity.groupe)
     ].join('_');
+  }
+
+  function existingCandidateForIdentity(identity) {
+    ensureRoots();
+    const expectedKey = String(identity && identity.identityKey || '');
+    if (!expectedKey) return null;
+    const records = [];
+    let entries = [];
+    try { entries = fs.readdirSync(candidatesRoot, { withFileTypes:true }); } catch (_) { entries = []; }
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      const candidateDir = path.join(candidatesRoot, entry.name);
+      const manifest = readManifest(candidateDir);
+      if (!manifest || !manifest.candidateId) continue;
+      if (candidateIdentityKey(manifest.candidat || {}) !== expectedKey) continue;
+      records.push({ candidateDir, folderName:entry.name, manifest });
+    }
+    if (!records.length) return null;
+    const canonical = buildFolderName(identity);
+    records.sort((a,b) => {
+      const ac = a.folderName === canonical ? 0 : 1;
+      const bc = b.folderName === canonical ? 0 : 1;
+      if (ac !== bc) return ac - bc;
+      return String(a.manifest.createdAt || '').localeCompare(String(b.manifest.createdAt || ''));
+    });
+    return records[0];
+  }
+
+  function activateExistingCandidate(record, identity) {
+    const manifest = record.manifest || {};
+    const candidateId = String(manifest.candidateId || '');
+    const shortId = String(manifest.shortId || candidateId.replace(/-/g, '').slice(0, 6).toUpperCase());
+    const pointer = {
+      schemaVersion:1,
+      candidateId,
+      shortId,
+      folderName:record.folderName,
+      candidateDir:record.candidateDir,
+      identityKey:identity.identityKey,
+      createdAt:String(manifest.createdAt || now().toISOString())
+    };
+    atomicWriteJson(activePointerPath, pointer);
+    return pointer;
   }
 
   function allocateCandidate(identity) {
@@ -223,6 +281,11 @@ function createCandidateStore(options = {}) {
     const active = readActivePointer();
     if (active && active.identityKey === identity.identityKey) {
       return active;
+    }
+
+    const existing = existingCandidateForIdentity(identity);
+    if (existing) {
+      return activateExistingCandidate(existing, identity);
     }
 
     return allocateCandidate(identity);

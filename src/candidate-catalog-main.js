@@ -5,6 +5,7 @@ const { shell } = require('electron');
 const {
   readJson,
   ensureDir,
+  normalize,
   standardFolderName,
   uniqueFolderPath,
   listCandidateDirs,
@@ -15,7 +16,7 @@ const {
   copyDirectoryAtomically
 } = require('./candidate-folder-utils');
 
-module.exports = function registerCandidateCatalog({ app, ipcMain, getAdminUnlocked }) {
+module.exports = function registerCandidateCatalog({ app, ipcMain, getAdminUnlocked, getActiveCandidate }) {
   const documentsPath = app.getPath('documents');
   const root = path.join(documentsPath, 'SEB EvalPro');
   const candidatesRoot = path.join(root, 'Candidats');
@@ -38,6 +39,212 @@ module.exports = function registerCandidateCatalog({ app, ipcMain, getAdminUnloc
     for (const rel of ['donnees', 'resultats', 'replay', path.join('bilan','historique'), path.join('bilan','exports')]) {
       ensureDir(path.join(dir, rel));
     }
+  }
+
+  function candidateIdentityKey(candidate) {
+    const c = candidate || {};
+    const parts = [
+      c.nom,
+      c.prenom || c['prénom'],
+      c.lieu || c.ville,
+      c.groupe
+    ].map(normalize);
+    return parts.every(Boolean) ? parts.join('|') : '';
+  }
+
+  function fileSha256(file) {
+    return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+  }
+
+  function copyTreePreserving(source, target, suffix) {
+    if (!fs.existsSync(source)) return 0;
+    let copied = 0;
+    const stat = fs.statSync(source);
+    if (stat.isDirectory()) {
+      ensureDir(target);
+      for (const entry of fs.readdirSync(source, { withFileTypes:true })) {
+        copied += copyTreePreserving(path.join(source, entry.name), path.join(target, entry.name), suffix);
+      }
+      return copied;
+    }
+    ensureDir(path.dirname(target));
+    if (!fs.existsSync(target)) {
+      fs.copyFileSync(source, target);
+      return 1;
+    }
+    try {
+      if (fileSha256(source) === fileSha256(target)) return 0;
+    } catch (_) {}
+    const parsed = path.parse(target);
+    let conflict = path.join(parsed.dir, parsed.name + '__' + suffix + parsed.ext);
+    let index = 2;
+    while (fs.existsSync(conflict)) {
+      try { if (fileSha256(source) === fileSha256(conflict)) return 0; } catch (_) {}
+      conflict = path.join(parsed.dir, parsed.name + '__' + suffix + '_' + index + parsed.ext);
+      index += 1;
+    }
+    fs.copyFileSync(source, conflict);
+    return 1;
+  }
+
+  function mergeJsonObjectFile(target, source) {
+    if (!fs.existsSync(source)) return false;
+    const sourceValue = readJson(source);
+    if (!sourceValue || typeof sourceValue !== 'object' || Array.isArray(sourceValue)) return false;
+    const targetValue = readJson(target);
+    if (!targetValue || typeof targetValue !== 'object' || Array.isArray(targetValue)) {
+      writeJson(target, sourceValue);
+      return true;
+    }
+    let sourceNewer = false;
+    try { sourceNewer = fs.statSync(source).mtimeMs >= fs.statSync(target).mtimeMs; } catch (_) {}
+    const merged = sourceNewer ? { ...targetValue, ...sourceValue } : { ...sourceValue, ...targetValue };
+    writeJson(target, merged);
+    return true;
+  }
+
+  function mergeEvaluationStateFile(target, source) {
+    if (!fs.existsSync(source)) return false;
+    const sourceValue = readJson(source);
+    if (!sourceValue || typeof sourceValue !== 'object' || Array.isArray(sourceValue)) return false;
+    const targetValue = readJson(target);
+    if (!targetValue || typeof targetValue !== 'object' || Array.isArray(targetValue)) {
+      writeJson(target, sourceValue);
+      return true;
+    }
+    let sourceNewer = false;
+    try {
+      const sourceTime = Date.parse(sourceValue.updatedAt || '') || fs.statSync(source).mtimeMs;
+      const targetTime = Date.parse(targetValue.updatedAt || '') || fs.statSync(target).mtimeMs;
+      sourceNewer = sourceTime >= targetTime;
+    } catch (_) {}
+    const older = sourceNewer ? targetValue : sourceValue;
+    const newer = sourceNewer ? sourceValue : targetValue;
+    const merged = {
+      ...older,
+      ...newer,
+      sessionStorage:{
+        ...((older.sessionStorage && typeof older.sessionStorage === 'object') ? older.sessionStorage : {}),
+        ...((newer.sessionStorage && typeof newer.sessionStorage === 'object') ? newer.sessionStorage : {})
+      },
+      localStorage:{
+        ...((older.localStorage && typeof older.localStorage === 'object') ? older.localStorage : {}),
+        ...((newer.localStorage && typeof newer.localStorage === 'object') ? newer.localStorage : {})
+      }
+    };
+    writeJson(target, merged);
+    return true;
+  }
+
+  function choosePrimaryDuplicate(records) {
+    let active = null;
+    try { active = typeof getActiveCandidate === 'function' ? getActiveCandidate() : null; } catch (_) {}
+    if (active && active.candidateId) {
+      const current = records.find((record) => String(record.candidateId) === String(active.candidateId));
+      if (current) return current;
+    }
+    const canonical = standardFolderName(records[0] && records[0].candidate);
+    const exact = records.find((record) => record.folderName === canonical);
+    if (exact) return exact;
+    return records.slice().sort((a,b) =>
+      String(a.manifest && a.manifest.createdAt || '').localeCompare(String(b.manifest && b.manifest.createdAt || ''))
+    )[0];
+  }
+
+  function consolidateDuplicateCandidateFolders() {
+    ensureDir(candidatesRoot);
+    const records = listCandidateDirs(candidatesRoot, false);
+    const groups = new Map();
+    for (const record of records) {
+      const key = candidateIdentityKey(record.candidate);
+      if (!key) continue;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(record);
+    }
+
+    const duplicateArchiveRoot = path.join(root, 'Corbeille', 'Doublons');
+    let consolidated = 0;
+    let archived = 0;
+    let mergedFiles = 0;
+
+    for (const group of groups.values()) {
+      if (group.length < 2) continue;
+      const primary = choosePrimaryDuplicate(group);
+      ensureCandidateShape(primary.candidateDir);
+      const consolidatedFrom = Array.isArray(primary.manifest && primary.manifest.consolidatedFrom)
+        ? primary.manifest.consolidatedFrom.slice()
+        : [];
+
+      for (const duplicate of group) {
+        if (duplicate.candidateDir === primary.candidateDir) continue;
+        ensureCandidateShape(duplicate.candidateDir);
+        const suffix = String(duplicate.candidateId || 'doublon').replace(/[^A-Za-z0-9_-]+/g, '').slice(0, 12) || 'doublon';
+
+        mergeJsonObjectFile(
+          path.join(primary.candidateDir, 'resultats', 'reponses.json'),
+          path.join(duplicate.candidateDir, 'resultats', 'reponses.json')
+        );
+        mergeJsonObjectFile(
+          path.join(primary.candidateDir, 'resultats', 'scores.json'),
+          path.join(duplicate.candidateDir, 'resultats', 'scores.json')
+        );
+        mergeEvaluationStateFile(
+          path.join(primary.candidateDir, 'donnees', 'evaluation-state.json'),
+          path.join(duplicate.candidateDir, 'donnees', 'evaluation-state.json')
+        );
+        mergeJsonObjectFile(
+          path.join(primary.candidateDir, 'donnees', 'progression.json'),
+          path.join(duplicate.candidateDir, 'donnees', 'progression.json')
+        );
+
+        mergedFiles += copyTreePreserving(
+          path.join(duplicate.candidateDir, 'replay'),
+          path.join(primary.candidateDir, 'replay'),
+          suffix
+        );
+        mergedFiles += copyTreePreserving(
+          path.join(duplicate.candidateDir, 'bilan', 'historique'),
+          path.join(primary.candidateDir, 'bilan', 'historique'),
+          suffix
+        );
+
+        const duplicateExports = path.join(duplicate.candidateDir, 'bilan', 'exports');
+        const primaryExports = path.join(primary.candidateDir, 'bilan', 'exports');
+        if (fs.existsSync(duplicateExports)) {
+          ensureDir(primaryExports);
+          for (const entry of fs.readdirSync(duplicateExports, { withFileTypes:true })) {
+            if (!entry.isFile() || !/\.(doc|docx)$/i.test(entry.name)) continue;
+            const target = path.join(primaryExports, entry.name);
+            if (!fs.existsSync(target)) {
+              fs.copyFileSync(path.join(duplicateExports, entry.name), target);
+              mergedFiles += 1;
+            }
+          }
+        }
+
+        ensureDir(duplicateArchiveRoot);
+        const archiveBase = duplicate.folderName + '__' + suffix;
+        const archiveTarget = uniqueFolderPath(duplicateArchiveRoot, archiveBase);
+        fs.renameSync(duplicate.candidateDir, archiveTarget);
+        consolidatedFrom.push({
+          candidateId:String(duplicate.candidateId || ''),
+          folderName:String(duplicate.folderName || ''),
+          archivedAt:new Date().toISOString(),
+          archivedPath:archiveTarget
+        });
+        consolidated += 1;
+        archived += 1;
+      }
+
+      const manifest = readJson(path.join(primary.candidateDir, 'manifest.json')) || {};
+      writeJson(path.join(primary.candidateDir, 'manifest.json'), {
+        ...manifest,
+        folderName:path.basename(primary.candidateDir),
+        consolidatedFrom
+      });
+    }
+
+    return { consolidated, archived, mergedFiles };
   }
 
   function completeLegacySkeleton(dir, record) {
@@ -157,9 +364,17 @@ module.exports = function registerCandidateCatalog({ app, ipcMain, getAdminUnloc
   }
 
   function synchronize() {
+    const firstPass = consolidateDuplicateCandidateFolders();
     const migratedCandidates = migrateLegacyCandidateFolders();
+    const secondPass = consolidateDuplicateCandidateFolders();
     const artifacts = syncLegacyArtifacts();
-    return { migratedCandidates, ...artifacts };
+    return {
+      migratedCandidates,
+      consolidatedDuplicates:firstPass.consolidated + secondPass.consolidated,
+      archivedDuplicates:firstPass.archived + secondPass.archived,
+      mergedDuplicateFiles:firstPass.mergedFiles + secondPass.mergedFiles,
+      ...artifacts
+    };
   }
 
   function stableJson(value) {

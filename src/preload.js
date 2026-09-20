@@ -429,7 +429,7 @@ function injectAdminBar() {
     returnButton.hidden = !adminUnlocked || !onAdminDetail;
     exportCandidatesButton.hidden = !adminUnlocked;
     importCandidatesButton.hidden = !adminUnlocked;
-    closeSessionButton.hidden = !adminUnlocked || !!adminCandidateWorkspace || onCandidateResults;
+    closeSessionButton.hidden = !adminUnlocked;
     adminButton.textContent = adminUnlocked ? 'Verrouiller' : 'Administrateur';
     refreshCandidateBadge();
   };
@@ -614,6 +614,22 @@ function showReadOnlyCandidateResults() {
   (document.documentElement || document.body).appendChild(runner);
   runner.remove();
   page.querySelectorAll('input,select,textarea,button').forEach((control) => { control.disabled = true; });
+
+  let closeResults = document.getElementById('seb-admin-results-close');
+  if (!closeResults) {
+    closeResults = document.createElement('button');
+    closeResults.id = 'seb-admin-results-close';
+    closeResults.type = 'button';
+    closeResults.textContent = 'Fermer les résultats';
+    closeResults.style.cssText = 'display:block;margin:0 0 14px auto;padding:8px 14px;border:2px solid #0070c0;border-radius:6px;background:#fff;color:#0070c0;font:700 14px Arial,sans-serif;cursor:pointer;';
+    closeResults.addEventListener('click', async () => {
+      closeResults.disabled = true;
+      await ipcRenderer.invoke('candidate-catalog:end-results').catch(() => false);
+      adminCandidateResultsWorkspace = null;
+      await ipcRenderer.invoke('admin:return-evaluation').catch(() => false);
+    });
+    notice.insertAdjacentElement('afterend', closeResults);
+  }
 }
 
 window.addEventListener('DOMContentLoaded', async () => {

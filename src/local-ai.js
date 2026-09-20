@@ -17,6 +17,8 @@ function createLocalAiService({ app }) {
   let serverPort = 0;
   let startPromise = null;
   let lastLogs = '';
+  let lastExitCode = null;
+  let lastStartError = '';
 
   function runtimeDir() {
     return app.isPackaged
@@ -99,6 +101,15 @@ function createLocalAiService({ app }) {
     });
   }
 
+  function runtimeDependencyMessage() {
+    const exitCode = Number(lastExitCode);
+    const missingDll = exitCode === -1073741515 || exitCode === 3221225781;
+    if (missingDll || /VCRUNTIME|MSVCP|Visual C\+\+/i.test(lastLogs + ' ' + lastStartError)) {
+      return 'Le composant Microsoft Visual C++ x64 requis par l’IA locale est absent ou endommagé. Réinstallez SEB EvalPro afin de réparer ce composant.';
+    }
+    return '';
+  }
+
   async function waitUntilReady(deadline) {
     let lastError = null;
     while (Date.now() < deadline) {
@@ -112,6 +123,9 @@ function createLocalAiService({ app }) {
       }
       await new Promise((resolve) => setTimeout(resolve, 500));
     }
+    const dependencyMessage = runtimeDependencyMessage();
+    if (dependencyMessage) throw new Error(dependencyMessage);
+    if (lastStartError) throw new Error('Le moteur IA local n’a pas pu démarrer. ' + lastStartError);
     throw new Error('Le modèle IA local n’a pas pu démarrer.' + (lastError ? ` ${lastError.message}` : ''));
   }
 
@@ -137,6 +151,8 @@ function createLocalAiService({ app }) {
       ];
 
       lastLogs = '';
+      lastExitCode = null;
+      lastStartError = '';
       serverProcess = spawn(p.server, args, {
         cwd: p.dir,
         windowsHide: true,
@@ -148,7 +164,14 @@ function createLocalAiService({ app }) {
       };
       serverProcess.stdout?.on('data', capture);
       serverProcess.stderr?.on('data', capture);
-      serverProcess.on('exit', () => {
+      serverProcess.on('error', (error) => {
+        lastStartError = String(error && error.message ? error.message : error || '');
+        capture(lastStartError);
+        serverProcess = null;
+        serverPort = 0;
+      });
+      serverProcess.on('exit', (code) => {
+        lastExitCode = code;
         serverProcess = null;
         serverPort = 0;
       });
