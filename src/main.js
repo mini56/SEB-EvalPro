@@ -166,6 +166,14 @@ function isAdminBilanPage(pageName) {
   return ['admin-bilan.html', 'bilan.html'].includes(String(pageName || '').toLowerCase());
 }
 
+function isAdminCandidatePage(pageName) {
+  return String(pageName || '').toLowerCase() === 'admin-candidats.html';
+}
+
+function isAdminNavigationPage(pageName) {
+  return isAdminBilanPage(pageName) || isAdminCandidatePage(pageName);
+}
+
 function existingWebPage(pageName) {
   const webRoot = path.join(__dirname, '..', 'app', 'web');
   const candidate = path.join(webRoot, safePageName(pageName));
@@ -294,16 +302,14 @@ function createWindow() {
   mainWindow.once('ready-to-show', finishStartup);
 
   mainWindow.webContents.on('did-navigate', (_event, url) => {
-    if (adminCandidateResultsMode) {
+    const page = safePageName(url);
+    if (adminCandidateResultsMode || isAdminNavigationPage(page)) {
       applyAdaptiveZoom();
       return;
     }
     const current = readState();
-    const page = safePageName(url);
     current.lastPage = page;
-    if (!isAdminBilanPage(page)) {
-      current.lastEvaluationPage = page;
-    }
+    current.lastEvaluationPage = page;
     writeState(current);
     applyAdaptiveZoom();
   });
@@ -465,6 +471,24 @@ ipcMain.handle('admin:import-candidates', async () => {
   } catch (error) {
     return { ok: false, error: error && error.message ? error.message : String(error) };
   }
+});
+
+function loadAdminCandidateBrowser(candidateId = '') {
+  if (!mainWindow || !adminSessionUnlocked) return false;
+  adminCandidateResultsMode = false;
+  const target = path.join(__dirname, '..', 'app', 'web', 'admin-candidats.html');
+  if (!fs.existsSync(target)) return false;
+  const selected = String(candidateId || '').trim();
+  mainWindow.loadFile(target, selected ? { query:{ candidateId:selected } } : undefined);
+  return true;
+}
+
+ipcMain.handle('admin:open-candidate-browser', (_event, candidateId) => {
+  return loadAdminCandidateBrowser(candidateId);
+});
+
+ipcMain.handle('admin:return-candidate-browser', (_event, candidateId) => {
+  return loadAdminCandidateBrowser(candidateId);
 });
 
 ipcMain.handle('admin:open-bilan', () => {

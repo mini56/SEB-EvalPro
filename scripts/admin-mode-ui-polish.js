@@ -132,7 +132,7 @@ function applyAdminWindowMode(unlocked) {
     out = replaceRequired(
       out,
       "ipcMain.handle('admin:lock', () => {\n  adminSessionUnlocked = false;\n  adminExportCandidateDir = null;\n  applyAdminWindowMode(false);\n  return true;\n});",
-      "ipcMain.handle('admin:lock', () => {\n  " + lockReturnMarker + "\n  adminSessionUnlocked = false;\n  adminExportCandidateDir = null;\n  applyAdminWindowMode(false);\n  if (mainWindow && !mainWindow.isDestroyed()) {\n    const state = readState();\n    const target = existingWebPage(state.lastEvaluationPage || 'qcmv1.0.html');\n    setTimeout(() => {\n      if (!mainWindow || mainWindow.isDestroyed() || adminSessionUnlocked) return;\n      mainWindow.loadFile(target);\n    }, 90);\n  }\n  return true;\n});",
+      "ipcMain.handle('admin:lock', () => {\n  " + lockReturnMarker + "\n  adminSessionUnlocked = false;\n  adminExportCandidateDir = null;\n  adminCandidateResultsMode = false;\n  applyAdminWindowMode(false);\n  if (mainWindow && !mainWindow.isDestroyed()) {\n    const state = readState();\n    const target = existingWebPage(state.lastEvaluationPage || 'qcmv1.0.html');\n    setTimeout(() => {\n      if (!mainWindow || mainWindow.isDestroyed() || adminSessionUnlocked) return;\n      mainWindow.loadFile(target);\n    }, 90);\n  }\n  return true;\n});",
       'Verrouiller doit quitter toute page Admin'
     );
   }
@@ -240,8 +240,11 @@ function sebSyncAdminBarState() {
     adminButton.hidden = false;
     adminButton.textContent = adminUnlocked ? 'Verrouiller' : 'Administrateur';
   }
-  if (bilanButton) bilanButton.hidden = !adminUnlocked || onAdminDetail;
-  if (returnButton) returnButton.hidden = !adminUnlocked || !onAdminDetail;
+  if (bilanButton) bilanButton.hidden = true;
+  if (returnButton) {
+    returnButton.hidden = !adminUnlocked || !onAdminDetail;
+    returnButton.textContent = 'Retour au candidat';
+  }
   if (exportCandidatesButton) exportCandidatesButton.hidden = !adminUnlocked;
   if (importCandidatesButton) importCandidatesButton.hidden = !adminUnlocked;
   if (closeSessionButton) closeSessionButton.hidden = !adminUnlocked;
@@ -249,12 +252,14 @@ function sebSyncAdminBarState() {
 `;
     out = replaceRequired(out, 'function injectAdminBar() {', syncHelper + '\nfunction injectAdminBar() {', 'helper synchronisation Admin');
 
-    out = replaceRequired(
-      out,
-      "    if (adminUnlocked) {\n      await ipcRenderer.invoke('admin:lock');",
-      "    if (adminUnlocked) {\n      try { window.localStorage.setItem('seb_evalpro_privacy_screen', 'temporary'); } catch (_) {}\n      try { saveNow(true); } catch (_) {}\n      await ipcRenderer.invoke('admin:lock');",
-      'préparer écran SEB EvalPro avant verrouillage'
-    );
+    if (!out.includes('// SEB_ADMIN_NAVIGATION_SAFE_LOCK')) {
+      out = replaceRequired(
+        out,
+        "    if (adminUnlocked) {\n      await ipcRenderer.invoke('admin:lock');",
+        "    if (adminUnlocked) {\n      try { window.localStorage.setItem('seb_evalpro_privacy_screen', 'temporary'); } catch (_) {}\n      try { saveNow(true); } catch (_) {}\n      await ipcRenderer.invoke('admin:lock');",
+        'préparer écran SEB EvalPro avant verrouillage'
+      );
+    }
 
     out = replaceRequired(
       out,
@@ -341,4 +346,4 @@ html body .tools #save{
   write(file, out);
 }
 
-console.log('SEB EvalPro Admin: verrouillage retourne à l’écran SEB EvalPro, état Admin synchronisé, 3 boutons Bilan forcés au style blanc/bleu; parcours stagiaire inchangé.');
+console.log('SEB EvalPro Admin: navigation candidat séparée du parcours, retour au candidat et verrouillage sécurisé.');

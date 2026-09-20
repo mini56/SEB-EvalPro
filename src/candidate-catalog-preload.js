@@ -3,6 +3,17 @@ const bilanHistory = require('./bilan-history-preload');
 const replayPreload = require('./replay-preload');
 
 let installed = false;
+let beforeAdminNavigate = null;
+
+function isCandidateAdminHost() {
+  try { return /\/admin-candidats\.html$/i.test(decodeURIComponent(window.location.pathname)); }
+  catch (_) { return false; }
+}
+
+function requestedCandidateId() {
+  try { return String(new URL(window.location.href).searchParams.get('candidateId') || '').trim(); }
+  catch (_) { return ''; }
+}
 
 function escapeHtml(value) {
   return String(value == null ? '' : value).replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -259,7 +270,7 @@ async function beginCandidateBilan(candidateId, detailOverlay = null) {
   return true;
 }
 
-function openCatalog() {
+function openCatalog(initialCandidateId = '') {
   return new Promise(async (resolve) => {
     addStyle();
     const old = document.getElementById('seb-candidate-catalog');
@@ -299,10 +310,6 @@ function openCatalog() {
         open.type='button'; open.className='primary'; open.textContent='Ouvrir';
         open.addEventListener('click', () => openCandidateDetail(item.candidateId, render));
         actions.append(open);
-        const bilan = document.createElement('button');
-        bilan.type='button'; bilan.className='primary'; bilan.textContent='Faire le bilan';
-        bilan.addEventListener('click', () => beginCandidateBilan(item.candidateId));
-        actions.append(bilan);
         list.appendChild(row);
       });
     };
@@ -310,10 +317,20 @@ function openCatalog() {
     try { items = await ipcRenderer.invoke('candidate-catalog:list'); } catch (_) { items = []; }
     render();
     search.addEventListener('input', render);
+    const closeButton = overlay.querySelector('#seb-cc-close');
     const close = () => { overlay.remove(); resolve(); };
-    overlay.querySelector('#seb-cc-close').addEventListener('click', close);
-    overlay.addEventListener('keydown', (event) => { if (event.key === 'Escape') close(); });
-    search.focus();
+    if (isCandidateAdminHost()) {
+      closeButton.hidden = true;
+    } else {
+      closeButton.addEventListener('click', close);
+      overlay.addEventListener('keydown', (event) => { if (event.key === 'Escape') close(); });
+    }
+    const selectedId = String(initialCandidateId || '').trim();
+    if (selectedId && items.some((item) => String(item.candidateId) === selectedId)) {
+      await openCandidateDetail(selectedId, render);
+    } else {
+      search.focus();
+    }
   });
 }
 
@@ -327,7 +344,16 @@ function ensureButton() {
     button.type = 'button';
     button.textContent = 'Ouvrir un candidat';
     button.hidden = true;
-    button.addEventListener('click', openCatalog);
+    button.addEventListener('click', async () => {
+      if (typeof beforeAdminNavigate === 'function') {
+        const saved = beforeAdminNavigate();
+        if (saved && saved.ok === false) {
+          alert(saved.error || 'La sauvegarde du parcours n’a pas pu être confirmée.');
+          return;
+        }
+      }
+      await ipcRenderer.invoke('admin:open-candidate-browser').catch(() => false);
+    });
   }
   const left = bar.querySelector('.seb-admin-left-actions');
   const replay = document.getElementById('seb-evalpro-replay');
@@ -346,13 +372,18 @@ function ensureButton() {
 async function refreshButton() {
   const button = document.getElementById('seb-evalpro-open-candidate');
   if (!button) return;
-  try { button.hidden = !(await ipcRenderer.invoke('admin:status')); }
-  catch (_) { button.hidden = true; }
+  try {
+    const unlocked = await ipcRenderer.invoke('admin:status');
+    const onBilan = /\/(?:admin-bilan|bilan)\.html$/i.test(decodeURIComponent(window.location.pathname));
+    const results = ipcRenderer.sendSync('candidate-catalog:results-workspace-load-sync');
+    button.hidden = !unlocked || isCandidateAdminHost() || onBilan || !!(results && results.ok);
+  } catch (_) { button.hidden = true; }
 }
 
-function install() {
+function install(options = {}) {
   if (installed) return;
   installed = true;
+  beforeAdminNavigate = typeof options.beforeNavigate === 'function' ? options.beforeNavigate : null;
   addStyle();
   installGenericSearchObserver();
   if (!ensureButton()) setTimeout(ensureButton, 150);
@@ -363,6 +394,11 @@ function install() {
     if (admin) setTimeout(refreshButton, 60);
   }, true);
   refreshButton();
+  if (isCandidateAdminHost()) {
+    setTimeout(() => {
+      if (!document.getElementById('seb-candidate-catalog')) openCatalog(requestedCandidateId());
+    }, 0);
+  }
 }
 
-module.exports = { install, openCatalog };
+module.exports = { install, openCatalog, openCandidateDetail };

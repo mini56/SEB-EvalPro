@@ -71,10 +71,12 @@ function parseJs(text, label) {
     out = out.replace(anchor, anchor + "\nconst candidateCatalog = require('./candidate-catalog-preload');");
   }
 
-  if (!out.includes('candidateCatalog.install();')) {
+  if (out.includes('candidateCatalog.install();')) {
+    out = out.replace('candidateCatalog.install();', 'candidateCatalog.install({ beforeNavigate: () => saveNow(true) });');
+  } else if (!out.includes('candidateCatalog.install({ beforeNavigate: () => saveNow(true) });')) {
     const anchor = '  bilanHistory.install();';
     if (!out.includes(anchor)) fail('installation bilanHistory absente', 3);
-    out = out.replace(anchor, anchor + '\n  candidateCatalog.install();');
+    out = out.replace(anchor, anchor + '\n  candidateCatalog.install({ beforeNavigate: () => saveNow(true) });');
   }
 
   out = out.replace(/\s*const groupName = await createTransferNameDialog\(\);[\s\S]*?if \(!groupName\) \{[\s\S]*?return;\s*\}\s*/m, '\n');
@@ -183,6 +185,7 @@ function parseJs(text, label) {
   const build135Audit = read('scripts/build135-audit-fixes.js').text;
   const build135Runner = read('scripts/build135-runner.js').text;
   const cleanRegressionGuard = read('scripts/build159-clean-regression-guard.js').text;
+  const adminCandidatesPage = read('overrides/admin-candidats.html').text;
 
   for (const token of [
     'copyVerifiedAtomic',
@@ -241,8 +244,19 @@ function parseJs(text, label) {
     "Résultats du candidat",
     "Ouvrir les résultats",
     "beginCandidateResults",
-    "Document Word du bilan"
-  ]) if (!catalogPreload.includes(token)) fail('accès exact candidat incomplet: ' + token, 7);
+    "Document Word du bilan",
+    "admin:open-candidate-browser",
+    "isCandidateAdminHost",
+    "requestedCandidateId",
+    "openCatalog(initialCandidateId = '')"
+  ]) if (!catalogPreload.includes(token)) fail('accès/navigation exacte candidat incomplet: ' + token, 7);
+
+  if (catalogPreload.includes("bilan.textContent='Faire le bilan'")) {
+    fail('Faire le bilan encore proposé directement depuis la liste candidats', 7);
+  }
+  for (const token of ['Espace administrateur', 'Dossiers candidats']) {
+    if (!adminCandidatesPage.includes(token)) fail('page Admin candidats incomplète: ' + token, 7);
+  }
 
   if (/\.(?:pdf)\b/i.test(catalogMain) || /Word\s*\/\s*PDF|Word\/PDF/i.test(catalogPreload)) {
     fail('référence PDF encore active dans le catalogue candidat', 7);
@@ -276,8 +290,12 @@ function parseJs(text, label) {
     'isCurrentCandidateWord',
     'cleanupNumberedCandidateWordCopies',
     'admin:open-candidate-results',
-    'adminCandidateResultsMode'
-  ]) if (!main.includes(token)) fail('confinement/offline incomplet: ' + token, 7);
+    'adminCandidateResultsMode',
+    'admin:open-candidate-browser',
+    'admin:return-candidate-browser',
+    'admin-candidats.html',
+    'isAdminNavigationPage(page)'
+  ]) if (!main.includes(token)) fail('confinement/navigation Admin incomplet: ' + token, 7);
 
   for (const token of [
     'Copie des fichiers terminée.',
@@ -285,8 +303,15 @@ function parseJs(text, label) {
     'déjà présent(s) et ignoré(s)',
     "closeSessionButton.hidden = !adminUnlocked;",
     'seb-admin-results-close',
-    'Fermer les résultats'
-  ]) if (!preload.includes(token)) fail('interface Admin/candidat incomplète: ' + token, 7);
+    'Fermer les résultats',
+    'adminNavigationLeaving',
+    'isAdminCandidatesPage',
+    "returnButton.textContent = 'Retour au candidat'",
+    'admin:return-candidate-browser',
+    'SEB_ADMIN_NAVIGATION_SAFE_LOCK',
+    'bilanButton.hidden = true',
+    'candidateCatalog.install({ beforeNavigate: () => saveNow(true) });'
+  ]) if (!preload.includes(token)) fail('interface/navigation Admin candidat incomplète: ' + token, 7);
 
   for (const token of [
     'Microsoft Visual C++ x64',

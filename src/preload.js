@@ -13,6 +13,7 @@ let closingSession = false;
 let lastSaveErrorShown = '';
 let adminCandidateWorkspace = null;
 let adminCandidateResultsWorkspace = null;
+let adminNavigationLeaving = false;
 
 function objectToStorage(storage, values) {
   if (!storage || !values || typeof values !== 'object') return;
@@ -46,14 +47,24 @@ function isAdminBilanPage(page = pageName()) {
   return ['admin-bilan.html', 'bilan.html'].includes(String(page || '').toLowerCase());
 }
 
+function isAdminCandidatesPage(page = pageName()) {
+  return String(page || '').toLowerCase() === 'admin-candidats.html';
+}
+
+function isAdminNavigationPage(page = pageName()) {
+  return isAdminBilanPage(page) || isAdminCandidatesPage(page);
+}
+
 function buildSnapshot() {
   const page = pageName();
   return {
     ...restoredState,
     sessionStorage: storageToObject(window.sessionStorage),
     localStorage: storageToObject(window.localStorage),
-    lastPage: page,
-    lastEvaluationPage: isAdminBilanPage(page)
+    lastPage: isAdminNavigationPage(page)
+      ? (restoredState.lastPage || restoredState.lastEvaluationPage || 'qcmv1.0.html')
+      : page,
+    lastEvaluationPage: isAdminNavigationPage(page)
       ? (restoredState.lastEvaluationPage || 'qcmv1.0.html')
       : page
   };
@@ -74,7 +85,11 @@ function handleSaveResult(result) {
 }
 
 function saveNow(sync = false) {
-  if (closingSession) return null;
+  if (closingSession || adminNavigationLeaving) return null;
+  if (isAdminCandidatesPage()) {
+    const adminResult = { ok:true, adminNavigation:true };
+    return sync ? adminResult : Promise.resolve(adminResult);
+  }
   if (adminCandidateResultsWorkspace) {
     const readOnlyResult = { ok:true, readOnly:true };
     return sync ? readOnlyResult : Promise.resolve(readOnlyResult);
@@ -103,7 +118,7 @@ function saveNow(sync = false) {
 }
 
 function scheduleSave() {
-  if (closingSession || adminCandidateResultsWorkspace) return;
+  if (closingSession || adminNavigationLeaving || isAdminCandidatesPage() || adminCandidateResultsWorkspace) return;
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => saveNow(false), 250);
 }
@@ -408,6 +423,11 @@ function injectAdminBar() {
         candidateBadge.hidden = false;
         return;
       }
+      if (isAdminCandidatesPage()) {
+        candidateBadge.textContent = 'Administration des dossiers candidats';
+        candidateBadge.hidden = false;
+        return;
+      }
       const active = await ipcRenderer.invoke('candidate:active');
       if (active && active.displayName) {
         candidateBadge.textContent = `Dossier candidat : ${active.displayName}`;
@@ -424,9 +444,10 @@ function injectAdminBar() {
   const updateAdminButtons = () => {
     const onBilan = isAdminBilanPage();
     const onCandidateResults = !!adminCandidateResultsWorkspace;
-    const onAdminDetail = onBilan || onCandidateResults;
-    bilanButton.hidden = !adminUnlocked || onAdminDetail;
+    const onAdminDetail = (!!adminCandidateWorkspace && onBilan) || onCandidateResults;
+    bilanButton.hidden = true;
     returnButton.hidden = !adminUnlocked || !onAdminDetail;
+    returnButton.textContent = 'Retour au candidat';
     exportCandidatesButton.hidden = !adminUnlocked;
     importCandidatesButton.hidden = !adminUnlocked;
     closeSessionButton.hidden = !adminUnlocked;
@@ -438,6 +459,25 @@ function injectAdminBar() {
     showBar();
 
     if (adminUnlocked) {
+      // SEB_ADMIN_NAVIGATION_SAFE_LOCK
+      if (adminCandidateWorkspace && isAdminBilanPage()) {
+        const saved = saveNow(true);
+        if (saved && saved.ok === false) {
+          await showTransferMessage('Verrouillage impossible', saved.error || 'Le bilan candidat n’a pas pu être sauvegardé.', true);
+          return;
+        }
+      }
+      adminNavigationLeaving = true;
+      if (adminCandidateResultsWorkspace) {
+        await ipcRenderer.invoke('candidate-catalog:end-results').catch(() => false);
+        adminCandidateResultsWorkspace = null;
+      }
+      if (adminCandidateWorkspace) {
+        await ipcRenderer.invoke('candidate-catalog:end-bilan').catch(() => false);
+        adminCandidateWorkspace = null;
+      }
+      await ipcRenderer.invoke('candidate:set-admin-export-context', '').catch(() => false);
+      try { window.localStorage.setItem('seb_evalpro_privacy_screen', 'temporary'); } catch (_) {}
       await ipcRenderer.invoke('admin:lock');
       adminUnlocked = false;
       updateAdminButtons();
@@ -453,25 +493,32 @@ function injectAdminBar() {
     scheduleHideBar();
   });
 
-  bilanButton.addEventListener('click', async () => {
-    saveNow(true);
-    await ipcRenderer.invoke('admin:open-bilan');
+  bilanButton.addEventListener('click', () => {
+    // Aucun bilan pendant un parcours : le bilan se lance uniquement depuis la fiche candidat.
   });
 
   returnButton.addEventListener('click', async () => {
-    saveNow(true);
     if (adminCandidateResultsWorkspace) {
+      const candidateId = String(adminCandidateResultsWorkspace.candidateId || '');
+      adminNavigationLeaving = true;
       await ipcRenderer.invoke('candidate-catalog:end-results').catch(() => false);
       adminCandidateResultsWorkspace = null;
-      await ipcRenderer.invoke('admin:return-evaluation');
+      await ipcRenderer.invoke('admin:return-candidate-browser', candidateId);
       return;
     }
     if (adminCandidateWorkspace) {
+      const candidateId = String(adminCandidateWorkspace.candidateId || '');
+      const saved = saveNow(true);
+      if (saved && saved.ok === false) {
+        await showTransferMessage('Retour impossible', saved.error || 'Le bilan candidat n’a pas pu être sauvegardé.', true);
+        return;
+      }
+      adminNavigationLeaving = true;
       await ipcRenderer.invoke('candidate-catalog:end-bilan').catch(() => false);
       await ipcRenderer.invoke('candidate:set-admin-export-context', '').catch(() => false);
       adminCandidateWorkspace = null;
+      await ipcRenderer.invoke('admin:return-candidate-browser', candidateId);
     }
-    await ipcRenderer.invoke('admin:return-evaluation');
   });
 
   exportCandidatesButton.addEventListener('click', async () => {
@@ -571,7 +618,11 @@ function injectAdminBar() {
 }
 
 try {
-  if (isAdminBilanPage()) {
+  if (isAdminCandidatesPage()) {
+    restoredState = { sessionStorage:{}, localStorage:{} };
+    try { window.sessionStorage.clear(); } catch (_) {}
+    try { window.localStorage.clear(); } catch (_) {}
+  } else if (isAdminBilanPage()) {
     const workspace = ipcRenderer.sendSync('candidate-catalog:workspace-load-sync');
     if (workspace && workspace.ok) {
       adminCandidateWorkspace = workspace;
@@ -624,9 +675,11 @@ function showReadOnlyCandidateResults() {
     closeResults.style.cssText = 'display:block;margin:0 0 14px auto;padding:8px 14px;border:2px solid #0070c0;border-radius:6px;background:#fff;color:#0070c0;font:700 14px Arial,sans-serif;cursor:pointer;';
     closeResults.addEventListener('click', async () => {
       closeResults.disabled = true;
+      const candidateId = String(adminCandidateResultsWorkspace && adminCandidateResultsWorkspace.candidateId || '');
+      adminNavigationLeaving = true;
       await ipcRenderer.invoke('candidate-catalog:end-results').catch(() => false);
       adminCandidateResultsWorkspace = null;
-      await ipcRenderer.invoke('admin:return-evaluation').catch(() => false);
+      await ipcRenderer.invoke('admin:return-candidate-browser', candidateId).catch(() => false);
     });
     notice.insertAdjacentElement('afterend', closeResults);
   }
@@ -646,7 +699,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 });
 
 window.addEventListener('beforeunload', () => {
-  if (!closingSession) saveNow(true);
+  if (!closingSession && !adminNavigationLeaving && !isAdminCandidatesPage()) saveNow(true);
 });
 
 contextBridge.exposeInMainWorld('sebEvalPro', {
