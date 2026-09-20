@@ -151,11 +151,15 @@ function replaceOnce(text, search, replacement, label) {
   let out = text;
   const oldBlock = `  document.addEventListener('input', scheduleSave, true);\n  document.addEventListener('change', scheduleSave, true);\n  document.addEventListener('click', scheduleSave, true);\n  periodicSaveTimer = setInterval(() => saveNow(false), 1000);`;
   const newBlock = `  if (!isAdminBilanPage()) {\n    document.addEventListener('input', scheduleSave, true);\n    document.addEventListener('change', scheduleSave, true);\n    document.addEventListener('click', scheduleSave, true);\n    periodicSaveTimer = setInterval(() => saveNow(false), 1000);\n  }`;
+  const guardedBlock = "if (!isAdminBilanPage()) {\n    document.addEventListener('input', scheduleSave, true);";
+  const resultsOldBlock = "  } else {\n    document.addEventListener('input', scheduleSave, true);\n    document.addEventListener('change', scheduleSave, true);\n    document.addEventListener('click', scheduleSave, true);\n    periodicSaveTimer = setInterval(() => saveNow(false), 1000);\n  }";
+  const resultsGuardedBlock = "  } else if (!isAdminBilanPage()) {\n    document.addEventListener('input', scheduleSave, true);\n    document.addEventListener('change', scheduleSave, true);\n    document.addEventListener('click', scheduleSave, true);\n    periodicSaveTimer = setInterval(() => saveNow(false), 1000);\n  }";
   if (out.includes(oldBlock)) out = out.replace(oldBlock, newBlock);
-  else if (!out.includes("if (!isAdminBilanPage()) {\n    document.addEventListener('input', scheduleSave, true);")) {
+  else if (out.includes(resultsOldBlock)) out = out.replace(resultsOldBlock, resultsGuardedBlock);
+  else if (!out.includes(guardedBlock) && !out.includes(resultsGuardedBlock)) {
     fail('bloc sauvegarde globale DOM introuvable', 12);
   }
-  if (!out.includes("if (!isAdminBilanPage()) {\n    document.addEventListener('input', scheduleSave, true);")) {
+  if (!out.includes(guardedBlock) && !out.includes(resultsGuardedBlock)) {
     fail('sauvegarde globale encore active à chaque frappe en Admin', 13);
   }
   try { new vm.Script(out); } catch (error) { fail('preload.js invalide: ' + error.message, 14); }
