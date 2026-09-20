@@ -50,11 +50,11 @@ function write(file, text) {
       `${importMarker}\nconst replayPrototype = require('./replay-preload');\nconst bilanHistory = require('./bilan-history-preload');\n// SEB_CANDIDATE_REPLAY_PROTO_PRELOAD`
     );
 
-    const domMarker = "  injectAdminBar();\n  document.addEventListener('input', scheduleSave, true);";
-    if (!out.includes(domMarker)) fail('point d’installation modules dans DOMContentLoaded introuvable');
+    const domMarker = "  injectAdminBar();";
+    if (!out.includes(domMarker)) fail('point d’installation modules après injectAdminBar introuvable');
     out = out.replace(
       domMarker,
-      "  injectAdminBar();\n  replayPrototype.install();\n  bilanHistory.install();\n  document.addEventListener('input', scheduleSave, true);"
+      "  injectAdminBar();\n  replayPrototype.install();\n  bilanHistory.install();"
     );
   }
   if (!out.includes("require('./replay-preload')")) fail('module replay preload non importé');
