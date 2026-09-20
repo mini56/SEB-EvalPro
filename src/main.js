@@ -80,7 +80,7 @@ function installDownloadRouting() {
     try {
       ensureSebDocumentsFolders();
       const candidateExportDir = getCandidateStore().getActiveExportDir();
-      const targetDirectory = candidateExportDir || adminExportCandidateDir || bilanDocumentsDir();
+      const targetDirectory = adminExportCandidateDir || candidateExportDir || bilanDocumentsDir();
       item.setSavePath(uniqueOutputPath(targetDirectory, filename));
     } catch (_) {}
   });

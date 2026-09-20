@@ -196,6 +196,9 @@ function parseJs(text, label) {
     "candidate-catalog:list",
     "candidate-catalog:detail",
     "candidate-catalog:open-export",
+    "candidate-catalog:begin-bilan",
+    "candidate-catalog:workspace-load-sync",
+    "candidate-catalog:workspace-save-sync",
     "verifyBilan",
     "syncLegacyArtifacts"
   ]) if (!catalogMain.includes(token)) fail('catalogue backend incomplet: ' + token, 7);
@@ -208,8 +211,13 @@ function parseJs(text, label) {
   for (const token of [
     "openCandidateReplay(candidateId, filename)",
     "candidate-catalog:open-export",
-    "Fichiers résultat / Word / PDF"
+    "Faire le bilan",
+    "Fichiers résultat / Word"
   ]) if (!catalogPreload.includes(token)) fail('accès exact candidat incomplet: ' + token, 7);
+
+  if (/\.(?:pdf)\b/i.test(catalogMain) || /Word\s*\/\s*PDF|Word\/PDF/i.test(catalogPreload)) {
+    fail('référence PDF encore active dans le catalogue candidat', 7);
+  }
 
   for (const token of [
     'SEB_CANDIDATE_AUTONOMOUS_REPLAY',

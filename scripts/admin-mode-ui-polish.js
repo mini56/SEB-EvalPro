@@ -242,7 +242,7 @@ function sebSyncAdminBarState() {
   if (returnButton) returnButton.hidden = !adminUnlocked || !onBilan;
   if (exportCandidatesButton) exportCandidatesButton.hidden = !adminUnlocked;
   if (importCandidatesButton) importCandidatesButton.hidden = !adminUnlocked;
-  if (closeSessionButton) closeSessionButton.hidden = !adminUnlocked;
+  if (closeSessionButton) closeSessionButton.hidden = !adminUnlocked || !!adminCandidateWorkspace;
 }
 `;
     out = replaceRequired(out, 'function injectAdminBar() {', syncHelper + '\nfunction injectAdminBar() {', 'helper synchronisation Admin');

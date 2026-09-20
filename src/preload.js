@@ -11,6 +11,7 @@ let periodicSaveTimer = null;
 let barHideTimer = null;
 let closingSession = false;
 let lastSaveErrorShown = '';
+let adminCandidateWorkspace = null;
 
 function objectToStorage(storage, values) {
   if (!storage || !values || typeof values !== 'object') return;
@@ -75,12 +76,18 @@ function saveNow(sync = false) {
   if (closingSession) return null;
   const snapshot = buildSnapshot();
   restoredState = snapshot;
+  const candidateWorkspace = !!adminCandidateWorkspace && isAdminBilanPage();
   if (sync) {
-    const result = ipcRenderer.sendSync('state:save-sync', snapshot);
+    const result = candidateWorkspace
+      ? ipcRenderer.sendSync('candidate-catalog:workspace-save-sync', snapshot)
+      : ipcRenderer.sendSync('state:save-sync', snapshot);
     handleSaveResult(result);
     return result;
   }
-  return ipcRenderer.invoke('state:save', snapshot).then((result) => {
+  const request = candidateWorkspace
+    ? ipcRenderer.invoke('candidate-catalog:workspace-save', snapshot)
+    : ipcRenderer.invoke('state:save', snapshot);
+  return request.then((result) => {
     handleSaveResult(result);
     return result;
   }).catch((error) => {
@@ -382,6 +389,13 @@ function injectAdminBar() {
       return;
     }
     try {
+      if (adminCandidateWorkspace && adminCandidateWorkspace.candidate) {
+        const selected = adminCandidateWorkspace.candidate;
+        const selectedName = [selected.prenom || selected['prénom'], selected.nom].filter(Boolean).join(' ').trim();
+        candidateBadge.textContent = 'Bilan candidat : ' + (selectedName || 'candidat sélectionné');
+        candidateBadge.hidden = false;
+        return;
+      }
       const active = await ipcRenderer.invoke('candidate:active');
       if (active && active.displayName) {
         candidateBadge.textContent = `Dossier candidat : ${active.displayName}`;
@@ -401,7 +415,7 @@ function injectAdminBar() {
     returnButton.hidden = !adminUnlocked || !onBilan;
     exportCandidatesButton.hidden = !adminUnlocked;
     importCandidatesButton.hidden = !adminUnlocked;
-    closeSessionButton.hidden = !adminUnlocked;
+    closeSessionButton.hidden = !adminUnlocked || !!adminCandidateWorkspace;
     adminButton.textContent = adminUnlocked ? 'Verrouiller' : 'Administrateur';
     refreshCandidateBadge();
   };
@@ -532,9 +546,24 @@ function injectAdminBar() {
 }
 
 try {
-  restoredState = ipcRenderer.sendSync('state:load-sync') || {};
+  if (isAdminBilanPage()) {
+    const workspace = ipcRenderer.sendSync('candidate-catalog:workspace-load-sync');
+    if (workspace && workspace.ok) {
+      adminCandidateWorkspace = workspace;
+      restoredState = workspace.state || {};
+      try { window.sessionStorage.clear(); } catch (_) {}
+      try { window.localStorage.clear(); } catch (_) {}
+    }
+  }
+  if (!adminCandidateWorkspace) {
+    restoredState = ipcRenderer.sendSync('state:load-sync') || {};
+  }
   objectToStorage(window.sessionStorage, restoredState.sessionStorage);
   objectToStorage(window.localStorage, restoredState.localStorage);
+  if (!isAdminBilanPage()) {
+    ipcRenderer.invoke('candidate-catalog:end-bilan').catch(() => {});
+    ipcRenderer.invoke('candidate:set-admin-export-context', '').catch(() => {});
+  }
 } catch (_) {}
 
 window.addEventListener('DOMContentLoaded', async () => {

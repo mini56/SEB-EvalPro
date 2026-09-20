@@ -45,13 +45,8 @@ function addStyle() {
 }
 
 function hideLegacyAdminEntryPoints() {
-  for (const id of ['seb-evalpro-old-bilan', 'seb-evalpro-replay', 'seb-evalpro-results']) {
-    const old = document.getElementById(id);
-    if (old) {
-      old.hidden = true;
-      old.style.display = 'none';
-    }
-  }
+  // Les anciens accès Admin restent visibles : ils servent à retrouver les bilans
+  // historiques qui ne sont pas encore rattachés à un dossier candidat autonome.
 }
 
 function enhanceChooser(dialogId, listId, rowSelector) {
@@ -121,9 +116,10 @@ async function openCandidateDetail(candidateId, onChanged) {
       <div class="seb-cc-body">
         <div class="seb-cc-section"><h3>Bilan et révisions</h3><div id="seb-cc-detail-bilans"></div></div>
         <div class="seb-cc-section"><h3>Replay du parcours</h3><div id="seb-cc-detail-replays"></div></div>
-        <div class="seb-cc-section"><h3>Fichiers résultat / Word / PDF</h3><div id="seb-cc-detail-exports"></div></div>
+        <div class="seb-cc-section"><h3>Fichiers résultat / Word</h3><div id="seb-cc-detail-exports"></div></div>
       </div>
       <div class="seb-cc-detail-actions">
+        <button type="button" id="seb-cc-detail-bilan" class="primary">Faire le bilan</button>
         <button type="button" id="seb-cc-detail-close">Fermer</button>
       </div>
     </div>`;
@@ -184,7 +180,7 @@ async function openCandidateDetail(candidateId, onChanged) {
 
   const exports = overlay.querySelector('#seb-cc-detail-exports');
   if (!Array.isArray(result.exports) || !result.exports.length) {
-    exports.innerHTML = '<div class="seb-cc-empty">Aucun fichier Word/PDF enregistré pour ce candidat.</div>';
+    exports.innerHTML = '<div class="seb-cc-empty">Aucun fichier Word enregistré pour ce candidat.</div>';
   } else {
     result.exports.forEach((filename) => {
       const row = document.createElement('div');
@@ -203,7 +199,32 @@ async function openCandidateDetail(candidateId, onChanged) {
     });
   }
 
+  overlay.querySelector('#seb-cc-detail-bilan').addEventListener('click', async () => {
+    await beginCandidateBilan(candidateId, overlay);
+  });
   overlay.querySelector('#seb-cc-detail-close').addEventListener('click', () => overlay.remove());
+}
+
+async function beginCandidateBilan(candidateId, detailOverlay = null) {
+  const prepared = await ipcRenderer.invoke('candidate-catalog:begin-bilan', candidateId);
+  if (!prepared || !prepared.ok) {
+    alert((prepared && prepared.error) || 'Impossible de préparer le bilan de ce candidat.');
+    return false;
+  }
+  const routed = await ipcRenderer.invoke('candidate:set-admin-export-context', candidateId).catch(() => false);
+  if (!routed) {
+    alert('Impossible de préparer le dossier Word de ce candidat.');
+    return false;
+  }
+  if (detailOverlay) detailOverlay.remove();
+  const catalog = document.getElementById('seb-candidate-catalog');
+  if (catalog) catalog.remove();
+  const opened = await ipcRenderer.invoke('admin:open-bilan');
+  if (!opened) {
+    alert('Impossible d’ouvrir le bilan administrateur.');
+    return false;
+  }
+  return true;
 }
 
 function openCatalog() {
@@ -247,6 +268,10 @@ function openCatalog() {
         open.type='button'; open.className='primary'; open.textContent='Ouvrir';
         open.addEventListener('click', () => openCandidateDetail(item.candidateId, render));
         actions.append(open);
+        const bilan = document.createElement('button');
+        bilan.type='button'; bilan.className='primary'; bilan.textContent='Faire le bilan';
+        bilan.addEventListener('click', () => beginCandidateBilan(item.candidateId));
+        actions.append(bilan);
         list.appendChild(row);
       });
     };

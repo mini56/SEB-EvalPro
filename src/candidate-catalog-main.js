@@ -24,6 +24,7 @@ module.exports = function registerCandidateCatalog({ app, ipcMain, getAdminUnloc
   const globalBilanRoot = path.join(root, 'Bilans', 'Historique');
   const globalExportsRoot = path.join(root, 'Bilans');
   const BILAN_TYPE = 'SEB_EVALPRO_BILAN_ARCHIVE';
+  let adminBilanWorkspace = null;
 
   function writeJson(target, value) {
     ensureDir(path.dirname(target));
@@ -142,7 +143,7 @@ module.exports = function registerCandidateCatalog({ app, ipcMain, getAdminUnloc
 
     ensureDir(globalExportsRoot);
     for (const entry of fs.readdirSync(globalExportsRoot, { withFileTypes:true })) {
-      if (!entry.isFile() || !/\.(doc|docx|pdf)$/i.test(entry.name)) continue;
+      if (!entry.isFile() || !/\.(doc|docx)$/i.test(entry.name)) continue;
       const match = selectCandidateFromFilename(records, entry.name);
       if (!match) { ambiguous += 1; continue; }
       if (copyFileIfMissing(
@@ -212,7 +213,7 @@ module.exports = function registerCandidateCatalog({ app, ipcMain, getAdminUnloc
     const dir = path.join(candidateDir, 'bilan', 'exports');
     if (!fs.existsSync(dir)) return [];
     return fs.readdirSync(dir, { withFileTypes:true })
-      .filter((e) => e.isFile() && /\.(doc|docx|pdf)$/i.test(e.name))
+      .filter((e) => e.isFile() && /\.(doc|docx)$/i.test(e.name))
       .map((e) => e.name)
       .sort((a,b) => a.localeCompare(b, 'fr', { sensitivity:'base' }));
   }
@@ -242,6 +243,102 @@ module.exports = function registerCandidateCatalog({ app, ipcMain, getAdminUnloc
   function findById(candidateId) {
     return listCandidateDirs(candidatesRoot, false).find((r) => r.candidateId === String(candidateId || '')) || null;
   }
+
+  function clone(value) {
+    return JSON.parse(JSON.stringify(value == null ? {} : value));
+  }
+
+  function candidateWorkspaceState(record) {
+    const candidateFile = readJson(path.join(record.candidateDir, 'donnees', 'candidat.json')) || record.candidate || {};
+    const saved = readJson(path.join(record.candidateDir, 'donnees', 'evaluation-state.json')) || {};
+    const responses = readJson(path.join(record.candidateDir, 'resultats', 'reponses.json'));
+    const scores = readJson(path.join(record.candidateDir, 'resultats', 'scores.json'));
+    const sessionStorage = { ...(saved.sessionStorage && typeof saved.sessionStorage === 'object' ? saved.sessionStorage : {}) };
+    const localStorage = { ...(saved.localStorage && typeof saved.localStorage === 'object' ? saved.localStorage : {}) };
+
+    sessionStorage.candidat_data = JSON.stringify(candidateFile);
+    if (responses && typeof responses === 'object') sessionStorage.reponses_data = JSON.stringify(responses);
+    if (scores && typeof scores === 'object') sessionStorage.scores_data = JSON.stringify(scores);
+
+    return {
+      ...saved,
+      version: 1,
+      sessionStorage,
+      localStorage,
+      lastPage: String(saved.lastPage || 'qcmv1.0.html'),
+      lastEvaluationPage: String(saved.lastEvaluationPage || saved.lastPage || 'qcmv1.0.html')
+    };
+  }
+
+  function saveCandidateWorkspaceState(workspace, state) {
+    if (!workspace || !workspace.candidateDir) throw new Error('Aucun candidat sélectionné pour le bilan.');
+    const candidateFile = readJson(path.join(workspace.candidateDir, 'donnees', 'candidat.json')) || workspace.candidate || {};
+    const safe = clone(state);
+    safe.version = 1;
+    safe.sessionStorage = safe.sessionStorage && typeof safe.sessionStorage === 'object' ? safe.sessionStorage : {};
+    safe.localStorage = safe.localStorage && typeof safe.localStorage === 'object' ? safe.localStorage : {};
+    safe.sessionStorage.candidat_data = JSON.stringify(candidateFile);
+    safe.updatedAt = new Date().toISOString();
+    writeJson(path.join(workspace.candidateDir, 'donnees', 'evaluation-state.json'), safe);
+    workspace.state = safe;
+    return safe;
+  }
+
+  ipcMain.handle('candidate-catalog:begin-bilan', (_event, candidateId) => {
+    if (!getAdminUnlocked()) return { ok:false, error:'Accès administrateur requis.' };
+    synchronize();
+    const record = findById(candidateId);
+    if (!record) return { ok:false, error:'Candidat introuvable.' };
+    const state = candidateWorkspaceState(record);
+    adminBilanWorkspace = {
+      candidateId: record.candidateId,
+      candidateDir: record.candidateDir,
+      candidate: clone(record.candidate || {}),
+      state
+    };
+    return { ok:true, candidate:serialize(record) };
+  });
+
+  ipcMain.on('candidate-catalog:workspace-load-sync', (event) => {
+    if (!getAdminUnlocked() || !adminBilanWorkspace) {
+      event.returnValue = { ok:false };
+      return;
+    }
+    event.returnValue = {
+      ok:true,
+      candidateId:adminBilanWorkspace.candidateId,
+      candidate:clone(adminBilanWorkspace.candidate),
+      state:clone(adminBilanWorkspace.state)
+    };
+  });
+
+  ipcMain.on('candidate-catalog:workspace-save-sync', (event, state) => {
+    if (!getAdminUnlocked() || !adminBilanWorkspace) {
+      event.returnValue = { ok:false, error:'Aucun candidat sélectionné pour le bilan.' };
+      return;
+    }
+    try {
+      const saved = saveCandidateWorkspaceState(adminBilanWorkspace, state || {});
+      event.returnValue = { ok:true, state:clone(saved) };
+    } catch (error) {
+      event.returnValue = { ok:false, error:error && error.message ? error.message : String(error) };
+    }
+  });
+
+  ipcMain.handle('candidate-catalog:workspace-save', (_event, state) => {
+    if (!getAdminUnlocked() || !adminBilanWorkspace) return { ok:false, error:'Aucun candidat sélectionné pour le bilan.' };
+    try {
+      const saved = saveCandidateWorkspaceState(adminBilanWorkspace, state || {});
+      return { ok:true, state:clone(saved) };
+    } catch (error) {
+      return { ok:false, error:error && error.message ? error.message : String(error) };
+    }
+  });
+
+  ipcMain.handle('candidate-catalog:end-bilan', () => {
+    adminBilanWorkspace = null;
+    return true;
+  });
 
   ipcMain.handle('candidate-catalog:list', () => {
     if (!getAdminUnlocked()) return [];
@@ -284,7 +381,7 @@ module.exports = function registerCandidateCatalog({ app, ipcMain, getAdminUnloc
     const record = findById(candidateId);
     if (!record) return { ok:false, error:'Candidat introuvable.' };
     const safe = path.basename(String(filename || ''));
-    if (!/\.(doc|docx|pdf)$/i.test(safe)) return { ok:false, error:'Type de fichier non autorisé.' };
+    if (!/\.(doc|docx)$/i.test(safe)) return { ok:false, error:'Type de fichier non autorisé.' };
     const full = path.join(record.candidateDir, 'bilan', 'exports', safe);
     if (!fs.existsSync(full)) return { ok:false, error:'Fichier résultat introuvable.' };
     const error = await shell.openPath(full);

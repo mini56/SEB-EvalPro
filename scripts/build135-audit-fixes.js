@@ -214,7 +214,7 @@ function checkHtmlScripts(html, label) {
     if (!out.includes("item.setSavePath(uniqueOutputPath(bilanDocumentsDir(), filename));")) {
       fail('routage DOCX candidat unique absent', 13);
     }
-  } else if (!out.includes("const targetDirectory = candidateExportDir || adminExportCandidateDir || bilanDocumentsDir();")) {
+  } else if (!out.includes("const targetDirectory = adminExportCandidateDir || candidateExportDir || bilanDocumentsDir();")) {
     fail('routage DOCX vers le dossier candidat/admin absent', 13);
   }
   try { new vm.Script(out); } catch (error) { fail('src/main.js invalide : ' + error.message, 13); }
