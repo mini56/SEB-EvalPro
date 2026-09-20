@@ -222,7 +222,7 @@ jobs:
           $signature = Get-AuthenticodeSignature $vcPath
           if ($signature.Status -ne 'Valid') { throw "Signature vc_redist.x64.exe invalide: $($signature.Status)" }
           if (-not $signature.SignerCertificate -or $signature.SignerCertificate.Subject -notmatch 'Microsoft') {
-            throw 'vc_redist.x64.exe n’est pas signé par Microsoft.'
+            throw "vc_redist.x64.exe n’est pas signé par Microsoft."
           }
           $sha = (Get-FileHash $vcPath -Algorithm SHA256).Hash.ToLowerInvariant()
           Write-Host "Microsoft Visual C++ x64 prêt: $size octets, SHA256=$sha"
