@@ -3,6 +3,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const registerCandidateCatalog = require('../src/candidate-catalog-main');
+const registerBilanHistory = require('../src/bilan-history-main');
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'seb-evalpro-candidate-catalog-'));
 const documentsPath = path.join(root, 'Documents');
@@ -84,6 +85,12 @@ try {
     getAdminUnlocked:() => true,
     getActiveCandidate:() => null
   });
+  registerBilanHistory({
+    app,
+    ipcMain,
+    getAdminUnlocked:() => true,
+    buildNumber:'79'
+  });
 
   const list = handlers.get('candidate-catalog:list');
   const detail = handlers.get('candidate-catalog:detail');
@@ -94,7 +101,9 @@ try {
   const loadWorkspaceSync = listeners.get('candidate-catalog:workspace-load-sync');
   const saveWorkspaceSync = listeners.get('candidate-catalog:workspace-save-sync');
   const sync = handlers.get('candidate-catalog:sync');
-  assert(list && detail && loadBilan && beginBilan && saveWorkspace && endBilan && loadWorkspaceSync && saveWorkspaceSync && sync, 'Handlers catalogue/bilan absents.');
+  const saveCurrentBilan = handlers.get('bilan-history:save-current');
+  const saveBilanRevision = handlers.get('bilan-history:save-revision');
+  assert(list && detail && loadBilan && beginBilan && saveWorkspace && endBilan && loadWorkspaceSync && saveWorkspaceSync && sync && saveCurrentBilan && saveBilanRevision, 'Handlers catalogue/bilan absents.');
   assert.strictEqual(handlers.has('candidate-catalog:delete'), false, 'Aucun handler ne doit permettre de supprimer un candidat.');
 
   const first = list();
@@ -126,6 +135,43 @@ try {
   const loadedCandidate = JSON.parse(loadEvent.returnValue.state.sessionStorage.candidat_data);
   assert.strictEqual(loadedCandidate.nom, 'DUPONT');
   assert.strictEqual(loadedCandidate.prenom || loadedCandidate['prénom'], 'Jean');
+  assert.strictEqual(loadEvent.returnValue.state.sessionStorage.seb_evalpro_admin_candidate_id, 'candidate-dupont');
+
+  const originalDocument = {
+    title:'Bilan institutionnel',
+    headers:['Modules','NE','I','II','III','Commentaires'],
+    rows:[{ kind:'item', key:'test', moduleText:'Test', level:'I', preset:'', comment:'Original', detail:'', options:[] }]
+  };
+  const firstBilan = saveCurrentBilan(null, {
+    candidateId:'candidate-dupont',
+    candidate:{ nom:'DUPONT', prenom:'Jean', date:'2026-09-18' },
+    originalBuild:'79',
+    sessionToken:'candidate-dupont-smoke',
+    document:originalDocument
+  });
+  assert(firstBilan && firstBilan.ok && firstBilan.revision === 0, 'Le bilan original doit être archivé directement dans le dossier candidat sélectionné.');
+  const firstArchive = JSON.parse(fs.readFileSync(path.join(newDir, 'bilan', 'historique', firstBilan.filename), 'utf8'));
+  assert.strictEqual(firstArchive.candidateId, 'candidate-dupont', 'L’archive doit mémoriser le dossier candidat exact.');
+
+  const revisionDocument = {
+    ...originalDocument,
+    rows:[{ ...originalDocument.rows[0], comment:'Révision 1' }]
+  };
+  const revision = saveBilanRevision(null, { sourceFilename:firstBilan.filename, document:revisionDocument });
+  assert(revision && revision.ok && revision.revision === 1, 'La première révision doit être enregistrée dans le même dossier candidat.');
+  assert(fs.existsSync(path.join(newDir, 'bilan', 'historique', revision.filename)), 'Le fichier de révision doit exister dans le dossier candidat.');
+
+  const wordBase = 'Evaluation_DUPONT_JEAN_2026-09-18.doc';
+  fs.writeFileSync(path.join(newDir, 'bilan', 'exports', wordBase), 'word courant', 'utf8');
+  fs.writeFileSync(path.join(newDir, 'bilan', 'exports', 'Evaluation_DUPONT_JEAN_2026-09-18_2.doc'), 'doublon', 'utf8');
+  fs.writeFileSync(path.join(newDir, 'bilan', 'exports', 'Evaluation_DUPONT_JEAN_2026-09-18_R01.doc'), 'ancienne révision Word', 'utf8');
+  const afterBilan = detail(null, 'candidate-dupont');
+  assert(afterBilan && afterBilan.ok);
+  assert.strictEqual(afterBilan.bilans.filter((b) => b.integrityOk).length, 2, 'Le catalogue doit voir le bilan original et sa révision.');
+  assert.strictEqual(afterBilan.candidate.revisionCount, 1, 'Le catalogue doit annoncer une révision.');
+  assert.deepStrictEqual(afterBilan.exports.filter((name) => /^Evaluation_DUPONT_JEAN_2026-09-18/i.test(name)), [wordBase], 'Un seul Word courant doit rester visible.');
+  assert.strictEqual(fs.existsSync(path.join(newDir, 'bilan', 'exports', 'Evaluation_DUPONT_JEAN_2026-09-18_2.doc')), false, 'Le doublon Word _2 doit être nettoyé.');
+  assert.strictEqual(fs.existsSync(path.join(newDir, 'bilan', 'exports', 'Evaluation_DUPONT_JEAN_2026-09-18_R01.doc')), false, 'L’ancien Word de révision doit être nettoyé.');
 
   const modifiedState = {
     ...loadEvent.returnValue.state,

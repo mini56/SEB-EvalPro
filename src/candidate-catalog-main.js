@@ -209,9 +209,24 @@ module.exports = function registerCandidateCatalog({ app, ipcMain, getAdminUnloc
       .map((e) => e.name);
   }
 
+  function cleanupDuplicateWordExports(candidateDir) {
+    const dir = path.join(candidateDir, 'bilan', 'exports');
+    if (!fs.existsSync(dir)) return;
+    const entries = fs.readdirSync(dir, { withFileTypes:true }).filter((e) => e.isFile() && /^Evaluation_.+\.docx?$/i.test(e.name));
+    const names = new Set(entries.map((e) => e.name.toLowerCase()));
+    for (const entry of entries) {
+      const match = entry.name.match(/^(Evaluation_.+?)(?:_R\d+|_\d+)(\.docx?)$/i);
+      if (!match) continue;
+      const canonical = (match[1] + match[2]).toLowerCase();
+      if (!names.has(canonical)) continue;
+      try { fs.rmSync(path.join(dir, entry.name), { force:true }); } catch (_) {}
+    }
+  }
+
   function exportEntries(candidateDir) {
     const dir = path.join(candidateDir, 'bilan', 'exports');
     if (!fs.existsSync(dir)) return [];
+    cleanupDuplicateWordExports(candidateDir);
     return fs.readdirSync(dir, { withFileTypes:true })
       .filter((e) => e.isFile() && /\.(doc|docx)$/i.test(e.name))
       .map((e) => e.name)
@@ -257,6 +272,7 @@ module.exports = function registerCandidateCatalog({ app, ipcMain, getAdminUnloc
     const localStorage = { ...(saved.localStorage && typeof saved.localStorage === 'object' ? saved.localStorage : {}) };
 
     sessionStorage.candidat_data = JSON.stringify(candidateFile);
+    sessionStorage.seb_evalpro_admin_candidate_id = String(record.candidateId || '');
     if (responses && typeof responses === 'object') sessionStorage.reponses_data = JSON.stringify(responses);
     if (scores && typeof scores === 'object') sessionStorage.scores_data = JSON.stringify(scores);
 

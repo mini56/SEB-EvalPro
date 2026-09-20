@@ -199,6 +199,8 @@ function parseJs(text, label) {
     "candidate-catalog:begin-bilan",
     "candidate-catalog:workspace-load-sync",
     "candidate-catalog:workspace-save-sync",
+    "seb_evalpro_admin_candidate_id",
+    "cleanupDuplicateWordExports",
     "verifyBilan",
     "syncLegacyArtifacts"
   ]) if (!catalogMain.includes(token)) fail('catalogue backend incomplet: ' + token, 7);
@@ -212,7 +214,7 @@ function parseJs(text, label) {
     "openCandidateReplay(candidateId, filename)",
     "candidate-catalog:open-export",
     "Faire le bilan",
-    "Fichiers résultat / Word"
+    "Document Word du bilan"
   ]) if (!catalogPreload.includes(token)) fail('accès exact candidat incomplet: ' + token, 7);
 
   if (/\.(?:pdf)\b/i.test(catalogMain) || /Word\s*\/\s*PDF|Word\/PDF/i.test(catalogPreload)) {
@@ -230,14 +232,18 @@ function parseJs(text, label) {
 
   for (const token of [
     'SEB_CANDIDATE_AUTONOMOUS_BILAN',
-    "path.join(candidateDir, 'bilan', 'historique')"
+    "path.join(candidateDir, 'bilan', 'historique')",
+    "candidateHistoryDir(candidate, candidateId)",
+    "candidateId:String(source.candidateId || '')"
   ]) if (!bilan.includes(token)) fail('bilan candidat incomplet: ' + token, 7);
 
   for (const token of [
     'SEB_RUNTIME_OFFLINE',
     'devTools: false',
     'SEB_CANDIDATE_CLOSE_GUARD',
-    'candidate:set-admin-export-context'
+    'candidate:set-admin-export-context',
+    'isCurrentCandidateWord',
+    'cleanupNumberedCandidateWordCopies'
   ]) if (!main.includes(token)) fail('confinement/offline incomplet: ' + token, 7);
 
   for (const token of [

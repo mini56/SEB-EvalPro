@@ -19,7 +19,7 @@ function addStyle() {
   const style = document.createElement('style');
   style.id = 'seb-candidate-catalog-style';
   style.textContent = `
-    #seb-evalpro-open-candidate{background:#e8f3ff!important;color:#005b9f!important;border-color:#fff!important;font-weight:700}
+    #seb-evalpro-open-candidate{background:#fff!important;color:#0070c0!important;border:2px solid #0070c0!important;font-weight:700}
     #seb-candidate-catalog,#seb-candidate-detail{position:fixed;inset:0;z-index:2147483647;background:rgba(0,0,0,.58);display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif}
     .seb-cc-card{width:min(1180px,96vw);max-height:90vh;background:#fff;border-radius:10px;box-shadow:0 16px 50px rgba(0,0,0,.35);display:flex;flex-direction:column;overflow:hidden}
     .seb-cc-head{background:#0070c0;color:#fff;padding:14px 18px;display:flex;align-items:center;gap:12px}
@@ -30,8 +30,9 @@ function addStyle() {
     .seb-cc-row{display:grid;grid-template-columns:1.3fr 1.2fr .72fr .9fr auto;gap:10px;align-items:center;padding:11px 12px;background:#fff;border:1px solid #d8dde8;border-radius:7px;margin-bottom:8px}
     .seb-cc-row strong{font-size:15px;color:#222}.seb-cc-row small{display:block;color:#666;margin-top:3px}.seb-cc-status{font-size:12px;font-weight:700}
     .seb-cc-bilan{font-size:13px;line-height:1.35}.seb-cc-actions{display:flex;gap:7px;justify-content:flex-end}
-    .seb-cc-actions button,.seb-cc-foot button,.seb-cc-bilan-row button,.seb-cc-detail-actions button{font:700 14px Arial,sans-serif;padding:8px 12px;border:1px solid #999;border-radius:5px;background:#f2f2f2;cursor:pointer}
-    .seb-cc-actions .primary,.seb-cc-bilan-row .primary,.seb-cc-detail-actions .primary{background:#0070c0;color:#fff;border-color:#0070c0}
+    .seb-cc-actions button,.seb-cc-foot button,.seb-cc-bilan-row button,.seb-cc-detail-actions button{font:700 14px Arial,sans-serif;padding:8px 12px;border:2px solid #0070c0!important;border-radius:6px;background:#fff!important;color:#0070c0!important;cursor:pointer}
+    .seb-cc-actions .primary,.seb-cc-bilan-row .primary,.seb-cc-detail-actions .primary{background:#fff!important;color:#0070c0!important;border-color:#0070c0!important}
+    .seb-cc-actions button:hover,.seb-cc-foot button:hover,.seb-cc-bilan-row button:hover,.seb-cc-detail-actions button:hover{background:#f5f9fd!important}
     .seb-cc-actions .danger{background:#fff;color:#c00000;border-color:#c00000}.seb-cc-actions .confirm{background:#c00000;color:#fff}
     .seb-cc-foot{display:flex;justify-content:flex-end;gap:10px;padding:12px 16px;border-top:1px solid #ddd;background:#fff}
     .seb-cc-empty{padding:35px;text-align:center;color:#555}
@@ -116,7 +117,7 @@ async function openCandidateDetail(candidateId, onChanged) {
       <div class="seb-cc-body">
         <div class="seb-cc-section"><h3>Bilan et révisions</h3><div id="seb-cc-detail-bilans"></div></div>
         <div class="seb-cc-section"><h3>Replay du parcours</h3><div id="seb-cc-detail-replays"></div></div>
-        <div class="seb-cc-section"><h3>Fichiers résultat / Word</h3><div id="seb-cc-detail-exports"></div></div>
+        <div class="seb-cc-section"><h3>Document Word du bilan</h3><div id="seb-cc-detail-exports"></div></div>
       </div>
       <div class="seb-cc-detail-actions">
         <button type="button" id="seb-cc-detail-bilan" class="primary">Faire le bilan</button>
@@ -180,7 +181,7 @@ async function openCandidateDetail(candidateId, onChanged) {
 
   const exports = overlay.querySelector('#seb-cc-detail-exports');
   if (!Array.isArray(result.exports) || !result.exports.length) {
-    exports.innerHTML = '<div class="seb-cc-empty">Aucun fichier Word enregistré pour ce candidat.</div>';
+    exports.innerHTML = '<div class="seb-cc-empty">Aucun document Word enregistré pour ce candidat.</div>';
   } else {
     result.exports.forEach((filename) => {
       const row = document.createElement('div');

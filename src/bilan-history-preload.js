@@ -18,12 +18,15 @@ function textOf(el) {
 }
 
 function candidateFromPage() {
+  let stored = {};
+  try { stored = JSON.parse(window.sessionStorage.getItem('candidat_data') || '{}') || {}; } catch (_) {}
   return {
-    nom: textOf(document.getElementById('nom')),
-    prenom: textOf(document.getElementById('prenom')),
-    date: textOf(document.getElementById('date')),
-    lieu: '',
-    groupe: ''
+    candidateId: String(window.sessionStorage.getItem('seb_evalpro_admin_candidate_id') || stored.candidateId || '').trim(),
+    nom: String(stored.nom || textOf(document.getElementById('nom')) || '').trim(),
+    prenom: String(stored.prenom || stored['prénom'] || textOf(document.getElementById('prenom')) || '').trim(),
+    date: String(stored.date || textOf(document.getElementById('date')) || '').trim(),
+    lieu: String(stored.lieu || stored.ville || '').trim(),
+    groupe: String(stored.groupe || '').trim()
   };
 }
 
@@ -87,8 +90,10 @@ async function archiveCurrentBilan() {
   if (!documentState) return;
   savingCurrent = true;
   try {
+    const selectedCandidate = candidateFromPage();
     const result = await ipcRenderer.invoke('bilan-history:save-current', {
-      candidate: candidateFromPage(),
+      candidateId: selectedCandidate.candidateId,
+      candidate: selectedCandidate,
       originalBuild: currentBuildLabel(),
       sessionToken: String(window.sessionStorage.getItem('seb_evalpro_replay_token') || ''),
       document: documentState

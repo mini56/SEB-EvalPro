@@ -79,8 +79,10 @@ module.exports = function registerBilanHistory({ app, ipcMain, getAdminUnlocked,
     };
   }
 
-  function candidateHistoryDir(candidate) {
-    const candidateDir = findCandidateDir(documentsPath, candidate);
+  function candidateHistoryDir(candidate, candidateId = '') {
+    const id = String(candidateId || '').trim();
+    const selected = id ? listCandidateDirs(candidatesRoot, false).find((record) => String(record.candidateId || '') === id) : null;
+    const candidateDir = selected ? selected.candidateDir : findCandidateDir(documentsPath, candidate);
     if (!candidateDir) throw new Error('Dossier candidat introuvable : bilan non enregistré.');
     const dir = path.join(candidateDir, 'bilan', 'historique');
     ensureDir(dir);
@@ -184,8 +186,8 @@ module.exports = function registerBilanHistory({ app, ipcMain, getAdminUnlocked,
       .sort((a, b) => Number(b.archive.revision || 0) - Number(a.archive.revision || 0))[0] || null;
   }
 
-  function writeArchive({ rootId, revision, parentFilename, originalBuild, candidate, document, source }) {
-    const targetHistory = candidateHistoryDir(candidate);
+  function writeArchive({ rootId, revision, parentFilename, originalBuild, candidateId, candidate, document, source }) {
+    const targetHistory = candidateHistoryDir(candidate, candidateId);
     const createdAt = new Date().toISOString();
     const body = {
       schemaVersion: 1,
@@ -199,6 +201,7 @@ module.exports = function registerBilanHistory({ app, ipcMain, getAdminUnlocked,
       originalBuild: String(originalBuild || CURRENT_BUILD),
       editedWithBuild: CURRENT_BUILD,
       createdAt,
+      candidateId: String(candidateId || ''),
       candidate,
       source: String(source || (revision === 0 ? 'CURRENT_BILAN' : 'HISTORICAL_REVISION')),
       document
@@ -221,8 +224,9 @@ module.exports = function registerBilanHistory({ app, ipcMain, getAdminUnlocked,
   ipcMain.handle('bilan-history:save-current', (_event, payload) => {
     if (!getAdminUnlocked()) return { ok:false, error:'Accès administrateur requis.' };
     try {
+      const candidateId = String(payload && payload.candidateId || '').trim();
       const candidate = normalizeCandidate(payload && payload.candidate);
-      if (!candidate.nom && !candidate.prenom) throw new Error('Candidat non identifié.');
+      if (!candidateId && !candidate.nom && !candidate.prenom) throw new Error('Candidat non identifié.');
       const document = normalizeDocument(payload && payload.document);
       const sessionToken = safePart(payload && payload.sessionToken, '');
       const rootId = sessionToken || sha({ candidate, originalBuild:String((payload && payload.originalBuild) || CURRENT_BUILD) }).slice(0,24);
@@ -237,6 +241,7 @@ module.exports = function registerBilanHistory({ app, ipcMain, getAdminUnlocked,
         revision,
         parentFilename: latest ? latest.filename : '',
         originalBuild:String((payload && payload.originalBuild) || CURRENT_BUILD),
+        candidateId,
         candidate,
         document,
         source: revision === 0 ? 'CURRENT_BILAN_ORIGINAL' : 'CURRENT_BILAN_SAVE'
@@ -306,6 +311,7 @@ module.exports = function registerBilanHistory({ app, ipcMain, getAdminUnlocked,
         revision,
         parentFilename:loaded.filename,
         originalBuild:source.originalBuild,
+        candidateId:String(source.candidateId || ''),
         candidate:normalizeCandidate(source.candidate),
         document,
         source:'HISTORICAL_REVISION'

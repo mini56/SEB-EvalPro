@@ -71,6 +71,18 @@ function uniqueOutputPath(directory, filename) {
   return target;
 }
 
+function cleanupNumberedCandidateWordCopies(directory, filename) {
+  if (!directory || !/^Evaluation_.+\.docx?$/i.test(filename)) return;
+  const parsed = path.parse(filename);
+  if (!fs.existsSync(directory)) return;
+  const escaped = parsed.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const duplicate = new RegExp('^' + escaped + '_(?:R\\d+|\\d+)' + parsed.ext.replace('.', '\\.') + '$', 'i');
+  for (const entry of fs.readdirSync(directory, { withFileTypes:true })) {
+    if (!entry.isFile() || !duplicate.test(entry.name)) continue;
+    try { fs.rmSync(path.join(directory, entry.name), { force:true }); } catch (_) {}
+  }
+}
+
 function installDownloadRouting() {
   if (!mainWindow || mainWindow.isDestroyed() || downloadRoutingInstalled) return;
   downloadRoutingInstalled = true;
@@ -81,7 +93,16 @@ function installDownloadRouting() {
       ensureSebDocumentsFolders();
       const candidateExportDir = getCandidateStore().getActiveExportDir();
       const targetDirectory = adminExportCandidateDir || candidateExportDir || bilanDocumentsDir();
-      item.setSavePath(uniqueOutputPath(targetDirectory, filename));
+      const isCurrentCandidateWord = !!adminExportCandidateDir && /^Evaluation_.+\.docx?$/i.test(filename);
+      if (isCurrentCandidateWord) {
+        const target = path.join(targetDirectory, filename);
+        item.setSavePath(target);
+        item.once('done', (_downloadEvent, state) => {
+          if (state === 'completed') cleanupNumberedCandidateWordCopies(targetDirectory, filename);
+        });
+      } else {
+        item.setSavePath(uniqueOutputPath(targetDirectory, filename));
+      }
     } catch (_) {}
   });
 }

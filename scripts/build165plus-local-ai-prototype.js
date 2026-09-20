@@ -88,7 +88,7 @@ function installUnifiedSynthesis(){
  const states=document.createElement('div');states.id='seb-ai-state-group';
  const motorState=document.createElement('span');motorState.id='seb-motor-result-status';motorState.className='seb-ai-apply-state';motorState.textContent='Formulation MOTEUR appliquée ❌';
  const aiState=document.createElement('span');aiState.id='seb-ai-result-status';aiState.className='seb-ai-apply-state';aiState.textContent='SEB-IA : Reformulation IA appliquée ❌';
- const detail=document.createElement('span');detail.id='seb-ai-result-detail';detail.textContent='En attente de génération.';
+ const detail=document.createElement('span');detail.id='seb-ai-result-detail';detail.textContent=aiText(area.value)?'Synthèse enregistrée précédemment. Cliquez sur Générer pour la recalculer.':'En attente de génération.';
  states.append(motorState,aiState,detail);
  const warning=document.createElement('p');warning.id='seb-ai-human-check';warning.innerHTML='<strong>SEB-IA peut faire des erreurs.</strong> Vérifiez les informations importantes.';
  footer.append(states,warning);area.insertAdjacentElement('afterend',footer);
