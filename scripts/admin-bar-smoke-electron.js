@@ -37,6 +37,7 @@ ipcMain.on('state:load-sync', (event) => {
   };
 });
 ipcMain.on('state:save-sync', (event) => { event.returnValue = { ok: true }; });
+ipcMain.on('candidate-catalog:workspace-load-sync', (event) => { event.returnValue = { ok:false }; });
 ipcMain.handle('state:save', () => ({ ok: true }));
 let smokeAdminUnlocked = true;
 ipcMain.handle('admin:status', () => smokeAdminUnlocked);
@@ -103,12 +104,12 @@ app.whenReady().then(async () => {
       };
     })()`);
 
-    if (!result.bar || !result.hotzone || !result.adminButton || !result.openCandidate || !result.openCandidateVisible || result.oldBilanVisible || result.oldReplayVisible || result.oldResultsVisible || !result.visible || result.adminText !== 'Verrouiller') {
-      fail('barre Admin incorrecte ou ancien accès global bilan/replay/résultats encore visible', result);
+    if (!result.bar || !result.hotzone || !result.adminButton || !result.openCandidate || !result.openCandidateVisible || !result.oldBilanVisible || !result.oldReplayVisible || result.oldResultsVisible || !result.visible || result.adminText !== 'Verrouiller') {
+      fail('barre Admin incorrecte ou accès historique Bilan/Replay indisponible', result);
       return;
     }
 
-    console.log('SEB EvalPro Admin smoke: OK - Ouvrir un candidat visible; anciens accès globaux bilan/replay/résultats masqués.');
+    console.log('SEB EvalPro Admin smoke: OK - Ouvrir un candidat visible; accès historiques Bilan/Replay conservés.');
     console.log(JSON.stringify(result));
 
     // Vérification réelle du correctif IA #25 : un seul bouton visible,

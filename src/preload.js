@@ -446,6 +446,11 @@ function injectAdminBar() {
 
   returnButton.addEventListener('click', async () => {
     saveNow(true);
+    if (adminCandidateWorkspace) {
+      await ipcRenderer.invoke('candidate-catalog:end-bilan').catch(() => false);
+      await ipcRenderer.invoke('candidate:set-admin-export-context', '').catch(() => false);
+      adminCandidateWorkspace = null;
+    }
     await ipcRenderer.invoke('admin:return-evaluation');
   });
 
@@ -560,10 +565,6 @@ try {
   }
   objectToStorage(window.sessionStorage, restoredState.sessionStorage);
   objectToStorage(window.localStorage, restoredState.localStorage);
-  if (!isAdminBilanPage()) {
-    ipcRenderer.invoke('candidate-catalog:end-bilan').catch(() => {});
-    ipcRenderer.invoke('candidate:set-admin-export-context', '').catch(() => {});
-  }
 } catch (_) {}
 
 window.addEventListener('DOMContentLoaded', async () => {
