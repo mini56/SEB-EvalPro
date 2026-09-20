@@ -259,8 +259,8 @@ function insertBefore(text, marker, addition, label) {
 
   const checks = [
     [main.includes('spellcheck: false'), 'spellcheck Electron'],
-    [main.includes("admin:list-results") && main.includes("admin:open-result"), 'accès admin résultats'],
-    [preload.includes('Résultats stagiaires'), 'bouton résultats admin'],
+    [(main.includes("admin:list-results") && main.includes("admin:open-result")) || main.includes("admin:open-candidate-results"), 'accès admin résultats'],
+    [preload.includes('Résultats stagiaires') || (preload.includes('adminCandidateResultsWorkspace') && preload.includes('showReadOnlyCandidateResults')), 'accès résultats candidat Admin'],
     [qcm.includes('sauvegarderResultatStagiaireDocx') && qcm.includes("Packer.toBlob"), 'DOCX résultat stagiaire'],
     [qcm.includes('normalizeSebTime(val) === normalizeSebTime(bonnes[i])'), 'normalisation heures page 3'],
     [stock.includes('data-seb-example') || stock.includes('sebExample'), 'marquage exemple stock'],
