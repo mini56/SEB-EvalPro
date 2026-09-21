@@ -26,8 +26,6 @@ let adminCandidateResultsMode = false;
 let lastCandidateSaveError = '';
 let allowApplicationExit = false;
 let candidateKeyGuardProcess = null;
-let evaluationRecoveryAttempts = 0;
-let evaluationRecoveryTimer = null;
 
 function candidateKeyGuardExecutable() {
   return app.isPackaged
@@ -215,47 +213,6 @@ function existingWebPage(pageName) {
   return path.join(webRoot, 'qcmv1.0.html');
 }
 
-// SEB_EVALUATION_PAGE_RECOVERY_GUARD
-function recoverEvaluationRenderer(reason = '') {
-  if (!mainWindow || mainWindow.isDestroyed() || adminSessionUnlocked || allowApplicationExit) return;
-  clearTimeout(evaluationRecoveryTimer);
-  evaluationRecoveryTimer = setTimeout(() => {
-    if (!mainWindow || mainWindow.isDestroyed() || adminSessionUnlocked || allowApplicationExit) return;
-    const state = readState();
-    const wanted = existingWebPage(state.lastEvaluationPage || state.lastPage || 'qcmv1.0.html');
-    const fallback = existingWebPage('qcmv1.0.html');
-    const target = evaluationRecoveryAttempts < 1 ? wanted : fallback;
-    evaluationRecoveryAttempts += 1;
-    console.error('Récupération fenêtre parcours:', reason || 'page vide', '->', path.basename(target));
-    mainWindow.loadFile(target).catch(() => {
-      if (target !== fallback) mainWindow.loadFile(fallback).catch(() => {});
-    });
-    reinforceCandidateWindowLock();
-  }, 120);
-}
-
-function verifyEvaluationRendererIsVisible() {
-  if (!mainWindow || mainWindow.isDestroyed() || adminSessionUnlocked) return;
-  const page = safePageName(mainWindow.webContents.getURL());
-  if (isAdminNavigationPage(page)) return;
-  setTimeout(async () => {
-    if (!mainWindow || mainWindow.isDestroyed() || adminSessionUnlocked) return;
-    try {
-      const healthy = await mainWindow.webContents.executeJavaScript(
-        "(() => !!document.body && (document.body.children.length > 0 || String(document.body.innerText || '').trim().length > 0))()",
-        true
-      );
-      if (healthy) {
-        evaluationRecoveryAttempts = 0;
-        return;
-      }
-      recoverEvaluationRenderer('document Electron vide');
-    } catch (_) {
-      recoverEvaluationRenderer('renderer inaccessible');
-    }
-  }, 250);
-}
-
 function verifyAdminPassword(password) {
   const received = crypto.createHash('sha256').update(String(password || '').trim().toUpperCase(), 'utf8').digest('hex');
   const expected = Buffer.from(ADMIN_PASSWORD_SHA256, 'utf8');
@@ -391,16 +348,6 @@ function createWindow() {
 
   mainWindow.webContents.on('did-finish-load', () => {
     applyAdaptiveZoom();
-    verifyEvaluationRendererIsVisible();
-  });
-
-  mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, _url, isMainFrame) => {
-    if (isMainFrame === false || errorCode === -3) return;
-    recoverEvaluationRenderer('échec chargement ' + errorCode + ' ' + String(errorDescription || ''));
-  });
-
-  mainWindow.webContents.on('render-process-gone', (_event, details) => {
-    recoverEvaluationRenderer('renderer arrêté: ' + String(details && details.reason || 'inconnu'));
   });
 
   mainWindow.webContents.once('did-finish-load', () => {

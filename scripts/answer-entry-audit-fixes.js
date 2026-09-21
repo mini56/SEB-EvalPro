@@ -227,11 +227,49 @@ for (const spec of [
 }
 
 // -----------------------------------------------------------------------------
-// 6. Dictée : aucun bouton Vérifier ni correction côté stagiaire.
-//    Dès que le candidat commence à saisir, afficher un seul bouton :
-//    « Dictée terminée, passer au suivant ». Son clic déclenche la vérification
-//    cachée, enregistre les données puis lance le bouton Suivant historique.
-//    La correction détaillée reste uniquement dans la page Résultats.
+// 6. Traitement de texte : restauration du comportement stable antérieur au
+//    correctif Dictée #23. Aucune suggestion/correction pendant la rédaction.
+// -----------------------------------------------------------------------------
+{
+  const { file, text } = read('app/web/nwtexte.html');
+  let out = text.replace(/spellcheck="true"/g, 'spellcheck="false"');
+  if (!out.includes('id="seb-no-live-text-correction"')) {
+    const patch = [
+      '<script id="seb-no-live-text-correction">',
+      '(function(){',
+      "  'use strict';",
+      '  function disableLiveCorrection(){',
+      "    document.querySelectorAll('#editor,.ql-editor,[contenteditable=\"true\"]').forEach(function(editor){",
+      "      editor.setAttribute('spellcheck', 'false');",
+      "      editor.setAttribute('autocorrect', 'off');",
+      "      editor.setAttribute('autocapitalize', 'off');",
+      '      editor.spellcheck = false;',
+      '    });',
+      '  }',
+      "  document.addEventListener('DOMContentLoaded', function(){",
+      '    disableLiveCorrection();',
+      '    setTimeout(disableLiveCorrection, 0);',
+      '    setTimeout(disableLiveCorrection, 250);',
+      '  });',
+      '})();',
+      '</script>'
+    ].join('\n');
+    out = appendBeforeBody(out, patch, 'Traitement de texte sans correction en direct');
+  }
+  if (/spellcheck="true"/.test(out)) fail('Traitement de texte: correcteur natif encore actif', 9);
+  if (!out.includes('seb-no-live-text-correction')) fail('Traitement de texte: garde anti-correction absente', 9);
+  const engine = read('app/web/js/nwtexte-quill-engine.js').text;
+  if (!engine.includes('scores.page7 = analyse.score.total;') || !engine.includes("sessionStorage.setItem('scores_data'")) fail('Traitement de texte: notation Page 7 absente du moteur Quill', 9);
+  write(file, out);
+}
+
+// -----------------------------------------------------------------------------
+// 6b. Dictée : correctif minimal et isolé.
+//     - aucune MutationObserver ajoutée ;
+//     - Vérifier/Suivant historiques restent le moteur interne mais sont cachés ;
+//     - la correction reste masquée uniquement par CSS ;
+//     - 1er clic : « Dictée terminée » -> calcul/enregistrement -> « Suivant » ;
+//     - 2e clic : navigation historique vers le Tri.
 // -----------------------------------------------------------------------------
 {
   const { file, text } = read('app/web/dictee.html');
@@ -239,46 +277,71 @@ for (const spec of [
   if (!out.includes('id="verifyBtn"') || !out.includes('id="nextBtn"') || !out.includes('id="candidateText"')) {
     fail('Dictée: contrôles historiques introuvables', 9);
   }
-  if (!out.includes('id="seb-dictee-finish-next"')) {
+
+  if (!out.includes('id="seb-dictee-stable-style"')) {
     const patch = [
-      '<style id="seb-dictee-finish-style">',
+      '<style id="seb-dictee-stable-style">',
       '#verifyBtn,#nextBtn,#feedback{display:none!important;visibility:hidden!important;}',
-      '#seb-dictee-finish-next{display:none;margin-top:12px;align-self:flex-end;font-weight:700;}',
+      '#seb-dictee-finish-next{display:inline-flex;margin-top:12px;align-self:flex-end;font-weight:700;}',
       '</style>',
-      '<script id="seb-dictee-finish-runtime">',
+      '<script id="seb-dictee-stable-runtime">',
       '(function(){',
       "  'use strict';",
-      '  function hideFeedback(){',
-      "    const f=document.getElementById('feedback');",
-      "    if(f){f.classList.remove('visible');f.style.setProperty('display','none','important');f.setAttribute('aria-hidden','true');}",
+      "  const KEY='dictee_data';",
+      "  const text=document.getElementById('candidateText');",
+      "  const verify=document.getElementById('verifyBtn');",
+      "  const next=document.getElementById('nextBtn');",
+      '  if(!text||!verify||!next)return;',
+      "  let finish=document.getElementById('seb-dictee-finish-next');",
+      "  if(!finish){finish=document.createElement('button');finish.id='seb-dictee-finish-next';finish.type='button';verify.insertAdjacentElement('beforebegin',finish);}",
+      '  function readState(){try{return JSON.parse(sessionStorage.getItem(KEY)||"null")}catch(_){return null}}',
+      '  function setMode(){',
+      '    const d=readState();',
+      "    const done=!!(d&&(d.status==='verified'||d.status==='abandoned'));",
+      "    finish.textContent=done?'Suivant':'Dictée terminée';",
+      "    finish.dataset.mode=done?'next':'finish';",
+      '    finish.disabled=false;',
+      "    if(done&&d.status==='verified')text.disabled=true;",
       '  }',
-      '  function init(){',
-      "    const text=document.getElementById('candidateText'),verify=document.getElementById('verifyBtn'),next=document.getElementById('nextBtn');",
-      '    if(!text||!verify||!next)return;',
-      "    verify.style.setProperty('display','none','important');next.style.setProperty('display','none','important');hideFeedback();",
-      "    let finish=document.getElementById('seb-dictee-finish-next');",
-      "    if(!finish){finish=document.createElement('button');finish.id='seb-dictee-finish-next';finish.type='button';finish.textContent='Dictée terminée, passer au suivant';text.insertAdjacentElement('afterend',finish);}",
-      "    function refresh(){finish.style.display=String(text.value||'').trim()?'inline-flex':'none';hideFeedback();}",
-      "    text.addEventListener('input',refresh);",
-      "    finish.addEventListener('click',function(){",
-      "      let d=null;try{d=JSON.parse(sessionStorage.getItem('dictee_data')||'null')}catch(_){}",
-      "      if(!d||d.status!=='verified'){verify.click();}",
-      '      hideFeedback();',
-      "      setTimeout(function(){next.disabled=false;next.removeAttribute('disabled');next.click();},0);",
-      '    });',
-      '    refresh();',
-      "    new MutationObserver(hideFeedback).observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:['class','style']});",
-      '  }',
-      "  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();",
+      "  finish.addEventListener('click',function(){",
+      '    const d=readState();',
+      "    if(d&&(d.status==='verified'||d.status==='abandoned')){",
+      '      finish.disabled=true;',
+      '      next.disabled=false;',
+      "      next.removeAttribute('disabled');",
+      '      next.click();',
+      '      return;',
+      '    }',
+      "    if(!String(text.value||'').trim()){window.alert('Saisissez le texte entendu avant de cliquer sur « Dictée terminée », ou utilisez « Abandonner l’exercice ».');try{text.focus()}catch(_){}return;}",
+      '    finish.disabled=true;',
+      '    verify.disabled=false;',
+      "    verify.removeAttribute('disabled');",
+      '    verify.click();',
+      '    setTimeout(function(){',
+      '      const after=readState();',
+      "      if(after&&after.status==='verified'){setMode();return;}",
+      '      finish.disabled=false;',
+      "      finish.textContent='Dictée terminée';",
+      "      finish.dataset.mode='finish';",
+      "      const status=document.getElementById('status');",
+      "      if(status)status.textContent='La dictée n’a pas pu être enregistrée. Cliquez de nouveau sur « Dictée terminée ».';",
+      '    },120);',
+      '  });',
+      '  setMode();',
       '})();',
       '</script>'
     ].join('\n');
-    out = appendBeforeBody(out, patch, 'Dictée bouton terminer');
+    out = appendBeforeBody(out, patch, 'Dictée stable sans correction visible');
   }
-  if (!out.includes("Dictée terminée, passer au suivant")) fail('Dictée: bouton terminer absent', 9);
-  if (!out.includes("if(!d||d.status!=='verified'){verify.click();}")) fail('Dictée: vérification automatique absente', 9);
-  if (!out.includes("next.click();")) fail('Dictée: navigation automatique absente', 9);
-  if (!out.includes('#verifyBtn,#nextBtn,#feedback{display:none!important')) fail('Dictée: anciens contrôles encore visibles', 9);
+
+  if (!out.includes('id="seb-dictee-stable-runtime"')) fail('Dictée: runtime stable absent', 9);
+  if (!out.includes("finish.textContent=done?'Suivant':'Dictée terminée'")) fail('Dictée: bouton deux états absent', 9);
+  if (!out.includes('verify.click();')) fail('Dictée: moteur de correction historique non appelé', 9);
+  if (!out.includes('next.click();')) fail('Dictée: navigation historique absente', 9);
+  if (!out.includes('#verifyBtn,#nextBtn,#feedback{display:none!important')) fail('Dictée: correction/anciens boutons non masqués', 9);
+  if (/MutationObserver[\s\S]{0,220}(?:feedback|hideFeedback)|(?:feedback|hideFeedback)[\s\S]{0,220}MutationObserver/.test(out)) {
+    fail('Dictée: MutationObserver de masquage interdit', 9);
+  }
   const results = read('app/web/qcmv1.0.html').text;
   if (!results.includes('seb-dictee-complex-results-v3')) fail('Dictée: correction détaillée Résultats absente', 9);
   write(file, out);
