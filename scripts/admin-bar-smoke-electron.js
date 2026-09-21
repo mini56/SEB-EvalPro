@@ -110,12 +110,12 @@ app.whenReady().then(async () => {
       };
     })()`);
 
-    if (!result.bar || !result.hotzone || !result.adminButton || !result.openCandidate || !result.openCandidateVisible || !result.closeSessionVisible || result.bilanVisible || !result.oldBilanVisible || !result.oldReplayVisible || result.oldResultsVisible || !result.visible || result.adminText !== 'Verrouiller') {
-      fail('barre Admin incorrecte : Ouvrir un candidat/Fermer cette session requis, Bilan global interdit, accès historiques conservés', result);
+    if (!result.bar || !result.hotzone || !result.adminButton || !result.openCandidate || !result.openCandidateVisible || !result.closeSessionVisible || result.bilanVisible || !result.oldBilanVisible || result.oldReplayVisible || result.oldResultsVisible || !result.visible || result.adminText !== 'Verrouiller') {
+      fail('barre Admin incorrecte : Ouvrir un candidat/Fermer cette session requis, Bilan global interdit, Replay global interdit, accès historiques conservés', result);
       return;
     }
 
-    console.log('SEB EvalPro Admin smoke: OK - Ouvrir un candidat et Fermer cette session visibles; Bilan global masqué; accès historiques conservés.');
+    console.log('SEB EvalPro Admin smoke: OK - Ouvrir un candidat et Fermer cette session visibles; Bilan global et Replay global masqués; accès historiques conservés.');
     console.log(JSON.stringify(result));
 
     // Vérification réelle du correctif IA #25 : un seul bouton visible,
