@@ -74,17 +74,24 @@ function applyAdminWindowMode(unlocked) {
       try { applyAdaptiveZoom(); } catch (_) {}
     }, 120);
   } else {
-    try { mainWindow.setAlwaysOnTop(true); } catch (_) {}
-    try { mainWindow.setSkipTaskbar(true); } catch (_) {}
+    const restoreCandidateShell = () => {
+      if (!mainWindow || mainWindow.isDestroyed() || adminSessionUnlocked) return;
+      try { mainWindow.setSkipTaskbar(true); } catch (_) {}
+      try { mainWindow.setAlwaysOnTop(true); } catch (_) {}
+      try { mainWindow.setFullScreen(true); } catch (_) {}
+      try { mainWindow.setKiosk(true); } catch (_) {}
+      try { mainWindow.moveTop(); } catch (_) {}
+      try { mainWindow.show(); } catch (_) {}
+      try { mainWindow.focus(); } catch (_) {}
+      try { mainWindow.webContents.focus(); } catch (_) {}
+      try { enforceCandidateWindowLock(true); } catch (_) {}
+      try { applyAdaptiveZoom(); } catch (_) {}
+    };
     if (process.platform === 'win32') {
       try { mainWindow.setOverlayIcon(null, ''); } catch (_) {}
     }
-    try { mainWindow.setFullScreen(true); } catch (_) {}
-    try { mainWindow.setKiosk(true); } catch (_) {}
-    setTimeout(() => {
-      if (!mainWindow || mainWindow.isDestroyed() || adminSessionUnlocked) return;
-      try { applyAdaptiveZoom(); } catch (_) {}
-    }, 80);
+    restoreCandidateShell();
+    [40, 120, 300, 700].forEach((delay) => setTimeout(restoreCandidateShell, delay));
   }
 
   try { mainWindow.setMenuBarVisibility(false); } catch (_) {}
