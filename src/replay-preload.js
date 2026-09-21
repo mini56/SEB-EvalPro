@@ -207,7 +207,6 @@ function addReplayStyle() {
     #seb-evalpro-topbar .seb-admin-left-actions,#seb-evalpro-topbar .seb-admin-right-actions{display:flex;align-items:center;gap:8px}
     #seb-evalpro-topbar .seb-admin-left-actions{margin-left:8px;padding-left:10px;border-left:1px solid rgba(255,255,255,.5)}
     #seb-evalpro-topbar .seb-admin-right-actions{margin-left:8px;padding-left:12px;border-left:1px solid rgba(255,255,255,.5)}
-    #seb-evalpro-replay{background:#e8f3ff!important;color:#005b9f!important;border-color:#fff!important;font-weight:700}
     #seb-replay-chooser,#seb-replay-viewer{position:fixed;inset:0;z-index:2147483647;background:rgba(0,0,0,.58);display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif}
     .seb-replay-card{width:min(980px,95vw);max-height:88vh;background:#fff;border:1px solid #aaa;border-radius:10px;box-shadow:0 15px 48px rgba(0,0,0,.34);display:flex;flex-direction:column;overflow:hidden}
     .seb-replay-head{background:#0070c0;color:#fff;padding:14px 18px;display:flex;align-items:center;gap:12px}
@@ -238,14 +237,8 @@ function addReplayStyle() {
 
 function regroupAdminButtons() {
   const bar = document.getElementById('seb-evalpro-topbar');
-  if (!bar || document.getElementById('seb-evalpro-replay')) return;
+  if (!bar || bar.querySelector('.seb-admin-left-actions')) return;
   addReplayStyle();
-
-  const replay = document.createElement('button');
-  replay.id = 'seb-evalpro-replay';
-  replay.type = 'button';
-  replay.textContent = 'Rejouer un parcours';
-  replay.hidden = true;
 
   const left = document.createElement('div');
   left.className = 'seb-admin-left-actions';
@@ -261,7 +254,9 @@ function regroupAdminButtons() {
   const build = document.getElementById('seb-evalpro-build');
   const name = bar.querySelector('.seb-evalpro-name');
 
-  [results, replay, bilan, retour].forEach((el) => { if (el) left.appendChild(el); });
+  // Le replay n'est jamais un bouton global de la barre Admin.
+  // Il reste accessible uniquement depuis la fiche du candidat concerné.
+  [results, bilan, retour].forEach((el) => { if (el) left.appendChild(el); });
   [close, admin].forEach((el) => { if (el) right.appendChild(el); });
 
   const anchor = build || name;
@@ -274,20 +269,6 @@ function regroupAdminButtons() {
     left.insertAdjacentElement('afterend', newSpacer);
     newSpacer.insertAdjacentElement('afterend', right);
   }
-
-  async function refreshReplayVisibility() {
-    try { replay.hidden = !(await ipcRenderer.invoke('admin:status')); }
-    catch (_) { replay.hidden = true; }
-  }
-
-  replay.addEventListener('click', () => createReplayChooserDialog());
-  if (admin) {
-    admin.addEventListener('click', () => setTimeout(refreshReplayVisibility, 30));
-    const observer = new MutationObserver(() => refreshReplayVisibility());
-    observer.observe(admin, { childList: true, characterData: true, subtree: true });
-  }
-  bar.addEventListener('mouseenter', refreshReplayVisibility);
-  refreshReplayVisibility();
 }
 
 function formatDate(value) {
