@@ -48,10 +48,9 @@ const runtimeLines = [
   '  function hideCorrection(){',
   "    const feedback = document.getElementById('feedback');",
   '    if (!feedback) return;',
-  "    feedback.classList.remove('visible');",
-  '    feedback.hidden = true;',
-  "    feedback.setAttribute('aria-hidden', 'true');",
-  "    if (feedback.innerHTML) feedback.innerHTML = '';",
+  "    if (feedback.classList.contains('visible')) feedback.classList.remove('visible');",
+  '    if (!feedback.hidden) feedback.hidden = true;',
+  "    if (feedback.getAttribute('aria-hidden') !== 'true') feedback.setAttribute('aria-hidden', 'true');",
   '  }',
   '',
   '  function hideLegacyButtons(){',
@@ -145,13 +144,8 @@ const runtimeLines = [
   '      });',
   '    }',
   '',
-  "    const feedback = document.getElementById('feedback');",
-  "    if (feedback && feedback.dataset.sebHiddenWatch !== '1') {",
-  "      feedback.dataset.sebHiddenWatch = '1';",
-  '      new MutationObserver(function(){ hideCorrection(); }).observe(feedback, {',
-  "        childList:true, subtree:true, attributes:true, attributeFilter:['class','style','hidden']",
-  '      });',
-  '    }',
+  '    // Aucun MutationObserver sur #feedback : le CSS display:none!important',
+  '    // suffit à masquer la correction et évite toute boucle de mutations.',
   '    refreshMode();',
   '    return true;',
   '  }',
@@ -183,7 +177,7 @@ for (const token of [
   'window.location.href = TRI_PAGE',
   '#verifyBtn,#nextBtn,#feedback{display:none!important}',
   "state.status === 'verified'",
-  'new MutationObserver(function(){ hideCorrection(); })'
+  'Aucun MutationObserver sur #feedback'
 ]) {
   if (!html.includes(token)) fail('contrôle absent: ' + token);
 }
