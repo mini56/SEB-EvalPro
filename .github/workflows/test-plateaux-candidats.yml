@@ -19,6 +19,14 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Set application version from build number
+        shell: pwsh
+        run: |
+          $version = "0.1.${{ github.run_number }}"
+          npm version $version --no-git-tag-version --allow-same-version
+          if ($LASTEXITCODE -ne 0) { throw "Mise à jour de version échouée: $version" }
+          Write-Host "SEB EvalPro version: $version"
+
       - name: Validate candidate-folder foundation
         shell: pwsh
         run: |

@@ -357,7 +357,7 @@ function injectAdminBar() {
     #seb-evalpro-topbar .seb-evalpro-name{font-size:18px;font-weight:700;white-space:nowrap}
     #seb-evalpro-topbar .seb-evalpro-candidate-badge{font-size:13px;font-weight:700;white-space:nowrap;padding:5px 9px;border:1px solid rgba(255,255,255,.55);border-radius:4px;background:rgba(255,255,255,.14)}
     #seb-evalpro-topbar .seb-evalpro-spacer{flex:1}
-    #seb-evalpro-topbar button{font-family:Arial,sans-serif;font-size:14px;padding:6px 12px;border:1px solid rgba(255,255,255,.75);border-radius:4px;background:#fff;color:#0070c0;cursor:pointer}
+    #seb-evalpro-topbar button{font-family:Arial,sans-serif;font-size:14px;font-weight:400;padding:6px 12px;border:1px solid rgba(255,255,255,.75);border-radius:4px;background:#fff;color:#0070c0;cursor:pointer}
     #seb-evalpro-topbar button:hover{background:#f2f2f2}
     #seb-evalpro-topbar #seb-evalpro-close-session{background:#c00000;color:#fff;border-color:#fff}
     #seb-evalpro-topbar #seb-evalpro-close-session:hover{background:#a00000}
