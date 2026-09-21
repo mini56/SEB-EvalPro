@@ -71,6 +71,7 @@ function write(file, text) {
   const replayPreload = read('src/replay-preload.js').text;
   const bilanMain = read('src/bilan-history-main.js').text;
   const bilanPreload = read('src/bilan-history-preload.js').text;
+  const candidateCatalogPreload = read('src/candidate-catalog-preload.js').text;
   const requiredMain = [
     "path.join(app.getPath('documents'), 'SEB EvalPro', 'parcours')",
     "ipcMain.handle('replay:capture-page'",
@@ -89,11 +90,9 @@ function write(file, text) {
     "final.classList.contains('visible')",
     'replay:capture-page',
     'seb_evalpro_replay_archive_file',
-    'Rejouer un parcours',
     'LECTURE SEULE · ARCHIVE VISUELLE FIGÉE · AUCUN RECALCUL',
-    'Choisir le parcours à rejouer',
-    'Documents\\\\SEB EvalPro\\\\parcours',
-    'admin:get-parcours-slide'
+    'admin:get-parcours-slide',
+    'openCandidateReplay(candidateId, filename)'
   ];
   const requiredBilanMain = [
     "SEB_CANDIDATE_AUTONOMOUS_BILAN",
@@ -118,6 +117,12 @@ function write(file, text) {
   ];
   for (const token of requiredMain) if (!replayMain.includes(token)) fail('contrôle backend replay manquant: ' + token);
   for (const token of requiredPreload) if (!replayPreload.includes(token)) fail('contrôle interface replay manquant: ' + token);
+  for (const token of ["open.textContent = 'Rejouer'", 'replayPreload.openCandidateReplay(candidateId, filename)']) {
+    if (!candidateCatalogPreload.includes(token)) fail('Replay absent de la fiche candidat: ' + token);
+  }
+  if (replayPreload.includes('Rejouer un parcours') || replayPreload.includes('seb-evalpro-replay')) {
+    fail('Le Replay ne doit plus être proposé comme bouton global dans la barre Admin.');
+  }
   for (const token of requiredBilanMain) if (!bilanMain.includes(token)) fail('contrôle backend bilan manquant: ' + token);
   for (const token of requiredBilanPreload) if (!bilanPreload.includes(token)) fail('contrôle interface bilan manquant: ' + token);
 }
