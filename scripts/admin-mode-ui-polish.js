@@ -189,6 +189,8 @@ function applyAdminWindowMode(unlocked) {
       box-shadow:0 2px 5px rgba(0,0,0,.18),inset 0 1px 0 rgba(255,255,255,.95)!important;
       font-weight:700!important;cursor:pointer;transition:background .12s ease,box-shadow .12s ease,transform .12s ease
     }
+    /* La barre Admin reste volontairement plus légère que les boutons de dialogue. */
+    #seb-evalpro-topbar button{font-weight:400!important}
     #seb-evalpro-topbar button:hover,
     #seb-evalpro-admin-dialog button:hover,
     #seb-evalpro-session-close-dialog button:hover,
