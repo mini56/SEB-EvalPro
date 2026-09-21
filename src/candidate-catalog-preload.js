@@ -45,17 +45,17 @@ function addStyle() {
     .seb-cc-actions .primary,.seb-cc-bilan-row .primary,.seb-cc-detail-actions .primary{background:#fff!important;color:#0070c0!important;border-color:#0070c0!important}
     .seb-cc-actions button:hover,.seb-cc-foot button:hover,.seb-cc-bilan-row button:hover,.seb-cc-detail-actions button:hover{background:#f5f9fd!important}
     .seb-cc-actions .danger{background:#fff;color:#c00000;border-color:#c00000}.seb-cc-actions .confirm{background:#c00000;color:#fff}
-    .seb-cc-detail-actions .danger{margin-left:auto;background:#c00000!important;color:#fff!important;border-color:#c00000!important}
-    .seb-cc-detail-actions .danger:hover{background:#a00000!important;color:#fff!important}
+    .seb-cc-detail-actions .danger{margin-left:auto;background:#fff!important;color:#c00000!important;border-color:#c00000!important}
+    .seb-cc-detail-actions .danger:hover{background:#fff!important;color:#c00000!important;border-color:#c00000!important}
     #seb-candidate-delete-confirm{position:fixed;inset:0;z-index:2147483647;background:rgba(0,0,0,.66);display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif}
     .seb-delete-card{width:min(560px,92vw);background:#fff;border-radius:9px;box-shadow:0 18px 55px rgba(0,0,0,.4);overflow:hidden}
     .seb-delete-head{padding:14px 18px;background:#c00000;color:#fff;font-size:19px;font-weight:700}
     .seb-delete-body{padding:20px;font-size:15px;line-height:1.5;color:#222}
     .seb-delete-actions{display:flex;justify-content:flex-end;gap:10px;padding:14px 18px;border-top:1px solid #ddd;background:#f7f9fc}
-    .seb-delete-actions button{font:700 14px Arial,sans-serif;padding:8px 14px;border:2px solid #0070c0;border-radius:6px;background:#fff;color:#0070c0;cursor:pointer;box-shadow:0 2px 5px rgba(0,0,0,.18)}
-    .seb-delete-actions button:hover{background:#f5f9fd}
-    .seb-delete-actions .danger{background:#c00000;color:#fff;border-color:#c00000}
-    .seb-delete-actions .danger:hover{background:#a00000;color:#fff}
+    .seb-delete-actions button{font:700 14px Arial,sans-serif;padding:8px 14px;border:2px solid #0070c0!important;border-radius:6px;background:#fff!important;color:#0070c0!important;cursor:pointer;box-shadow:0 2px 5px rgba(0,0,0,.18)}
+    .seb-delete-actions button:hover{background:#fff!important;color:#0070c0!important;border-color:#0070c0!important}
+    .seb-delete-actions .danger{background:#fff!important;color:#c00000!important;border-color:#c00000!important}
+    .seb-delete-actions .danger:hover{background:#fff!important;color:#c00000!important;border-color:#c00000!important}
     .seb-cc-foot{display:flex;justify-content:flex-end;gap:10px;padding:12px 16px;border-top:1px solid #ddd;background:#fff}
     .seb-cc-empty{padding:35px;text-align:center;color:#555}
     .seb-cc-meta{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px 18px;padding:14px 16px;background:#f7f9fc;border-bottom:1px solid #ddd;font-size:14px}

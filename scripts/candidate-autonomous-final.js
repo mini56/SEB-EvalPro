@@ -232,10 +232,10 @@ function parseJs(text, label) {
   let adminHome = fs.readFileSync(adminHomeFile, 'utf8').replace(/\r\n/g, '\n');
   if (!adminHome.includes('seb-admin-home-program-image')) {
     if (!adminHome.includes('</style>')) fail('style page Admin candidats introuvable', 6);
-    adminHome = adminHome.replace('</style>', "    #seb-admin-home-program-image{display:block;width:min(560px,36vw);max-width:72%;max-height:38vh;height:auto;object-fit:contain;margin:28px auto 0;user-select:none;-webkit-user-drag:none}\n  </style>");
-    const textAnchor = '<p>Dossiers candidats</p>';
-    if (!adminHome.includes(textAnchor)) fail('contenu page Admin candidats introuvable', 6);
-    adminHome = adminHome.replace(textAnchor, textAnchor + '\n    <img id="seb-admin-home-program-image" src="imageqcm/seb-evalpro-privacy-screen.jpg" alt="SEB EvalPro">');
+    adminHome = adminHome.replace('</style>', "    #seb-admin-home-program-image{display:block;width:min(560px,36vw);max-width:72%;max-height:42vh;height:auto;object-fit:contain;margin:0 auto;user-select:none;-webkit-user-drag:none}\n  </style>");
+    const titleAnchor = '<h1>Espace administrateur</h1>';
+    if (!adminHome.includes(titleAnchor)) fail('contenu page Admin candidats introuvable', 6);
+    adminHome = adminHome.replace(titleAnchor, titleAnchor + '\n    <img id="seb-admin-home-program-image" src="imageqcm/seb-evalpro-privacy-screen.jpg" alt="SEB EvalPro">');
   }
   fs.writeFileSync(adminHomeFile, adminHome, 'utf8');
 }
@@ -346,13 +346,18 @@ function parseJs(text, label) {
   if (catalogPreload.includes("bilan.textContent='Faire le bilan'")) {
     fail('Faire le bilan encore proposé directement depuis la liste candidats', 7);
   }
-  for (const token of ['Espace administrateur', 'Dossiers candidats']) {
-    if (!adminCandidatesPage.includes(token)) fail('page Admin candidats incomplète: ' + token, 7);
-  }
+  if (!adminCandidatesPage.includes('Espace administrateur')) fail('page Admin candidats incomplète: Espace administrateur', 7);
+  if (adminCandidatesPage.includes('<p>Dossiers candidats</p>')) fail('texte noir Dossiers candidats encore présent sur l’écran Admin neutre', 7);
 
   for (const token of ['seb-admin-home-program-image', 'imageqcm/seb-evalpro-privacy-screen.jpg']) {
     if (!adminCandidatesGenerated.includes(token)) fail('écran Admin neutre incomplet: ' + token, 7);
   }
+  if (adminCandidatesGenerated.includes('<p>Dossiers candidats</p>')) fail('texte Dossiers candidats réintroduit dans l’écran Admin neutre', 7);
+  if (!preload.includes('const BAR_HIDE_DELAY = 1000;')) fail('temporisation de fermeture barre Admin différente de 1 seconde', 7);
+  for (const token of [
+    '.seb-cc-detail-actions .danger{margin-left:auto;background:#fff!important;color:#c00000!important;border-color:#c00000!important}',
+    '.seb-delete-actions .danger{background:#fff!important;color:#c00000!important;border-color:#c00000!important}'
+  ]) if (!catalogPreload.includes(token)) fail('style blanc/contour rouge des boutons Supprimer incomplet: ' + token, 7);
 
   if (/\.(?:pdf)\b/i.test(catalogMain) || /Word\s*\/\s*PDF|Word\/PDF/i.test(catalogPreload)) {
     fail('référence PDF encore active dans le catalogue candidat', 7);

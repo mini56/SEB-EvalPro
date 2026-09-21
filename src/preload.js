@@ -3,7 +3,7 @@ const path = require('path');
 
 const BAR_HEIGHT = 44;
 const HOTZONE_HEIGHT = 5;
-const BAR_HIDE_DELAY = 450;
+const BAR_HIDE_DELAY = 1000;
 let restoredState = {};
 let adminUnlocked = false;
 let saveTimer = null;
