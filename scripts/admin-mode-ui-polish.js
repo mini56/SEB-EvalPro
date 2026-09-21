@@ -62,6 +62,7 @@ function applyAdminWindowMode(unlocked) {
 
   if (isUnlocked) {
     try { mainWindow.setAlwaysOnTop(false); } catch (_) {}
+    try { mainWindow.setSkipTaskbar(false); } catch (_) {}
     try { mainWindow.setKiosk(false); } catch (_) {}
     try { mainWindow.setFullScreen(false); } catch (_) {}
     if (process.platform === 'win32') {
@@ -74,6 +75,7 @@ function applyAdminWindowMode(unlocked) {
     }, 120);
   } else {
     try { mainWindow.setAlwaysOnTop(true); } catch (_) {}
+    try { mainWindow.setSkipTaskbar(true); } catch (_) {}
     if (process.platform === 'win32') {
       try { mainWindow.setOverlayIcon(null, ''); } catch (_) {}
     }
@@ -93,9 +95,9 @@ function applyAdminWindowMode(unlocked) {
 
     out = replaceRequired(
       out,
-      "    mainWindow.show();\n    mainWindow.setKiosk(true);\n    mainWindow.setFullScreen(true);",
-      "    mainWindow.show();\n    applyAdminWindowMode(adminSessionUnlocked);",
-      'démarrage kiosque'
+      "    mainWindow.show();\n    enforceCandidateWindowLock(true);",
+      "    mainWindow.show();\n    applyAdminWindowMode(adminSessionUnlocked);\n    if (!adminSessionUnlocked) enforceCandidateWindowLock(true);",
+      'démarrage kiosque renforcé'
     );
 
     out = replaceRequired(
@@ -107,14 +109,14 @@ function applyAdminWindowMode(unlocked) {
 
     out = replaceRequired(
       out,
-      "ipcMain.handle('admin:verify', (_event, password) => {\n  const ok = verifyAdminPassword(password);\n  if (ok) {\n    adminSessionUnlocked = true;\n    if (mainWindow && !mainWindow.isDestroyed()) {\n      mainWindow.setAlwaysOnTop(false);\n      mainWindow.setKiosk(false);\n      mainWindow.focus();\n    }\n  }\n  return ok;\n});",
+      "ipcMain.handle('admin:verify', (_event, password) => {\n  const ok = verifyAdminPassword(password);\n  if (ok) {\n    adminSessionUnlocked = true;\n    if (mainWindow && !mainWindow.isDestroyed()) {\n      mainWindow.setAlwaysOnTop(false);\n      mainWindow.setSkipTaskbar(false);\n      mainWindow.setKiosk(false);\n      mainWindow.setFullScreen(false);\n      mainWindow.focus();\n    }\n  }\n  return ok;\n});",
       "ipcMain.handle('admin:verify', (_event, password) => {\n  const ok = verifyAdminPassword(password);\n  if (ok) {\n    adminSessionUnlocked = true;\n    applyAdminWindowMode(true);\n  }\n  return ok;\n});",
       'déverrouillage Admin persistant'
     );
 
     out = replaceRequired(
       out,
-      "ipcMain.handle('admin:lock', () => {\n  adminSessionUnlocked = false;\n  adminExportCandidateDir = null;\n  if (mainWindow && !mainWindow.isDestroyed()) {\n    mainWindow.setKiosk(true);\n    mainWindow.setFullScreen(true);\n    mainWindow.focus();\n  }\n  return true;\n});",
+      "ipcMain.handle('admin:lock', () => {\n  adminSessionUnlocked = false;\n  adminExportCandidateDir = null;\n  if (mainWindow && !mainWindow.isDestroyed()) {\n    mainWindow.setSkipTaskbar(true);\n    mainWindow.setKiosk(true);\n    mainWindow.setFullScreen(true);\n    mainWindow.setAlwaysOnTop(true);\n    reinforceCandidateWindowLock();\n  }\n  return true;\n});",
       "ipcMain.handle('admin:lock', () => {\n  adminSessionUnlocked = false;\n  adminExportCandidateDir = null;\n  applyAdminWindowMode(false);\n  return true;\n});",
       'reverrouillage Admin manuel'
     );
