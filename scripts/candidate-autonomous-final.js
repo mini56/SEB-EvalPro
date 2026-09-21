@@ -81,6 +81,66 @@ function parseJs(text, label) {
 
   out = out.replace(/\s*const groupName = await createTransferNameDialog\(\);[\s\S]*?if \(!groupName\) \{[\s\S]*?return;\s*\}\s*/m, '\n');
   out = out.replace("ipcRenderer.invoke('admin:import-candidates', groupName)", "ipcRenderer.invoke('admin:import-candidates')");
+  // SEB_BUILD94_ADMIN_HOME_EXPORT
+  const exportGuardMarker = '// SEB_ADMIN_EXPORT_REQUIRES_CLOSED_CANDIDATE';
+  if (!out.includes(exportGuardMarker)) {
+    const exportAnchor = "  exportCandidatesButton.addEventListener('click', async () => {\n    showBar();\n    saveNow(true);";
+    if (!out.includes(exportAnchor)) fail('ancre export dossiers candidats absente', 3);
+    const exportReplacement = [
+      "  exportCandidatesButton.addEventListener('click', async () => {",
+      "    showBar();",
+      "    // SEB_ADMIN_EXPORT_REQUIRES_CLOSED_CANDIDATE",
+      "    const candidateFolderOpen = !!document.getElementById('seb-candidate-detail')",
+      "      || !!adminCandidateWorkspace",
+      "      || !!adminCandidateResultsWorkspace",
+      "      || !!document.getElementById('seb-bilan-history-editor')",
+      "      || !!document.getElementById('seb-replay-viewer');",
+      "    if (candidateFolderOpen) {",
+      "      await showTransferMessage('Export impossible', 'Fermez le dossier candidat avant de lancer l’export.', true);",
+      "      scheduleHideBar();",
+      "      return;",
+      "    }",
+      "    saveNow(true);"
+    ].join('\n');
+    out = out.replace(exportAnchor, exportReplacement);
+  }
+
+  const adminHomeButtonMarker = '// SEB_ADMIN_HOME_PRIVACY_BUTTON_IN_BAR';
+  if (!out.includes(adminHomeButtonMarker)) {
+    const toggleAnchor = "  function ensurePrivacyToggle(){\n    let button = document.getElementById('seb-evalpro-privacy-toggle');\n    if (button) return button;";
+    if (!out.includes(toggleAnchor)) fail('ancre bouton écran accueil absente', 3);
+    const toggleReplacement = [
+      "  // SEB_ADMIN_HOME_PRIVACY_BUTTON_IN_BAR",
+      "  function placePrivacyToggleForAdminHome(button){",
+      "    if (!button) return button;",
+      "    const onAdminHome = typeof isAdminCandidatesPage === 'function' && isAdminCandidatesPage();",
+      "    if (!onAdminHome) return button;",
+      "    const bar = document.getElementById('seb-evalpro-topbar');",
+      "    if (!bar) return button;",
+      "    if (button.parentElement !== bar) bar.appendChild(button);",
+      "    const centered = {",
+      "      position:'absolute', left:'50%', right:'auto', bottom:'auto', top:'50%',",
+      "      transform:'translate(-50%, -50%)', zIndex:'2147483647', margin:'0',",
+      "      padding:'6px 12px', border:'1px solid rgba(255,255,255,.75)',",
+      "      borderRadius:'4px', background:'#fff', color:'#0070c0',",
+      "      font:'14px Arial, sans-serif', boxShadow:'none'",
+      "    };",
+      "    Object.entries(centered).forEach(([name, value]) => {",
+      "      const cssName = name.replace(/[A-Z]/g, (letter) => '-' + letter.toLowerCase());",
+      "      button.style.setProperty(cssName, value, 'important');",
+      "    });",
+      "    return button;",
+      "  }",
+      "",
+      "  function ensurePrivacyToggle(){",
+      "    let button = document.getElementById('seb-evalpro-privacy-toggle');",
+      "    if (button) return placePrivacyToggleForAdminHome(button);"
+    ].join('\n');
+    out = out.replace(toggleAnchor, toggleReplacement);
+    const appendAnchor = "    document.body.appendChild(button);\n    return button;\n  }\n\n  function ensurePrivacyLayer(){";
+    if (!out.includes(appendAnchor)) fail('ancre insertion bouton écran accueil absente', 3);
+    out = out.replace(appendAnchor, "    document.body.appendChild(button);\n    return placePrivacyToggleForAdminHome(button);\n  }\n\n  function ensurePrivacyLayer(){");
+  }
 
   for (const token of [
     'adminCandidateResultsWorkspace',
@@ -164,6 +224,22 @@ function parseJs(text, label) {
 }
 
 // -----------------------------------------------------------------------------
+// ÉCRAN ADMIN NEUTRE : visuel SEB EvalPro centré, sans modifier le parcours.
+// -----------------------------------------------------------------------------
+{
+  const adminHomeFile = path.join(root, 'app', 'web', 'admin-candidats.html');
+  if (!fs.existsSync(adminHomeFile)) fail('page Admin candidats générée introuvable', 6);
+  let adminHome = fs.readFileSync(adminHomeFile, 'utf8').replace(/\r\n/g, '\n');
+  if (!adminHome.includes('seb-admin-home-program-image')) {
+    if (!adminHome.includes('</style>')) fail('style page Admin candidats introuvable', 6);
+    adminHome = adminHome.replace('</style>', "    #seb-admin-home-program-image{display:block;width:min(560px,36vw);max-width:72%;max-height:38vh;height:auto;object-fit:contain;margin:28px auto 0;user-select:none;-webkit-user-drag:none}\n  </style>");
+    const textAnchor = '<p>Dossiers candidats</p>';
+    if (!adminHome.includes(textAnchor)) fail('contenu page Admin candidats introuvable', 6);
+    adminHome = adminHome.replace(textAnchor, textAnchor + '\n    <img id="seb-admin-home-program-image" src="imageqcm/seb-evalpro-privacy-screen.jpg" alt="SEB EvalPro">');
+  }
+  fs.writeFileSync(adminHomeFile, adminHome, 'utf8');
+}
+// -----------------------------------------------------------------------------
 // Contrôles bloquants : ces choix sont désormais des invariants fonctionnels.
 // -----------------------------------------------------------------------------
 {
@@ -186,6 +262,7 @@ function parseJs(text, label) {
   const build135Runner = read('scripts/build135-runner.js').text;
   const cleanRegressionGuard = read('scripts/build159-clean-regression-guard.js').text;
   const adminCandidatesPage = read('overrides/admin-candidats.html').text;
+  const adminCandidatesGenerated = read('app/web/admin-candidats.html').text;
 
   for (const token of [
     'copyVerifiedAtomic',
@@ -265,6 +342,10 @@ function parseJs(text, label) {
     if (!adminCandidatesPage.includes(token)) fail('page Admin candidats incomplète: ' + token, 7);
   }
 
+  for (const token of ['seb-admin-home-program-image', 'imageqcm/seb-evalpro-privacy-screen.jpg']) {
+    if (!adminCandidatesGenerated.includes(token)) fail('écran Admin neutre incomplet: ' + token, 7);
+  }
+
   if (/\.(?:pdf)\b/i.test(catalogMain) || /Word\s*\/\s*PDF|Word\/PDF/i.test(catalogPreload)) {
     fail('référence PDF encore active dans le catalogue candidat', 7);
   }
@@ -317,7 +398,10 @@ function parseJs(text, label) {
     'admin:return-candidate-browser',
     'SEB_ADMIN_NAVIGATION_SAFE_LOCK',
     'bilanButton.hidden = true',
-    'candidateCatalog.install({ beforeNavigate: () => saveNow(true) });'
+    'candidateCatalog.install({ beforeNavigate: () => saveNow(true) });',
+    'SEB_ADMIN_EXPORT_REQUIRES_CLOSED_CANDIDATE',
+    'Fermez le dossier candidat avant de lancer l’export.',
+    'SEB_ADMIN_HOME_PRIVACY_BUTTON_IN_BAR'
   ]) if (!preload.includes(token)) fail('interface/navigation Admin candidat incomplète: ' + token, 7);
 
   for (const token of [
