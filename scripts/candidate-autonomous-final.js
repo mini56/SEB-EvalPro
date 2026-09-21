@@ -291,6 +291,7 @@ function parseJs(text, label) {
   for (const token of [
     "candidate-catalog:list",
     "candidate-catalog:detail",
+    "candidate-catalog:delete",
     "candidate-catalog:open-export",
     "candidate-catalog:begin-bilan",
     "candidate-catalog:workspace-load-sync",
@@ -306,10 +307,17 @@ function parseJs(text, label) {
     "consolidatedDuplicates"
   ]) if (!catalogMain.includes(token)) fail('catalogue backend incomplet: ' + token, 7);
 
-  if (catalogMain.includes("candidate-catalog:delete")) fail('suppression d’un dossier candidat encore possible', 7);
-  if (catalogPreload.includes("candidate-catalog:delete") || catalogPreload.includes("remove.textContent='Supprimer'")) {
-    fail('bouton suppression candidat encore présent', 7);
-  }
+  for (const token of [
+    'removeLegacyCandidateCopies',
+    'removeCandidateRuntimeState',
+    "candidate-catalog:delete"
+  ]) if (!catalogMain.includes(token)) fail('effacement candidat Admin incomplet: ' + token, 7);
+  for (const token of [
+    'confirmCandidateDeletion',
+    'seb-cc-detail-delete',
+    'Supprimer définitivement',
+    "ipcRenderer.invoke('candidate-catalog:delete'"
+  ]) if (!catalogPreload.includes(token)) fail('interface effacement candidat incomplète: ' + token, 7);
   if (catalogPreload.includes('function statusLabel') || catalogPreload.includes('Session fermée') || catalogPreload.includes('>En cours<')) {
     fail('statut technique candidat encore affiché dans le catalogue', 7);
   }
