@@ -212,6 +212,7 @@ function enforceCandidateWindowLock(focusWindow = false) {
     if (!mainWindow.isKiosk()) mainWindow.setKiosk(true);
     if (!mainWindow.isFullScreen()) mainWindow.setFullScreen(true);
     if (!mainWindow.isAlwaysOnTop()) mainWindow.setAlwaysOnTop(true);
+    mainWindow.setSkipTaskbar(true);
     mainWindow.setMenuBarVisibility(false);
     if (focusWindow) mainWindow.focus();
   } catch (_) {}
@@ -293,6 +294,7 @@ function createWindow() {
     show: false,
     fullscreen: true,
     kiosk: true,
+    skipTaskbar: true,
     autoHideMenuBar: true,
     backgroundColor: '#ffffff',
     webPreferences: {
@@ -356,6 +358,42 @@ function createWindow() {
   mainWindow.on('resize', applyAdaptiveZoom);
 
   mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+
+  // SEB_CANDIDATE_OS_SHORTCUT_GUARD :
+  // pendant le parcours, empêcher les raccourcis qui permettent de sortir vers
+  // Windows ou de lancer une application externe (dont la calculatrice système).
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (adminSessionUnlocked) return;
+    const key = String(input && input.key || '').toLowerCase();
+    const alt = !!(input && input.alt);
+    const control = !!(input && input.control);
+    const meta = !!(input && input.meta);
+    const shift = !!(input && input.shift);
+
+    const windowsOrLauncherKey =
+      meta ||
+      key === 'meta' ||
+      key === 'super' ||
+      key === 'os' ||
+      key === 'calculator' ||
+      key === 'launchapp1' ||
+      key === 'launchapp2' ||
+      key === 'launchapplication1' ||
+      key === 'launchapplication2' ||
+      key.includes('calculator');
+
+    const escapeToWindows =
+      (alt && ['tab', 'escape', 'esc', ' ', 'space', 'f4'].includes(key)) ||
+      (control && ['escape', 'esc'].includes(key)) ||
+      (control && shift && ['escape', 'esc'].includes(key)) ||
+      key === 'f11' ||
+      key === 'f12';
+
+    if (windowsOrLauncherKey || escapeToWindows) {
+      event.preventDefault();
+      setTimeout(() => enforceCandidateWindowLock(true), 0);
+    }
+  });
 
   // SEB_RUNTIME_OFFLINE : le plateau candidat ne doit jamais dépendre d'Internet.
   mainWindow.webContents.on('will-navigate', (event, url) => {
@@ -426,7 +464,9 @@ ipcMain.handle('admin:verify', (_event, password) => {
     adminSessionUnlocked = true;
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.setAlwaysOnTop(false);
+      mainWindow.setSkipTaskbar(false);
       mainWindow.setKiosk(false);
+      mainWindow.setFullScreen(false);
       mainWindow.focus();
     }
   }
@@ -443,9 +483,11 @@ ipcMain.handle('admin:lock', () => {
   adminSessionUnlocked = false;
   adminExportCandidateDir = null;
   if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.setSkipTaskbar(true);
     mainWindow.setKiosk(true);
     mainWindow.setFullScreen(true);
-    mainWindow.focus();
+    mainWindow.setAlwaysOnTop(true);
+    reinforceCandidateWindowLock();
   }
   return true;
 });
