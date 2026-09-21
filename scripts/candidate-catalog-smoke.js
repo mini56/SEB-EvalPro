@@ -7,6 +7,7 @@ const registerBilanHistory = require('../src/bilan-history-main');
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'seb-evalpro-candidate-catalog-'));
 const documentsPath = path.join(root, 'Documents');
+const userDataPath = path.join(root, 'UserData');
 const sebRoot = path.join(documentsPath, 'SEB EvalPro');
 const legacyDir = path.join(sebRoot, 'Admin', 'Ancien groupe', 'DUPONT_Jean_ancien');
 const replayRoot = path.join(sebRoot, 'parcours');
@@ -75,6 +76,7 @@ try {
   const app = {
     getPath(name) {
       if (name === 'documents') return documentsPath;
+      if (name === 'userData') return userDataPath;
       throw new Error('Chemin non simulé: ' + name);
     }
   };
@@ -104,10 +106,10 @@ try {
   const loadWorkspaceSync = listeners.get('candidate-catalog:workspace-load-sync');
   const saveWorkspaceSync = listeners.get('candidate-catalog:workspace-save-sync');
   const sync = handlers.get('candidate-catalog:sync');
+  const deleteCandidate = handlers.get('candidate-catalog:delete');
   const saveCurrentBilan = handlers.get('bilan-history:save-current');
   const saveBilanRevision = handlers.get('bilan-history:save-revision');
-  assert(list && detail && loadBilan && beginBilan && beginResults && endResults && loadResultsWorkspaceSync && saveWorkspace && endBilan && loadWorkspaceSync && saveWorkspaceSync && sync && saveCurrentBilan && saveBilanRevision, 'Handlers catalogue/bilan/résultats absents.');
-  assert.strictEqual(handlers.has('candidate-catalog:delete'), false, 'Aucun handler ne doit permettre de supprimer un candidat.');
+  assert(list && detail && loadBilan && beginBilan && beginResults && endResults && loadResultsWorkspaceSync && saveWorkspace && endBilan && loadWorkspaceSync && saveWorkspaceSync && sync && deleteCandidate && saveCurrentBilan && saveBilanRevision, 'Handlers catalogue/bilan/résultats/suppression absents.');
 
   const first = list();
   assert.strictEqual(first.length, 1, 'Le candidat historique doit être migré une seule fois.');
@@ -283,9 +285,26 @@ try {
 
   const again = list();
   assert.strictEqual(again.length, 1, 'La migration automatique ne doit jamais dupliquer le candidat.');
-  assert(fs.existsSync(newDir), 'Un dossier candidat n’est jamais supprimé par le catalogue.');
+  assert(fs.existsSync(newDir), 'Le dossier candidat doit exister avant suppression administrateur.');
 
-  console.log('Candidate Catalog Authoritative Folder Test: OK');
+  fs.mkdirSync(userDataPath, { recursive:true });
+  writeJson(path.join(userDataPath, 'evaluation-state.json'), {
+    version:1,
+    sessionStorage:{ candidat_data:JSON.stringify(candidate) },
+    localStorage:{}
+  });
+
+  const deleted = deleteCandidate(null, 'candidate-dupont');
+  assert(deleted && deleted.ok, 'La suppression administrateur du candidat doit réussir.');
+  assert.strictEqual(fs.existsSync(newDir), false, 'Le dossier candidat complet doit être supprimé.');
+  assert.strictEqual(fs.existsSync(legacyDir), false, 'La copie historique Admin du même candidat doit être supprimée.');
+  assert.strictEqual(fs.existsSync(path.join(replayRoot, replayName)), false, 'Le replay historique du candidat doit être supprimé.');
+  assert.strictEqual(fs.existsSync(path.join(bilanRoot, bilanName)), false, 'Le bilan historique global du candidat doit être supprimé.');
+  assert.strictEqual(fs.existsSync(path.join(sebRoot, 'Bilans', legacyWordName)), false, 'Le Word historique global du candidat doit être supprimé.');
+  assert.strictEqual(fs.existsSync(path.join(userDataPath, 'evaluation-state.json')), false, 'L’état local du candidat supprimé ne doit pas permettre sa recréation.');
+  assert.strictEqual(list().length, 0, 'Un candidat supprimé ne doit pas réapparaître après synchronisation.');
+
+  console.log('Candidate Catalog Authoritative Folder + Erasure Test: OK');
 } finally {
   fs.rmSync(root, { recursive:true, force:true });
 }

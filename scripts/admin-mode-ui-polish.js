@@ -61,6 +61,7 @@ function applyAdminWindowMode(unlocked) {
   const isUnlocked = !!unlocked;
 
   if (isUnlocked) {
+    try { stopCandidateKeyGuard(); } catch (_) {}
     try { mainWindow.setAlwaysOnTop(false); } catch (_) {}
     try { mainWindow.setSkipTaskbar(false); } catch (_) {}
     try { mainWindow.setKiosk(false); } catch (_) {}
@@ -76,6 +77,7 @@ function applyAdminWindowMode(unlocked) {
   } else {
     const restoreCandidateShell = () => {
       if (!mainWindow || mainWindow.isDestroyed() || adminSessionUnlocked) return;
+      try { startCandidateKeyGuard(); } catch (_) {}
       try { mainWindow.setSkipTaskbar(true); } catch (_) {}
       try { mainWindow.setAlwaysOnTop(true); } catch (_) {}
       try { mainWindow.setFullScreen(true); } catch (_) {}

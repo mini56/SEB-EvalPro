@@ -32,11 +32,19 @@
       {
         "from": "ai-runtime",
         "to": "ai",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "build/candidate-keyguard.exe",
+        "to": "candidate-keyguard.exe"
       }
     ],
     "win": {
-      "target": ["nsis"],
+      "target": [
+        "nsis"
+      ],
       "icon": "build/app-icon.ico"
     },
     "nsis": {
@@ -53,7 +61,9 @@
       "artifactName": "SEB-eval-PRO-${version}-Windows-Setup.${ext}"
     },
     "linux": {
-      "target": ["AppImage"],
+      "target": [
+        "AppImage"
+      ],
       "category": "Education",
       "artifactName": "SEB-eval-PRO-${version}-Linux.${ext}"
     }

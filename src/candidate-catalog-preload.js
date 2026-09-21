@@ -45,6 +45,15 @@ function addStyle() {
     .seb-cc-actions .primary,.seb-cc-bilan-row .primary,.seb-cc-detail-actions .primary{background:#fff!important;color:#0070c0!important;border-color:#0070c0!important}
     .seb-cc-actions button:hover,.seb-cc-foot button:hover,.seb-cc-bilan-row button:hover,.seb-cc-detail-actions button:hover{background:#f5f9fd!important}
     .seb-cc-actions .danger{background:#fff;color:#c00000;border-color:#c00000}.seb-cc-actions .confirm{background:#c00000;color:#fff}
+    .seb-cc-detail-actions .danger{margin-left:auto;background:#c00000!important;color:#fff!important;border-color:#c00000!important}
+    .seb-cc-detail-actions .danger:hover{background:#a00000!important;color:#fff!important}
+    #seb-candidate-delete-confirm{position:fixed;inset:0;z-index:2147483647;background:rgba(0,0,0,.66);display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif}
+    .seb-delete-card{width:min(560px,92vw);background:#fff;border-radius:9px;box-shadow:0 18px 55px rgba(0,0,0,.4);overflow:hidden}
+    .seb-delete-head{padding:14px 18px;background:#c00000;color:#fff;font-size:19px;font-weight:700}
+    .seb-delete-body{padding:20px;font-size:15px;line-height:1.5;color:#222}
+    .seb-delete-actions{display:flex;justify-content:flex-end;gap:10px;padding:14px 18px;border-top:1px solid #ddd;background:#f7f9fc}
+    .seb-delete-actions button{font:700 14px Arial,sans-serif;padding:8px 14px;border:2px solid #0070c0;border-radius:6px;background:#fff;color:#0070c0;cursor:pointer}
+    .seb-delete-actions .danger{background:#c00000;color:#fff;border-color:#c00000}
     .seb-cc-foot{display:flex;justify-content:flex-end;gap:10px;padding:12px 16px;border-top:1px solid #ddd;background:#fff}
     .seb-cc-empty{padding:35px;text-align:center;color:#555}
     .seb-cc-meta{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px 18px;padding:14px 16px;background:#f7f9fc;border-bottom:1px solid #ddd;font-size:14px}
@@ -102,6 +111,35 @@ function bilanLabel(item) {
   return 'Bilan disponible<br><b>Original</b>';
 }
 
+
+function confirmCandidateDeletion(item) {
+  return new Promise((resolve) => {
+    const old = document.getElementById('seb-candidate-delete-confirm');
+    if (old) old.remove();
+    const overlay = document.createElement('div');
+    overlay.id = 'seb-candidate-delete-confirm';
+    overlay.innerHTML = `
+      <div class="seb-delete-card" role="dialog" aria-modal="true" aria-label="Supprimer le candidat">
+        <div class="seb-delete-head">Supprimer le candidat</div>
+        <div class="seb-delete-body">
+          <b>${escapeHtml(item.nom)} ${escapeHtml(item.prenom)}</b><br><br>
+          Cette suppression est définitive. Le dossier candidat complet, ses données, résultats, bilans, révisions, replay et documents Word seront supprimés.
+        </div>
+        <div class="seb-delete-actions">
+          <button type="button" id="seb-delete-cancel">Annuler</button>
+          <button type="button" id="seb-delete-confirm" class="danger">Supprimer définitivement</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    const finish = (value) => { overlay.remove(); resolve(value); };
+    overlay.querySelector('#seb-delete-cancel').addEventListener('click', () => finish(false));
+    overlay.querySelector('#seb-delete-confirm').addEventListener('click', () => finish(true));
+    overlay.addEventListener('keydown', (event) => { if (event.key === 'Escape') finish(false); });
+    overlay.tabIndex = -1;
+    overlay.focus();
+  });
+}
+
 async function openCandidateDetail(candidateId, onChanged) {
   const old = document.getElementById('seb-candidate-detail');
   if (old) old.remove();
@@ -130,6 +168,7 @@ async function openCandidateDetail(candidateId, onChanged) {
       <div class="seb-cc-detail-actions">
         <button type="button" id="seb-cc-detail-bilan" class="primary">Faire le bilan</button>
         <button type="button" id="seb-cc-detail-close">Fermer</button>
+        <button type="button" id="seb-cc-detail-delete" class="danger">Supprimer</button>
       </div>
     </div>`;
   document.body.appendChild(overlay);
@@ -228,6 +267,17 @@ async function openCandidateDetail(candidateId, onChanged) {
     await beginCandidateBilan(candidateId, overlay);
   });
   overlay.querySelector('#seb-cc-detail-close').addEventListener('click', () => overlay.remove());
+  overlay.querySelector('#seb-cc-detail-delete').addEventListener('click', async () => {
+    const confirmed = await confirmCandidateDeletion(item);
+    if (!confirmed) return;
+    const deleted = await ipcRenderer.invoke('candidate-catalog:delete', candidateId);
+    if (!deleted || !deleted.ok) {
+      alert((deleted && deleted.error) || 'Suppression du candidat impossible.');
+      return;
+    }
+    overlay.remove();
+    if (typeof onChanged === 'function') await onChanged();
+  });
 }
 
 async function beginCandidateResults(candidateId, detailOverlay = null) {
@@ -308,14 +358,17 @@ function openCatalog(initialCandidateId = '') {
         const actions = row.querySelector('.seb-cc-actions');
         const open = document.createElement('button');
         open.type='button'; open.className='primary'; open.textContent='Ouvrir';
-        open.addEventListener('click', () => openCandidateDetail(item.candidateId, render));
+        open.addEventListener('click', () => openCandidateDetail(item.candidateId, reload));
         actions.append(open);
         list.appendChild(row);
       });
     };
 
-    try { items = await ipcRenderer.invoke('candidate-catalog:list'); } catch (_) { items = []; }
-    render();
+    const reload = async () => {
+      try { items = await ipcRenderer.invoke('candidate-catalog:list'); } catch (_) { items = []; }
+      render();
+    };
+    await reload();
     search.addEventListener('input', render);
     const closeButton = overlay.querySelector('#seb-cc-close');
     const close = () => { overlay.remove(); resolve(); };
@@ -396,9 +449,12 @@ function install(options = {}) {
   }, true);
   refreshButton();
   if (isCandidateAdminHost()) {
-    setTimeout(() => {
-      if (!document.getElementById('seb-candidate-catalog')) openCatalog(requestedCandidateId());
-    }, 0);
+    const selectedId = requestedCandidateId();
+    if (selectedId) {
+      setTimeout(() => {
+        if (!document.getElementById('seb-candidate-catalog')) openCatalog(selectedId);
+      }, 0);
+    }
   }
 }
 

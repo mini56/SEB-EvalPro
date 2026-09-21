@@ -227,6 +227,21 @@ jobs:
           $sha = (Get-FileHash $vcPath -Algorithm SHA256).Hash.ToLowerInvariant()
           Write-Host "Microsoft Visual C++ x64 prêt: $size octets, SHA256=$sha"
 
+
+      - name: Build native candidate keyboard guard
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path 'build' | Out-Null
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          if (-not (Test-Path $vswhere)) { throw 'vswhere.exe introuvable.' }
+          $install = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (-not $install) { throw 'Visual C++ Build Tools introuvables.' }
+          $vcvars = Join-Path $install 'VC\Auxiliary\Build\vcvars64.bat'
+          if (-not (Test-Path $vcvars)) { throw 'vcvars64.bat introuvable.' }
+          cmd.exe /d /s /c "`"`"$vcvars`" && cl.exe /nologo /O2 /EHsc /DUNICODE /D_UNICODE native\candidate-keyguard.cpp /Fe:build\candidate-keyguard.exe user32.lib`""
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path 'build\candidate-keyguard.exe')) { throw 'Compilation candidate-keyguard.exe échouée.' }
+
       - name: Normalize Windows NSIS encodings
         shell: pwsh
         run: |

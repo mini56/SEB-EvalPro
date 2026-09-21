@@ -611,12 +611,111 @@ module.exports = function registerCandidateCatalog({ app, ipcMain, getAdminUnloc
     return true;
   });
 
+
+  function sameCandidate(candidateA, candidateB) {
+    const a = candidateIdentityKey(candidateA);
+    const b = candidateIdentityKey(candidateB);
+    return !!a && a === b;
+  }
+
+  function removeCandidateRuntimeState(candidate) {
+    const userData = app.getPath('userData');
+    const statePath = path.join(userData, 'evaluation-state.json');
+    const state = readJson(statePath);
+    try {
+      const raw = state && state.sessionStorage && state.sessionStorage.candidat_data;
+      const storedCandidate = raw ? JSON.parse(raw) : null;
+      if (storedCandidate && sameCandidate(storedCandidate, candidate)) fs.rmSync(statePath, { force:true });
+    } catch (_) {}
+
+    const activePath = path.join(userData, 'active-candidate.json');
+    const active = readJson(activePath);
+    if (active && active.candidateDir) {
+      try {
+        const manifest = readJson(path.join(active.candidateDir, 'manifest.json'));
+        if (manifest && sameCandidate(manifest.candidat || manifest.candidate, candidate)) fs.rmSync(activePath, { force:true });
+      } catch (_) {}
+    }
+  }
+
+  function removeLegacyCandidateCopies(candidate, authoritativeRecord, recordsBeforeDelete) {
+    let removedLegacyFolders = 0;
+    let removedReplay = 0;
+    let removedBilans = 0;
+    let removedWords = 0;
+    let removedDuplicateArchives = 0;
+
+    for (const legacy of listCandidateDirs(legacyAdminRoot, true)) {
+      if (!sameCandidate(legacy.candidate, candidate)) continue;
+      fs.rmSync(legacy.candidateDir, { recursive:true, force:true });
+      removedLegacyFolders += 1;
+    }
+
+    const duplicateRoot = path.join(root, 'Corbeille', 'Doublons');
+    for (const duplicate of listCandidateDirs(duplicateRoot, true)) {
+      if (!sameCandidate(duplicate.candidate, candidate)) continue;
+      fs.rmSync(duplicate.candidateDir, { recursive:true, force:true });
+      removedDuplicateArchives += 1;
+    }
+
+    if (fs.existsSync(globalReplayRoot)) {
+      for (const entry of fs.readdirSync(globalReplayRoot, { withFileTypes:true })) {
+        const full = path.join(globalReplayRoot, entry.name);
+        const replayCandidateValue = replayCandidate(full);
+        if (!replayCandidateValue || !sameCandidate(replayCandidateValue, candidate)) continue;
+        fs.rmSync(full, { recursive:true, force:true });
+        removedReplay += 1;
+      }
+    }
+
+    if (fs.existsSync(globalBilanRoot)) {
+      for (const entry of fs.readdirSync(globalBilanRoot, { withFileTypes:true })) {
+        if (!entry.isFile() || !entry.name.toLowerCase().endsWith('.json')) continue;
+        const full = path.join(globalBilanRoot, entry.name);
+        const archive = readJson(full);
+        if (!archive || !sameCandidate(archive.candidate, candidate)) continue;
+        fs.rmSync(full, { force:true });
+        removedBilans += 1;
+      }
+    }
+
+    if (fs.existsSync(globalExportsRoot)) {
+      for (const entry of fs.readdirSync(globalExportsRoot, { withFileTypes:true })) {
+        if (!entry.isFile() || !/\.(doc|docx)$/i.test(entry.name)) continue;
+        const matched = selectCandidateFromFilename(recordsBeforeDelete, entry.name);
+        if (!matched || String(matched.candidateId) !== String(authoritativeRecord.candidateId)) continue;
+        fs.rmSync(path.join(globalExportsRoot, entry.name), { force:true });
+        removedWords += 1;
+      }
+    }
+
+    return { removedLegacyFolders, removedReplay, removedBilans, removedWords, removedDuplicateArchives };
+  }
+
   ipcMain.handle('candidate-catalog:list', () => {
     if (!getAdminUnlocked()) return [];
     synchronize();
     return listCandidateDirs(candidatesRoot, false)
       .map(serialize)
       .sort((a,b) => [a.nom,a.prenom,a.date].join('|').localeCompare([b.nom,b.prenom,b.date].join('|'), 'fr', { sensitivity:'base' }));
+  });
+
+  ipcMain.handle('candidate-catalog:delete', (_event, candidateId) => {
+    if (!getAdminUnlocked()) return { ok:false, error:'Accès administrateur requis.' };
+    synchronize();
+    const records = listCandidateDirs(candidatesRoot, false);
+    const record = records.find((item) => String(item.candidateId) === String(candidateId || ''));
+    if (!record) return { ok:false, error:'Candidat introuvable.' };
+    if ((adminBilanWorkspace && String(adminBilanWorkspace.candidateId) === String(record.candidateId))
+      || (adminResultsWorkspace && String(adminResultsWorkspace.candidateId) === String(record.candidateId))) {
+      return { ok:false, error:'Fermez le bilan ou les résultats de ce candidat avant de le supprimer.' };
+    }
+
+    const candidate = clone(record.candidate || {});
+    const legacy = removeLegacyCandidateCopies(candidate, record, records);
+    removeCandidateRuntimeState(candidate);
+    fs.rmSync(record.candidateDir, { recursive:true, force:true });
+    return { ok:true, candidateId:record.candidateId, ...legacy };
   });
 
   ipcMain.handle('candidate-catalog:detail', (_event, candidateId) => {

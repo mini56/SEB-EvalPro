@@ -1,4 +1,5 @@
-const { app, BrowserWindow, ipcMain, screen, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, dialog, Menu } = require('electron');
+const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
@@ -24,6 +25,37 @@ let adminExportCandidateDir = null;
 let adminCandidateResultsMode = false;
 let lastCandidateSaveError = '';
 let allowApplicationExit = false;
+let candidateKeyGuardProcess = null;
+
+function candidateKeyGuardExecutable() {
+  return app.isPackaged
+    ? path.join(process.resourcesPath, 'candidate-keyguard.exe')
+    : path.join(__dirname, '..', 'build', 'candidate-keyguard.exe');
+}
+
+function stopCandidateKeyGuard() {
+  const proc = candidateKeyGuardProcess;
+  candidateKeyGuardProcess = null;
+  if (!proc) return;
+  try { proc.kill(); } catch (_) {}
+}
+
+function startCandidateKeyGuard() {
+  if (process.platform !== 'win32' || adminSessionUnlocked || allowApplicationExit) return;
+  if (candidateKeyGuardProcess && candidateKeyGuardProcess.exitCode == null && !candidateKeyGuardProcess.killed) return;
+  const executable = candidateKeyGuardExecutable();
+  if (!fs.existsSync(executable)) return;
+  try {
+    const proc = spawn(executable, [], { windowsHide:true, stdio:'ignore' });
+    candidateKeyGuardProcess = proc;
+    proc.once('exit', () => {
+      if (candidateKeyGuardProcess === proc) candidateKeyGuardProcess = null;
+      if (!adminSessionUnlocked && !allowApplicationExit) setTimeout(() => startCandidateKeyGuard(), 250);
+    });
+  } catch (_) {
+    candidateKeyGuardProcess = null;
+  }
+}
 
 function stateFilePath() {
   return path.join(app.getPath('userData'), 'evaluation-state.json');
@@ -207,6 +239,7 @@ function applyAdaptiveZoom() {
 // SEB_CANDIDATE_KIOSK_GUARD
 function enforceCandidateWindowLock(focusWindow = false) {
   if (adminSessionUnlocked || !mainWindow || mainWindow.isDestroyed()) return;
+  startCandidateKeyGuard();
   try {
     if (mainWindow.isMinimized()) mainWindow.restore();
     if (!mainWindow.isKiosk()) mainWindow.setKiosk(true);
@@ -285,6 +318,7 @@ function finishStartup() {
 }
 
 function createWindow() {
+  Menu.setApplicationMenu(null);
   setSplashProgress(28, 'Lecture de la sauvegarde…');
   const state = readState();
   adminSessionUnlocked = false;
@@ -375,6 +409,7 @@ function createWindow() {
       key === 'meta' ||
       key === 'super' ||
       key === 'os' ||
+      key === 'alt' ||
       key === 'calculator' ||
       key === 'launchapp1' ||
       key === 'launchapp2' ||
@@ -615,6 +650,7 @@ app.whenReady().then(startApplication);
 
 app.on('before-quit', () => {
   allowApplicationExit = true;
+  stopCandidateKeyGuard();
   localAi.stop();
 });
 
