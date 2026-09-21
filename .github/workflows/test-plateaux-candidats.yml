@@ -239,7 +239,8 @@ jobs:
           if (-not $install) { throw 'Visual C++ Build Tools introuvables.' }
           $vcvars = Join-Path $install 'VC\Auxiliary\Build\vcvars64.bat'
           if (-not (Test-Path $vcvars)) { throw 'vcvars64.bat introuvable.' }
-          cmd.exe /d /s /c "`"`"$vcvars`" && cl.exe /nologo /O2 /EHsc /DUNICODE /D_UNICODE native\candidate-keyguard.cpp /Fe:build\candidate-keyguard.exe user32.lib`""
+          $compile = 'call "' + $vcvars + '" && cl.exe /nologo /O2 /EHsc /DUNICODE /D_UNICODE native\candidate-keyguard.cpp /Fe:build\candidate-keyguard.exe user32.lib'
+          cmd.exe /d /c $compile
           if ($LASTEXITCODE -ne 0 -or -not (Test-Path 'build\candidate-keyguard.exe')) { throw 'Compilation candidate-keyguard.exe échouée.' }
 
       - name: Normalize Windows NSIS encodings
