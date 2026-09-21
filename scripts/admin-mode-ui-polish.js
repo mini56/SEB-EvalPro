@@ -111,8 +111,8 @@ function applyAdminWindowMode(unlocked) {
 
     out = replaceRequired(
       out,
-      "  mainWindow.webContents.on('did-finish-load', () => {\n    applyAdaptiveZoom();\n  });",
-      "  mainWindow.webContents.on('did-finish-load', () => {\n    applyAdminWindowMode(adminSessionUnlocked);\n    applyAdaptiveZoom();\n  });",
+      "  mainWindow.webContents.on('did-finish-load', () => {\n    applyAdaptiveZoom();\n    verifyEvaluationRendererIsVisible();\n  });",
+      "  mainWindow.webContents.on('did-finish-load', () => {\n    applyAdminWindowMode(adminSessionUnlocked);\n    applyAdaptiveZoom();\n    verifyEvaluationRendererIsVisible();\n  });",
       'persistance mode Admin après navigation'
     );
 
