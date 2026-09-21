@@ -487,8 +487,22 @@ function injectAdminBar() {
 
     const ok = await createPasswordDialog();
     if (ok) {
+      const saved = saveNow(true);
+      if (saved && saved.ok === false) {
+        await showTransferMessage('Accès administrateur impossible', saved.error || 'La sauvegarde du parcours n’a pas pu être confirmée.', true);
+        await ipcRenderer.invoke('admin:lock').catch(() => false);
+        adminUnlocked = false;
+        updateAdminButtons();
+        scheduleHideBar();
+        return;
+      }
       adminUnlocked = true;
       updateAdminButtons();
+      // Après déverrouillage, quitter immédiatement l'écran du parcours :
+      // l'Administrateur arrive toujours sur l'écran neutre Espace administrateur.
+      adminNavigationLeaving = true;
+      await ipcRenderer.invoke('admin:open-candidate-browser').catch(() => false);
+      return;
     }
     scheduleHideBar();
   });
