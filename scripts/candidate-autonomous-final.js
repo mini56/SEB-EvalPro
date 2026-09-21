@@ -361,6 +361,9 @@ function parseJs(text, label) {
     "action.textContent = verified ? 'Suivant' : 'Dictée terminée'",
     '#verifyBtn,#nextBtn,#feedback{display:none!important}'
   ]) if (!dicteeGenerated.includes(token)) fail('flux Dictée candidat final incomplet: ' + token, 7);
+  if (dicteeGenerated.includes("new MutationObserver(function(){ hideCorrection(); })")) {
+    fail('boucle MutationObserver interdite sur feedback Dictée', 7);
+  }
   if (!main.includes('SEB_EVALUATION_PAGE_RECOVERY_GUARD')
       || !main.includes('did-fail-load')
       || !main.includes('render-process-gone')
