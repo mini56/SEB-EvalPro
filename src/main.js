@@ -204,6 +204,25 @@ function applyAdaptiveZoom() {
   mainWindow.webContents.setZoomFactor(calculateAdaptiveZoom());
 }
 
+// SEB_CANDIDATE_KIOSK_GUARD
+function enforceCandidateWindowLock(focusWindow = false) {
+  if (adminSessionUnlocked || !mainWindow || mainWindow.isDestroyed()) return;
+  try {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    if (!mainWindow.isKiosk()) mainWindow.setKiosk(true);
+    if (!mainWindow.isFullScreen()) mainWindow.setFullScreen(true);
+    if (!mainWindow.isAlwaysOnTop()) mainWindow.setAlwaysOnTop(true);
+    mainWindow.setMenuBarVisibility(false);
+    if (focusWindow) mainWindow.focus();
+  } catch (_) {}
+}
+
+function reinforceCandidateWindowLock() {
+  for (const delay of [0, 120, 350, 800]) {
+    setTimeout(() => enforceCandidateWindowLock(delay === 0 || delay === 350), delay);
+  }
+}
+
 function setSplashProgress(percent, message) {
   if (!splashWindow || splashWindow.isDestroyed()) return;
   const value = Math.max(0, Math.min(100, Number(percent) || 0));
@@ -255,12 +274,12 @@ function finishStartup() {
   setTimeout(() => {
     if (!mainWindow || mainWindow.isDestroyed()) return;
     mainWindow.show();
-    mainWindow.setKiosk(true);
-    mainWindow.setFullScreen(true);
-    mainWindow.setAlwaysOnTop(true);
+    enforceCandidateWindowLock(true);
     applyAdaptiveZoom();
-    mainWindow.focus();
     if (splashWindow && !splashWindow.isDestroyed()) splashWindow.close();
+    // La fermeture du splash peut brièvement rendre la barre des tâches Windows
+    // au premier plan : réaffirmer le verrou candidat après cette transition.
+    reinforceCandidateWindowLock();
   }, delay + 180);
 }
 
@@ -318,6 +337,22 @@ function createWindow() {
     setTimeout(applyAdaptiveZoom, 50);
   });
 
+  mainWindow.on('leave-full-screen', () => {
+    if (!adminSessionUnlocked) setTimeout(() => enforceCandidateWindowLock(true), 30);
+  });
+
+  mainWindow.on('blur', () => {
+    if (!adminSessionUnlocked) setTimeout(() => enforceCandidateWindowLock(true), 80);
+  });
+
+  mainWindow.on('minimize', () => {
+    if (!adminSessionUnlocked) setTimeout(() => enforceCandidateWindowLock(true), 30);
+  });
+
+  mainWindow.on('show', () => {
+    if (!adminSessionUnlocked) reinforceCandidateWindowLock();
+  });
+
   mainWindow.on('resize', applyAdaptiveZoom);
 
   mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
@@ -341,10 +376,7 @@ function createWindow() {
     if (allowApplicationExit) return;
     event.preventDefault();
     if (!mainWindow || mainWindow.isDestroyed()) return;
-    mainWindow.setKiosk(true);
-    mainWindow.setFullScreen(true);
-    mainWindow.setAlwaysOnTop(true);
-    mainWindow.focus();
+    enforceCandidateWindowLock(true);
   });
 
   mainWindow.on('closed', () => {
