@@ -263,6 +263,7 @@ function parseJs(text, label) {
   const cleanRegressionGuard = read('scripts/build159-clean-regression-guard.js').text;
   const adminCandidatesPage = read('overrides/admin-candidats.html').text;
   const adminCandidatesGenerated = read('app/web/admin-candidats.html').text;
+  const dicteeGenerated = read('app/web/dictee.html').text;
 
   for (const token of [
     'copyVerifiedAtomic',
@@ -353,6 +354,19 @@ function parseJs(text, label) {
     if (!adminCandidatesGenerated.includes(token)) fail('écran Admin neutre incomplet: ' + token, 7);
   }
   if (adminCandidatesGenerated.includes('<p>Dossiers candidats</p>')) fail('texte Dossiers candidats réintroduit dans l’écran Admin neutre', 7);
+  for (const token of [
+    'seb-dictee-single-finish-flow',
+    'seb-dictee-finish-next',
+    'Dictée terminée',
+    "action.textContent = verified ? 'Suivant' : 'Dictée terminée'",
+    '#verifyBtn,#nextBtn,#feedback{display:none!important}'
+  ]) if (!dicteeGenerated.includes(token)) fail('flux Dictée candidat final incomplet: ' + token, 7);
+  if (!main.includes('SEB_EVALUATION_PAGE_RECOVERY_GUARD')
+      || !main.includes('did-fail-load')
+      || !main.includes('render-process-gone')
+      || !main.includes('verifyEvaluationRendererIsVisible')) {
+    fail('garde de récupération page Electron vide incomplet', 7);
+  }
   if (!preload.includes('const BAR_HIDE_DELAY = 1000;')) fail('temporisation de fermeture barre Admin différente de 1 seconde', 7);
   for (const token of [
     '.seb-cc-detail-actions .danger{margin-left:auto;background:#fff!important;color:#c00000!important;border-color:#c00000!important}',
