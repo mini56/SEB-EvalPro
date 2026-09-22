@@ -90,7 +90,7 @@ jobs:
             "'--ctx-size', '4096'",
             "'--n-gpu-layers', '0'",
             'SEB_LOCAL_AI_QWEN_RICH_CONTEXT',
-            'qwen-rich-context-v1',
+            'qwen-rich-coverage-v2',
             'top_k: 40',
             'repeat_penalty: 1.1',
             'mirostat: 0'
@@ -321,7 +321,7 @@ jobs:
           $uninstaller = (Resolve-Path "dist\SEB-eval-PRO-$version-Windows-Desinstallation.exe").Path
           $repo = "${{ github.repository }}"
           $title = "SEB EvalPro - Test Qwen contexte riche #${{ github.run_number }}"
-          $notes = "Test Qwen contexte riche #${{ github.run_number }}. Base fonctionnelle #127 inchangée. Nouvelle méthode Qwen : extraction des descriptions qualitatives du bilan, suppression des scores/niveaux, regroupement thématique, contrastes pré-analysés, JSON riche, prompt haute densité, cinq paragraphes minimum et contrôle de longueur. Version expérimentale uniquement."
+          $notes = "Test Qwen contexte riche #${{ github.run_number }}. Base fonctionnelle #127 inchangée. JSON riche conservé avec faits obligatoires, priorité forte des difficultés majeures, plan de couverture par domaines, contrôle automatique des omissions et protection contre l’atténuation ou les intensités non sourcées. Version expérimentale uniquement."
           $setupSize = (Get-Item $setup).Length
           Write-Host "Setup à publier: $setupSize octets"
 
