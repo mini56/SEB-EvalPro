@@ -99,17 +99,16 @@ function replaceOnce(text, search, replacement, label) {
     'garde capture navigation Admin'
   );
 
-  out = replaceOnce(
-    out,
-    `function install() {\n  if (installed) return;\n  installed = true;`,
-    `function install() {\n  if (installed || adminWorkBlocked()) return;\n  installed = true;`,
-    'désactivation capteur navigation sur page Admin'
-  );
+  const installMarker = `function install() {\n  if (!document.documentElement) return;\n  if (document.documentElement.dataset.sebReplayNavigationCaptureInstalled === '1') return;\n  document.documentElement.dataset.sebReplayNavigationCaptureInstalled = '1';`;
+  const guardedInstall = `function install() {\n  if (!document.documentElement || adminWorkBlocked()) return;\n  if (document.documentElement.dataset.sebReplayNavigationCaptureInstalled === '1') return;\n  document.documentElement.dataset.sebReplayNavigationCaptureInstalled = '1';`;
+  if (out.includes(installMarker)) out = out.replace(installMarker, guardedInstall);
+  else if (!out.includes(guardedInstall)) fail('installation capteur navigation introuvable', 8);
 
   for (const required of [
     'function adminWorkBlocked()',
     'replayBlocked() || adminWorkBlocked()',
-    'if (installed || adminWorkBlocked()) return;\n  installed = true;'
+    "if (!document.documentElement || adminWorkBlocked()) return;",
+    "dataset.sebReplayNavigationCaptureInstalled = '1'"
   ]) {
     if (!out.includes(required)) fail('garde navigation Admin absente: ' + required, 8);
   }

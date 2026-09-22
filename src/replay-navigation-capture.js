@@ -2,7 +2,6 @@ const { ipcRenderer } = require('electron');
 const path = require('path');
 const crypto = require('crypto');
 
-let installed = false;
 let replayingNavigation = false;
 const NAV_CAPTURE_TIMEOUT_MS = 2000;
 
@@ -142,8 +141,9 @@ function continueNavigation(control) {
 }
 
 function install() {
-  if (installed) return;
-  installed = true;
+  if (!document.documentElement) return;
+  if (document.documentElement.dataset.sebReplayNavigationCaptureInstalled === '1') return;
+  document.documentElement.dataset.sebReplayNavigationCaptureInstalled = '1';
 
   // Les champs de la page 3 sont nombreux : une capture au changement de champ
   // garantit qu'un remplissage rapide n'attend pas le debounce générique.

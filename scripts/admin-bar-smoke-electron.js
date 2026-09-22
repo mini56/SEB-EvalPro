@@ -214,11 +214,14 @@ app.whenReady().then(async () => {
         textEnabled:!!text&&!text.disabled,
         verifyHidden:!!verify&&getComputedStyle(verify).display==='none',
         nextHidden:!!oldNext&&getComputedStyle(oldNext).display==='none',
-        feedbackHidden:!!feedback&&getComputedStyle(feedback).display==='none'
+        feedbackHidden:!!feedback&&getComputedStyle(feedback).display==='none',
+        replayNavInstalled:document.documentElement.dataset.sebReplayNavigationCaptureInstalled==='1',
+        adminText:(document.getElementById('seb-evalpro-admin')||{}).textContent||'',
+        privacyDisplay:(()=>{const p=document.getElementById('seb-evalpro-privacy-layer');return p?getComputedStyle(p).display:'absent';})()
       };
     })()`);
     if (!dictOpen.action || !/Dictée terminée/.test(dictOpen.label) || !dictOpen.textEnabled ||
-        !dictOpen.verifyHidden || !dictOpen.nextHidden || !dictOpen.feedbackHidden) {
+        !dictOpen.verifyHidden || !dictOpen.nextHidden || !dictOpen.feedbackHidden || !dictOpen.replayNavInstalled) {
       fail('Dictée incorrecte dès l’ouverture', dictOpen);
       return;
     }
