@@ -204,64 +204,79 @@ function writingBlockTemplate() {
     return cleanModelOutput(response?.choices?.[0]?.message?.content || '');
   }
 
-  async function richDraft(profile) {
-    const system = [
-      "Tu es un professionnel médico-social rédigeant une synthèse d'évaluation à partir d'observations de plateau technique.",
-      '',
-      "Les données JSON ont déjà été analysées par le programme. Elles contiennent un plan de couverture, tous les faits qualitatifs obligatoires avec leur importance métier et les contrastes observés.",
-      "Tu n'as pas à recalculer les résultats ni à inventer une interprétation : ton rôle est de rédiger une synthèse professionnelle, explicite, détaillée et nuancée à partir de toute la matière qualitative fournie.",
+  function factsForPlan(profile,planItem) {
+    const facts=Array.isArray(profile?.faits_obligatoires)?profile.faits_obligatoires:[];
+    const byId=new Map(facts.map(f=>[f.id,f]));
+    const ids=Array.isArray(planItem?.faits_ids)?planItem.faits_ids:[];
+    return ids.map(id=>byId.get(id)).filter(Boolean).map(f=>{
+      const copy=JSON.parse(JSON.stringify(f));
+      delete copy.validation_couverture;
+      return copy;
+    });
+  }
+
+  function relevantContrasts(profile,facts) {
+    const exercises=new Set(facts.map(f=>String(f.exercice||'')));
+    const contrasts=Array.isArray(profile?.contrastes_observes)?profile.contrastes_observes:[];
+    return contrasts.filter(c=>{
+      const ex=Array.isArray(c.exercices_concernes)?c.exercices_concernes:[c.exercice].filter(Boolean);
+      return ex.some(e=>exercises.has(String(e||'')));
+    });
+  }
+
+  async function draftOneParagraph(profile,planItem) {
+    const facts=factsForPlan(profile,planItem);
+    const system=[
+      "Tu es un professionnel médico-social rédigeant UN SEUL paragraphe d'une synthèse d'évaluation de plateau technique.",
+      "Les faits fournis ont déjà été qualifiés par le programme. Tu dois les rédiger, pas les réévaluer.",
       '',
       'RÈGLES OBLIGATOIRES :',
-      '- Commence par "Monsieur NOM Prénom a participé aux mises en situation proposées au cours du plateau technique." ou la forme Madame correspondante.',
-      '- Le JSON contient plan_redaction. Rédige UN PARAGRAPHE DISTINCT pour chaque élément obligatoire de plan_redaction, dans l’ordre indiqué. Ne fusionne pas les paragraphes fabrication/briques, raisonnement/stock/planning, tri, numérique, expression/mathématiques.',
-      '- Chaque paragraphe doit développer les observations utiles et utiliser des connecteurs logiques pour mettre en relation les faits.',
-      '- Dans chaque élément de plan_redaction, la propriété faits contient les faits obligatoires de ce paragraphe : CHAQUE fait doit être explicitement traité. Aucun fait ni exercice évalué ne doit disparaître.',
-      '- Explique clairement les points d’appui et les besoins d’accompagnement sans réciter le tableau ligne par ligne.',
-      '- Utilise les contrastes déjà fournis pour relier les exercices quand ils éclairent la manière de travailler.',
-      '- Reste strictement fidèle aux observations qualitatives et à leur intensité.',
-      '- Les faits marqués importance=prioritaire correspondent aux difficultés majeures : ils doivent être explicitement développés et ne doivent jamais être minimisés, atténués ou compensés par une formulation positive contradictoire.',
-      '- Ne déduis aucun trait de personnalité, état psychologique, motivation, concentration, confiance, résilience ou potentiel qui ne soit pas explicitement observé. N’ajoute jamais les qualificatifs légère, remarquable, exceptionnelle, idéale ou pourrait être améliorée s’ils ne figurent pas dans les observations.',
-      '- Ne fais aucun diagnostic et ne propose aucune orientation professionnelle.',
-      '- N’utilise aucun score, pourcentage, nombre d’erreurs, durée ni niveau I/II/III/NE.',
-      '- Après la première phrase, utilise Monsieur ou Madame pour désigner la personne. N’utilise jamais il, elle, le candidat, le stagiaire, vous, votre ou vos.',
-      '- Ne mets aucun titre, sous-titre, liste à puces ou numérotation.',
-      '- Les expressions qualitatives présentes dans les observations, par exemple nombreuses erreurs, besoin d’aide, satisfaisant ou conforme, peuvent être reprises car elles portent le sens métier même si les nombres ont été retirés.',
-      '- Ton professionnel, factuel, bienveillant et destiné à des professionnels du secteur médico-social.',
-      '',
-      'Retourne uniquement la synthèse finale.'
+      '- Rédige exactement un paragraphe continu, sans titre, liste ni numérotation.',
+      '- Traite explicitement TOUS les objets de faits, sans en omettre un seul.',
+      '- Conserve exactement le sens et l’intensité des observations_qualitatives.',
+      '- Un fait importance=prioritaire doit être présenté comme une difficulté importante nécessitant l’accompagnement indiqué par la source ; ne le minimise jamais.',
+      '- Ne transforme jamais une réussite en difficulté ni une difficulté en réussite.',
+      '- N’invente aucune qualité, faiblesse, personnalité, motivation, concentration, confiance, résilience, potentiel ou orientation.',
+      '- N’ajoute pas légère, quelques difficultés, remarquable, exceptionnel, idéal ou pourrait être amélioré si ces mots ne sont pas dans les observations.',
+      '- N’utilise aucun score, pourcentage, nombre d’erreurs, durée ou niveau.',
+      '- Utilise Monsieur ou Madame pour désigner la personne ; jamais il, elle, le candidat, le stagiaire, vous, votre ou vos.',
+      '- Tu peux relier les faits avec des connecteurs logiques, mais aucune relation ne doit être inventée.',
+      '- Retourne uniquement le paragraphe.'
     ].join('\n');
-
-    const facts = Array.isArray(profile?.faits_obligatoires) ? profile.faits_obligatoires : [];
-    const byId = new Map(facts.map(f=>[f.id,f]));
-    const plan = Array.isArray(profile?.plan_couverture) ? profile.plan_couverture : [];
-    const plan_redaction = plan.map(p=>{
-      const ids = Array.isArray(p.faits_ids) ? p.faits_ids : [];
-      const grouped = ids.map(id=>byId.get(id)).filter(Boolean).map(f=>{
-        const copy = JSON.parse(JSON.stringify(f));
-        delete copy.validation_couverture;
-        return copy;
-      });
-      return {
-        paragraphe:p.paragraphe,
-        objet:p.objet,
-        obligatoire:p.obligatoire,
-        priorite:p.priorite || undefined,
-        faits:grouped
-      };
+    const user='/no_think\n\nParagraphe à rédiger :\n'+JSON.stringify({
+      identite:profile?.identite||{},
+      objet:planItem?.objet||'',
+      priorite:planItem?.priorite||'',
+      faits,
+      contrastes_observes:relevantContrasts(profile,facts)
     });
-    const modelProfile = {
-      identite:profile?.identite || {},
-      consigne_de_lecture:profile?.consigne_de_lecture || '',
-      plan_redaction,
-      contrastes_observes:Array.isArray(profile?.contrastes_observes)?profile.contrastes_observes:[]
-    };
-    const user = '/no_think\n\nDonnées JSON riches organisées par paragraphe :\n' + JSON.stringify(modelProfile);
     return complete(
-      [{ role:'system', content:system }, { role:'user', content:user }],
-      0.3,
-      0.9,
-      1900
+      [{role:'system',content:system},{role:'user',content:user}],
+      0.3,0.9,520
     );
+  }
+
+  async function richDraft(profile) {
+    const identite=profile?.identite||{};
+    const civilite=String(identite.civilite||'Monsieur').trim()||'Monsieur';
+    const nom=String(identite.nom||'').trim();
+    const prenom=String(identite.prenom||'').trim();
+    const intro=[civilite,nom,prenom].filter(Boolean).join(' ') +
+      ' a participé aux mises en situation proposées au cours du plateau technique. Le parcours met en évidence des compétences mobilisables dans plusieurs domaines, avec des besoins d’accompagnement qui restent marqués dans certaines situations.';
+
+    const plan=(Array.isArray(profile?.plan_couverture)?profile.plan_couverture:[])
+      .filter(p=>p?.obligatoire && Number(p?.paragraphe)>=2)
+      .sort((a,b)=>Number(a.paragraphe)-Number(b.paragraphe));
+
+    const parts=[intro];
+    let passes=0;
+    for(const item of plan){
+      const paragraph=await draftOneParagraph(profile,item);
+      passes+=1;
+      if(!paragraph) throw new Error('Qwen n’a produit aucun texte pour le paragraphe '+String(item.paragraphe));
+      parts.push(paragraph.trim());
+    }
+    return {text:parts.join('\n\n'),passes};
   }
 
   async function legacyRewrite(sourceText) {
@@ -285,8 +300,9 @@ function writingBlockTemplate() {
       await ensureStarted();
       const rich = parseRichPayload(sourceText);
       if (rich) {
-        const raw = await richDraft(rich.profile);
-        passes = 1;
+        const drafted = await richDraft(rich.profile);
+        const raw = String(drafted?.text||'');
+        passes = Number(drafted?.passes||0);
         if (!raw) return {ok:false,error:'Qwen n’a produit aucun texte.'};
         const finalText = postProcessRich(raw, rich.profile);
         const validationErrors = validateRichOutput(finalText, rich.profile);
