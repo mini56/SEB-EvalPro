@@ -29,7 +29,7 @@ const payload = serialize(profile);
   try {
     const result = await service.rewrite(payload);
     if (!result?.ok) throw new Error(result?.error || 'génération IA vide');
-    if (result.fallback) throw new Error('Qwen a été refusé par le validateur: ' + (result.reason || 'raison inconnue'));
+    if (result.fallback) { console.error('QWEN_REJECTED_SAMPLE\n'+String(result.rejectedSample||'')); throw new Error('Qwen a été refusé par le validateur: ' + (result.reason || 'raison inconnue')); }
     const text = String(result.text || '').trim();
     const norm = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
     if (!norm.startsWith('monsieur jose tout')) throw new Error('identité initiale incorrecte');
