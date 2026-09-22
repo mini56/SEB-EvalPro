@@ -27,22 +27,22 @@
 
   const COVERAGE={
     'fabrication-plan':[['plan']],
-    'fabrication-tracage':[['traçage','tracage']],
-    'fabrication-decoupe':[['découpe','decoupe']],
-    'fabrication-assemblage':[['assemblage','pliage']],
-    'fabrication-finition':[['finition']],
-    'briques-identification':[['brique'],['schéma','schema']],
-    'briques-manipulation':[['brique'],['assemblage','manipulation']],
-    'carre':[['carré magique','carre magique','problème structuré','probleme structure'],['contrainte']],
+    'fabrication-tracage':[['traç','trac']],
+    'fabrication-decoupe':[['découp','decoup']],
+    'fabrication-assemblage':[['assembl','pliag']],
+    'fabrication-finition':[['finit']],
+    'briques-identification':[['briqu'],['schém','schem']],
+    'briques-manipulation':[['briqu'],['assembl','manipul']],
+    'carre':[['carré magique','carre magique','problem'],['contraint']],
     'organisation':[['stock','rangement']],
-    'planning':[['planification',"ordre d'exécution",'ordre d’exécution','restaurant']],
+    'planning':[['planif',"ordre d'exécution",'ordre d’exécution','restaurant']],
     'tri-temps':[['tri'],['rythme']],
-    'tri-erreurs':[['tri'],['fiabilité','fiabilite']],
+    'tri-erreurs':[['tri'],['fiabil']],
     'texte':[['traitement de texte']],
-    'mail':[['messagerie','message hiérarchisé','message hierarchise']],
-    'expression':[['expression écrite','expression ecrite','orthographe','phrases']],
-    'math-enonce':[['mathématique','mathematique'],['consigne']],
-    'math-problemes':[['mathématique','mathematique'],['problème','probleme','pourcentage','échelle','echelle']]
+    'mail':[['messagerie','message hiérarch','message hierarch']],
+    'expression':[['expression écrite','expression ecrite','orthograph','phrase']],
+    'math-enonce':[['mathém','mathem'],['consigne']],
+    'math-problemes':[['mathém','mathem'],['probl','pourcentage','échell','echell']]
   };
 
   function norm(v){return String(v??'').replace(/\u00a0/g,' ').replace(/\r/g,'\n').replace(/[ \t]+/g,' ').replace(/\n+/g,'\n').trim()}
