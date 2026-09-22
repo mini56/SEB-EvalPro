@@ -12,7 +12,7 @@ const rows = {
   'briques-manipulation': {level:'I',select:'I. Assemble les pièces sans difficultés.',detail:'- 1 erreur'},
   'carre': {level:'III',select:"III. A des difficultés à identifier les contraintes d'un problème structuré et à établir les relations entre ses éléments.",detail:'- 10 erreurs'},
   'organisation': {level:'III',select:'III. Réalise la tâche avec de nombreuses erreurs nécessitant un accompagnement.',detail:'- 30 erreurs'},
-  'planning': {level:'III',select:"III. N’est pas en capacité de déterminer l’ordre d’exécution de tâches les unes par rapport aux autres.",detail:'- 11 / 23 points'},
+  'planning': {level:'III',select:"III. N’est pas en capacité de déterminer l’ordre d’exécution de tâches les unes par rapport aux autres.",detail:'- 12 erreurs'},
   'tri-temps': {level:'I',comment:'Le rythme de réalisation est satisfaisant.',detail:'Moyenne 00:03'},
   'tri-erreurs': {level:'I',comment:'Fiabilité satisfaisante.',detail:'6 erreurs'},
   'texte': {level:'II',select:"II. A besoin d’aide pour utiliser un logiciel de traitement de texte pour produire un travail individuel présentable à un tiers.",detail:'- 4 erreurs'},
@@ -31,12 +31,21 @@ assert(profile.domaines.length >= 4, 'Les grandes thématiques ne sont pas toute
 assert(profile.points_appui.length > 0, 'Points d’appui absents.');
 assert(profile.points_vigilance.length > 0, 'Points de vigilance absents.');
 assert(profile.contrastes_observes.length > 0, 'Contrastes absents.');
+assert.strictEqual(profile.faits_obligatoires.length,17,'Tous les faits évalués doivent être obligatoires.');
+assert(profile.plan_couverture.filter(x=>x.obligatoire).length>=6,'Plan de couverture obligatoire incomplet.');
+for(const id of ['carre','organisation','planning']){
+  const fact=profile.faits_obligatoires.find(x=>x.id===id);
+  assert(fact,'Fait obligatoire absent: '+id);
+  assert.strictEqual(fact.importance,'prioritaire','La priorité forte est perdue pour '+id);
+}
 
 const qualitative=JSON.stringify({
   points_appui:profile.points_appui,
   points_vigilance:profile.points_vigilance,
   domaines:profile.domaines,
-  contrastes_observes:profile.contrastes_observes
+  contrastes_observes:profile.contrastes_observes,
+  faits_obligatoires:profile.faits_obligatoires,
+  plan_couverture:profile.plan_couverture
 });
 for(const forbidden of [
   /\b\d+(?:[.,]\d+)?\s*%/,
@@ -47,7 +56,7 @@ for(const forbidden of [
   assert(!forbidden.test(qualitative), 'Le JSON riche contient encore un élément quantitatif/niveau interdit: '+forbidden);
 }
 
-const payload=JSON.stringify({kind:'seb-qwen-rich-context-v1',profile});
+const payload=JSON.stringify({kind:'seb-qwen-rich-coverage-v2',profile});
 
 (async()=>{
   const service=createLocalAiService({app:{isPackaged:false}});
@@ -62,14 +71,14 @@ const payload=JSON.stringify({kind:'seb-qwen-rich-context-v1',profile});
     const text=String(result.text||'').trim();
     assert(text,'Qwen riche: synthèse vide');
     const paragraphs=text.split(/\n\s*\n/).map(x=>x.trim()).filter(Boolean);
-    assert(paragraphs.length>=5,'Qwen riche: moins de cinq paragraphes');
+    assert(paragraphs.length>=6,'Qwen riche: moins de six paragraphes de couverture');
     console.log('QWEN_RICH_PROFILE_BEGIN');
     console.log(JSON.stringify(profile,null,2));
     console.log('QWEN_RICH_PROFILE_END');
     console.log('QWEN_RICH_OUTPUT_BEGIN');
     console.log(text);
     console.log('QWEN_RICH_OUTPUT_END');
-    console.log('QWEN_RICH_VALIDATION: OK');
+    console.log('QWEN_RICH_COVERAGE_VALIDATION: OK');
   }finally{
     service.stop();
   }
