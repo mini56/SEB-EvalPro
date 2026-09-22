@@ -87,6 +87,7 @@ function writingBlockTemplate() {
     out = out.replace(/\b\d+(?:[.,]\d+)?\s*\/\s*\d+(?:[.,]\d+)?\b/g, '');
     out = out.replace(/\b\d+\s*(?:min|mn|minutes?|secondes?|s)\b/gi, '');
     out = out.replace(/\b(?:niveau\s*)?(?:NE|III|II|I)\b/g, '');
+    out = out.replace(/\b\d+(?:[.,]\d+)?\b/g, '');
     out = out.replace(/[ \t]+([,.;:!?])/g, '$1');
     out = out.replace(/[ \t]{2,}/g, ' ');
     out = out.replace(/\n{3,}/g, '\n\n').trim();
@@ -128,10 +129,13 @@ function writingBlockTemplate() {
 
   function prioritySentence(text, fact) {
     const ss = sentences(text);
-    const firstGroup = Array.isArray(fact?.validation_couverture?.[0]) ? fact.validation_couverture[0] : [];
+    const groups = Array.isArray(fact?.validation_couverture) ? fact.validation_couverture : [];
     return ss.filter(sentence => {
       const n = guardNorm(sentence);
-      return firstGroup.some(term => n.includes(guardNorm(term)));
+      return groups.every(group => {
+        const alternatives=Array.isArray(group)?group:[group];
+        return alternatives.some(term=>n.includes(guardNorm(term)));
+      });
     }).join(' ');
   }
 
@@ -149,7 +153,7 @@ function writingBlockTemplate() {
     if (/\b\d+\s*erreur(?:\(s\)|s)?\b/i.test(text)) errors.push('Présence de nombres d’erreurs');
     if (/\b(?:niveau\s*)?(?:NE|III|II|I)\b/.test(text)) errors.push('Présence de niveaux');
     if (/\b(?:vous|votre|vos)\b/i.test(text)) errors.push('Adresse directe au candidat');
-    if (/\b(?:le candidat|la candidate|le stagiaire|la stagiaire)\b/i.test(text)) errors.push('Désignation interdite');
+    if (/\b(?:le candidat|la candidate|stagiaire)\b/i.test(text)) errors.push('Désignation interdite');
     if (/\b(?:il|elle)\b/i.test(text)) errors.push('Présence de il/elle');
 
     const forbiddenIntensity = [
@@ -162,6 +166,8 @@ function writingBlockTemplate() {
       ['potentiel','interprétation "potentiel"'],
       ['resilien','interprétation "résilience"'],
       ['concentration','interprétation "concentration"'],
+      ['attention','interprétation "attention"'],
+      ['taux de reussite','quantification reformulée "taux de réussite"'],
       ['confiance','interprétation "confiance"'],
       ['profil dynamique','interprétation "profil dynamique"'],
       ['ideal','intensité ajoutée "idéal"']
@@ -238,6 +244,8 @@ function writingBlockTemplate() {
       '- Conserve exactement le sens et l’intensité des observations_qualitatives.',
       '- Un fait importance=prioritaire doit être présenté comme une difficulté importante nécessitant l’accompagnement indiqué par la source ; ne le minimise jamais.',
       '- Ne transforme jamais une réussite en difficulté ni une difficulté en réussite.',
+      '- Reprends explicitement la compétence de chaque fait. Si le fait concerne la découpe, écris découpe ; s’il concerne la lecture de schéma, écris schéma ; s’il concerne les finitions, écris finitions.',
+      '- Ne transforme jamais « n’a pas besoin d’aide pour commencer » en autonomie générale, aptitude générale ou qualité personnelle.',
       '- N’invente aucune qualité, faiblesse, personnalité, motivation, concentration, confiance, résilience, potentiel ou orientation.',
       '- N’ajoute pas légère, quelques difficultés, remarquable, exceptionnel, idéal ou pourrait être amélioré si ces mots ne sont pas dans les observations.',
       '- N’utilise aucun score, pourcentage, nombre d’erreurs, durée ou niveau.',
@@ -273,6 +281,22 @@ function writingBlockTemplate() {
     const parts=[intro];
     let passes=0;
     for(const item of plan){
+      if(Number(item?.paragraphe)===2){
+        const allFacts=factsForPlan(profile,item);
+        const exercises=['structure 3D papier','briques'];
+        const subparts=[];
+        for(const exercise of exercises){
+          const ids=allFacts.filter(f=>String(f.exercice||'')===exercise).map(f=>f.id);
+          if(!ids.length) continue;
+          const subItem={...item,faits_ids:ids,objet:item.objet+' — '+exercise};
+          const sub=await draftOneParagraph(profile,subItem);
+          passes+=1;
+          if(!sub) throw new Error('Qwen n’a produit aucun texte pour '+exercise);
+          subparts.push(sub.trim());
+        }
+        parts.push(subparts.join(' '));
+        continue;
+      }
       const paragraph=await draftOneParagraph(profile,item);
       passes+=1;
       if(!paragraph) throw new Error('Qwen n’a produit aucun texte pour le paragraphe '+String(item.paragraphe));
