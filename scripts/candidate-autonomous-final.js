@@ -482,6 +482,19 @@ function parseJs(text, label) {
   if (!dicteeGenerated.includes("finish.id='seb-dictee-action'") || dicteeGenerated.includes('seb-dictee-finish-next')) {
     fail('Dictée encore confondue avec une navigation Replay', 7);
   }
+  if (!dicteeGenerated.includes('position:fixed!important;left:50%!important;right:auto!important;bottom:22px!important;transform:translateX(-50%)!important')) {
+    fail('Dictée: le bouton final « Dictée terminée / Suivant » n’est pas centré dans le rendu final', 7);
+  }
+  for (const token of [
+    "1:\"9h15\", 2:'8h50', 3:'9h05', 4:'9h20', 5:'8h45', 6:'5h15'",
+    "7:'9h45', 8:'9h15', 9:'9h30', 10:'9h55', 11:'9h25', 12:'2h35'",
+    "13:'0h31', 14:'1h03'"
+  ]) {
+    if (!qcm.includes(token)) fail('Page 3: grille horaire finale incorrecte: ' + token, 7);
+  }
+  if (qcm.includes("9:'9h25', 10:'9h55', 11:'9h25', 12:'2h30'")) {
+    fail('Page 3: anciennes réponses erronées réintroduites', 7);
+  }
   if (!main.includes('SEB_TEMP_WINDOWS_RECOVERY') || !main.includes('TEMP_ALLOW_WINDOWS_RECOVERY = true')) {
     fail('sortie Windows temporaire de récupération absente', 7);
   }

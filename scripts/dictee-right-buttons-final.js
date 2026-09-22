@@ -13,6 +13,7 @@ const runtime=String.raw`
   function place(){
     const verify=document.getElementById('verifyBtn');
     const next=document.getElementById('nextBtn');
+    const action=document.getElementById('seb-dictee-action');
     if(!verify||!next)return false;
 
     let box=document.getElementById('seb-dictee-centered-actions');
@@ -24,6 +25,7 @@ const runtime=String.raw`
     }
     if(verify.parentElement!==box)box.appendChild(verify);
     if(next.parentElement!==box)box.appendChild(next);
+    if(action&&action.parentElement!==box)box.appendChild(action);
     return true;
   }
   function init(){
@@ -37,7 +39,7 @@ const runtime=String.raw`
 })();
 </script>`;
 html=html.replace(/<\/body>/i,runtime+'\n</body>');
-if(!html.includes('seb-dictee-right-actions-final')||!html.includes('seb-dictee-centered-actions'))fail('runtime boutons centrés absent');
+if(!html.includes('seb-dictee-right-actions-final')||!html.includes('seb-dictee-centered-actions')||!html.includes("document.getElementById('seb-dictee-action')"))fail('runtime boutons centrés absent');
 if(/right:12px;bottom:12px/.test(html))fail('ancien placement bas-droite encore présent');
 fs.writeFileSync(target,html,'utf8');
 console.log('SEB EvalPro dictée: « Dictée terminée » puis « Suivant » centrés en bas de la page.');

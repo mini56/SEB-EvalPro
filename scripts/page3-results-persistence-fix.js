@@ -12,13 +12,20 @@ function fail(message, code = 2) {
 if (!fs.existsSync(file)) fail('qcmv1.0.html généré introuvable');
 let html = fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n');
 
-// 1) Les réponses Page 3 officielles doivent correspondre aux calculs affichés :
-// mercredi 9h05 + 0h25 = 9h30 ; rangement total = 2h35 ; moyenne = 0h31.
-const oldP3 = `  7:'9h45', 8:'9h15', 9:'9h25', 10:'9h55', 11:'9h25', 12:'2h30',\n  13:'0h30', 14:'1h03'`;
-const newP3 = `  7:'9h45', 8:'9h15', 9:'9h30', 10:'9h55', 11:'9h25', 12:'2h35',\n  13:'0h31', 14:'1h03'`;
-if (!html.includes(newP3)) {
-  if (!html.includes(oldP3)) fail('bloc des réponses Page 3 introuvable', 3);
-  html = html.replace(oldP3, newP3);
+// 1) Les réponses Page 3 officielles sont une donnée source, jamais une
+// correction de build. Si elles changent ou si les anciennes valeurs reviennent,
+// le build doit échouer immédiatement.
+const expectedP3 = `const bonnesReponsesPage3   = {
+  1:"9h15", 2:'8h50', 3:'9h05', 4:'9h20', 5:'8h45', 6:'5h15',
+  7:'9h45', 8:'9h15', 9:'9h30', 10:'9h55', 11:'9h25', 12:'2h35',
+  13:'0h31', 14:'1h03'
+};`;
+if (!html.includes(expectedP3)) {
+  fail('réponses officielles Page 3 absentes ou modifiées : attendu 9h30 / 2h35 / 0h31', 3);
+}
+if (html.includes("9:'9h25', 10:'9h55', 11:'9h25', 12:'2h30'") ||
+    html.includes("13:'0h30', 14:'1h03'")) {
+  fail('anciennes réponses erronées Page 3 réintroduites', 3);
 }
 
 // 2) Au rechargement de qcmv1.0.html, ne jamais repartir avec deux objets vides :
@@ -61,7 +68,7 @@ if (!html.includes('Récupération renforcée Page 3')) {
 }
 
 const checks = [
-  [html.includes("9:'9h30'") && html.includes("12:'2h35'") && html.includes("13:'0h31'"), 'réponses Page 3 corrigées'],
+  [html.includes(expectedP3), 'réponses Page 3 source verrouillées'],
   [html.includes("reponses = JSON.parse(sessionStorage.getItem('reponses_data')"), 'réhydratation globale'],
   [html.includes('const persistedResponses = JSON.parse'), 'fusion avant sauvegarde'],
   [html.includes("sessionStorage.setItem('page3_resultats'"), 'sauvegarde dédiée Page 3'],
@@ -72,4 +79,4 @@ const failed = checks.filter(([ok]) => !ok).map(([, label]) => label);
 if (failed.length) fail('contrôles finaux échoués : ' + failed.join(', '), 8);
 
 fs.writeFileSync(file, html, 'utf8');
-console.log('SEB EvalPro TEST: Page 3 persistée/restaurée dans Résultats stagiaire; réponses vérifiées = Q9 9h30, Q12 2h35, Q13 0h31.');
+console.log('SEB EvalPro TEST: Page 3 persistée/restaurée; grille source verrouillée = 9h15, 8h50, 9h05, 9h20, 8h45, 5h15, 9h45, 9h15, 9h30, 9h55, 9h25, 2h35, 0h31, 1h03.');

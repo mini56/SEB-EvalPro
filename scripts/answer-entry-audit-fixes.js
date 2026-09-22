@@ -282,7 +282,7 @@ for (const spec of [
     const patch = [
       '<style id="seb-dictee-stable-style">',
       '#verifyBtn,#nextBtn,#feedback{display:none!important;visibility:hidden!important;}',
-      '#seb-dictee-action{display:inline-flex;margin-top:12px;align-self:flex-end;font-weight:700;}',
+      '#seb-dictee-action{display:inline-flex!important;position:fixed!important;left:50%!important;right:auto!important;bottom:22px!important;transform:translateX(-50%)!important;z-index:1200!important;margin:0!important;align-self:auto!important;font-weight:700;}',
       '</style>',
       '<script id="seb-dictee-stable-runtime">',
       '(function(){',
@@ -339,6 +339,9 @@ for (const spec of [
   if (!out.includes('verify.click();')) fail('Dictée: moteur de correction historique non appelé', 9);
   if (!out.includes('next.click();')) fail('Dictée: navigation historique absente', 9);
   if (!out.includes('#verifyBtn,#nextBtn,#feedback{display:none!important')) fail('Dictée: correction/anciens boutons non masqués', 9);
+  if (!out.includes('position:fixed!important;left:50%!important;right:auto!important;bottom:22px!important;transform:translateX(-50%)!important')) {
+    fail('Dictée: bouton final non centré', 9);
+  }
   if (/MutationObserver[\s\S]{0,220}(?:feedback|hideFeedback)|(?:feedback|hideFeedback)[\s\S]{0,220}MutationObserver/.test(out)) {
     fail('Dictée: MutationObserver de masquage interdit', 9);
   }
