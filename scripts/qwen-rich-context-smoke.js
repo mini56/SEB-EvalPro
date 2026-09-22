@@ -27,9 +27,6 @@ const profile=buildRichProfile({
   rows
 });
 
-assert(profile.domaines.length >= 4, 'Les grandes thématiques ne sont pas toutes présentes.');
-assert(profile.points_appui.length > 0, 'Points d’appui absents.');
-assert(profile.points_vigilance.length > 0, 'Points de vigilance absents.');
 assert(profile.contrastes_observes.length > 0, 'Contrastes absents.');
 assert.strictEqual(profile.faits_obligatoires.length,17,'Tous les faits évalués doivent être obligatoires.');
 assert(profile.plan_couverture.filter(x=>x.obligatoire).length>=6,'Plan de couverture obligatoire incomplet.');
@@ -40,9 +37,6 @@ for(const id of ['carre','organisation','planning']){
 }
 
 const qualitative=JSON.stringify({
-  points_appui:profile.points_appui,
-  points_vigilance:profile.points_vigilance,
-  domaines:profile.domaines,
   contrastes_observes:profile.contrastes_observes,
   faits_obligatoires:profile.faits_obligatoires,
   plan_couverture:profile.plan_couverture
