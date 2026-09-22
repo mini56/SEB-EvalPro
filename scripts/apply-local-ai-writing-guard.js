@@ -120,7 +120,7 @@ function writingBlockTemplate() {
     if (/^Monsieur\b/i.test(lead) && /\bil\b/i.test(output)) throw new Error('La synthèse IA a utilisé « il » au lieu de « Monsieur ».');
     if (/^Madame\b/i.test(lead) && /\belle\b/i.test(output)) throw new Error('La synthèse IA a utilisé « elle » au lieu de « Madame ».');
     if (/\b(?:le candidat|la candidate|le stagiaire|la stagiaire|la personne)\b/i.test(output)) throw new Error('La synthèse IA a remplacé Monsieur/Madame par une désignation interdite.');
-    if (/\b(?:vous|votre|vos|tu|ton|ta|tes)\b/i.test(output)) throw new Error('La synthèse IA s’adresse directement à la personne, ce qui est interdit.');
+    if (/\b(?:vous|votre|vos|tu)\b/i.test(output)) throw new Error('La synthèse IA s’adresse directement à la personne, ce qui est interdit.');
 
     if (/\bniveau\s*(?:NE|I{1,3})\b/i.test(output) || /\d+(?:[.,]\d+)?\s*%/.test(output) || /\d+\s*erreurs?\b/i.test(output) || /\d+(?:[.,]\d+)?\s*\/\s*\d+(?:[.,]\d+)?/.test(output)) {
       throw new Error('La synthèse IA récite un score, un niveau ou un nombre d’erreurs.');

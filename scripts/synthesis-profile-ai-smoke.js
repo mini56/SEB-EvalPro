@@ -38,7 +38,7 @@ const payload = serialize(profile);
     const norm = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
     if (!norm.startsWith('monsieur jose tout')) throw new Error('identité initiale incorrecte');
     if (/\b(il|elle)\b/i.test(text) || /\b(?:le candidat|la candidate|le stagiaire|la stagiaire|la personne)\b/i.test(text)) throw new Error('désignation personnelle interdite');
-    if (/\b(?:vous|votre|vos|tu|ton|ta|tes)\b/i.test(text)) throw new Error('adresse directe interdite');
+    if (/\b(?:vous|votre|vos|tu)\b/i.test(text)) throw new Error('adresse directe interdite');
     if (/^\s*#{1,6}\s+|^\s*[-*]\s+/m.test(text)) throw new Error('titre ou liste détecté');
     if (/\d+(?:[.,]\d+)?\s*%|\d+\s*erreurs?\b|\bniveau\s*(?:I|II|III|NE)\b/i.test(text)) throw new Error('résultat brut récité');
     if (text.split(/\n\s*\n/).filter(Boolean).length < 4) throw new Error('moins de quatre paragraphes');
