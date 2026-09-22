@@ -110,8 +110,16 @@ function adminInteractionTarget(target) {
   const { file, text } = read('src/replay-main.js');
   let out = text;
   if (!out.includes('SEB_ADMIN_CAPTURE_ADMINMODE_GUARD')) {
-    const marker = `      // SEB_ADMIN_CAPTURE_BACKEND_GUARD\n      let senderPage = '';`;
-    const replacement = `      // SEB_ADMIN_CAPTURE_BACKEND_GUARD\n      // SEB_ADMIN_CAPTURE_ADMINMODE_GUARD\n      if (getAdminUnlocked()) {\n        return { ok: false, skipped: true, adminWorkBlocked: true };\n      }\n      let senderPage = '';`;
+    const marker6 = `      // SEB_ADMIN_CAPTURE_BACKEND_GUARD\n      let senderPage = '';`;
+    const marker4 = `    // SEB_ADMIN_CAPTURE_BACKEND_GUARD\n    let senderPage = '';`;
+    const marker = out.includes(marker6) ? marker6 : marker4;
+    const indent = marker === marker6 ? '      ' : '    ';
+    const replacement = indent + `// SEB_ADMIN_CAPTURE_BACKEND_GUARD\n` +
+      indent + `// SEB_ADMIN_CAPTURE_ADMINMODE_GUARD\n` +
+      indent + `if (getAdminUnlocked()) {\n` +
+      indent + `  return { ok: false, skipped: true, adminWorkBlocked: true };\n` +
+      indent + `}\n` +
+      indent + `let senderPage = '';`;
     out = replaceRequired(out, marker, replacement, 'barrière backend mode Admin');
   }
   if (!out.includes('SEB_ADMIN_CAPTURE_ADMINMODE_GUARD') || !out.includes('if (getAdminUnlocked())')) fail('barrière backend Admin absente', 9);
