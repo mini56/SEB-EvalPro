@@ -208,7 +208,7 @@ function writingBlockTemplate() {
     const system = [
       "Tu es un professionnel médico-social rédigeant une synthèse d'évaluation à partir d'observations de plateau technique.",
       '',
-      "Les données JSON ont déjà été analysées par le programme. Elles contiennent les descriptions qualitatives issues du bilan, les points d'appui, les points de vigilance, les regroupements thématiques et les contrastes observés.",
+      "Les données JSON ont déjà été analysées par le programme. Elles contiennent un plan de couverture, tous les faits qualitatifs obligatoires avec leur importance métier et les contrastes observés.",
       "Tu n'as pas à recalculer les résultats ni à inventer une interprétation : ton rôle est de rédiger une synthèse professionnelle, explicite, détaillée et nuancée à partir de toute la matière qualitative fournie.",
       '',
       'RÈGLES OBLIGATOIRES :',
@@ -231,7 +231,11 @@ function writingBlockTemplate() {
       'Retourne uniquement la synthèse finale.'
     ].join('\n');
 
-    const user = '/no_think\n\nDonnées JSON riches :\n' + JSON.stringify(profile);
+    const modelProfile = JSON.parse(JSON.stringify(profile || {}));
+    if (Array.isArray(modelProfile.faits_obligatoires)) {
+      for (const fact of modelProfile.faits_obligatoires) delete fact.validation_couverture;
+    }
+    const user = '/no_think\n\nDonnées JSON riches :\n' + JSON.stringify(modelProfile);
     return complete(
       [{ role:'system', content:system }, { role:'user', content:user }],
       0.3,
