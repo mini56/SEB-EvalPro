@@ -60,7 +60,7 @@ if (!preloadSource.includes('rewriteSynthesisLocal')) fail('pont IA locale absen
 </style>
 <script id="seb-local-ai-unified-prototype">
 (()=>{'use strict';
-const FINAL_KEY='seb_evalpro_bilan_synthese',SOURCE_KEY='seb_evalpro_bilan_synthese_moteur';
+const FINAL_KEY='seb_evalpro_bilan_synthese',SOURCE_KEY='seb_evalpro_bilan_synthese_moteur',PROFILE_KEY='seb_evalpro_bilan_synthese_profile_v1';
 function aiText(v){return String(v||'').replace(/\r\n/g,'\n').trim()}
 function stripAiWrappers(v){
  let text=aiText(v);
@@ -108,12 +108,13 @@ function installUnifiedSynthesis(){
    if(!deterministic){setStatus('Aucune synthèse n’a pu être générée.');setApplied(false,false,'Aucun texte moteur disponible.');return}
    sessionStorage.setItem(SOURCE_KEY,deterministic);
    sessionStorage.setItem(FINAL_KEY,deterministic);
-   setApplied(true,false,'SEB-IA reformule localement…');
-   setStatus('SEB-IA reformule la synthèse localement…');
+   setApplied(true,false,'SEB-IA rédige à partir du profil structuré…');
+   setStatus('SEB-IA rédige la synthèse localement…');
    try{
     const st=await window.sebEvalPro?.localAiStatus?.();
     if(!st?.available){setStatus('Synthèse moteur conservée.');setApplied(true,false,'IA indisponible.');return}
-    const answer=await window.sebEvalPro.rewriteSynthesisLocal(deterministic);
+    const profilePayload=String(sessionStorage.getItem(PROFILE_KEY)||'').trim();
+    const answer=await window.sebEvalPro.rewriteSynthesisLocal(profilePayload||deterministic);
     if(!answer?.ok){setStatus('Synthèse moteur conservée.');setApplied(true,false,answer?.error||'Reformulation indisponible.');return}
     const finalText=stripAiWrappers(answer.text);
     if(!finalText){setStatus('Synthèse moteur conservée.');setApplied(true,false,'Reformulation vide.');return}
@@ -181,11 +182,12 @@ function sebBhInstallUnifiedSynthesis(){
    await Promise.resolve();
    const deterministic=String(summary.value||'').replace(/\r\n/g,'\n').trim();
    if(!deterministic){setStatus('Aucune synthèse n’a pu être générée.');setApplied(false,false,'Aucun texte moteur disponible.');return}
-   setApplied(true,false,'SEB-IA reformule localement…');setStatus('SEB-IA reformule la synthèse localement…');
+   setApplied(true,false,'SEB-IA rédige à partir du profil structuré…');setStatus('SEB-IA rédige la synthèse localement…');
    try{
     const st=await ipcRenderer.invoke('ai:status');
     if(!st?.available){setStatus('Synthèse moteur conservée.');setApplied(true,false,'IA indisponible.');return}
-    const answer=await ipcRenderer.invoke('ai:rewrite-synthesis',deterministic);
+    const card=summary.closest('.seb-bh-editor-card');const profilePayload=String(card?.dataset?.sebSynthesisProfile||'').trim();
+    const answer=await ipcRenderer.invoke('ai:rewrite-synthesis',profilePayload||deterministic);
     if(!answer?.ok){setStatus('Synthèse moteur conservée.');setApplied(true,false,answer?.error||'Reformulation indisponible.');return}
     let finalText=String(answer.text||'').replace(/\r\n/g,'\n').trim();
     finalText=finalText.replace(/^\s*<\/?(?:bilan_reformule|bilan_source|texte_source|proposition)>\s*/i,'').replace(/\s*<\/(?:bilan_reformule|bilan_source|texte_source|proposition)>\s*$/i,'').trim();
