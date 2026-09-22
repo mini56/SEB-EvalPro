@@ -20,7 +20,7 @@ const block = '<script id="seb-qwen-rich-context-engine">\n' + browserEngine + '
 ' <script id="seb-qwen-rich-context-ui">\n'.trimStart() +
 `(()=>{
  'use strict';
- const KIND='seb-qwen-rich-context-v1';
+ const KIND='seb-qwen-rich-coverage-v2';
  function candidate(){try{return JSON.parse(sessionStorage.getItem('candidat_data')||'{}')||{}}catch(_){return{}}}
  function rows(){
    const out={};
@@ -38,7 +38,7 @@ const block = '<script id="seb-qwen-rich-context-engine">\n' + browserEngine + '
  window.sebQwenRichPayload=()=>{
    const profile=window.SebQwenRich.buildRichProfile({candidate:candidate(),rows:rows()});
    const payload={kind:KIND,profile};
-   try{sessionStorage.setItem('seb_evalpro_qwen_rich_profile_v1',JSON.stringify(payload))}catch(_){ }
+   try{sessionStorage.setItem('seb_evalpro_qwen_rich_profile_v2',JSON.stringify(payload))}catch(_){ }
    window.sebQwenRichLastProfile=profile;
    return JSON.stringify(payload);
  };
