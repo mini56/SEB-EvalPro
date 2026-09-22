@@ -470,6 +470,9 @@ function parseJs(text, label) {
   for (const token of ['NAV_CAPTURE_TIMEOUT_MS = 2000', 'await captureBeforeNavigation()', "captureNow('navigation-before-guaranteed')"]) {
     if (!replayNavigation.includes(token)) fail('navigation Replay bornée absente: ' + token, 7);
   }
+  if (!replayNavigation.includes("replace(/^[^A-Za-zÀ-ÖØ-öø-ÿ0-9]+/, '')")) {
+    fail('navigation Replay ne normalise pas les icônes des boutons', 7);
+  }
   if (!replayNavigation.includes("dataset.sebReplayNavigationCaptureInstalled = '1'") || replayNavigation.includes('let installed = false')) {
     fail('installation Replay encore globale au lieu d’être liée au document', 7);
   }

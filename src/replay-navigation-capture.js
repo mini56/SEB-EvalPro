@@ -100,6 +100,8 @@ function labelOf(control) {
   return String(control && (control.textContent || control.value) || '')
     .replace(/\s+/g, ' ')
     .trim()
+    .replace(/^[^A-Za-zÀ-ÖØ-öø-ÿ0-9]+/, '')
+    .trim()
     .toLowerCase();
 }
 
