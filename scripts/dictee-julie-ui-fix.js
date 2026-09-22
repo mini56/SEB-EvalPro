@@ -14,20 +14,15 @@ if (!fs.existsSync(target)) fail('dictee.html généré introuvable');
 let html = fs.readFileSync(target, 'utf8');
 if (!/<\/body>/i.test(html)) fail('balise </body> introuvable');
 
-// Supprimer l'ancien texte qui annonçait une vitesse 1,00 imposée.
-html = html.replace(
-  /Le débit est fixé à la vitesse normale(?:\s|&nbsp;|\u00a0)*1[,.]00\.?(?:\s|&nbsp;|\u00a0)*Il n['’]est pas possible d['’]accélérer l['’]enregistrement\.?/giu,
-  ''
-);
+const newInstruction = 'Relisez votre texte avant de cliquer sur « Dictée terminée ». Votre réponse sera alors verrouillée et ne pourra plus être modifiée. Cliquez ensuite sur « Suivant » pour poursuivre l’évaluation.';
 
-const cleanedBeforeRuntime = html
-  .normalize('NFD')
-  .replace(/[\u0300-\u036f]/g, '')
-  .replace(/\s+/g, ' ')
-  .toLowerCase();
-if (cleanedBeforeRuntime.includes('le debit est fixe a la vitesse normale 1,00')) {
-  fail('ancien texte vitesse 1,00 encore présent après nettoyage');
-}
+// Corriger aussi la consigne directement dans le HTML généré quand elle est
+// présente sous forme de texte continu. Le runtime ci-dessous sert de garde
+// supplémentaire si le texte est fragmenté par des balises.
+html = html.replace(
+  /Relisez votre texte avant de cliquer sur\s*(?:«|&laquo;)?\s*Vérifier\s*(?:»|&raquo;)?\.?/giu,
+  newInstruction
+);
 
 const runtime = String.raw`
 <script id="${marker}">
@@ -119,7 +114,31 @@ const runtime = String.raw`
     return true;
   }
 
-  function removeObsoleteSpeedText() {
+  function removeObsoleteSpeedNotice() {
+    const candidates = Array.from(document.querySelectorAll('p,div,section,aside,span')).filter(element => {
+      const text = norm(element.textContent);
+      return text.includes('le debit est fixe a la vitesse normale 1,00')
+        && text.includes("il n'est pas possible d'accelerer l'enregistrement");
+    });
+    if (!candidates.length) return false;
+
+    candidates.sort((a, b) => a.querySelectorAll('*').length - b.querySelectorAll('*').length);
+    let target = candidates[0];
+    const noticeText = norm(target.textContent);
+
+    // Remonter jusqu'au conteneur qui ne contient QUE cette note afin de
+    // supprimer aussi son fond bleu et l'espace qu'il occupait.
+    while (target.parentElement && target.parentElement !== document.body) {
+      const parent = target.parentElement;
+      if (norm(parent.textContent) !== noticeText) break;
+      target = parent;
+    }
+    target.remove();
+    return true;
+  }
+
+  function updateInstructionText() {
+    const replacement = 'Relisez votre texte avant de cliquer sur « Dictée terminée ». Votre réponse sera alors verrouillée et ne pourra plus être modifiée. Cliquez ensuite sur « Suivant » pour poursuivre l’évaluation.';
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
     const nodes = [];
     let node;
@@ -127,12 +146,10 @@ const runtime = String.raw`
 
     for (const textNode of nodes) {
       const raw = String(textNode.nodeValue || '');
-      const normalized = norm(raw);
-      if (!normalized.includes('le debit est fixe a la vitesse normale 1,00')) continue;
-      if (!normalized.includes("il n'est pas possible d'accelerer l'enregistrement")) continue;
+      if (!norm(raw).includes('relisez votre texte avant de cliquer sur verifier')) continue;
       textNode.nodeValue = raw.replace(
-        /Le débit est fixé à la vitesse normale\s*1[,.]00\.?(?:\s|\u00a0)*Il n['’]est pas possible d['’]accélérer l['’]enregistrement\.?/giu,
-        ''
+        /Relisez votre texte avant de cliquer sur\s*(?:«)?\s*Vérifier\s*(?:»)?\.?/giu,
+        replacement
       );
     }
   }
@@ -208,7 +225,8 @@ const runtime = String.raw`
   }
 
   function refreshLayout() {
-    removeObsoleteSpeedText();
+    removeObsoleteSpeedNotice();
+    updateInstructionText();
     moveValidationButtonsLeft();
     configureFixedAudio();
     alignPrivacyButtonWithAbandon();
@@ -250,4 +268,4 @@ if (!html.includes('alignPrivacyButtonWithAbandon')) fail('alignement écran acc
 if (!html.includes("document.getElementById('seb-evalpro-abandon-fixed')")) fail('priorité au bouton Abandon unifié absente');
 if (!html.includes('id="seb-ui-runtime-loader"') || !html.includes('src="js/seb-ui-runtime.js"')) fail('mécanisme d’abandon unifié non chargé dans la Dictée');
 
-console.log('SEB EvalPro dictée: WAV fixe utilisé; texte vitesse supprimé; Vérifier/Suivant à gauche; écran d’accueil aligné avec Abandonner.');
+console.log('SEB EvalPro dictée: WAV fixe utilisé; encadré vitesse supprimé; consigne Dictée terminée/Suivant corrigée; écran d’accueil aligné avec Abandonner.');

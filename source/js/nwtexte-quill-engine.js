@@ -14,6 +14,13 @@
   let savedRange = null;
   let autosaveTimer = null;
 
+  // SEB_NWTEXTE_STABLE_TYPING_FORMAT_124
+  // La police et la taille d'écriture ne changent que sur une action explicite
+  // de l'utilisateur. Un déplacement de curseur ne réinitialise jamais l'état
+  // actif vers les valeurs visuelles par défaut.
+  let activeTypingFont = 'Calibri';
+  let activeTypingSize = '14px';
+
   function normalizeQuestion(value) {
     return String(value || '')
       .normalize('NFD')
@@ -81,13 +88,31 @@
     if (el) el.classList.toggle('active', !!active);
   }
 
-  function setSelectValue(selector, value, fallback) {
+  function setSelectValue(selector, value) {
     const el = document.querySelector(selector);
-    if (!el) return;
-    const target = value || fallback;
-    if (target && Array.from(el.options).some((option) => option.value === target)) {
-      el.value = target;
+    if (!el || !value) return;
+    if (Array.from(el.options).some((option) => option.value === value)) {
+      el.value = value;
     }
+  }
+
+  function rememberTypingFormat(name, value) {
+    if (name === 'font' && FONT_VALUES.includes(value)) activeTypingFont = value;
+    if (name === 'size' && SIZE_VALUES.includes(value)) activeTypingSize = value;
+  }
+
+  function restoreTypingFormatFromDocument(range) {
+    if (!quill || !range || quill.getLength() <= 1) return;
+    const probeIndex = Math.max(0, Math.min(range.index > 0 ? range.index - 1 : 0, quill.getLength() - 2));
+    const format = quill.getFormat(probeIndex, 1);
+    if (typeof format.font === 'string' && FONT_VALUES.includes(format.font)) activeTypingFont = format.font;
+    if (typeof format.size === 'string' && SIZE_VALUES.includes(format.size)) activeTypingSize = format.size;
+  }
+
+  function applyTypingFormat(range) {
+    if (!quill || !range || range.length) return;
+    quill.format('font', activeTypingFont, 'silent');
+    quill.format('size', activeTypingSize, 'silent');
   }
 
   function updateToolbarFromSelection() {
@@ -103,9 +128,11 @@
     setActive('btn-ul', format.list === 'bullet');
     setActive('btn-ol', format.list === 'ordered');
 
-    setSelectValue('select[title="Changer la police"]', typeof format.font === 'string' ? format.font : '', 'Calibri');
-    setSelectValue('select[title="Taille du texte"]', typeof format.size === 'string' ? format.size : '', '14px');
-    setSelectValue('select[title="Interligne"]', typeof format.lineHeight === 'string' ? format.lineHeight : '', '1');
+    const displayedFont = typeof format.font === 'string' ? format.font : activeTypingFont;
+    const displayedSize = typeof format.size === 'string' ? format.size : activeTypingSize;
+    setSelectValue('select[title="Changer la police"]', displayedFont);
+    setSelectValue('select[title="Taille du texte"]', displayedSize);
+    setSelectValue('select[title="Interligne"]', typeof format.lineHeight === 'string' ? format.lineHeight : '1');
 
     const textIndicator = document.getElementById('text-color-indicator');
     const highlightIndicator = document.getElementById('highlight-color-indicator');
@@ -142,6 +169,7 @@
   function setInlineFormat(name, value) {
     const range = restoreSelection();
     if (!range) return;
+    rememberTypingFormat(name, value);
     quill.format(name, value, 'user');
     saveSelection();
     updateToolbarFromSelection();
@@ -315,6 +343,8 @@
     const index = Math.max(0, quill.getLength() - 1);
     quill.setSelection(index, 0, 'silent');
     savedRange = { index, length: 0 };
+    restoreTypingFormatFromDocument(savedRange);
+    applyTypingFormat(savedRange);
   }
 
   function scheduleAutosave() {
@@ -583,12 +613,25 @@
     restoreSavedContent();
 
     quill.on('selection-change', function (range) {
-      if (range) savedRange = { index: range.index, length: range.length };
+      if (range) {
+        savedRange = { index: range.index, length: range.length };
+        applyTypingFormat(range);
+      }
       updateToolbarFromSelection();
     });
     quill.on('text-change', function (_delta, _oldDelta, source) {
-      if (source !== 'silent') scheduleAutosave();
-      updateToolbarFromSelection();
+      if (source !== 'silent') {
+        scheduleAutosave();
+        setTimeout(function () {
+          const range = quill.getSelection();
+          if (!range) return;
+          savedRange = { index: range.index, length: range.length };
+          applyTypingFormat(range);
+          updateToolbarFromSelection();
+        }, 0);
+      } else {
+        updateToolbarFromSelection();
+      }
     });
 
     document.addEventListener('click', function (event) {

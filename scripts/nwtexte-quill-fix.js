@@ -6,6 +6,7 @@ const webRoot = path.join(root, 'app', 'web');
 const nwtextePath = path.join(webRoot, 'nwtexte.html');
 const saveSimulationPath = path.join(webRoot, 'js', 'nwtexte-save-simulation.js');
 const closedDialogsPath = path.join(webRoot, 'js', 'nwtexte-closed-dialogs.js');
+const quillEnginePath = path.join(webRoot, 'js', 'nwtexte-quill-engine.js');
 const quillDist = path.join(root, 'node_modules', 'quill', 'dist');
 const vendorDir = path.join(webRoot, 'vendor', 'quill');
 
@@ -17,6 +18,17 @@ function fail(message, code) {
 if (!fs.existsSync(nwtextePath)) fail('nwtexte.html introuvable.', 2);
 if (!fs.existsSync(saveSimulationPath)) fail('simulation d’enregistrement nwtexte introuvable.', 3);
 if (!fs.existsSync(closedDialogsPath)) fail('fenêtres fictives Ouvrir/Image nwtexte introuvables.', 8);
+if (!fs.existsSync(quillEnginePath)) fail('moteur Quill nwtexte introuvable.', 12);
+const quillEngine = fs.readFileSync(quillEnginePath, 'utf8');
+for (const token of [
+  'SEB_NWTEXTE_STABLE_TYPING_FORMAT_124',
+  "let activeTypingFont = 'Calibri'",
+  "let activeTypingSize = '14px'",
+  'rememberTypingFormat(name, value)',
+  'applyTypingFormat(range)'
+]) {
+  if (!quillEngine.includes(token)) fail('stabilisation police/taille nwtexte absente: ' + token, 13);
+}
 for (const name of ['quill.js', 'quill.core.css']) {
   if (!fs.existsSync(path.join(quillDist, name))) fail(`dépendance Quill manquante: ${name}`, 4);
 }
