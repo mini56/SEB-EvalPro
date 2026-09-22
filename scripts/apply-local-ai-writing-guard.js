@@ -66,7 +66,7 @@ function writingBlockTemplate() {
     }
     text = text.replace(/\bla organisation\b/gi, 'l’organisation');
     text = text.replace(/\b0\s+erreurs\b/gi, '0 erreur').replace(/\b1\s+erreurs\b/gi, '1 erreur');
-    const heading=/^\s*(?:#{1,6}\s*)?(?:\*\*)?(?:synthèse(?:\s+de\s+l[’']évaluation)?|bilan\s+global|compétences?(?:\s+techniques?(?:\s+et\s+manuelles?)?)?|organisation(?:\s+et\s+logistique)?|raisonnement(?:\s+et\s+résolution\s+de\s+problèmes?)?|tri|outils\s+numériques?|savoirs\s+fondamentaux|conclusion|préconisations?(?:\s+et\s+pistes?\s+de\s+travail)?)(?:\*\*)?\s*:?\s*$/i;
+    const heading=/^\s*(?:#{1,6}\s*)?(?:\*\*)?(?:\d+\s*[.)\-:]\s*)?(?:synthèse(?:\s+de\s+l[’']évaluation)?|bilan\s+global|compétences?(?:\s+techniques?(?:\s+et\s+manuelles?)?)?|organisation(?:\s*,?\s*logistique(?:\s+et\s+rigueur)?|\s+et\s+logistique(?:\s+et\s+rigueur)?)?|raisonnement(?:\s+et\s+résolution\s+de\s+problèmes?)?|activité\s+de\s+tri|tri|outils\s+numériques?|savoirs\s+fondamentaux(?:\s+et\s+numérique)?|conclusion(?:\s+générale)?|préconisations?(?:\s+et\s+pistes?\s+de\s+travail)?)(?:\s*\([^)]*\))?(?:\*\*)?\s*[:.\-]?\s*$/i;
     text = text.split(/\n/).filter(line=>!heading.test(line)).join('\n').replace(/\n{3,}/g,'\n\n').trim();
     return text;
   }
@@ -187,11 +187,12 @@ function writingBlockTemplate() {
     return complete([{ role: 'system', content: system }, { role: 'user', content: user }], 0.25, 0.75, 1500, { repeat_penalty: 1.08 });
   }
 
-  function fallbackResult(text, startedAt, passes, reason) {
+  function fallbackResult(text, startedAt, passes, reason, rejectedText) {
     return {
       ok: true,
       text: String(text || '').trim(),
       fallback: true,
+      rejectedSample: String(rejectedText || '').slice(0, 1200),
       elapsedMs: Date.now() - startedAt,
       model: MODEL_LABEL,
       runtime: RUNTIME_LABEL,
@@ -220,7 +221,7 @@ function writingBlockTemplate() {
           const output = validateProfileOutput(payload, draft);
           return { ok: true, text: output, fallback: false, elapsedMs: Date.now() - startedAt, model: MODEL_LABEL, runtime: RUNTIME_LABEL, offline: true, passes, guard: 'qwen3-1.7b-profile-json-v10' };
         } catch (error) {
-          return fallbackResult(fallback, startedAt, passes, error.message);
+          return fallbackResult(fallback, startedAt, passes, error.message, draft);
         }
       }
 
