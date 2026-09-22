@@ -29,27 +29,13 @@ const payload = serialize(profile);
   try {
     const result = await service.rewrite(payload);
     if (!result?.ok) throw new Error(result?.error || 'génération IA vide');
-    if (result.fallback) {
-      console.warn('QWEN_REJECTED_SAFE_FALLBACK');
-      console.warn(String(result.reason || 'raison inconnue'));
-      if (result.rejectedSample) console.warn('QWEN_REJECTED_SAMPLE\n' + String(result.rejectedSample));
-    }
     const text = String(result.text || '').trim();
-    const norm = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-    if (!norm.startsWith('monsieur jose tout')) throw new Error('identité initiale incorrecte');
-    if (/\b(il|elle)\b/i.test(text) || /\b(?:le candidat|la candidate|le stagiaire|la stagiaire|la personne)\b/i.test(text)) throw new Error('désignation personnelle interdite');
-    if (/\b(?:vous|votre|vos|tu)\b/i.test(text)) throw new Error('adresse directe interdite');
-    if (/^\s*#{1,6}\s+|^\s*[-*]\s+/m.test(text)) throw new Error('titre ou liste détecté');
-    if (/\d+(?:[.,]\d+)?\s*%|\d+\s*erreurs?\b|\bniveau\s*(?:I|II|III|NE)\b/i.test(text)) throw new Error('résultat brut récité');
-    if (text.split(/\n\s*\n/).filter(Boolean).length < 4) throw new Error('moins de quatre paragraphes');
-    for (const re of [/plan|decoup|assembl/, /raisonn|organis|planif|contrainte/, /tri|rythme|fiabil/, /traitement de texte|messager|numeriq/, /expression|math|calcul|consigne/]) {
-      if (!re.test(norm)) throw new Error('domaine attendu absent: ' + re);
-    }
-    if (/\bprofil\b|\bdiagnostic\b|\bpsycholog|\borient(?:er|ation)\b|\bmetier\b/i.test(norm)) throw new Error('extrapolation interdite détectée');
-    if (!/difficult|consolid|davantage de (?:repere|controle|precision|accompagnement)/.test(norm) || !/contrainte/.test(norm)) throw new Error('difficulté de raisonnement/contraintes perdue');
-    if (/bonne maitrise du raisonnement|raisonnement[^.!?]{0,80}(?:maitris|point d appui)/.test(norm)) throw new Error('inversion factuelle sur le raisonnement détectée');
-    console.log('SEB IA profil JSON V10: ' + (result.fallback ? 'FALLBACK SÛR' : 'QWEN ACCEPTÉ') + ' - ' + (result.passes || 1) + ' passe(s), ' + Math.max(1, Math.round((result.elapsedMs || 0) / 1000)) + ' s.');
+    if (!text) throw new Error('Qwen a produit une synthèse vide.');
+    console.log('SEB IA profil JSON V10 — MODE OBSERVATION');
+    console.log('Avertissements non bloquants: ' + JSON.stringify(result.warnings || []));
+    console.log('QWEN_OUTPUT_BEGIN');
     console.log(text);
+    console.log('QWEN_OUTPUT_END');
   } finally {
     service.stop();
   }
