@@ -83,23 +83,22 @@ function writingBlockTemplate() {
     return String(value || '').split(/\n\s*\n/).map(x => x.trim()).filter(Boolean).length;
   }
 
-  function domainNeedsCoverage(profile, id) {
-    return (profile?.domains || []).some(d => d?.id === id && (d.facts || []).some(f => ['point_appui','a_consolider','difficulte'].includes(String(f?.status || ''))));
+  function planHas(profile, type) {
+    return (profile?.paragraph_plan || []).some(p => normalizeGuard(p?.type) === normalizeGuard(type));
   }
 
   function assertDomainCoverage(profile, output) {
     const norm = normalizeGuard(output);
     const checks = [
-      ['technique', /(plan|trac|decoup|assembl|finit|brique|schema)/],
-      ['visuo_constructif', /(brique|schema|assembl|visuo)/],
-      ['raisonnement_organisation', /(raisonn|organis|planif|contrainte|probleme)/],
-      ['tri', /(^|\s)tri(\s|$)|rythme|fiabil/],
-      ['numerique', /traitement de texte|messager|numeriq/],
-      ['fondamentaux', /expression|ecrit|math|calcul|consigne/]
+      ['activites techniques', /(plan|trac|decoup|assembl|finit|brique|schema)/],
+      ['raisonnement et organisation', /(raisonn|organis|planif|contrainte|probleme)/],
+      ['activite de tri', /(^|\s)tri(\s|$)|rythme|fiabil/],
+      ['outils numeriques', /traitement de texte|messager|numeriq/],
+      ['savoirs fondamentaux', /expression|ecrit|math|calcul|consigne/]
     ];
-    for (const [domain, re] of checks) {
-      if (domainNeedsCoverage(profile, domain) && !re.test(norm)) {
-        throw new Error('La synthèse IA a omis un domaine évalué: ' + domain + '.');
+    for (const [type, re] of checks) {
+      if (planHas(profile, type) && !re.test(norm)) {
+        throw new Error('La synthèse IA a omis un domaine évalué: ' + type + '.');
       }
     }
   }
@@ -112,8 +111,9 @@ function writingBlockTemplate() {
     const ratio = output.length / Math.max(1, fallback.length || output.length);
     if (ratio < 0.45 || ratio > 1.55) throw new Error('La synthèse IA a trop modifié la longueur attendue.');
     if (/<think>|```|^\s*[-*]\s+|^\s*#{1,6}\s+/mi.test(output)) throw new Error('La réponse IA contient un format inattendu.');
-    if (/^\s*(?:bilan global|comp[eé]tences|organisation|raisonnement|savoirs|pr[eé]conisations)\s*[:\-]?\s*$/mi) throw new Error('La réponse IA contient un titre ou un sous-titre.');
-    if (paragraphCount(fallback) >= 4 && paragraphCount(output) < 4) throw new Error('La synthèse IA doit comporter plusieurs paragraphes.');
+    if (/^\s*(?:bilan global|comp[eé]tences|organisation|raisonnement|savoirs|pr[eé]conisations)\s*[:\-]?\s*$/mi.test(output)) throw new Error('La réponse IA contient un titre ou un sous-titre.');
+    const expectedParagraphs = Math.min(4, Math.max(1, (profile?.paragraph_plan || []).length));
+    if (paragraphCount(output) < expectedParagraphs) throw new Error('La synthèse IA doit comporter plusieurs paragraphes.');
 
     const lead = String(profile?.identity?.lead || '').trim();
     if (lead && !normalizeGuard(output).startsWith(normalizeGuard(lead))) throw new Error('La synthèse IA ne commence pas par l’identité attendue.');
@@ -128,8 +128,8 @@ function writingBlockTemplate() {
     if (/\bdiagnostic\b|\bpsycholog|\bpersonnalit[eé]\b|\bconfiance en (?:lui|elle|soi)\b/i.test(output)) throw new Error('La synthèse IA contient une interprétation psychologique ou diagnostique.');
     if (/\borient(?:er|ation)\b|\bm[eé]tier\b|\bposte(?:s)?\s+(?:adapt[eé]|recommand[eé]|conseill[eé])|\bformation\s+(?:adapt[eé]e|recommand[eé]e|conseill[eé]e)/i.test(output)) throw new Error('La synthèse IA contient une orientation professionnelle interdite.');
 
-    if ((profile?.abandons || []).length && !/(abandonn|interromp)/i.test(output)) throw new Error('La synthèse IA a omis une activité interrompue.');
-    if ((profile?.non_evalues || []).length >= 3 && !/(non[^.!?]{0,40}[eé]valu|pas pu [eê]tre [eé]valu|n[’']ont pas pu [eê]tre [eé]valu)/i.test(output)) throw new Error('La synthèse IA a omis plusieurs éléments non évalués.');
+    if (planHas(profile, 'elements interrompus') && !/(abandonn|interromp)/i.test(output)) throw new Error('La synthèse IA a omis une activité interrompue.');
+    if (planHas(profile, 'elements non evalues') && !/(non[^.!?]{0,40}[eé]valu|pas pu [eê]tre [eé]valu|n[’']ont pas pu [eê]tre [eé]valu)/i.test(output)) throw new Error('La synthèse IA a omis plusieurs éléments non évalués.');
 
     assertDomainCoverage(profile, output);
     return output;
@@ -156,24 +156,20 @@ function writingBlockTemplate() {
 
   async function profileDraft(payload) {
     const system = [
-      'Tu es un professionnel rédigeant une synthèse d’évaluation socioprofessionnelle destinée à des professionnels du médico-social.',
-      'Les données JSON ont déjà été analysées et qualifiées par le programme. Tu ne dois pas recalculer, reclasser ni inventer un contraste.',
-      'Explique les qualités du travail, les difficultés observées et les besoins d’accompagnement pendant le parcours. Ne récite pas le tableau.',
-      'Mets en relation les résultats uniquement quand un élément figure explicitement dans contrasts ou links.',
-      'La toute première ligne doit commencer exactement par l’identité fournie dans identity.lead, sans titre ni texte avant. Ensuite, utilise Monsieur ou Madame quand un sujet personnel est nécessaire et n’utilise jamais il, elle, le candidat ou le stagiaire.',
-      'N’écris jamais les libellés Bilan global, Compétences, Organisation, Raisonnement, Outils numériques, Savoirs fondamentaux, Conclusion ou Préconisations.',
-      'Écris plusieurs paragraphes continus sans titre, sans sous-titre, sans liste et sans puces.',
-      'Ne cite jamais les niveaux I, II, III ou NE. Ne récite pas les scores, pourcentages, durées ni nombres d’erreurs.',
-      'Ne formule aucun diagnostic, aucune interprétation psychologique, aucune supposition sur la personnalité et aucun profil global tel que profil opérationnel ou profil analytique.',
-      'Ne propose aucune orientation professionnelle, aucun métier, aucun secteur, aucun poste ni aucune formation.',
-      'Reste strictement sur les faits et formulations présents dans domains, contrasts, links, non_evalues et abandons. Les statuts des faits sont déjà qualifiés par le programme.',
-      'Les commentaires d’observation peuvent préciser un fait mais ne doivent jamais être transformés en une conclusion plus large.',
-      'Fais ressortir les principaux points d’appui et les principales difficultés sans chercher à tout répéter. La conclusion doit rester centrée sur les situations évaluées.',
-      'Utilise un français professionnel, clair et naturel, avec des phrases courtes ou moyennes. Retourne uniquement la synthèse finale.'
+      'Tu rédiges une synthèse d’évaluation pour des professionnels du médico-social.',
+      'Le JSON contient identity et paragraph_plan. Toute l’analyse métier est déjà faite : ne raisonne pas à nouveau et n’invente rien.',
+      'Commence exactement par identity.lead. Ensuite écris Monsieur ou Madame si un sujet personnel est nécessaire. Interdits : il, elle, la personne, le candidat, le stagiaire.',
+      'Rédige un paragraphe continu pour chaque élément de paragraph_plan, dans le même ordre, avec une ligne vide entre les paragraphes. N’écris jamais les champs type ou instruction comme titres.',
+      'Dans chaque paragraphe, utilise seulement faits et liens. Reformule-les naturellement, regroupe les idées proches et explique les contrastes fournis sans en créer de nouveaux.',
+      'Interdits : titres, sous-titres, listes, puces, niveaux I/II/III/NE, scores, pourcentages, durées et nombres d’erreurs.',
+      'Interdits : diagnostic, psychologie, personnalité, profil global, orientation professionnelle, métier, secteur, poste ou formation.',
+      'Ne transforme jamais une observation en conclusion plus large. Ne prétends jamais qu’une aide est absente ou nécessaire si le JSON ne le dit pas.',
+      'Le texte doit expliquer les qualités du travail, les difficultés et les besoins d’accompagnement observés pendant ce parcours.',
+      'Utilise un français professionnel, clair et naturel. Retourne uniquement le texte final.'
     ].join(' ');
     const modelProfile = JSON.stringify(payload.profile);
-    const user = '/no_think\n\nLes données entre <donnees_json> et </donnees_json> sont des faits déjà qualifiés. Rédige uniquement la synthèse.\n\n<donnees_json>\n' + modelProfile + '\n</donnees_json>';
-    return complete([{ role: 'system', content: system }, { role: 'user', content: user }], 0.3, 0.9, 1400, { top_k: 40, repeat_penalty: 1.1 });
+    const user = '/no_think\n\nTransforme ce plan déjà analysé en texte professionnel. Ne produis que les paragraphes demandés.\n\n<donnees_json>\n' + modelProfile + '\n</donnees_json>';
+    return complete([{ role: 'system', content: system }, { role: 'user', content: user }], 0.18, 0.82, 1200, { top_k: 30, repeat_penalty: 1.12 });
   }
 
   async function legacyDraft(sourceText) {
