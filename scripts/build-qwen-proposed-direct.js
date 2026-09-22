@@ -31,6 +31,7 @@ ${browserEngine}
      const r=document.querySelector('tr[data-r="'+key+'"]');
      out[key]=r?{
        level:String(r.querySelector('.level.on')?.dataset.l||''),
+       select:String(r.querySelector('.csel')?.value||''),
        comment:String(r.querySelector('.ctxt')?.value||''),
        detail:String(r.querySelector('.detail')?.textContent||'')
      }:{};
