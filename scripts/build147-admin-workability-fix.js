@@ -126,12 +126,19 @@ function replaceOnce(text, search, replacement, label) {
   const { file, text } = read('src/replay-main.js');
   let out = text;
   if (!out.includes('SEB_ADMIN_CAPTURE_BACKEND_GUARD')) {
-    out = replaceOnce(
-      out,
-      `  async function capturePage(event, payload) {\n    try {`,
-      `  async function capturePage(event, payload) {\n    try {\n      // SEB_ADMIN_CAPTURE_BACKEND_GUARD\n      let senderPage = '';\n      try { senderPage = path.basename(new URL(event.sender.getURL()).pathname).toLowerCase(); } catch (_) {}\n      if (senderPage === 'admin-bilan.html' || senderPage === 'bilan.html') {\n        return { ok: false, skipped: true, adminWorkBlocked: true };\n      }`,
-      'barrière backend capture Admin'
-    );
+    const queuedMarker = `    return enqueueCapture(token, async () => {\n`;
+    const legacyMarker = `  async function capturePage(event, payload) {\n    try {`;
+    const guard = `    // SEB_ADMIN_CAPTURE_BACKEND_GUARD\n    let senderPage = '';\n    try { senderPage = path.basename(new URL(event.sender.getURL()).pathname).toLowerCase(); } catch (_) {}\n    if (senderPage === 'admin-bilan.html' || senderPage === 'bilan.html') {\n      return { ok: false, skipped: true, adminWorkBlocked: true };\n    }\n`;
+    if (out.includes(queuedMarker)) {
+      out = out.replace(queuedMarker, guard + queuedMarker);
+    } else if (out.includes(legacyMarker)) {
+      out = out.replace(
+        legacyMarker,
+        `  async function capturePage(event, payload) {\n    try {\n` + guard
+      );
+    } else {
+      fail('cible introuvable pour barrière backend capture Admin', 3);
+    }
   }
   if (!out.includes('SEB_ADMIN_CAPTURE_BACKEND_GUARD') || !out.includes("senderPage === 'admin-bilan.html'")) {
     fail('barrière backend replay Admin absente', 10);
@@ -149,11 +156,11 @@ function replaceOnce(text, search, replacement, label) {
 {
   const { file, text } = read('src/preload.js');
   let out = text;
-  const oldBlock = `  document.addEventListener('input', scheduleSave, true);\n  document.addEventListener('change', scheduleSave, true);\n  document.addEventListener('click', scheduleSave, true);\n  periodicSaveTimer = setInterval(() => saveNow(false), 1000);`;
-  const newBlock = `  if (!isAdminBilanPage()) {\n    document.addEventListener('input', scheduleSave, true);\n    document.addEventListener('change', scheduleSave, true);\n    document.addEventListener('click', scheduleSave, true);\n    periodicSaveTimer = setInterval(() => saveNow(false), 1000);\n  }`;
+  const oldBlock = `  document.addEventListener('input', scheduleSave, true);\n  document.addEventListener('change', scheduleSave, true);\n  document.addEventListener('click', scheduleSave, true);\n  periodicSaveTimer = setInterval(() => saveNow(false), SAVE_CHECKPOINT_MS);`;
+  const newBlock = `  if (!isAdminBilanPage()) {\n    document.addEventListener('input', scheduleSave, true);\n    document.addEventListener('change', scheduleSave, true);\n    document.addEventListener('click', scheduleSave, true);\n    periodicSaveTimer = setInterval(() => saveNow(false), SAVE_CHECKPOINT_MS);\n  }`;
   const guardedBlock = "if (!isAdminBilanPage()) {\n    document.addEventListener('input', scheduleSave, true);";
-  const resultsOldBlock = "  } else {\n    document.addEventListener('input', scheduleSave, true);\n    document.addEventListener('change', scheduleSave, true);\n    document.addEventListener('click', scheduleSave, true);\n    periodicSaveTimer = setInterval(() => saveNow(false), 1000);\n  }";
-  const resultsGuardedBlock = "  } else if (!isAdminBilanPage()) {\n    document.addEventListener('input', scheduleSave, true);\n    document.addEventListener('change', scheduleSave, true);\n    document.addEventListener('click', scheduleSave, true);\n    periodicSaveTimer = setInterval(() => saveNow(false), 1000);\n  }";
+  const resultsOldBlock = "  } else {\n    document.addEventListener('input', scheduleSave, true);\n    document.addEventListener('change', scheduleSave, true);\n    document.addEventListener('click', scheduleSave, true);\n    periodicSaveTimer = setInterval(() => saveNow(false), SAVE_CHECKPOINT_MS);\n  }";
+  const resultsGuardedBlock = "  } else if (!isAdminBilanPage()) {\n    document.addEventListener('input', scheduleSave, true);\n    document.addEventListener('change', scheduleSave, true);\n    document.addEventListener('click', scheduleSave, true);\n    periodicSaveTimer = setInterval(() => saveNow(false), SAVE_CHECKPOINT_MS);\n  }";
   if (out.includes(oldBlock)) out = out.replace(oldBlock, newBlock);
   else if (out.includes(resultsOldBlock)) out = out.replace(resultsOldBlock, resultsGuardedBlock);
   else if (!out.includes(guardedBlock) && !out.includes(resultsGuardedBlock)) {
