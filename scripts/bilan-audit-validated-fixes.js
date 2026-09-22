@@ -46,7 +46,7 @@ function write(file, text) { fs.writeFileSync(file, text, 'utf8'); }
   const detailReplacements = [
     ["apply('carre',carre<=2?'I':carre<=4?'II':'III','- '+carre+' erreur(s)')", "apply('carre',carre<=2?'I':carre<=4?'II':'III',errorDetail(carre))", 'Carré magique'],
     ["apply('organisation',e<=2?'I':e<=4?'II':'III','- '+e+' erreur(s)')", "apply('organisation',e<=2?'I':e<=4?'II':'III',errorDetail(e))", 'Organisation'],
-    ["apply('mail',e<=2?'I':e===3?'II':'III','- '+e+' erreur(s)')", "apply('mail',e<=2?'I':e===3?'II':'III',errorDetail(e))", 'Messagerie']
+    ["apply('mail',e<=1?'I':e<=3?'II':'III','- '+e+' erreur(s)')", "apply('mail',e<=1?'I':e<=3?'II':'III',errorDetail(e))", 'Messagerie']
   ];
   for (const [oldText,newText,label] of detailReplacements) {
     if (!html.includes(oldText)) fail('détail ancien introuvable: ' + label);
