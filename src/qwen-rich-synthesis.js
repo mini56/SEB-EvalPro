@@ -189,15 +189,17 @@
       validation_couverture:x.validation_couverture
     }));
   }
-  function planCouverture(){
+  function planCouverture(lines){
+    const ids=new Set(lines.map(x=>x.id));
+    const keep=(list)=>list.filter(id=>ids.has(id));
     return [
-      {paragraphe:1,objet:"vue d'ensemble du parcours",obligatoire:true},
-      {paragraphe:2,objet:'fabrication de la structure 3D et construction à base de briques',obligatoire:true},
-      {paragraphe:3,objet:'raisonnement, rangement du stock et planification sous contraintes',obligatoire:true,priorite:'les difficultés prioritaires de ce domaine ne doivent jamais être omises ni atténuées'},
-      {paragraphe:4,objet:'tri de chevilles : rythme et fiabilité',obligatoire:true},
-      {paragraphe:5,objet:'outils numériques : traitement de texte et messagerie',obligatoire:true},
-      {paragraphe:6,objet:'expression écrite et mathématiques',obligatoire:true},
-      {paragraphe:7,objet:"synthèse générale sans ajouter de conclusion psychologique ni d'orientation",obligatoire:false}
+      {paragraphe:1,objet:"vue d'ensemble du parcours",obligatoire:true,faits_ids:[]},
+      {paragraphe:2,objet:'fabrication de la structure 3D et construction à base de briques',obligatoire:true,faits_ids:keep(['fabrication-plan','fabrication-tracage','fabrication-decoupe','fabrication-assemblage','fabrication-finition','briques-identification','briques-manipulation'])},
+      {paragraphe:3,objet:'raisonnement, rangement du stock et planification sous contraintes',obligatoire:true,faits_ids:keep(['carre','organisation','planning']),priorite:'traiter explicitement chacun de ces faits ; les difficultés prioritaires ne doivent jamais être omises ni atténuées'},
+      {paragraphe:4,objet:'tri de chevilles : rythme et fiabilité',obligatoire:true,faits_ids:keep(['tri-temps','tri-erreurs'])},
+      {paragraphe:5,objet:'outils numériques : traitement de texte et messagerie',obligatoire:true,faits_ids:keep(['texte','mail'])},
+      {paragraphe:6,objet:'expression écrite et mathématiques',obligatoire:true,faits_ids:keep(['expression','math-enonce','math-problemes'])},
+      {paragraphe:7,objet:"synthèse générale sans ajouter de conclusion psychologique ni d'orientation",obligatoire:false,faits_ids:[]}
     ];
   }
   function buildRichProfile(input){
@@ -212,7 +214,7 @@
         date_evaluation:formatDateFr(candidate.date)
       },
       consigne_de_lecture:'Les observations ci-dessous sont déjà qualifiées et nettoyées des scores, nombres d’erreurs, durées et niveaux. Chaque fait obligatoire doit apparaître dans la synthèse sans être atténué, renforcé ou déplacé vers un autre domaine.',
-      plan_couverture:planCouverture(),
+      plan_couverture:planCouverture(lines),
       faits_obligatoires:faitsObligatoires(lines),
       contrastes_observes:contrastes(lines)
     };
