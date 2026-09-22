@@ -16,9 +16,9 @@ if(html.includes('seb-qwen-proposed-direct-ui')){console.log('SEB EvalPro Qwen d
 if(!html.includes('seb-generate-synthese'))fail('bouton Générer introuvable');
 
 const browserEngine=engine.replace(/^\s*if\s*\(typeof module[^\n]*module\.exports[^\n]*\n/m,'');
-const block=\`
+const block=`
 <script id="seb-qwen-proposed-engine">
-\${browserEngine}
+${browserEngine}
 </script>
 <script id="seb-qwen-proposed-direct-ui">
 (()=>{
@@ -46,7 +46,7 @@ const block=\`
  };
 })();
 </script>
-\`;
+`;
 
 const end=html.toLowerCase().lastIndexOf('</body>');
 if(end<0)fail('balise body introuvable');
