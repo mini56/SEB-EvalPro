@@ -102,14 +102,14 @@ function replaceOnce(text, search, replacement, label) {
   out = replaceOnce(
     out,
     `function install() {\n  if (installed) return;\n  installed = true;`,
-    `function install() {\n  if (installed) return;\n  installed = true;\n  if (adminWorkBlocked()) return;`,
+    `function install() {\n  if (installed || adminWorkBlocked()) return;\n  installed = true;`,
     'désactivation capteur navigation sur page Admin'
   );
 
   for (const required of [
     'function adminWorkBlocked()',
     'replayBlocked() || adminWorkBlocked()',
-    'installed = true;\n  if (adminWorkBlocked()) return;'
+    'if (installed || adminWorkBlocked()) return;\n  installed = true;'
   ]) {
     if (!out.includes(required)) fail('garde navigation Admin absente: ' + required, 8);
   }
