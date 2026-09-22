@@ -214,9 +214,6 @@
       consigne_de_lecture:'Les observations ci-dessous sont déjà qualifiées et nettoyées des scores, nombres d’erreurs, durées et niveaux. Chaque fait obligatoire doit apparaître dans la synthèse sans être atténué, renforcé ou déplacé vers un autre domaine.',
       plan_couverture:planCouverture(),
       faits_obligatoires:faitsObligatoires(lines),
-      points_appui:faitsSaillants(lines,'point_appui'),
-      points_vigilance:faitsSaillants(lines,'point_vigilance'),
-      domaines:groupThemes(lines),
       contrastes_observes:contrastes(lines)
     };
   }
