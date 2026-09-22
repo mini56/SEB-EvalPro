@@ -108,12 +108,13 @@ function installUnifiedSynthesis(){
    if(!deterministic){setStatus('Aucune synthèse n’a pu être générée.');setApplied(false,false,'Aucun texte moteur disponible.');return}
    sessionStorage.setItem(SOURCE_KEY,deterministic);
    sessionStorage.setItem(FINAL_KEY,deterministic);
-   setApplied(true,false,'SEB-IA reformule localement…');
-   setStatus('SEB-IA reformule la synthèse localement…');
+   setApplied(true,false,'Qwen rédige à partir du contexte qualitatif riche…');
+   setStatus('Qwen rédige la synthèse détaillée à partir du contexte qualitatif riche…');
    try{
     const st=await window.sebEvalPro?.localAiStatus?.();
     if(!st?.available){setStatus('Synthèse moteur conservée.');setApplied(true,false,'IA indisponible.');return}
-    const answer=await window.sebEvalPro.rewriteSynthesisLocal(deterministic);
+    const richPayload=window.sebQwenRichPayload?.();
+    const answer=await window.sebEvalPro.rewriteSynthesisLocal(richPayload||deterministic);
     if(!answer?.ok){setStatus('Synthèse moteur conservée.');setApplied(true,false,answer?.error||'Reformulation indisponible.');return}
     const finalText=stripAiWrappers(answer.text);
     if(!finalText){setStatus('Synthèse moteur conservée.');setApplied(true,false,'Reformulation vide.');return}
