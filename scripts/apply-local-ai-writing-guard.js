@@ -247,7 +247,7 @@ function writingBlockTemplate() {
       identite:profile?.identite||{},
       objet:planItem?.objet||'',
       priorite:planItem?.priorite||'',
-      faits,
+      faits:facts,
       contrastes_observes:relevantContrasts(profile,facts)
     });
     return complete(
