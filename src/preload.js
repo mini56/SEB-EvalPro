@@ -4,10 +4,16 @@ const path = require('path');
 const BAR_HEIGHT = 44;
 const HOTZONE_HEIGHT = 5;
 const BAR_HIDE_DELAY = 1000;
+const SAVE_DEBOUNCE_MS = 750;
+const SAVE_CHECKPOINT_MS = 5000;
 let restoredState = {};
 let adminUnlocked = false;
 let saveTimer = null;
 let periodicSaveTimer = null;
+let saveDirty = true;
+let saveInFlight = null;
+let saveAfterFlight = false;
+let lastSavedFingerprint = '';
 let barHideTimer = null;
 let closingSession = false;
 let lastSaveErrorShown = '';
@@ -70,15 +76,32 @@ function buildSnapshot() {
   };
 }
 
+function snapshotFingerprint(snapshot) {
+  try {
+    return JSON.stringify({
+      sessionStorage: snapshot && snapshot.sessionStorage || {},
+      localStorage: snapshot && snapshot.localStorage || {},
+      lastPage: snapshot && snapshot.lastPage || '',
+      lastEvaluationPage: snapshot && snapshot.lastEvaluationPage || ''
+    });
+  } catch (_) {
+    return '';
+  }
+}
+
 function handleSaveResult(result) {
-  if (!result || result.ok !== false || !result.error) return;
+  if (!result || result.ok !== false) {
+    lastSaveErrorShown = '';
+    return;
+  }
+  if (!result.error) return;
   const message = String(result.error);
   if (message === lastSaveErrorShown) return;
   lastSaveErrorShown = message;
   if (document && document.body) {
     showTransferMessage(
       'Attention — sauvegarde',
-      message + '\n\nLes données déjà enregistrées restent conservées. Vérifiez le support de stockage avant de poursuivre.',
+      message + '\n\nLes données déjà enregistrées restent conservées. SEB EvalPro réessaiera automatiquement.',
       true
     ).catch(() => {});
   }
@@ -94,33 +117,73 @@ function saveNow(sync = false) {
     const readOnlyResult = { ok:true, readOnly:true };
     return sync ? readOnlyResult : Promise.resolve(readOnlyResult);
   }
+
   const snapshot = buildSnapshot();
+  const fingerprint = snapshotFingerprint(snapshot);
   restoredState = snapshot;
   const candidateWorkspace = !!adminCandidateWorkspace && isAdminBilanPage();
+
   if (sync) {
+    clearTimeout(saveTimer);
     const result = candidateWorkspace
       ? ipcRenderer.sendSync('candidate-catalog:workspace-save-sync', snapshot)
       : ipcRenderer.sendSync('state:save-sync', snapshot);
+    if (result && result.ok !== false) {
+      lastSavedFingerprint = fingerprint;
+      saveDirty = false;
+      saveAfterFlight = false;
+    } else {
+      saveDirty = true;
+    }
     handleSaveResult(result);
     return result;
   }
+
+  if (!saveDirty && fingerprint && fingerprint === lastSavedFingerprint) {
+    return Promise.resolve({ ok:true, unchanged:true });
+  }
+
+  if (saveInFlight) {
+    saveDirty = true;
+    saveAfterFlight = true;
+    return saveInFlight;
+  }
+
+  saveDirty = false;
+  saveAfterFlight = false;
   const request = candidateWorkspace
     ? ipcRenderer.invoke('candidate-catalog:workspace-save', snapshot)
     : ipcRenderer.invoke('state:save', snapshot);
-  return request.then((result) => {
+
+  const current = request.then((result) => {
+    if (result && result.ok !== false) lastSavedFingerprint = fingerprint;
+    else saveDirty = true;
     handleSaveResult(result);
     return result;
   }).catch((error) => {
     const result = { ok:false, error:String(error && error.message ? error.message : error) };
+    saveDirty = true;
     handleSaveResult(result);
     return result;
   });
+
+  saveInFlight = current;
+  current.then(() => {
+    if (saveInFlight === current) saveInFlight = null;
+    if (saveDirty || saveAfterFlight) {
+      saveAfterFlight = false;
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(() => saveNow(false), SAVE_DEBOUNCE_MS);
+    }
+  });
+  return current;
 }
 
 function scheduleSave() {
   if (closingSession || adminNavigationLeaving || isAdminCandidatesPage() || adminCandidateResultsWorkspace) return;
+  saveDirty = true;
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => saveNow(false), 250);
+  saveTimer = setTimeout(() => saveNow(false), SAVE_DEBOUNCE_MS);
 }
 
 function createPasswordDialog() {
@@ -708,7 +771,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     document.addEventListener('input', scheduleSave, true);
     document.addEventListener('change', scheduleSave, true);
     document.addEventListener('click', scheduleSave, true);
-    periodicSaveTimer = setInterval(() => saveNow(false), 1000);
+    periodicSaveTimer = setInterval(() => saveNow(false), SAVE_CHECKPOINT_MS);
   }
 });
 

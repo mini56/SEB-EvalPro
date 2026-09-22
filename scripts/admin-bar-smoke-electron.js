@@ -45,7 +45,15 @@ ipcMain.handle('state:save', (_event, payload) => {
   smokeState = { ...smokeState, ...(payload || {}) };
   return { ok: true, state: smokeState };
 });
-ipcMain.handle('replay:capture-page', () => ({ ok:true }));
+let slowReplayNavigation = false;
+let replayNavigationCaptureCount = 0;
+ipcMain.handle('replay:capture-page', async (_event, payload) => {
+  if (slowReplayNavigation && payload && payload.reason === 'navigation-before-guaranteed') {
+    replayNavigationCaptureCount += 1;
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+  }
+  return { ok:true };
+});
 let smokeAdminUnlocked = true;
 ipcMain.handle('admin:status', () => smokeAdminUnlocked);
 ipcMain.handle('admin:verify', () => { smokeAdminUnlocked = true; return true; });
@@ -195,7 +203,7 @@ app.whenReady().then(async () => {
     await new Promise((resolve) => setTimeout(resolve, 650));
 
     const dictOpen = await win.webContents.executeJavaScript(`(()=>{
-      const action=document.getElementById('seb-dictee-finish-next');
+      const action=document.getElementById('seb-dictee-action');
       const verify=document.getElementById('verifyBtn');
       const oldNext=document.getElementById('nextBtn');
       const feedback=document.getElementById('feedback');
@@ -215,9 +223,11 @@ app.whenReady().then(async () => {
       return;
     }
 
+    slowReplayNavigation = true;
+    replayNavigationCaptureCount = 0;
     const dictFinish = await win.webContents.executeJavaScript(`(async()=>{
       const text=document.getElementById('candidateText');
-      const action=document.getElementById('seb-dictee-finish-next');
+      const action=document.getElementById('seb-dictee-action');
       text.value='Ce matin un client a téléphoné au service commercial.';
       text.dispatchEvent(new Event('input',{bubbles:true}));
       action.click();
@@ -236,11 +246,15 @@ app.whenReady().then(async () => {
       fail('Dictée terminée -> Suivant incorrect', dictFinish);
       return;
     }
+    if (replayNavigationCaptureCount !== 0) {
+      fail('Le premier clic Dictée terminée a été pris pour une navigation Replay', { replayNavigationCaptureCount });
+      return;
+    }
 
     await win.loadFile(path.join(__dirname, '..', 'app', 'web', 'dictee.html'));
     await new Promise((resolve) => setTimeout(resolve, 450));
     const dictResume = await win.webContents.executeJavaScript(`(()=>{
-      const action=document.getElementById('seb-dictee-finish-next');
+      const action=document.getElementById('seb-dictee-action');
       const feedback=document.getElementById('feedback');
       let data=null;try{data=JSON.parse(sessionStorage.getItem('dictee_data')||'null')}catch(_){}
       return {
@@ -256,14 +270,18 @@ app.whenReady().then(async () => {
       return;
     }
 
-    await win.webContents.executeJavaScript("document.getElementById('seb-dictee-finish-next').click();");
-    await new Promise((resolve) => setTimeout(resolve, 900));
+    await win.webContents.executeJavaScript("document.getElementById('seb-dictee-action').click();");
+    await new Promise((resolve) => setTimeout(resolve, 2400));
     const dictFinalPage = path.basename(new URL(win.webContents.getURL()).pathname);
     if (String(dictFinalPage).toLowerCase() !== 'tri_de_cheville.html') {
-      fail('Navigation Dictée vers Tri échouée', { dictFinalPage, url:win.webContents.getURL() });
+      fail('Navigation Dictée vers Tri échouée', { dictFinalPage, url:win.webContents.getURL(), replayNavigationCaptureCount });
       return;
     }
-    console.log('SEB EvalPro Dictée smoke: OK - ouverture, terminaison, correction masquée, reprise et navigation vers Tri.');
+    if (replayNavigationCaptureCount !== 1) {
+      fail('Capture Replay navigation Dictée inattendue', { replayNavigationCaptureCount });
+      return;
+    }
+    console.log('SEB EvalPro Dictée smoke: OK - premier clic non intercepté, capture navigation bornée, puis Tri.');
 
     win.destroy();
     app.exit(0);

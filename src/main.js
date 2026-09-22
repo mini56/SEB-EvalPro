@@ -26,6 +26,9 @@ let adminCandidateResultsMode = false;
 let lastCandidateSaveError = '';
 let allowApplicationExit = false;
 let candidateKeyGuardProcess = null;
+// SEB_TEMP_WINDOWS_RECOVERY : temporaire pendant la phase de stabilisation.
+const TEMP_ALLOW_WINDOWS_RECOVERY = true;
+let stateWriteCounter = 0;
 
 function candidateKeyGuardExecutable() {
   return app.isPackaged
@@ -161,18 +164,40 @@ function readState() {
   }
 }
 
+function waitForFileRetry(ms) {
+  try { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms); } catch (_) {}
+}
+
+function atomicReplaceState(target, content) {
+  stateWriteCounter += 1;
+  const temp = `${target}.${process.pid}.${stateWriteCounter}.tmp`;
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  fs.writeFileSync(temp, content, 'utf8');
+  let lastError = null;
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    try {
+      fs.renameSync(temp, target);
+      return;
+    } catch (error) {
+      lastError = error;
+      const code = String(error && error.code || '');
+      if (!['EPERM','EACCES','EBUSY','EEXIST','ENOTEMPTY'].includes(code)) break;
+      waitForFileRetry(25 + attempt * 35);
+    }
+  }
+  try { fs.rmSync(temp, { force:true }); } catch (_) {}
+  throw lastError || new Error('Remplacement atomique de la sauvegarde impossible.');
+}
+
 function writeState(nextState) {
   const target = stateFilePath();
-  const temp = `${target}.tmp`;
   const safeState = {
     ...defaultState(),
     ...nextState,
     version: STATE_VERSION,
     updatedAt: new Date().toISOString()
   };
-  fs.mkdirSync(path.dirname(target), { recursive: true });
-  fs.writeFileSync(temp, JSON.stringify(safeState, null, 2), 'utf8');
-  fs.renameSync(temp, target);
+  atomicReplaceState(target, JSON.stringify(safeState, null, 2));
 
   try {
     getCandidateStore().saveSnapshot(safeState);
@@ -378,7 +403,11 @@ function createWindow() {
   });
 
   mainWindow.on('blur', () => {
-    if (!adminSessionUnlocked) setTimeout(() => enforceCandidateWindowLock(true), 80);
+    // Temporaire : pendant les tests de stabilité, la touche Windows doit pouvoir
+    // afficher la barre Windows en cas de blocage.
+    if (!adminSessionUnlocked && !TEMP_ALLOW_WINDOWS_RECOVERY) {
+      setTimeout(() => enforceCandidateWindowLock(true), 80);
+    }
   });
 
   mainWindow.on('minimize', () => {
@@ -404,11 +433,10 @@ function createWindow() {
     const meta = !!(input && input.meta);
     const shift = !!(input && input.shift);
 
+    const isWindowsKey = key === 'meta' || key === 'super' || key === 'os';
+    const windowsCombo = meta && !isWindowsKey;
     const windowsOrLauncherKey =
-      meta ||
-      key === 'meta' ||
-      key === 'super' ||
-      key === 'os' ||
+      windowsCombo ||
       key === 'alt' ||
       key === 'calculator' ||
       key === 'launchapp1' ||

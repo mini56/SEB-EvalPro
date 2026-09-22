@@ -4,6 +4,7 @@ const crypto = require('crypto');
 
 let installed = false;
 let replayingNavigation = false;
+const NAV_CAPTURE_TIMEOUT_MS = 2000;
 
 function pageName() {
   try {
@@ -82,6 +83,20 @@ async function captureNow(reason) {
   }
 }
 
+async function captureBeforeNavigation() {
+  let timer = null;
+  try {
+    return await Promise.race([
+      captureNow('navigation-before-guaranteed'),
+      new Promise((resolve) => {
+        timer = setTimeout(() => resolve(false), NAV_CAPTURE_TIMEOUT_MS);
+      })
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 function labelOf(control) {
   return String(control && (control.textContent || control.value) || '')
     .replace(/\s+/g, ' ')
@@ -93,12 +108,10 @@ function isNavigationControl(control) {
   if (!control) return false;
   const tag = String(control.tagName || '').toLowerCase();
   const label = labelOf(control);
-  const id = String(control.id || '').toLowerCase();
   const onclick = String(control.getAttribute && control.getAttribute('onclick') || '').toLowerCase();
   const href = String(control.getAttribute && control.getAttribute('href') || '').trim();
 
   if (/^(suivant|suivante|page suivante|étape suivante|etape suivante|passer|passez|continuer)\b/.test(label)) return true;
-  if (/(next|suivant)/.test(id)) return true;
   if (/nextpage\s*\(|location\.href|window\.location/.test(onclick)) return true;
   if (tag === 'a' && href && !href.startsWith('#') && !href.toLowerCase().startsWith('javascript:')) return true;
   return false;
@@ -153,7 +166,7 @@ function install() {
     event.stopPropagation();
     if (event.stopImmediatePropagation) event.stopImmediatePropagation();
 
-    await captureNow('navigation-before-guaranteed');
+    await captureBeforeNavigation();
     continueNavigation(control);
   }, true);
 }

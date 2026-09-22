@@ -13,6 +13,7 @@ function createCandidateStore(options = {}) {
   const sebRoot = path.join(documentsPath, 'SEB EvalPro');
   const candidatesRoot = path.join(sebRoot, 'Candidats');
   const activePointerPath = path.join(userDataPath, 'active-candidate.json');
+  let atomicWriteCounter = 0;
 
   function ensureDirectory(directory) {
     fs.mkdirSync(directory, { recursive: true });
@@ -27,9 +28,23 @@ function createCandidateStore(options = {}) {
 
   function atomicWriteJson(target, value) {
     ensureDirectory(path.dirname(target));
-    const temp = `${target}.tmp`;
+    atomicWriteCounter += 1;
+    const temp = `${target}.${process.pid}.${atomicWriteCounter}.tmp`;
     fs.writeFileSync(temp, JSON.stringify(value, null, 2), 'utf8');
-    fs.renameSync(temp, target);
+    let lastError = null;
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      try {
+        fs.renameSync(temp, target);
+        return;
+      } catch (error) {
+        lastError = error;
+        const code = String(error && error.code || '');
+        if (!['EPERM','EACCES','EBUSY','EEXIST','ENOTEMPTY'].includes(code)) break;
+        try { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 25 + attempt * 35); } catch (_) {}
+      }
+    }
+    try { fs.rmSync(temp, { force:true }); } catch (_) {}
+    throw lastError || new Error('Écriture JSON candidat impossible.');
   }
 
   function readJson(target) {

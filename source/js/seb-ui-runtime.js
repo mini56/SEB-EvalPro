@@ -200,8 +200,12 @@
     if (!raw) return;
     const label = stripActionIcon(raw);
     const kind = buttonKind(label);
-    button.classList.remove('seb-btn-nav', 'seb-btn-confirm', 'seb-btn-tool', 'seb-btn-danger');
-    button.classList.add('seb-action-btn', 'seb-btn-' + kind);
+    const desiredKind = 'seb-btn-' + kind;
+    for (const cls of ['seb-btn-nav', 'seb-btn-confirm', 'seb-btn-tool', 'seb-btn-danger']) {
+      if (cls !== desiredKind && button.classList.contains(cls)) button.classList.remove(cls);
+    }
+    if (!button.classList.contains('seb-action-btn')) button.classList.add('seb-action-btn');
+    if (!button.classList.contains(desiredKind)) button.classList.add(desiredKind);
     const nextLabel = iconizedLabel(label);
     if (nextLabel && cleanText(button.textContent) !== nextLabel) button.textContent = nextLabel;
   }

@@ -7,6 +7,8 @@ module.exports = function registerCandidateReplay({ app, ipcMain, getAdminUnlock
   const BUILD = String(buildNumber || 'DEV');
   const TYPE = 'SEB_EVALPRO_PARCOURS_ARCHIVE';
   const SCHEMA_VERSION = 2;
+  const captureQueues = new Map();
+  let replayAtomicCounter = 0;
   const ARCHIVE_MARKER_KEYS = new Set([
     'seb_evalpro_replay_archive',
     'seb_evalpro_replay_archive_file',
@@ -31,6 +33,39 @@ module.exports = function registerCandidateReplay({ app, ipcMain, getAdminUnlock
 
   function ensurePendingRoot() {
     ensureDir(pendingRoot());
+  }
+
+  function atomicWriteReplayFile(target, data, encoding) {
+    replayAtomicCounter += 1;
+    const temp = `${target}.${process.pid}.${replayAtomicCounter}.tmp`;
+    ensureDir(path.dirname(target));
+    if (encoding) fs.writeFileSync(temp, data, encoding);
+    else fs.writeFileSync(temp, data);
+    let lastError = null;
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      try {
+        fs.renameSync(temp, target);
+        return;
+      } catch (error) {
+        lastError = error;
+        const code = String(error && error.code || '');
+        if (!['EPERM','EACCES','EBUSY','EEXIST','ENOTEMPTY'].includes(code)) break;
+        try { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 25 + attempt * 35); } catch (_) {}
+      }
+    }
+    try { fs.rmSync(temp, { force:true }); } catch (_) {}
+    throw lastError || new Error('Écriture Replay impossible.');
+  }
+
+  function enqueueCapture(token, work) {
+    const previous = captureQueues.get(token) || Promise.resolve();
+    const current = previous.catch(() => {}).then(work);
+    captureQueues.set(token, current);
+    const cleanup = () => {
+      if (captureQueues.get(token) === current) captureQueues.delete(token);
+    };
+    current.then(cleanup, cleanup);
+    return current;
   }
 
   function safeToken(value) {
@@ -110,9 +145,7 @@ module.exports = function registerCandidateReplay({ app, ipcMain, getAdminUnlock
     const dir = pendingDir(token);
     ensureDir(dir);
     const target = pendingIndexPath(token);
-    const temp = `${target}.tmp`;
-    fs.writeFileSync(temp, JSON.stringify(index, null, 2), 'utf8');
-    fs.renameSync(temp, target);
+    atomicWriteReplayFile(target, JSON.stringify(index, null, 2), 'utf8');
   }
 
   function cleanupOldPending() {
@@ -190,9 +223,10 @@ module.exports = function registerCandidateReplay({ app, ipcMain, getAdminUnlock
   }
 
   async function capturePage(event, payload) {
+    const token = safeToken(payload && payload.token);
+    if (!token) return { ok: false, error: 'Jeton de parcours invalide.' };
+    return enqueueCapture(token, async () => {
     try {
-      const token = safeToken(payload && payload.token);
-      if (!token) return { ok: false, error: 'Jeton de parcours invalide.' };
       const pageKey = safePageKey(payload && payload.pageKey);
       const title = String((payload && payload.title) || pageKey).trim().slice(0, 180) || pageKey;
       cleanupOldPending();
@@ -215,9 +249,7 @@ module.exports = function registerCandidateReplay({ app, ipcMain, getAdminUnlock
       const targetDir = pendingDir(token);
       ensureDir(targetDir);
       const target = path.join(targetDir, file);
-      const temp = `${target}.tmp`;
-      fs.writeFileSync(temp, png);
-      fs.renameSync(temp, target);
+      atomicWriteReplayFile(target, png);
 
       index.pages[pageKey] = {
         order,
@@ -235,6 +267,7 @@ module.exports = function registerCandidateReplay({ app, ipcMain, getAdminUnlock
     } catch (error) {
       return { ok: false, error: error && error.message ? error.message : String(error) };
     }
+    });
   }
 
   ipcMain.handle('replay:capture-page', capturePage);

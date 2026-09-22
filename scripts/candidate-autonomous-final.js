@@ -263,6 +263,10 @@ function parseJs(text, label) {
   const cleanRegressionGuard = read('scripts/build159-clean-regression-guard.js').text;
   const adminCandidatesPage = read('overrides/admin-candidats.html').text;
   const adminCandidatesGenerated = read('app/web/admin-candidats.html').text;
+  const runtimeGenerated = read('app/web/js/seb-ui-runtime.js').text;
+  const replayNavigation = read('src/replay-navigation-capture.js').text;
+  const nativeKeyguard = read('native/candidate-keyguard.cpp').text;
+  const dicteeGenerated = read('app/web/dictee.html').text;
 
   for (const token of [
     'copyVerifiedAtomic',
@@ -453,6 +457,30 @@ function parseJs(text, label) {
     for (const forbidden of ['sauvegarderResultatStagiaireDocx', 'seb_evalpro_candidate_result_saved']) {
       if (source.includes(forbidden)) fail(label + ' dépend encore de l’ancien DOCX Résultat: ' + forbidden, 7);
     }
+  }
+
+  for (const token of ['SAVE_DEBOUNCE_MS = 750', 'SAVE_CHECKPOINT_MS = 5000', 'lastSavedFingerprint', 'saveInFlight']) {
+    if (!preload.includes(token)) fail('stabilisation sauvegarde absente: ' + token, 7);
+  }
+  if (preload.includes('setInterval(() => saveNow(false), 1000)')) fail('ancienne sauvegarde disque chaque seconde réintroduite', 7);
+  if (!store.includes('atomicWriteCounter') || !main.includes('atomicReplaceState')) fail('écriture atomique robuste absente', 7);
+  if (!replay.includes('captureQueues') || !replay.includes('atomicWriteReplayFile') || !replay.includes('Capture Replay trop longue.')) {
+    fail('stabilisation Replay backend absente', 7);
+  }
+  for (const token of ['NAV_CAPTURE_TIMEOUT_MS = 2000', 'await captureBeforeNavigation()', "captureNow('navigation-before-guaranteed')"]) {
+    if (!replayNavigation.includes(token)) fail('navigation Replay bornée absente: ' + token, 7);
+  }
+  if (!runtimeGenerated.includes("if (!button.classList.contains(desiredKind)) button.classList.add(desiredKind)")) {
+    fail('normalisation boutons non idempotente', 7);
+  }
+  if (!dicteeGenerated.includes('id="seb-dictee-action"') || dicteeGenerated.includes('seb-dictee-finish-next')) {
+    fail('Dictée encore confondue avec une navigation Replay', 7);
+  }
+  if (!main.includes('SEB_TEMP_WINDOWS_RECOVERY') || !main.includes('TEMP_ALLOW_WINDOWS_RECOVERY = true')) {
+    fail('sortie Windows temporaire de récupération absente', 7);
+  }
+  if (nativeKeyguard.includes('if (vk == VK_LWIN || vk == VK_RWIN) return 1;') || !nativeKeyguard.includes('winHeld')) {
+    fail('touche Windows temporaire encore bloquée', 7);
   }
 
   if (/https:\/\/cdnjs\.cloudflare\.com/i.test(qcm)) fail('CDN jsPDF encore présent', 7);

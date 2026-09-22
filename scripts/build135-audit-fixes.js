@@ -211,10 +211,10 @@ function checkHtmlScripts(html, label) {
   }
 
   const oldCapture = `      const image = await event.sender.capturePage();\n      if (!image || image.isEmpty()) return { ok: false, error: 'Capture visuelle vide.' };\n      const png = image.toPNG();\n      if (!png || !png.length) return { ok: false, error: 'Capture PNG vide.' };\n      const size = image.getSize();`;
-  const newCapture = `      const capture = await captureFullPage(event.sender);\n      const png = capture.png;\n      if (!png || !png.length) return { ok: false, error: 'Capture PNG vide.' };\n      const size = capture.size;`;
+  const newCapture = `      const capture = await Promise.race([\n        captureFullPage(event.sender),\n        new Promise((_, reject) => setTimeout(() => reject(new Error('Capture Replay trop longue.')), 2000))\n      ]);\n      const png = capture.png;\n      if (!png || !png.length) return { ok: false, error: 'Capture PNG vide.' };\n      const size = capture.size;`;
   if (out.includes(oldCapture)) out = out.replace(oldCapture, newCapture);
-  if (!out.includes("captureBeyondViewport: true") || !out.includes('const capture = await captureFullPage(event.sender);')) {
-    fail('capture pleine page replay incomplète', 14);
+  if (!out.includes("captureBeyondViewport: true") || !out.includes("Capture Replay trop longue.") || !out.includes("Promise.race([")) {
+    fail('capture pleine page replay bornée incomplète', 14);
   }
   try { new vm.Script(out); } catch (error) { fail('src/replay-main.js invalide : ' + error.message, 14); }
   write(file, out);

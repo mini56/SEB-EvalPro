@@ -13,8 +13,12 @@ static LRESULT CALLBACK keyboardProc(int code, WPARAM message, LPARAM data) {
     const DWORD vk = key->vkCode;
     const bool alt = keyDown(VK_MENU);
     const bool ctrl = keyDown(VK_CONTROL);
+    const bool winHeld = keyDown(VK_LWIN) || keyDown(VK_RWIN);
 
-    if (vk == VK_LWIN || vk == VK_RWIN) return 1;
+    // TEMPORAIRE pendant les tests de stabilité : la touche Windows seule est
+    // autorisée pour permettre d'accéder à la barre Windows en cas de blocage.
+    // Les combinaisons Windows+... restent bloquées.
+    if (winHeld && vk != VK_LWIN && vk != VK_RWIN) return 1;
     if (ctrl && vk == VK_ESCAPE) return 1;
     if (alt && (vk == VK_TAB || vk == VK_ESCAPE || vk == VK_SPACE || vk == VK_F4)) return 1;
   }

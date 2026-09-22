@@ -70,7 +70,7 @@ function checkJs(text, label) {
 
   if (out.includes(focusMarker)) fail('capture focusout encore présente', 14);
   if (!out.includes("captureNow('change-immediate')")) fail('capture change-immediate absente', 15);
-  if (!out.includes("await captureNow('navigation-before-guaranteed')")) fail('capture garantie avant navigation absente', 16);
+  if (!out.includes("captureNow('navigation-before-guaranteed')") || !out.includes('await captureBeforeNavigation()') || !out.includes('NAV_CAPTURE_TIMEOUT_MS = 2000')) fail('capture garantie bornée avant navigation absente', 16);
   checkJs(out, 'replay-navigation-capture.js');
   fs.writeFileSync(file, out, 'utf8');
 }

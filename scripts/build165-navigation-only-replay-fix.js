@@ -93,8 +93,8 @@ function removeListenerContaining(text, eventName, marker, label) {
     if (out.includes(forbidden)) fail('capture de saisie encore active: ' + forbidden, 11);
   }
 
-  if (!out.includes("await captureNow('navigation-before-guaranteed')")) {
-    fail('capture garantie avant navigation absente', 12);
+  if (!out.includes("captureNow('navigation-before-guaranteed')") || !out.includes('await captureBeforeNavigation()') || !out.includes('NAV_CAPTURE_TIMEOUT_MS = 2000')) {
+    fail('capture garantie bornée avant navigation absente', 12);
   }
 
   checkJs(out, 'replay-navigation-capture.js');
