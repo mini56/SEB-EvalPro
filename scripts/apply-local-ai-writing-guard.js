@@ -59,8 +59,26 @@ function writingBlockTemplate() {
   }
 
   // Nettoyage final de sécurité demandé pour le petit modèle.
-  function postProcessRich(text) {
+  function postProcessRich(text, profile) {
     let out = String(text || '').replace(/\r\n/g, '\n');
+    const identite = profile?.identite || {};
+    const civilite = String(identite.civilite || 'Monsieur').trim() || 'Monsieur';
+    const nom = String(identite.nom || '').trim();
+    const prenom = String(identite.prenom || '').trim();
+
+    // Sécurité de pronoms : même logique que le post-traitement Qwen,
+    // mais sans casser les formes élidées françaises.
+    const repl = civilite;
+    out = out
+      .replace(/\blorsqu['’]il\b/gi, 'lorsque '+repl)
+      .replace(/\blorsqu['’]elle\b/gi, 'lorsque '+repl)
+      .replace(/\bpuisqu['’]il\b/gi, 'puisque '+repl)
+      .replace(/\bpuisqu['’]elle\b/gi, 'puisque '+repl)
+      .replace(/\bs['’]il\b/gi, 'si '+repl)
+      .replace(/\bs['’]elle\b/gi, 'si '+repl)
+      .replace(/\bqu['’]il\b/gi, 'que '+repl)
+      .replace(/\bqu['’]elle\b/gi, 'que '+repl)
+      .replace(/(^|[\s([{"«])(?:Il|il|Elle|elle)\b/g, (m,prefix)=>prefix+repl);
     out = out.replace(/^#+\s.*$/gm, '');
     out = out.replace(/^\s*\*\*.*\*\*\s*$/gm, '');
     out = out.replace(/^\s*[-*]\s+/gm, '');
@@ -72,6 +90,16 @@ function writingBlockTemplate() {
     out = out.replace(/[ \t]+([,.;:!?])/g, '$1');
     out = out.replace(/[ \t]{2,}/g, ' ');
     out = out.replace(/\n{3,}/g, '\n\n').trim();
+
+    // L'identité d'ouverture est déterministe : Qwen rédige le contenu,
+    // le programme garantit uniquement la forme d'identification demandée.
+    if (nom || prenom) {
+      const opening = [civilite, nom, prenom].filter(Boolean).join(' ') +
+        ' a participé aux mises en situation proposées au cours du plateau technique.';
+      const firstEnd = out.search(/[.!?](?:\s|$)/);
+      out = firstEnd >= 0 ? opening + out.slice(firstEnd + 1) : opening + '\n\n' + out;
+      out = out.replace(/[ \t]{2,}/g, ' ').trim();
+    }
     return out;
   }
 
@@ -173,7 +201,7 @@ function writingBlockTemplate() {
         const raw = await richDraft(rich.profile);
         passes = 1;
         if (!raw) return {ok:false,error:'Qwen n’a produit aucun texte.'};
-        const finalText = postProcessRich(raw);
+        const finalText = postProcessRich(raw, rich.profile);
         const validationErrors = validateRichOutput(finalText);
         if (validationErrors.length) {
           return {
