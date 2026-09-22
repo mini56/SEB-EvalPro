@@ -213,9 +213,9 @@ function writingBlockTemplate() {
       '',
       'RÈGLES OBLIGATOIRES :',
       '- Commence par "Monsieur NOM Prénom a participé aux mises en situation proposées au cours du plateau technique." ou la forme Madame correspondante.',
-      '- Respecte le plan_couverture du JSON et rédige AU MOINS SIX PARAGRAPHES DENSES ET CONTINUS : vue d’ensemble ; fabrication et briques ; raisonnement/stock/planning ; tri ; numérique ; expression écrite et mathématiques. Un dernier paragraphe de synthèse est possible.',
+      '- Le JSON contient plan_redaction. Rédige UN PARAGRAPHE DISTINCT pour chaque élément obligatoire de plan_redaction, dans l’ordre indiqué. Ne fusionne pas les paragraphes fabrication/briques, raisonnement/stock/planning, tri, numérique, expression/mathématiques.',
       '- Chaque paragraphe doit développer les observations utiles et utiliser des connecteurs logiques pour mettre en relation les faits.',
-      '- La liste faits_obligatoires est une liste de contrôle : CHAQUE fait doit apparaître au moins une fois dans le texte. Aucun exercice évalué ne doit disparaître.',
+      '- Dans chaque élément de plan_redaction, la propriété faits contient les faits obligatoires de ce paragraphe : CHAQUE fait doit être explicitement traité. Aucun fait ni exercice évalué ne doit disparaître.',
       '- Explique clairement les points d’appui et les besoins d’accompagnement sans réciter le tableau ligne par ligne.',
       '- Utilise les contrastes déjà fournis pour relier les exercices quand ils éclairent la manière de travailler.',
       '- Reste strictement fidèle aux observations qualitatives et à leur intensité.',
@@ -231,11 +231,31 @@ function writingBlockTemplate() {
       'Retourne uniquement la synthèse finale.'
     ].join('\n');
 
-    const modelProfile = JSON.parse(JSON.stringify(profile || {}));
-    if (Array.isArray(modelProfile.faits_obligatoires)) {
-      for (const fact of modelProfile.faits_obligatoires) delete fact.validation_couverture;
-    }
-    const user = '/no_think\n\nDonnées JSON riches :\n' + JSON.stringify(modelProfile);
+    const facts = Array.isArray(profile?.faits_obligatoires) ? profile.faits_obligatoires : [];
+    const byId = new Map(facts.map(f=>[f.id,f]));
+    const plan = Array.isArray(profile?.plan_couverture) ? profile.plan_couverture : [];
+    const plan_redaction = plan.map(p=>{
+      const ids = Array.isArray(p.faits_ids) ? p.faits_ids : [];
+      const grouped = ids.map(id=>byId.get(id)).filter(Boolean).map(f=>{
+        const copy = JSON.parse(JSON.stringify(f));
+        delete copy.validation_couverture;
+        return copy;
+      });
+      return {
+        paragraphe:p.paragraphe,
+        objet:p.objet,
+        obligatoire:p.obligatoire,
+        priorite:p.priorite || undefined,
+        faits:grouped
+      };
+    });
+    const modelProfile = {
+      identite:profile?.identite || {},
+      consigne_de_lecture:profile?.consigne_de_lecture || '',
+      plan_redaction,
+      contrastes_observes:Array.isArray(profile?.contrastes_observes)?profile.contrastes_observes:[]
+    };
+    const user = '/no_think\n\nDonnées JSON riches organisées par paragraphe :\n' + JSON.stringify(modelProfile);
     return complete(
       [{ role:'system', content:system }, { role:'user', content:user }],
       0.3,
