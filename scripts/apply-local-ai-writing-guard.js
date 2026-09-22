@@ -88,7 +88,7 @@ function writingBlockTemplate() {
     if (text.trim().length < 1200) errors.push('Synthèse trop courte');
     if (ps.length < 5) errors.push('Moins de cinq paragraphes denses');
     if (/<think>|\x60\x60\x60/i.test(text)) errors.push('Format technique inattendu');
-    if (/^\s*#+\s/m.test(text) || /^\s*\*\*.*\*\*\s*$/m) errors.push('Présence de titres');
+    if (/^\s*#+\s/m.test(text) || /^\s*\*\*.*\*\*\s*$/m.test(text)) errors.push('Présence de titres');
     if (/\b\d+(?:[.,]\d+)?\s*%/.test(text)) errors.push('Présence de pourcentages');
     if (/\b\d+\s*erreur(?:\(s\)|s)?\b/i.test(text)) errors.push('Présence de nombres d’erreurs');
     if (/\b(?:niveau\s*)?(?:NE|III|II|I)\b/.test(text)) errors.push('Présence de niveaux');
