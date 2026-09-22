@@ -232,7 +232,10 @@ function writingBlockTemplate() {
   }
 
   async function draftOneParagraph(profile,planItem) {
-    const facts=factsForPlan(profile,planItem);
+    const facts=factsForPlan(profile,planItem).map(f=>({
+      ...f,
+      formulation_source:[String(f.competence||'').trim(),...(Array.isArray(f.observations_qualitatives)?f.observations_qualitatives:[])].filter(Boolean).join(' — ')
+    }));
     const system=[
       "Tu es un professionnel médico-social rédigeant UN SEUL paragraphe d'une synthèse d'évaluation de plateau technique.",
       "Les faits fournis ont déjà été qualifiés par le programme. Tu dois les rédiger, pas les réévaluer.",
@@ -241,6 +244,8 @@ function writingBlockTemplate() {
       '- Rédige exactement un paragraphe continu, sans titre, liste ni numérotation.',
       '- Traite explicitement TOUS les objets de faits, sans en omettre un seul.',
       '- Il y a un nombre précis de faits dans ce paragraphe : rédige au moins une phrase ou proposition clairement identifiable pour CHAQUE fait, dans l’ordre fourni. Ne remplace jamais plusieurs faits précis par une conclusion globale.',
+      '- Pour chaque fait, formulation_source est la référence factuelle. Reprends son vocabulaire métier presque mot pour mot. Tu peux seulement ajuster la grammaire et ajouter un connecteur ; ne change ni la négation, ni l’adjectif, ni le degré de difficulté ou de réussite.',
+      '- La compétence nommée au début de chaque formulation_source doit apparaître clairement dans ta phrase. N’échange jamais les observations entre deux compétences.',
       '- Conserve exactement le sens et l’intensité des observations_qualitatives.',
       '- Un fait importance=prioritaire doit être présenté comme une difficulté importante nécessitant l’accompagnement indiqué par la source ; ne le minimise jamais.',
       '- Ne transforme jamais une réussite en difficulté ni une difficulté en réussite.',
@@ -262,7 +267,7 @@ function writingBlockTemplate() {
     });
     return complete(
       [{role:'system',content:system},{role:'user',content:user}],
-      0.3,0.9,520
+      0.1,0.9,520
     );
   }
 
