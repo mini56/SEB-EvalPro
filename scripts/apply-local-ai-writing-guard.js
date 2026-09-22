@@ -66,6 +66,8 @@ function writingBlockTemplate() {
     }
     text = text.replace(/\bla organisation\b/gi, 'l’organisation');
     text = text.replace(/\b0\s+erreurs\b/gi, '0 erreur').replace(/\b1\s+erreurs\b/gi, '1 erreur');
+    const heading=/^\s*(?:#{1,6}\s*)?(?:\*\*)?(?:synthèse(?:\s+de\s+l[’']évaluation)?|bilan\s+global|compétences?(?:\s+techniques?(?:\s+et\s+manuelles?)?)?|organisation(?:\s+et\s+logistique)?|raisonnement(?:\s+et\s+résolution\s+de\s+problèmes?)?|tri|outils\s+numériques?|savoirs\s+fondamentaux|conclusion|préconisations?(?:\s+et\s+pistes?\s+de\s+travail)?)(?:\*\*)?\s*:?\s*$/i;
+    text = text.split(/\n/).filter(line=>!heading.test(line)).join('\n').replace(/\n{3,}/g,'\n\n').trim();
     return text;
   }
 
@@ -158,7 +160,8 @@ function writingBlockTemplate() {
       'Les données JSON ont déjà été analysées et qualifiées par le programme. Tu ne dois pas recalculer, reclasser ni inventer un contraste.',
       'Explique les qualités du travail, les difficultés observées et les besoins d’accompagnement pendant le parcours. Ne récite pas le tableau.',
       'Mets en relation les résultats uniquement quand un élément figure explicitement dans contrasts ou links.',
-      'Commence exactement par l’identité fournie dans identity.lead. Ensuite, utilise Monsieur ou Madame quand un sujet personnel est nécessaire et n’utilise jamais il, elle, le candidat ou le stagiaire.',
+      'La toute première ligne doit commencer exactement par l’identité fournie dans identity.lead, sans titre ni texte avant. Ensuite, utilise Monsieur ou Madame quand un sujet personnel est nécessaire et n’utilise jamais il, elle, le candidat ou le stagiaire.',
+      'N’écris jamais les libellés Bilan global, Compétences, Organisation, Raisonnement, Outils numériques, Savoirs fondamentaux, Conclusion ou Préconisations.',
       'Écris plusieurs paragraphes continus sans titre, sans sous-titre, sans liste et sans puces.',
       'Ne cite jamais les niveaux I, II, III ou NE. Ne récite pas les scores, pourcentages, durées ni nombres d’erreurs.',
       'Ne formule aucun diagnostic, aucune interprétation psychologique, aucune supposition sur la personnalité et aucun profil global tel que profil opérationnel ou profil analytique.',
