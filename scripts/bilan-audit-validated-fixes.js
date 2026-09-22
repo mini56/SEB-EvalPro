@@ -28,7 +28,7 @@ function write(file, text) { fs.writeFileSync(file, text, 'utf8'); }
   const triStart = html.indexOf("const tri=json('tri_cheville_data',null);");
   const triEnd = html.indexOf("if(Object.hasOwn(sc,'page7'))", triStart);
   if (triStart < 0 || triEnd <= triStart) fail('bloc Tri introuvable');
-  const triNew = "const tri=json('tri_cheville_data',null);if(Array.isArray(tri?.tris)){let sum=0,n=0,err=0,lines=[];tri.tris.slice(0,5).forEach((t,i)=>{const m=+t?.minutes||0,s=+t?.secondes||0,e=+t?.erreurs||0;if(m||s){sum+=m*60+s;n++;err+=e;lines.push('N°'+(i+1)+' : '+String(m).padStart(2,'0')+' min '+String(s).padStart(2,'0')+' s')}});if(n>0){const sec=Math.round(sum/n),avg=String(Math.floor(sec/60)).padStart(2,'0')+':'+String(sec%60).padStart(2,'0'),errAvg=err/n;$('#triAvg').textContent=avg;$('#triTimes').innerHTML=lines.join('<br>');apply('tri-temps',sec<=720?'I':sec<=840?'II':'III');$('#triErr').textContent=err+' erreur'+(err===1?'':'s');apply('tri-erreurs',errAvg<=1.6?'I':errAvg<=3.2?'II':'III','')}}\n";
+  const triNew = "const tri=json('tri_cheville_data',null);if(Array.isArray(tri?.tris)){let sum=0,n=0,err=0,lines=[];tri.tris.slice(0,5).forEach((t,i)=>{const m=+t?.minutes||0,s=+t?.secondes||0,e=+t?.erreurs||0;if(m||s){sum+=m*60+s;n++;err+=e;lines.push('N°'+(i+1)+' : '+String(m).padStart(2,'0')+' min '+String(s).padStart(2,'0')+' s')}});if(n>0){const sec=Math.round(sum/n),avg=String(Math.floor(sec/60)).padStart(2,'0')+':'+String(sec%60).padStart(2,'0'),errAvg=err/n;$('#triAvg').textContent=avg;$('#triTimes').innerHTML=lines.join('<br>');apply('tri-temps',sec<=720?'I':sec<=840?'II':'III');$('#triErr').textContent=err+' erreur'+(err<=1?'':'s');apply('tri-erreurs',errAvg<=1.6?'I':errAvg<=3.2?'II':'III','')}}\n";
   html = html.slice(0, triStart) + triNew + html.slice(triEnd);
 
   const textStart = html.indexOf("if(Object.hasOwn(sc,'page7'))");
@@ -76,6 +76,8 @@ function write(file, text) { fs.writeFileSync(file, text, 'utf8'); }
   if (!html.includes("Math.round(v/75*100)")) fail('Expression /75 absente');
 
   if (html.includes('erreur(s)')) fail('forme erreur(s) encore présente dans le bilan généré');
+  if (!html.includes("errorDetail(n){const v=Math.max(0,Number(n)||0);return '- '+v+' erreur'+(v<=1?'':'s')}")) fail('règle 0/1 erreur singulier absente');
+  if (!html.includes("err+' erreur'+(err<=1?'':'s')")) fail('règle Tri 0/1 erreur singulier absente');
   if (html.includes(" / 23 point(s)") || html.includes(" / 8 point(s)") || html.includes(" — Texte à trous :") ||
       html.includes(" / 10 réponses correctes (") || html.includes(" / 27 réponses correctes (")) {
     fail('ancien détail de résultat encore présent dans une cellule du bilan');
