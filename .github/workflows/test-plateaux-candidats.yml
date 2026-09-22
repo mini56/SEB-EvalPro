@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - test-plateaux-candidats
+      - tmp-qwen-synthese-json
 
 jobs:
   build-windows-plateaux-test:
@@ -70,6 +71,10 @@ jobs:
             'src/main.js',
             'src/preload.js',
             'src/local-ai.js',
+            'src/synthesis-profile.js',
+            'scripts/build165plus-synthesis-profile-v10.js',
+            'scripts/synthesis-profile-smoke.js',
+            'scripts/synthesis-profile-ai-smoke.js',
             'scripts/build165plus-local-ai-prototype.js',
             'scripts/fix-local-ai-admin-bar.js',
             'scripts/apply-local-ai-writing-guard.js',
@@ -85,14 +90,17 @@ jobs:
             "const REQUEST_TIMEOUT_MS = 240000;",
             "'--ctx-size', '4096'",
             "'--n-gpu-layers', '0'",
-            'SEB_LOCAL_AI_WRITING_GUARD_FROM_WORKING_9'
+            'SEB_LOCAL_AI_WRITING_GUARD_FROM_WORKING_9',
+            'SEB_LOCAL_AI_SYNTHESIS_PROFILE_V10'
           )) {
             if (-not $ai.Contains($required)) { throw "Socle #9 ou garde rédactionnelle absent: $required" }
           }
           foreach ($forbidden in @('START_ATTEMPTS','totalRamGb <= 8','ctxSize =')) {
             if ($ai.Contains($forbidden)) { throw "Régression de démarrage postérieure au #9 détectée: $forbidden" }
           }
-          Write-Host 'Socle moteur #9 confirmé intact; garde rédactionnelle isolée présente.'
+          node scripts/synthesis-profile-smoke.js
+          if ($LASTEXITCODE -ne 0) { throw 'Smoke test du profil structuré V10 échoué.' }
+          Write-Host 'Socle moteur #9 confirmé intact; profil JSON V10 et garde rédactionnelle présents.'
 
       - name: Prepare embedded local AI runtime
         shell: pwsh
@@ -172,37 +180,12 @@ jobs:
             if ($proc -and -not $proc.HasExited) { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue }
           }
 
-      - name: Smoke test application service with improved writing
+      - name: Smoke test Qwen with structured synthesis profile
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          @'
-          const { createLocalAiService } = require('./src/local-ai');
-          const source = [
-            'Dans les activités de fabrication, la lecture du plan et la découpe sont maîtrisées. Le traçage, le repérage, le pliage, l’assemblage et les finitions demandent encore davantage de contrôle et de précision.',
-            'Concernant les outils numériques, le traitement de texte reste difficile. La messagerie nécessite encore un accompagnement.',
-            'En mathématiques, la compréhension d’une consigne simple constitue un point d’appui. Les calculs et la résolution de problèmes n’ont pas été évalués.'
-          ].join('\n\n');
-          (async()=>{
-            const service=createLocalAiService({app:{isPackaged:false}});
-            try {
-              const result=await service.rewrite(source);
-              if(!result?.ok) throw new Error(result?.error||'réécriture IA vide');
-              const text=String(result.text||'');
-              const norm=text.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
-              for(const word of ['plan','decoup','trac','reper','pliag','assembl','finit','traitement de texte','messager','consign','calcul']){
-                if(!norm.includes(word)) throw new Error('information protégée perdue: '+word);
-              }
-              if(/activement|accompagnement continu|supplementaire/.test(norm)) throw new Error('qualificatif non sourcé ajouté');
-              if(!/(?:pas|non)[^.!?]{0,80}evalu/.test(norm)) throw new Error('non-évalué perdu');
-              if(/<\/?(?:texte_source|proposition|message_du_controle|bilan_source)>/i.test(text)) throw new Error('balise technique visible');
-              console.log(`SEB IA service #9 + rédaction: OK - ${result.passes||1} passe(s), ${Math.max(1,Math.round((result.elapsedMs||0)/1000))} s.`);
-              console.log(text);
-            } finally { service.stop(); }
-          })().then(()=>process.exit(0)).catch(e=>{console.error(e.stack||e);process.exit(2)});
-          '@ | Set-Content -Path '_local-ai-service-smoke.js' -Encoding UTF8
-          node _local-ai-service-smoke.js
-          if ($LASTEXITCODE -ne 0) { throw 'Smoke test du service IA #9 amélioré échoué.' }
+          node scripts/synthesis-profile-ai-smoke.js
+          if ($LASTEXITCODE -ne 0) { throw 'Smoke test réel Qwen profil JSON V10 échoué.' }
 
       - name: Ensure ImageMagick
         shell: pwsh
@@ -277,6 +260,7 @@ jobs:
             'scripts/build165plus-natural-synthesis-v7-runner.js',
             'scripts/build165plus-natural-synthesis-v8-runner.js',
             'scripts/build165plus-natural-synthesis-v9.js',
+            'scripts/build165plus-synthesis-profile-v10.js',
             'scripts/build165plus-local-ai-prototype.js',
             'scripts/fix-local-ai-admin-bar.js',
             'scripts/apply-local-ai-writing-guard.js',
@@ -332,12 +316,12 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
-          $tag = "seb-evalpro-test-plateaux-${{ github.run_number }}"
+          $tag = "seb-evalpro-qwen-synthese-${{ github.run_number }}"
           $setup = (Resolve-Path "dist\SEB-eval-PRO-$version-Windows-Setup.exe").Path
           $uninstaller = (Resolve-Path "dist\SEB-eval-PRO-$version-Windows-Desinstallation.exe").Path
           $repo = "${{ github.repository }}"
-          $title = "SEB EvalPro - Test Plateaux #${{ github.run_number }}"
-          $notes = "Test Plateaux #${{ github.run_number }}. Dossier candidat unique renforcé : une même identité Nom/Prénom/Ville/Groupe réutilise le même dossier et les doublons historiques sont consolidés sans destruction puis archivés dans Corbeille\\Doublons. La fiche candidat donne accès au bilan, aux révisions, au replay, aux résultats en lecture seule et au document Word courant. Les statuts techniques En cours / Session fermée ne sont plus affichés. Le mode Admin conserve toujours l’action Fermer cette session et la page Résultats possède Fermer les résultats. Le Setup embarque le Microsoft Visual C++ Redistributable x64 requis par l’IA locale et l’installe automatiquement s’il manque. Export/import USB restent vérifiés et sans écrasement. Runtime candidat hors ligne et DevTools désactivé. Version de test uniquement."
+          $title = "SEB EvalPro - Qwen Synthese JSON #${{ github.run_number }}"
+          $notes = "Branche expérimentale Qwen Synthese JSON #${{ github.run_number }}. Pré-analyse métier des résultats, profil JSON structuré, détection contrôlée des contrastes et rédaction locale par Qwen3-1.7B.  Dossier candidat unique renforcé : une même identité Nom/Prénom/Ville/Groupe réutilise le même dossier et les doublons historiques sont consolidés sans destruction puis archivés dans Corbeille\\Doublons. La fiche candidat donne accès au bilan, aux révisions, au replay, aux résultats en lecture seule et au document Word courant. Les statuts techniques En cours / Session fermée ne sont plus affichés. Le mode Admin conserve toujours l’action Fermer cette session et la page Résultats possède Fermer les résultats. Le Setup embarque le Microsoft Visual C++ Redistributable x64 requis par l’IA locale et l’installe automatiquement s’il manque. Export/import USB restent vérifiés et sans écrasement. Runtime candidat hors ligne et DevTools désactivé. Version de test uniquement."
           $setupSize = (Get-Item $setup).Length
           Write-Host "Setup à publier: $setupSize octets"
 
