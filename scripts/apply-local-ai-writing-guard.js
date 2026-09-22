@@ -120,6 +120,7 @@ function writingBlockTemplate() {
     if (/^Monsieur\b/i.test(lead) && /\bil\b/i.test(output)) throw new Error('La synthèse IA a utilisé « il » au lieu de « Monsieur ».');
     if (/^Madame\b/i.test(lead) && /\belle\b/i.test(output)) throw new Error('La synthèse IA a utilisé « elle » au lieu de « Madame ».');
     if (/\b(?:le candidat|la candidate|le stagiaire|la stagiaire|la personne)\b/i.test(output)) throw new Error('La synthèse IA a remplacé Monsieur/Madame par une désignation interdite.');
+    if (/\b(?:vous|votre|vos|tu|ton|ta|tes)\b/i.test(output)) throw new Error('La synthèse IA s’adresse directement à la personne, ce qui est interdit.');
 
     if (/\bniveau\s*(?:NE|I{1,3})\b/i.test(output) || /\d+(?:[.,]\d+)?\s*%/.test(output) || /\d+\s*erreurs?\b/i.test(output) || /\d+(?:[.,]\d+)?\s*\/\s*\d+(?:[.,]\d+)?/.test(output)) {
       throw new Error('La synthèse IA récite un score, un niveau ou un nombre d’erreurs.');
@@ -154,22 +155,53 @@ function writingBlockTemplate() {
     return cleanModelOutput(response?.choices?.[0]?.message?.content || '');
   }
 
-  async function profileDraft(payload) {
+  function cleanParagraphDraft(value) {
+    let text = cleanModelOutput(value).replace(/\r\n/g, '\n').trim();
+    text = text.replace(/^\s*(?:identity\.lead|paragraph_plan|paragraphe\s*\d+|p\d+)\s*:\s*/i, '').trim();
+    text = text.split(/\n+/).map(x => x.trim()).filter(Boolean).join(' ');
+    text = text.replace(/\s{2,}/g, ' ').trim();
+    return text;
+  }
+
+  async function profileParagraphDraft(payload, item, index, total) {
+    const identity = payload?.profile?.identity || {};
+    const first = index === 0;
     const system = [
-      'Tu rédiges une synthèse d’évaluation pour des professionnels du médico-social.',
-      'Le JSON contient identity et paragraph_plan. Toute l’analyse métier est déjà faite : ne raisonne pas à nouveau et n’invente rien.',
-      'Commence exactement par identity.lead. Ensuite écris Monsieur ou Madame si un sujet personnel est nécessaire. Interdits : il, elle, la personne, le candidat, le stagiaire.',
-      'Rédige un paragraphe continu pour chaque élément de paragraph_plan, dans le même ordre, avec une ligne vide entre les paragraphes. N’écris jamais les champs type ou instruction comme titres.',
-      'Dans chaque paragraphe, utilise seulement faits et liens. Reformule-les naturellement, regroupe les idées proches et explique les contrastes fournis sans en créer de nouveaux.',
-      'Interdits : titres, sous-titres, listes, puces, niveaux I/II/III/NE, scores, pourcentages, durées et nombres d’erreurs.',
-      'Interdits : diagnostic, psychologie, personnalité, profil global, orientation professionnelle, métier, secteur, poste ou formation.',
-      'Ne transforme jamais une observation en conclusion plus large. Ne prétends jamais qu’une aide est absente ou nécessaire si le JSON ne le dit pas.',
-      'Le texte doit expliquer les qualités du travail, les difficultés et les besoins d’accompagnement observés pendant ce parcours.',
-      'Utilise un français professionnel, clair et naturel. Retourne uniquement le texte final.'
+      'Tu rédiges UN SEUL paragraphe d’une synthèse d’évaluation destinée à des professionnels du médico-social.',
+      'L’analyse métier est déjà faite. Tu dois seulement transformer les faits fournis en français professionnel naturel.',
+      first
+        ? 'Ce premier paragraphe doit commencer exactement par : ' + String(identity.lead || '').trim()
+        : 'Ce paragraphe ne doit pas répéter le nom complet. Utilise seulement ' + String(identity.subject || 'Monsieur/Madame') + ' si un sujet personnel est nécessaire.',
+      'N’adresse jamais la personne directement : interdits absolus vous, votre, vos, tu, ton, ta, tes.',
+      'Interdits absolus : il, elle, la personne, le candidat, la candidate, le stagiaire, la stagiaire.',
+      'Utilise uniquement les faits et liens fournis. Ne crée aucun nouveau contraste, aucune cause et aucune conclusion plus large.',
+      'N’écris aucun titre, sous-titre, numéro, étiquette, liste, puce, champ JSON ou préambule.',
+      'Ne cite aucun niveau I/II/III/NE, score, pourcentage, durée ou nombre d’erreurs.',
+      'Aucun diagnostic, psychologie, personnalité, profil global, orientation professionnelle, métier, secteur, poste ou formation.',
+      'Retourne uniquement le paragraphe rédigé, sans ligne vide avant ou après.'
     ].join(' ');
-    const modelProfile = JSON.stringify(payload.profile);
-    const user = '/no_think\n\nTransforme ce plan déjà analysé en texte professionnel. Ne produis que les paragraphes demandés.\n\n<donnees_json>\n' + modelProfile + '\n</donnees_json>';
-    return complete([{ role: 'system', content: system }, { role: 'user', content: user }], 0.18, 0.82, 1200, { top_k: 30, repeat_penalty: 1.12 });
+    const data = JSON.stringify({
+      identity: { lead: identity.lead || '', subject: identity.subject || '' },
+      position: (index + 1) + '/' + total,
+      instruction: String(item?.instruction || ''),
+      faits: Array.isArray(item?.faits) ? item.faits : [],
+      liens: Array.isArray(item?.liens) ? item.liens : []
+    });
+    const user = '/no_think\n\nRédige uniquement le paragraphe correspondant à ces données déjà analysées :\n<donnees_json>\n' + data + '\n</donnees_json>';
+    const raw = await complete([{ role: 'system', content: system }, { role: 'user', content: user }], 0.16, 0.80, 320, { top_k: 24, repeat_penalty: 1.12 });
+    const text = cleanParagraphDraft(raw);
+    if (!text) throw new Error('Qwen a produit un paragraphe vide à la position ' + (index + 1) + '.');
+    return text;
+  }
+
+  async function profileDraft(payload) {
+    const plan = Array.isArray(payload?.profile?.paragraph_plan) ? payload.profile.paragraph_plan : [];
+    if (!plan.length) throw new Error('Le profil structuré ne contient aucun paragraphe à rédiger.');
+    const paragraphs = [];
+    for (let index = 0; index < plan.length; index++) {
+      paragraphs.push(await profileParagraphDraft(payload, plan[index], index, plan.length));
+    }
+    return paragraphs.join('\n\n');
   }
 
   async function legacyDraft(sourceText) {
