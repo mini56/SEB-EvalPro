@@ -22,7 +22,7 @@ function mustReplace(search, replacement, label) {
 
 mustReplace(
   "function apply(id,l,detail){const r=row(id);if(!r)return;level(r,l);if(detail!==undefined)r.querySelector('.detail').textContent=detail||''}",
-  "function syncComment(r,l){if(!r||!l)return;const s=r.querySelector('.csel'),t=r.querySelector('.ctxt');if(!s)return;const o=Array.from(s.options).find(opt=>opt.dataset.l===l);if(!o)return;s.value=o.value;if(t)t.value=o.value}function apply(id,l,detail){const r=row(id);if(!r)return;level(r,l);syncComment(r,l);if(detail!==undefined)r.querySelector('.detail').textContent=detail||''}function errorDetail(n){const v=Math.max(0,Number(n)||0);return '- '+v+' erreur'+(v===1?'':'s')}",
+  "function syncComment(r,l){if(!r||!l)return;const s=r.querySelector('.csel'),t=r.querySelector('.ctxt');if(!s)return;const o=Array.from(s.options).find(opt=>opt.dataset.l===l);if(!o)return;s.value=o.value;if(t)t.value=o.value}function apply(id,l,detail){const r=row(id);if(!r)return;level(r,l);syncComment(r,l);if(detail!==undefined)r.querySelector('.detail').textContent=detail||''}function errorDetail(n){const v=Math.max(0,Number(n)||0);return '- '+v+' erreur'+(v<=1?'':'s')}",
   'sélection automatique du commentaire institutionnel'
 );
 

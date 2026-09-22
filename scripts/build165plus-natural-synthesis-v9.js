@@ -61,6 +61,7 @@ function sebV9Style(v){
    'Les besoins d’accompagnement concernent principalement le traitement de texte et le raisonnement. L’organisation de plusieurs informations reste également à consolider. L’utilisation autonome de la messagerie demande encore des repères.');
 
  s=sebV9BreakLongSentences(s);
+ s=s.replace(/\\b0\\s+erreurs\\b/gi,'0 erreur').replace(/\\b1\\s+erreurs\\b/gi,'1 erreur');
  s=s.replace(/[ \\t]{2,}/g,' ').replace(/ +\\n/g,'\\n').replace(/\\n{3,}/g,'\\n\\n').trim();
  return sebV9Single(s);
 }
@@ -75,6 +76,7 @@ function sebV9Style(v){
  for(const good of ['Des difficultés persistent toutefois','La lecture du plan est bien maîtrisée.','L’identification des contraintes demande encore des repères.','Un accompagnement reste nécessaire dans ce type de situation.','L’orthographe en situation de dictée reste fragile.','L’utilisation autonome de la messagerie demande encore des repères.'])if(!out.includes(good))fail('autocontrôle V9: formulation attendue absente: '+good);
  const sentences=out.match(/[^.!?]+[.!?]+/g)||[];
  if(sentences.some(x=>x.trim().length>210))fail('autocontrôle V9: phrase encore trop longue');
+ if(out.split(/\\n\\s*\\n/).filter(Boolean).length<4)fail('autocontrôle V9: paragraphes insuffisants');
 }
 
 // Bilan courant : V9 polit uniquement le texte produit par V8.
@@ -86,6 +88,10 @@ function sebV9Style(v){
  const old='const value=window.sebV8Polish(sebV7Generate(l7,t7,sebV7Identity(c7())));';
  if(!h.includes(old))fail('génération courante V8 introuvable');
  h=h.replace(old,'const value=window.sebV9Style(window.sebV8Polish(sebV7Generate(l7,t7,sebV7Identity(c7()))));');
+ const wordOld='summaryHtml=summaryText?\'<h2 style="margin-top:18pt">Synthèse de l’évaluation</h2><p style="white-space:pre-wrap;line-height:1.35">\'+esc(summaryText)+\'</p>\':\'\'';
+ const wordNew='summaryHtml=summaryText?\'<h2 style="margin-top:18pt">Synthèse de l’évaluation</h2>\'+summaryText.split(/\\n\\s*\\n/).map(p=>\'<p style="margin:0 0 9pt;line-height:1.35">\'+esc(p)+\'</p>\').join(\'\'):\'\'';
+ if(!h.includes(wordOld))fail('export Word courant: bloc synthèse unique introuvable');
+ h=h.replace(wordOld,wordNew);
  checkHtml(h);write(adminFile,h);
 }
 
@@ -96,6 +102,10 @@ function sebV9Style(v){
  const old='return sebV8Polish(sebV7Generate(lv,tx,sebV7Identity(c||{})))';
  if(!s.includes(old))fail('générateur historique V8 introuvable');
  s=s.replace(old,'return sebV9Style(sebV8Polish(sebV7Generate(lv,tx,sebV7Identity(c||{}))))');
+ const histWordOld='const summaryHtml = edited.summary ? \'<h2 style="margin-top:18pt">Synthèse de l’évaluation</h2><p style="white-space:pre-wrap">\' + escapeHtml(edited.summary) + \'</p>\' : \'\';';
+ const histWordNew='const summaryHtml = edited.summary ? \'<h2 style="margin-top:18pt">Synthèse de l’évaluation</h2>\' + edited.summary.split(/\\n\\s*\\n/).map(p => \'<p style="margin:0 0 9pt">\' + escapeHtml(p) + \'</p>\').join(\'\') : \'\';';
+ if(!s.includes(histWordOld))fail('export Word historique: bloc synthèse unique introuvable');
+ s=s.replace(histWordOld,histWordNew);
  try{new vm.Script(s)}catch(e){fail('historique V9 invalide: '+e.message)};write(historyFile,s);
 }
-console.log('SEB EvalPro 165+ V9: phrases raccourcies, enchaînements de « et » allégés, structure et contenu du bilan conservés.');
+console.log('SEB EvalPro 165+ V9: synthèse en paragraphes réels dans Word, erreurs 0/1 au singulier, structure professionnelle conservée.');

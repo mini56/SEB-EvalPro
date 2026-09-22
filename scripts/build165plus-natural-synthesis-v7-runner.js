@@ -19,11 +19,11 @@ function sebV7Result(raw,label){
  }
  if(pct)return sebV7Cap(label)+' : '+fmt(pct[1])+' % de réussite.';
  const err=src.match(/(?:-|—)?\s*(\d+)\s*erreur(?:\(s\)|s)?/i);
- if(err)return sebV7Cap(label)+' : '+err[1]+' erreur'+(err[1]==='1'?'':'s')+'.';
+ if(err){const n=Number(err[1]);return sebV7Cap(label)+' : '+err[1]+' erreur'+(n<=1?'':'s')+'.';}
  return'';
 }
-function sebV7Results(keys,text,max){
- const out=[];for(const k of keys){const r=sebV7Result(text(k),SEB_V7_LABELS[k]||k);if(r&&!out.includes(r))out.push(r);if(out.length>=(max||2))break}return out;
+function sebV7Results(keys,text,max,level){
+ const out=[];for(const k of keys){if(level&&!['II','III'].includes(String(level(k)||'')))continue;const r=sebV7Result(text(k),SEB_V7_LABELS[k]||k);if(r&&!out.includes(r))out.push(r);if(out.length>=(max||2))break}return out;
 }`;
 s=s.slice(0,start)+metricGood+resultHelpers+s.slice(end);
 const exprOld='sebV7GroupInsights(SEB_V7_GROUPS.expression,text,id,3)';
@@ -31,20 +31,20 @@ if(!s.includes(exprOld))throw new Error('Limite observations expression V7 intro
 s=s.replace(exprOld,'sebV7GroupInsights(SEB_V7_GROUPS.expression,text,id,5)');
 
 const injects=[
- ["const e=sebV7GroupInsights(SEB_V7_GROUPS.fabrication,text,id,2);if(e.length)s+=e.join(' ');p.push(s.trim())","const e=sebV7GroupInsights(SEB_V7_GROUPS.fabrication,text,id,2);if(e.length)s+=e.join(' ');const r=sebV7Results(SEB_V7_GROUPS.fabrication,text,2);if(r.length)s+=' '+r.join(' ');p.push(s.trim())"],
- ["const e=sebV7GroupInsights(SEB_V7_GROUPS.briques,text,id,1);if(e.length)s+=e[0];p.push(s.trim())","const e=sebV7GroupInsights(SEB_V7_GROUPS.briques,text,id,1);if(e.length)s+=e[0];const r=sebV7Results(SEB_V7_GROUPS.briques,text,2);if(r.length)s+=' '+r.join(' ');p.push(s.trim())"],
- ["const e=sebV7GroupInsights(SEB_V7_GROUPS.organisation,text,id,2);if(e.length)s+=e.join(' ');p.push(s.trim())","const e=sebV7GroupInsights(SEB_V7_GROUPS.organisation,text,id,2);if(e.length)s+=e.join(' ');const r=sebV7Results(SEB_V7_GROUPS.organisation,text,2);if(r.length)s+=' '+r.join(' ');p.push(s.trim())"],
- ["const e=sebV7GroupInsights(SEB_V7_GROUPS.tri,text,id,1);if(e.length&&!/fiabilité sont satisfaisants/i.test(s))s+=' '+e[0];p.push(s.trim())","const e=sebV7GroupInsights(SEB_V7_GROUPS.tri,text,id,1);if(e.length&&!/fiabilité sont satisfaisants/i.test(s))s+=' '+e[0];const r=sebV7Results(SEB_V7_GROUPS.tri,text,2);if(r.length)s+=' '+r.join(' ');p.push(s.trim())"],
- ["const e=sebV7GroupInsights(SEB_V7_GROUPS.numerique,text,id,2);if(e.length)s+=e.join(' ');p.push(s.trim())","const e=sebV7GroupInsights(SEB_V7_GROUPS.numerique,text,id,2);if(e.length)s+=e.join(' ');const r=sebV7Results(SEB_V7_GROUPS.numerique,text,2);if(r.length)s+=' '+r.join(' ');p.push(s.trim())"],
- ["const e=sebV7GroupInsights(SEB_V7_GROUPS.expression,text,id,5);if(e.length)s+=e.join(' ');p.push(s.trim())","const e=sebV7GroupInsights(SEB_V7_GROUPS.expression,text,id,5);if(e.length)s+=e.join(' ');const r=sebV7Results(SEB_V7_GROUPS.expression,text,2);if(r.length)s+=' '+r.join(' ');p.push(s.trim())"],
- ["const e=sebV7GroupInsights(SEB_V7_GROUPS.maths,text,id,1);if(e.length)s+=e[0];p.push(s.trim())","const e=sebV7GroupInsights(SEB_V7_GROUPS.maths,text,id,1);if(e.length)s+=e[0];const r=sebV7Results(SEB_V7_GROUPS.maths,text,2);if(r.length)s+=' '+r.join(' ');p.push(s.trim())"]
+ ["const e=sebV7GroupInsights(SEB_V7_GROUPS.fabrication,text,id,2);if(e.length)s+=e.join(' ');p.push(s.trim())","const e=sebV7GroupInsights(SEB_V7_GROUPS.fabrication,text,id,2);if(e.length)s+=e.join(' ');const r=sebV7Results(SEB_V7_GROUPS.fabrication,text,2,level);if(r.length)s+=' '+r.join(' ');p.push(s.trim())"],
+ ["const e=sebV7GroupInsights(SEB_V7_GROUPS.briques,text,id,1);if(e.length)s+=e[0];p.push(s.trim())","const e=sebV7GroupInsights(SEB_V7_GROUPS.briques,text,id,1);if(e.length)s+=e[0];const r=sebV7Results(SEB_V7_GROUPS.briques,text,2,level);if(r.length)s+=' '+r.join(' ');p.push(s.trim())"],
+ ["const e=sebV7GroupInsights(SEB_V7_GROUPS.organisation,text,id,2);if(e.length)s+=e.join(' ');p.push(s.trim())","const e=sebV7GroupInsights(SEB_V7_GROUPS.organisation,text,id,2);if(e.length)s+=e.join(' ');const r=sebV7Results(SEB_V7_GROUPS.organisation,text,2,level);if(r.length)s+=' '+r.join(' ');p.push(s.trim())"],
+ ["const e=sebV7GroupInsights(SEB_V7_GROUPS.tri,text,id,1);if(e.length&&!/fiabilité sont satisfaisants/i.test(s))s+=' '+e[0];p.push(s.trim())","const e=sebV7GroupInsights(SEB_V7_GROUPS.tri,text,id,1);if(e.length&&!/fiabilité sont satisfaisants/i.test(s))s+=' '+e[0];const r=sebV7Results(SEB_V7_GROUPS.tri,text,2,level);if(r.length)s+=' '+r.join(' ');p.push(s.trim())"],
+ ["const e=sebV7GroupInsights(SEB_V7_GROUPS.numerique,text,id,2);if(e.length)s+=e.join(' ');p.push(s.trim())","const e=sebV7GroupInsights(SEB_V7_GROUPS.numerique,text,id,2);if(e.length)s+=e.join(' ');const r=sebV7Results(SEB_V7_GROUPS.numerique,text,2,level);if(r.length)s+=' '+r.join(' ');p.push(s.trim())"],
+ ["const e=sebV7GroupInsights(SEB_V7_GROUPS.expression,text,id,5);if(e.length)s+=e.join(' ');p.push(s.trim())","const e=sebV7GroupInsights(SEB_V7_GROUPS.expression,text,id,5);if(e.length)s+=e.join(' ');const r=sebV7Results(SEB_V7_GROUPS.expression,text,2,level);if(r.length)s+=' '+r.join(' ');p.push(s.trim())"],
+ ["const e=sebV7GroupInsights(SEB_V7_GROUPS.maths,text,id,1);if(e.length)s+=e[0];p.push(s.trim())","const e=sebV7GroupInsights(SEB_V7_GROUPS.maths,text,id,1);if(e.length)s+=e[0];const r=sebV7Results(SEB_V7_GROUPS.maths,text,2,level);if(r.length)s+=' '+r.join(' ');p.push(s.trim())"]
 ];
 for(const [oldValue,newValue] of injects){if(!s.includes(oldValue))throw new Error('Point d’injection des résultats V7 introuvable');s=s.replace(oldValue,newValue)}
 
 // Les données chiffrées utiles doivent désormais atteindre la synthèse déterministe,
 // afin que l'IA locale puisse les reformuler sans les inventer.
-if(!s.includes('sebV7Results(SEB_V7_GROUPS.expression,text,2)'))throw new Error('Résultats expression non injectés');
-if(!s.includes('sebV7Results(SEB_V7_GROUPS.maths,text,2)'))throw new Error('Résultats maths non injectés');
+if(!s.includes('sebV7Results(SEB_V7_GROUPS.expression,text,2,level)'))throw new Error('Résultats expression non injectés');
+if(!s.includes('sebV7Results(SEB_V7_GROUPS.maths,text,2,level)'))throw new Error('Résultats maths non injectés');
 
 fs.writeFileSync(temp,s,'utf8');
 try{require(temp)}finally{try{fs.unlinkSync(temp)}catch(_){}}
