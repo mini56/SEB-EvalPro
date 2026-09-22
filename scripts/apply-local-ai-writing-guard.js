@@ -89,11 +89,10 @@ function writingBlockTemplate() {
       top_k: 40,
       repeat_penalty: 1.1,
       mirostat: 0,
-      max_tokens: maxTokens,
-      seed: 42,
       stream: false,
       ...(extra || {})
     };
+    if (Number.isFinite(maxTokens) && maxTokens > 0) body.max_tokens = maxTokens;
     const response = await requestJson('POST', '/v1/chat/completions', body, REQUEST_TIMEOUT_MS);
     return cleanModelOutput(response?.choices?.[0]?.message?.content || '');
   }
@@ -123,12 +122,12 @@ function writingBlockTemplate() {
       'À partir des données JSON fournies, rédige la synthèse.'
     ].join('\n');
 
-    const user = '/no_think\n\nDonnées JSON :\n' + JSON.stringify(profile, null, 2);
+    const user = '/no_think\n\nDonnées JSON :\n' + JSON.stringify(profile);
     return complete(
       [{ role: 'system', content: system }, { role: 'user', content: user }],
       0.3,
       0.9,
-      1600
+      null
     );
   }
 
