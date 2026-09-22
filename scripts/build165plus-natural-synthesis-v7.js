@@ -110,7 +110,7 @@ function sebV7Generate(level,text,id){
 
 // Autocontrôle du moteur avant toute modification des fichiers générés.
 {
- const box={};new vm.Script(engine+'\nthis.g=sebV7Generate;this.d=sebV7Single;').runInNewContext(box);
+ const box={};new vm.Script(engine+'\nthis.g=sebV7Generate;this.d=sebV7Single;this.i=sebV7Identity;').runInNewContext(box);
  const levels={'fabrication-plan':'I','fabrication-tracage':'I','fabrication-decoupe':'II','fabrication-assemblage':'I','fabrication-finition':'I','briques-identification':'I','briques-manipulation':'I','carre':'III','organisation':'III','planning':'I','tri-temps':'I','tri-erreurs':'I','texte':'III','mail':'II','expression':'II','math-enonce':'I','math-problemes':'NE'};
  const texts={'fabrication-plan':"La personne n'a pas besoin d'aide pour commencer l'exercice.",'fabrication-decoupe':'Les découpes ne sont pas droites ou incomplètes.','briques-identification':"La personne n'a pas besoin d'aide pour commencer l'exercice. - 1 erreur(s).",'carre':"A des difficultés à identifier les contraintes d'un problème structuré et à établir les relations entre ses éléments. - 7 erreur(s).",'organisation':'Réalise la tâche avec de nombreuses erreurs nécessitant un accompagnement. - 31 erreur(s).','tri-erreurs':'Fiabilité satisfaisante.','texte':'Ne sait pas utiliser un logiciel de traitement de texte. - 1 / 7 point(s).','mail':"A besoin d’aide pour envoyer un message et/ou des oublis de consignes sont révélés. - 2 erreur(s).",'expression':'Structure des phrases et orthographe globalement correcte. Idées présentées de manière ordonnée. - 42.75 / 75 point(s) (57 %) — Texte à trous: 3 / 15 · Paronymes: 20 / 20 · Genre / Nombre: 15 / 20 · Dictée: 4.75 / 20.','math-enonce':'Comprend et exécute une consigne unique. - 10 / 10 réponses correctes (100 %).','math-problemes':'Exercice abandonné.'};
  const out=box.g(k=>levels[k]||'',k=>texts[k]||'',{lead:'La personne',subject:'La personne'});
@@ -119,8 +119,8 @@ function sebV7Generate(level,text,id){
  if((out.match(/a participé aux différentes mises en situation/g)||[]).length!==1)fail('autocontrôle V7: introduction dupliquée');
  if(box.d([out,out,out,out].join('\n\n'))!==out)fail('autocontrôle V7: déduplication de quatre synthèses en échec');
  if(/compétences mathématiques/.test(out))fail('autocontrôle V7: généralisation mathématique interdite quand les problèmes sont NE');
- const male=sebV7Identity({civilite:'M.',nom:'José',prenom:'tout'});if(male.lead!=='Monsieur JOSÉ Tout'||male.subject!=='Monsieur')fail('autocontrôle V7: identité Monsieur incorrecte');
- const female=sebV7Identity({civilite:'Mme',nom:'Martin',prenom:'alice'});if(female.lead!=='Madame MARTIN Alice'||female.subject!=='Madame')fail('autocontrôle V7: identité Madame incorrecte');
+ const male=box.i({civilite:'M.',nom:'José',prenom:'tout'});if(male.lead!=='Monsieur JOSÉ Tout'||male.subject!=='Monsieur')fail('autocontrôle V7: identité Monsieur incorrecte');
+ const female=box.i({civilite:'Mme',nom:'Martin',prenom:'alice'});if(female.lead!=='Madame MARTIN Alice'||female.subject!=='Madame')fail('autocontrôle V7: identité Madame incorrecte');
 }
 
 // Bilan courant : bouton rendu réellement unique + nettoyage des anciennes répétitions.
