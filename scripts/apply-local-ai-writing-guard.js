@@ -332,7 +332,7 @@ replacement = replacement.split('\n').map(line => line ? '  ' + line : '').join(
 source = source.slice(0,start) + replacement + source.slice(end);
 
 if (!source.startsWith(motorPrefix)) fail('le patch a modifié la zone moteur de démarrage');
-for (const required of [marker,'qwen-rich-coverage-v2','top_k: 40','repeat_penalty: 1.1','mirostat: 0','AU MOINS CINQ PARAGRAPHES DENSES ET CONTINUS']) {
+for (const required of [marker,'qwen-rich-coverage-v2','top_k: 40','repeat_penalty: 1.1','mirostat: 0','AU MOINS SIX PARAGRAPHES DENSES ET CONTINUS']) {
   if (!source.includes(required)) fail('élément Qwen riche absent après patch: '+required);
 }
 for (const forbidden of ['START_ATTEMPTS', "'--ctx-size', String(", 'totalRamGb <= 8']) {
