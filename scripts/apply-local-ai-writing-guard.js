@@ -163,32 +163,34 @@ function writingBlockTemplate() {
     return text;
   }
 
-  async function profileParagraphDraft(payload, item, index, total) {
+  async function profileParagraphDraft(payload, item, sourceParagraph, index, total) {
     const identity = payload?.profile?.identity || {};
     const first = index === 0;
     const system = [
-      'Tu rédiges UN SEUL paragraphe d’une synthèse d’évaluation destinée à des professionnels du médico-social.',
-      'L’analyse métier est déjà faite. Tu dois seulement transformer les faits fournis en français professionnel naturel.',
+      'Tu corriges et fluidifies UN SEUL paragraphe déjà rédigé d’une synthèse destinée à des professionnels du médico-social.',
+      'Le paragraphe SOURCE est factuellement validé par le programme. Sa signification, ses réussites, ses difficultés et ses contrastes sont intouchables.',
+      'Ta mission est uniquement rédactionnelle : accords, fluidité, répétitions lexicales proches et enchaînements.',
+      'Tu ne dois jamais inverser une réussite et une difficulté, ajouter une compétence, ajouter une qualité, ajouter une cause ni élargir une conclusion.',
       first
-        ? 'Ce premier paragraphe doit commencer exactement par : ' + String(identity.lead || '').trim()
-        : 'Ce paragraphe ne doit pas répéter le nom complet. Utilise seulement ' + String(identity.subject || 'Monsieur/Madame') + ' si un sujet personnel est nécessaire.',
+        ? 'Le paragraphe doit commencer exactement par : ' + String(identity.lead || '').trim()
+        : 'Ne répète pas le nom complet. Utilise seulement ' + String(identity.subject || 'Monsieur/Madame') + ' si un sujet personnel est nécessaire.',
       'N’adresse jamais la personne directement : interdits absolus vous, votre, vos, tu, ton, ta, tes.',
       'Interdits absolus : il, elle, la personne, le candidat, la candidate, le stagiaire, la stagiaire.',
-      'Utilise uniquement les faits et liens fournis. Ne crée aucun nouveau contraste, aucune cause et aucune conclusion plus large.',
       'N’écris aucun titre, sous-titre, numéro, étiquette, liste, puce, champ JSON ou préambule.',
       'Ne cite aucun niveau I/II/III/NE, score, pourcentage, durée ou nombre d’erreurs.',
       'Aucun diagnostic, psychologie, personnalité, profil global, orientation professionnelle, métier, secteur, poste ou formation.',
-      'Retourne uniquement le paragraphe rédigé, sans ligne vide avant ou après.'
+      'Si une reformulation risque de modifier le sens, recopie la phrase SOURCE plutôt que de l’interpréter.',
+      'Retourne uniquement le paragraphe final.'
     ].join(' ');
-    const data = JSON.stringify({
+    const context = JSON.stringify({
       identity: { lead: identity.lead || '', subject: identity.subject || '' },
       position: (index + 1) + '/' + total,
       instruction: String(item?.instruction || ''),
       faits: Array.isArray(item?.faits) ? item.faits : [],
       liens: Array.isArray(item?.liens) ? item.liens : []
     });
-    const user = '/no_think\n\nRédige uniquement le paragraphe correspondant à ces données déjà analysées :\n<donnees_json>\n' + data + '\n</donnees_json>';
-    const raw = await complete([{ role: 'system', content: system }, { role: 'user', content: user }], 0.16, 0.80, 320, { top_k: 24, repeat_penalty: 1.12 });
+    const user = '/no_think\n\n<paragraphe_source>\n' + String(sourceParagraph || '').trim() + '\n</paragraphe_source>\n\n<context_json>\n' + context + '\n</context_json>\n\nRéécris seulement le paragraphe SOURCE sans changer aucun constat.';
+    const raw = await complete([{ role: 'system', content: system }, { role: 'user', content: user }], 0.10, 0.72, 280, { top_k: 20, repeat_penalty: 1.08 });
     const text = cleanParagraphDraft(raw);
     if (!text) throw new Error('Qwen a produit un paragraphe vide à la position ' + (index + 1) + '.');
     return text;
@@ -196,10 +198,12 @@ function writingBlockTemplate() {
 
   async function profileDraft(payload) {
     const plan = Array.isArray(payload?.profile?.paragraph_plan) ? payload.profile.paragraph_plan : [];
+    const sourceParagraphs = String(payload?.fallback_text || '').split(/\n\s*\n/).map(x => x.trim()).filter(Boolean);
     if (!plan.length) throw new Error('Le profil structuré ne contient aucun paragraphe à rédiger.');
+    if (sourceParagraphs.length !== plan.length) throw new Error('Le plan structuré et la synthèse moteur ne contiennent pas le même nombre de paragraphes.');
     const paragraphs = [];
     for (let index = 0; index < plan.length; index++) {
-      paragraphs.push(await profileParagraphDraft(payload, plan[index], index, plan.length));
+      paragraphs.push(await profileParagraphDraft(payload, plan[index], sourceParagraphs[index], index, plan.length));
     }
     return paragraphs.join('\n\n');
   }
