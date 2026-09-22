@@ -473,7 +473,7 @@ function parseJs(text, label) {
   if (!runtimeGenerated.includes("if (!button.classList.contains(desiredKind)) button.classList.add(desiredKind)")) {
     fail('normalisation boutons non idempotente', 7);
   }
-  if (!dicteeGenerated.includes('id="seb-dictee-action"') || dicteeGenerated.includes('seb-dictee-finish-next')) {
+  if (!dicteeGenerated.includes("finish.id='seb-dictee-action'") || dicteeGenerated.includes('seb-dictee-finish-next')) {
     fail('Dictée encore confondue avec une navigation Replay', 7);
   }
   if (!main.includes('SEB_TEMP_WINDOWS_RECOVERY') || !main.includes('TEMP_ALLOW_WINDOWS_RECOVERY = true')) {
