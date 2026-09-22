@@ -66,8 +66,7 @@ function writingBlockTemplate() {
     }
     text = text.replace(/\bla organisation\b/gi, 'l’organisation');
     text = text.replace(/\b0\s+erreurs\b/gi, '0 erreur').replace(/\b1\s+erreurs\b/gi, '1 erreur');
-    const heading=/^\s*(?:#{1,6}\s*)?(?:\*\*)?(?:\d+\s*[.)\-:]\s*)?(?:synthèse(?:\s+de\s+l[’']évaluation)?|bilan\s+global|compétences?(?:\s+techniques?(?:\s+et\s+manuelles?)?)?|organisation(?:\s*,?\s*logistique(?:\s+et\s+rigueur)?|\s+et\s+logistique(?:\s+et\s+rigueur)?)?|raisonnement(?:\s+et\s+résolution\s+de\s+problèmes?)?|activité\s+de\s+tri|tri|outils\s+numériques?|savoirs\s+fondamentaux(?:\s+et\s+numérique)?|conclusion(?:\s+générale)?|préconisations?(?:\s+et\s+pistes?\s+de\s+travail)?)(?:\s*\([^)]*\))?(?:\*\*)?\s*[:.\-]?\s*$/i;
-    text = text.split(/\n/).filter(line=>!heading.test(line)).join('\n').replace(/\n{3,}/g,'\n\n').trim();
+    text = text.replace(/\n{3,}/g,'\n\n').trim();
     return text;
   }
 
@@ -103,37 +102,26 @@ function writingBlockTemplate() {
     }
   }
 
-  function validateProfileOutput(payload, outputText) {
+  function inspectProfileOutput(payload, outputText) {
     const profile = payload.profile || {};
     const fallback = String(payload.fallback_text || '').trim();
     const output = String(outputText || '').trim();
     if (!output) throw new Error('L’IA locale n’a produit aucun texte.');
+    if (/<think>|\`\`\`/i.test(output)) throw new Error('La réponse IA contient un format technique inattendu.');
+    const warnings = [];
     const ratio = output.length / Math.max(1, fallback.length || output.length);
-    if (ratio < 0.45 || ratio > 1.55) throw new Error('La synthèse IA a trop modifié la longueur attendue.');
-    if (/<think>|```|^\s*[-*]\s+|^\s*#{1,6}\s+/mi.test(output)) throw new Error('La réponse IA contient un format inattendu.');
-    if (/^\s*(?:bilan global|comp[eé]tences|organisation|raisonnement|savoirs|pr[eé]conisations)\s*[:\-]?\s*$/mi.test(output)) throw new Error('La réponse IA contient un titre ou un sous-titre.');
+    if (ratio < 0.35 || ratio > 1.80) warnings.push('longueur très différente du texte moteur');
     const expectedParagraphs = Math.min(4, Math.max(1, (profile?.paragraph_plan || []).length));
-    if (paragraphCount(output) < expectedParagraphs) throw new Error('La synthèse IA doit comporter plusieurs paragraphes.');
-
+    if (paragraphCount(output) < expectedParagraphs) warnings.push('moins de paragraphes que prévu');
     const lead = String(profile?.identity?.lead || '').trim();
-    if (lead && !normalizeGuard(output).startsWith(normalizeGuard(lead))) throw new Error('La synthèse IA ne commence pas par l’identité attendue.');
-    if (/^Monsieur\b/i.test(lead) && /\bil\b/i.test(output)) throw new Error('La synthèse IA a utilisé « il » au lieu de « Monsieur ».');
-    if (/^Madame\b/i.test(lead) && /\belle\b/i.test(output)) throw new Error('La synthèse IA a utilisé « elle » au lieu de « Madame ».');
-    if (/\b(?:le candidat|la candidate|le stagiaire|la stagiaire|la personne)\b/i.test(output)) throw new Error('La synthèse IA a remplacé Monsieur/Madame par une désignation interdite.');
-    if (/\b(?:vous|votre|vos|tu)\b/i.test(output)) throw new Error('La synthèse IA s’adresse directement à la personne, ce qui est interdit.');
-
-    if (/\bniveau\s*(?:NE|I{1,3})\b/i.test(output) || /\d+(?:[.,]\d+)?\s*%/.test(output) || /\d+\s*erreurs?\b/i.test(output) || /\d+(?:[.,]\d+)?\s*\/\s*\d+(?:[.,]\d+)?/.test(output)) {
-      throw new Error('La synthèse IA récite un score, un niveau ou un nombre d’erreurs.');
-    }
-    if (/\bprofil\b/i.test(output)) throw new Error('La synthèse IA a attribué un profil global non demandé.');
-    if (/\bdiagnostic\b|\bpsycholog|\bpersonnalit[eé]\b|\bconfiance en (?:lui|elle|soi)\b/i.test(output)) throw new Error('La synthèse IA contient une interprétation psychologique ou diagnostique.');
-    if (/\borient(?:er|ation)\b|\bm[eé]tier\b|\bposte(?:s)?\s+(?:adapt[eé]|recommand[eé]|conseill[eé])|\bformation\s+(?:adapt[eé]e|recommand[eé]e|conseill[eé]e)/i.test(output)) throw new Error('La synthèse IA contient une orientation professionnelle interdite.');
-
-    if (planHas(profile, 'elements interrompus') && !/(abandonn|interromp)/i.test(output)) throw new Error('La synthèse IA a omis une activité interrompue.');
-    if (planHas(profile, 'elements non evalues') && !/(non[^.!?]{0,40}[eé]valu|pas pu [eê]tre [eé]valu|n[’']ont pas pu [eê]tre [eé]valu)/i.test(output)) throw new Error('La synthèse IA a omis plusieurs éléments non évalués.');
-
-    assertDomainCoverage(profile, output);
-    return output;
+    if (lead && !normalizeGuard(output).startsWith(normalizeGuard(lead))) warnings.push('identité initiale différente');
+    if (/\bil\b|\belle\b|\b(?:le candidat|la candidate|le stagiaire|la stagiaire|la personne)\b/i.test(output)) warnings.push('désignation personnelle à revoir');
+    if (/\b(?:vous|votre|vos|tu)\b/i.test(output)) warnings.push('adresse directe à la personne');
+    if (/^\s*#{1,6}\s+|^\s*(?:bilan global|comp[eé]tences|organisation|raisonnement|savoirs|pr[eé]conisations)\s*[:\-]?\s*$/mi.test(output)) warnings.push('titre ou sous-titre présent');
+    if (/\bniveau\s*(?:NE|I{1,3})\b/i.test(output) || /\d+(?:[.,]\d+)?\s*%/.test(output) || /\d+\s*erreurs?\b/i.test(output)) warnings.push('résultat brut cité');
+    if (/\bprofil\b|\bdiagnostic\b|\bpsycholog|\bpersonnalit[eé]\b|\borient(?:er|ation)\b|\bm[eé]tier\b/i.test(output)) warnings.push('interprétation ou orientation à examiner');
+    try { assertDomainCoverage(profile, output); } catch (error) { warnings.push(String(error.message || error)); }
+    return { output, warnings };
   }
 
   function validateLegacyRewrite(sourceText, outputText) {
@@ -163,49 +151,18 @@ function writingBlockTemplate() {
     return text;
   }
 
-  async function profileParagraphDraft(payload, item, sourceParagraph, index, total) {
-    const identity = payload?.profile?.identity || {};
-    const first = index === 0;
-    const system = [
-      'Tu corriges et fluidifies UN SEUL paragraphe déjà rédigé d’une synthèse destinée à des professionnels du médico-social.',
-      'Le paragraphe SOURCE est factuellement validé par le programme. Sa signification, ses réussites, ses difficultés et ses contrastes sont intouchables.',
-      'Ta mission est uniquement rédactionnelle : accords, fluidité, répétitions lexicales proches et enchaînements.',
-      'Tu ne dois jamais inverser une réussite et une difficulté, ajouter une compétence, ajouter une qualité, ajouter une cause ni élargir une conclusion.',
-      first
-        ? 'Le paragraphe doit commencer exactement par : ' + String(identity.lead || '').trim()
-        : 'Ne répète pas le nom complet. Utilise seulement ' + String(identity.subject || 'Monsieur/Madame') + ' si un sujet personnel est nécessaire.',
-      'N’adresse jamais la personne directement : interdits absolus vous, votre, vos, tu, ton, ta, tes.',
-      'Interdits absolus : il, elle, la personne, le candidat, la candidate, le stagiaire, la stagiaire.',
-      'N’écris aucun titre, sous-titre, numéro, étiquette, liste, puce, champ JSON ou préambule.',
-      'Ne cite aucun niveau I/II/III/NE, score, pourcentage, durée ou nombre d’erreurs.',
-      'Aucun diagnostic, psychologie, personnalité, profil global, orientation professionnelle, métier, secteur, poste ou formation.',
-      'Si une reformulation risque de modifier le sens, recopie la phrase SOURCE plutôt que de l’interpréter.',
-      'Retourne uniquement le paragraphe final.'
-    ].join(' ');
-    const context = JSON.stringify({
-      identity: { lead: identity.lead || '', subject: identity.subject || '' },
-      position: (index + 1) + '/' + total,
-      instruction: String(item?.instruction || ''),
-      faits: Array.isArray(item?.faits) ? item.faits : [],
-      liens: Array.isArray(item?.liens) ? item.liens : []
-    });
-    const user = '/no_think\n\n<paragraphe_source>\n' + String(sourceParagraph || '').trim() + '\n</paragraphe_source>\n\n<context_json>\n' + context + '\n</context_json>\n\nRéécris seulement le paragraphe SOURCE sans changer aucun constat.';
-    const raw = await complete([{ role: 'system', content: system }, { role: 'user', content: user }], 0.10, 0.72, 280, { top_k: 20, repeat_penalty: 1.08 });
-    const text = cleanParagraphDraft(raw);
-    if (!text) throw new Error('Qwen a produit un paragraphe vide à la position ' + (index + 1) + '.');
-    return text;
-  }
-
   async function profileDraft(payload) {
-    const plan = Array.isArray(payload?.profile?.paragraph_plan) ? payload.profile.paragraph_plan : [];
-    const sourceParagraphs = String(payload?.fallback_text || '').split(/\n\s*\n/).map(x => x.trim()).filter(Boolean);
-    if (!plan.length) throw new Error('Le profil structuré ne contient aucun paragraphe à rédiger.');
-    if (sourceParagraphs.length !== plan.length) throw new Error('Le plan structuré et la synthèse moteur ne contiennent pas le même nombre de paragraphes.');
-    const paragraphs = [];
-    for (let index = 0; index < plan.length; index++) {
-      paragraphs.push(await profileParagraphDraft(payload, plan[index], sourceParagraphs[index], index, plan.length));
-    }
-    return paragraphs.join('\n\n');
+    const system = [
+      'Tu rédiges une synthèse professionnelle d’un plateau d’évaluation destinée à des professionnels du médico-social.',
+      'Le JSON fourni a déjà été analysé par le programme : les faits, points d’appui, difficultés et contrastes utiles y sont préparés.',
+      'À partir de ces éléments, rédige une synthèse claire qui explique la manière dont la personne a travaillé pendant le parcours, ses qualités de travail et ses difficultés observées.',
+      'Mets naturellement en relation les éléments lorsqu’un lien ou un contraste est fourni, sans inventer de fait absent du JSON.',
+      'Commence par l’identité indiquée. Rédige plusieurs paragraphes fluides sans faire une simple récitation du tableau.',
+      'Reste centré sur les observations du parcours et n’établis aucun diagnostic.',
+      'Retourne uniquement la synthèse rédigée en français.'
+    ].join(' ');
+    const user = '/no_think\n\nVoici les données déjà pré-analysées par SEB EvalPro. Rédige la synthèse professionnelle correspondante.\n\n<donnees_json>\n' + JSON.stringify(payload.profile) + '\n</donnees_json>';
+    return complete([{ role: 'system', content: system }, { role: 'user', content: user }], 0.30, 0.90, 1400, { top_k: 40, repeat_penalty: 1.08 });
   }
 
   async function legacyDraft(sourceText) {
@@ -249,12 +206,20 @@ function writingBlockTemplate() {
         if (!fallback) return { ok: false, error: 'La synthèse de secours du profil est absente.' };
         const draft = await profileDraft(payload);
         passes = 1;
-        try {
-          const output = validateProfileOutput(payload, draft);
-          return { ok: true, text: output, fallback: false, elapsedMs: Date.now() - startedAt, model: MODEL_LABEL, runtime: RUNTIME_LABEL, offline: true, passes, guard: 'qwen3-1.7b-profile-json-v10' };
-        } catch (error) {
-          return fallbackResult(fallback, startedAt, passes, error.message, draft);
-        }
+        const inspected = inspectProfileOutput(payload, draft);
+        return {
+          ok: true,
+          text: inspected.output,
+          fallback: false,
+          observationMode: true,
+          warnings: inspected.warnings,
+          elapsedMs: Date.now() - startedAt,
+          model: MODEL_LABEL,
+          runtime: RUNTIME_LABEL,
+          offline: true,
+          passes,
+          guard: 'qwen3-1.7b-profile-json-v10-observation'
+        };
       }
 
       const draft = await legacyDraft(sourceText);
@@ -297,4 +262,4 @@ for (const required of [marker, v10Marker, "const PROFILE_KIND = 'seb-evalpro-sy
 try { new vm.Script(source); }
 catch (error) { fail('local-ai.js invalide après patch: ' + error.message); }
 fs.writeFileSync(file, source, 'utf8');
-console.log('SEB EvalPro IA V10: profil JSON pré-analysé + Qwen3-1.7B rédactionnel + validation stricte, socle #9 inchangé.');
+console.log('SEB EvalPro IA V10: mode observation Qwen — profil JSON pré-analysé, sortie conservée avec avertissements non bloquants.');
