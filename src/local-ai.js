@@ -5,6 +5,7 @@ const http = require('http');
 const net = require('net');
 const { spawn } = require('child_process');
 
+// SEB_MINISTRAL_DETERMINISTIC_REWRITE_V1
 const MODEL_FILE = 'Ministral-3-8B-Instruct-2512-Q4_K_M.gguf';
 const MODEL_LABEL = 'Ministral 3 8B Instruct Q4_K_M';
 const RUNTIME_LABEL = 'llama.cpp b10964';
