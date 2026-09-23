@@ -94,9 +94,9 @@ jobs:
             'qwen-rich-context-v1',
             'qwen-four-blocks-v8',
             'Rédige UN SEUL paragraphe professionnel',
-            'top_k: 40',
-            'repeat_penalty: 1.1',
-            'mirostat: 0'
+            'top_k:40',
+            'repeat_penalty:1.1',
+            'mirostat:0'
           )) {
             if (-not $ai.Contains($required)) { throw "Socle #9 ou garde rédactionnelle absent: $required" }
           }
