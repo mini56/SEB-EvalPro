@@ -112,7 +112,7 @@ function writingBlockTemplate() {
       '8. Les éléments de "domaines_reussite" doivent rester des réussites et les éléments de "domaines_vigilance" doivent rester des difficultés ou besoins d’étayage. N’inverse jamais leur sens.',
       '9. Ne généralise jamais un domaine mixte : si une même activité contient des réussites et des vigilances, décris cette nuance. Ne présente pas toute l’activité comme maîtrisée ou toute l’activité comme difficile.',
       '10. N’étends jamais une difficulté à une compétence voisine qui figure parmi les réussites. En particulier, organisation logistique, planification, raisonnement sous contraintes, fabrication et outils numériques doivent rester distincts selon les données.',
-      '11. N’invente aucun trait de personnalité, potentiel, stress, blocage, épanouissement, motivation, adaptabilité, dynamisme, concentration ou confiance. N’ajoute aucune recommandation de soutien, d’amélioration ou de performance si elle n’est pas explicitement portée par les données.',
+      '11. Reste strictement sur les compétences, comportements observés et besoins explicitement présents dans les données. Toute appréciation sur la personnalité, l’état émotionnel, les qualités globales, le potentiel ou les perspectives est interdite si elle n’est pas fournie. Ne formule aucune recommandation, aucun objectif de progression ni aucun besoin supplémentaire qui ne soit explicitement présent dans les données.',
       '12. Les "contrastes" servent uniquement à relier les faits. En cas de formulation générale, les éléments détaillés de "domaines_reussite" et "domaines_vigilance" sont prioritaires et ne doivent jamais être contredits.',
       '',
       'Données à synthétiser :',

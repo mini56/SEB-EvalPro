@@ -47,6 +47,9 @@ const payload=JSON.stringify({kind:'seb-qwen-rich-context-v1',profile});
     assert(text.length>=1200,'La synthèse doit respecter la densité demandée.');
     assert(text.split(/\n\s*\n/).filter(Boolean).length>=4,'La synthèse doit contenir au moins quatre paragraphes.');
 
+    console.log('QWEN_LIGHT_FACTUAL_OUTPUT_BEGIN');
+    console.log(text);
+    console.log('QWEN_LIGHT_FACTUAL_OUTPUT_END');
     const norm=text.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
     for(const unsupported of ['stress','blocage','potentiel','epanouissement','profil dynamique','adaptable','maximiser','performance optimale']){
       assert(!norm.includes(unsupported),'Interprétation non sourcée détectée: '+unsupported);
@@ -65,9 +68,6 @@ const payload=JSON.stringify({kind:'seb-qwen-rich-context-v1',profile});
     assert(!/monsieur convient de noter/.test(norm),'La tournure impersonnelle "Il convient" ne doit plus être cassée.');
     assert(!/qu['’]monsieur/.test(norm),'Le remplacement mécanique il/elle ne doit plus produire qu’Monsieur.');
 
-    console.log('QWEN_LIGHT_FACTUAL_OUTPUT_BEGIN');
-    console.log(text);
-    console.log('QWEN_LIGHT_FACTUAL_OUTPUT_END');
     console.log('QWEN_LIGHT_FACTUAL_GARCIA: OK');
 
     const cancelStarted=Date.now();
