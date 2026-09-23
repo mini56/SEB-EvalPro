@@ -232,6 +232,53 @@ function createLocalAiService({ app }) {
     return text;
   }
 
+  function semanticDegreeGuard(source, output) {
+    const normalize = (value) => String(value || '')
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('fr-FR');
+
+    const src = normalize(source);
+    const out = normalize(output);
+
+    // Les termes ci-dessous ne sont pas interdits en eux-mêmes. Ils sont refusés
+    // seulement quand ils apparaissent dans la synthèse sans degré équivalent
+    // dans la source, car cela transforme le sens plutôt que le style.
+    const strongerTerms = [
+      ['excellent', /\bexcellent(?:e|es|s)?\b/],
+      ['remarquable', /\bremarquable(?:s)?\b/],
+      ['exceptionnel', /\bexceptionnel(?:le|les|s)?\b/],
+      ['parfait', /\bparfait(?:e|es|s)?\b/],
+      ['systematique', /\bsystematiquement\b|\bsystematique(?:s)?\b/],
+      ['pleinement', /\bpleinement\b/],
+      ['totalement', /\btotalement\b/],
+      ['sans ambiguite', /\bsans ambiguite\b/],
+      ['grande rigueur', /\bgrande?\s+rigueur\b/],
+      ['grande precision', /\bgrande?\s+precision\b/],
+      ['tres', /\btres\b/]
+    ];
+
+    const sourceHasStrongDegree = /\b(?:excellent|remarquable|exceptionnel|parfait|systematique|pleinement|totalement|sans ambiguite|tres|particulierement|fortement|grande?\s+(?:rigueur|precision))\b/.test(src);
+
+    if (!sourceHasStrongDegree) {
+      for (const [label, re] of strongerTerms) {
+        if (re.test(out) && !re.test(src)) {
+          throw new Error('La reformulation IA a intensifié une observation absente de la source (' + label + '). Le texte sans IA est conservé.');
+        }
+      }
+    }
+
+    // Une réussite simple ne doit pas devenir une qualité générale de la personne.
+    const personalQualities = [
+      /\b(?:engagement|investissement)\s+(?:fort|marque|remarquable|concret)\b/,
+      /\bprofil\s+(?:dynamique|adapte|polyvalent)\b/,
+      /\b(?:personne|individu|candidat)\s+(?:rigoureux|dynamique|autonome|adapte|polyvalent)\b/
+    ];
+    for (const re of personalQualities) {
+      if (re.test(out) && !re.test(src)) {
+        throw new Error('La reformulation IA a ajouté une qualité générale absente de la source. Le texte sans IA est conservé.');
+      }
+    }
+  }
+
   function validateRewrite(source, output) {
     if (!output) throw new Error('L’IA locale n’a produit aucun texte.');
     const ratio = output.length / Math.max(1, source.length);
@@ -252,6 +299,7 @@ function createLocalAiService({ app }) {
     if (/(abandonn|interromp)/i.test(source) && !/(abandonn|interromp)/i.test(output)) {
       throw new Error('La reformulation IA ne conserve pas clairement l’activité interrompue.');
     }
+    semanticDegreeGuard(source, output);
     return output;
   }
 

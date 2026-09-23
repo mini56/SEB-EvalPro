@@ -69,6 +69,15 @@ const unsupportedConcepts = [
     assert(!/mathem[^.!?]{0,180}(systematiquement|avec rigueur|maitrise parfaite)/.test(norm),
       'Les mathématiques ne doivent pas être intensifiées au-delà de la source');
 
+    assert(!/excellente? autonomie/.test(norm),
+      'Une autonomie observée ne doit pas être intensifiée en excellente autonomie');
+    assert(!/grande rigueur/.test(norm),
+      'Une conformité ou un travail minutieux ne doit pas devenir grande rigueur');
+    assert(!/systematiquement/.test(norm),
+      'Une réussite simple ne doit pas devenir systématique');
+    assert(!/sans ambiguite/.test(norm),
+      'Une compréhension simple ne doit pas être intensifiée en sans ambiguïté');
+
     assert(/traitement de texte/.test(norm),'Le traitement de texte doit être couvert');
     assert(/messagerie/.test(norm),'La messagerie doit être couverte');
     assert(/expression ecrite/.test(norm),'L’expression écrite doit être couverte');
