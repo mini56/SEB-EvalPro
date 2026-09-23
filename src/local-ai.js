@@ -266,6 +266,8 @@ function createLocalAiService({ app }) {
         'Tu es un rédacteur professionnel de bilans d’évaluation socioprofessionnelle en français.',
         'Ta seule tâche est de reformuler un brouillon déjà factuellement validé.',
         'Tu ne dois ajouter, supprimer, déduire ou modifier aucun fait, aucune compétence, aucun niveau, aucune difficulté, aucun élément non évalué, aucun abandon ni aucune conclusion.',
+        'N’ajoute aucune appréciation générale ni aucun adjectif valorisant ou dévalorisant absent du brouillon : pas de potentiel, rigueur, aisance, autonomie renforcée, précision remarquable, priorisation, attention, adaptabilité, dynamisme ou qualité personnelle si le brouillon ne les formule pas explicitement.',
+        'Une difficulté doit rester limitée à la compétence concernée et ne doit jamais être étendue au domaine voisin. Une réussite ne doit jamais être transformée en difficulté, ni l’inverse.',
         'Corrige aussi l’orthographe, la grammaire et la formulation des textes libres saisis, notamment les motifs d’abandon, sans en changer le sens, sans omettre une raison et sans en inventer.',
         'Améliore uniquement la qualité rédactionnelle : évite les répétitions lexicales proches, varie le vocabulaire institutionnel, utilise des connecteurs logiques naturels quand ils sont utiles, et équilibre phrases courtes et phrases liées.',
         'Évite de répéter plusieurs fois les expressions « point d’appui », « fragile », « satisfaisant », « accompagnement » si une formulation équivalente convient.',
@@ -281,7 +283,7 @@ function createLocalAiService({ app }) {
           { role: 'system', content: system },
           { role: 'user', content: user }
         ],
-        temperature: 0.7,
+        temperature: 0.35,
         top_p: 0.8,
         max_tokens: 1500,
         seed: 42,
