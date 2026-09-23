@@ -522,6 +522,9 @@ function injectAdminBar() {
     showBar();
 
     if (adminUnlocked) {
+      if (adminCandidateWorkspace || adminCandidateResultsWorkspace) {
+        await ipcRenderer.invoke('ai:cancel-current').catch(() => false);
+      }
       // SEB_ADMIN_NAVIGATION_SAFE_LOCK
       if (adminCandidateWorkspace && isAdminBilanPage()) {
         const saved = saveNow(true);
@@ -575,6 +578,9 @@ function injectAdminBar() {
   });
 
   returnButton.addEventListener('click', async () => {
+    if (adminCandidateResultsWorkspace || adminCandidateWorkspace) {
+      await ipcRenderer.invoke('ai:cancel-current').catch(() => false);
+    }
     if (adminCandidateResultsWorkspace) {
       const candidateId = String(adminCandidateResultsWorkspace.candidateId || '');
       adminNavigationLeaving = true;
@@ -662,6 +668,8 @@ function injectAdminBar() {
       scheduleHideBar();
       return;
     }
+
+    await ipcRenderer.invoke('ai:cancel-current').catch(() => false);
 
     const saved = saveNow(true);
     if (saved && saved.ok === false) {
@@ -752,6 +760,7 @@ function showReadOnlyCandidateResults() {
     closeResults.style.cssText = 'display:block;margin:0 0 14px auto;padding:8px 14px;border:2px solid #0070c0;border-radius:6px;background:#fff;color:#0070c0;font:700 14px Arial,sans-serif;cursor:pointer;';
     closeResults.addEventListener('click', async () => {
       closeResults.disabled = true;
+      await ipcRenderer.invoke('ai:cancel-current').catch(() => false);
       const candidateId = String(adminCandidateResultsWorkspace && adminCandidateResultsWorkspace.candidateId || '');
       adminNavigationLeaving = true;
       await ipcRenderer.invoke('candidate-catalog:end-results').catch(() => false);

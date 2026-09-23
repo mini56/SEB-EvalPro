@@ -19,6 +19,7 @@ function createLocalAiService({ app }) {
   let lastLogs = '';
   let lastExitCode = null;
   let lastStartError = '';
+  const activeRequests = new Set();
 
   function runtimeDir() {
     return app.isPackaged
@@ -94,6 +95,8 @@ function createLocalAiService({ app }) {
           catch (_) { reject(new Error('Réponse JSON invalide du moteur IA local.')); }
         });
       });
+      activeRequests.add(req);
+      req.once('close', () => activeRequests.delete(req));
       req.on('timeout', () => req.destroy(new Error('Délai dépassé pour le moteur IA local.')));
       req.on('error', reject);
       if (payload) req.write(payload);
@@ -162,18 +165,23 @@ function createLocalAiService({ app }) {
       const capture = (chunk) => {
         lastLogs = (lastLogs + String(chunk || '')).slice(-8000);
       };
+      const spawnedProcess = serverProcess;
       serverProcess.stdout?.on('data', capture);
       serverProcess.stderr?.on('data', capture);
       serverProcess.on('error', (error) => {
         lastStartError = String(error && error.message ? error.message : error || '');
         capture(lastStartError);
-        serverProcess = null;
-        serverPort = 0;
+        if (serverProcess === spawnedProcess) {
+          serverProcess = null;
+          serverPort = 0;
+        }
       });
       serverProcess.on('exit', (code) => {
         lastExitCode = code;
-        serverProcess = null;
-        serverPort = 0;
+        if (serverProcess === spawnedProcess) {
+          serverProcess = null;
+          serverPort = 0;
+        }
       });
 
       await waitUntilReady(Date.now() + START_TIMEOUT_MS);
@@ -270,15 +278,44 @@ function createLocalAiService({ app }) {
     }
   }
 
-  function stop() {
+  function cancelCurrent(reason = 'Fermeture du candidat') {
+    const message = 'Génération IA annulée : ' + String(reason || 'fermeture du candidat') + '.';
+    let requestsCancelled = 0;
+    for (const req of Array.from(activeRequests)) {
+      try {
+        requestsCancelled += 1;
+        req.destroy(new Error(message));
+      } catch (_) {}
+    }
+    activeRequests.clear();
+
+    const processToStop = serverProcess;
+    let processStopped = false;
     try {
-      if (serverProcess && !serverProcess.killed) serverProcess.kill();
+      if (processToStop && !processToStop.killed) {
+        processToStop.kill();
+        processStopped = true;
+      }
     } catch (_) {}
-    serverProcess = null;
-    serverPort = 0;
+    if (serverProcess === processToStop) {
+      serverProcess = null;
+      serverPort = 0;
+    }
+
+    return {
+      ok: true,
+      cancelled: requestsCancelled > 0 || processStopped,
+      requestsCancelled,
+      processStopped,
+      offline: true
+    };
   }
 
-  return { status, rewrite, stop };
+  function stop() {
+    cancelCurrent('Arrêt de SEB EvalPro');
+  }
+
+  return { status, rewrite, cancelCurrent, stop };
 }
 
 module.exports = { createLocalAiService };

@@ -543,6 +543,7 @@ ipcMain.handle('admin:verify-password', (_event, password) => {
 ipcMain.handle('admin:status', () => adminSessionUnlocked);
 
 ipcMain.handle('admin:lock', () => {
+  localAi.cancelCurrent('Verrouillage de l’espace administrateur');
   adminSessionUnlocked = false;
   adminExportCandidateDir = null;
   if (mainWindow && !mainWindow.isDestroyed()) {
@@ -625,6 +626,7 @@ ipcMain.handle('admin:open-candidate-browser', (_event, candidateId) => {
 });
 
 ipcMain.handle('admin:return-candidate-browser', (_event, candidateId) => {
+  localAi.cancelCurrent('Fermeture du candidat');
   return loadAdminCandidateBrowser(candidateId);
 });
 
@@ -660,6 +662,11 @@ ipcMain.handle('ai:status', () => {
 ipcMain.handle('ai:rewrite-synthesis', async (_event, text) => {
   if (!adminSessionUnlocked) return { ok: false, error: 'Accès administrateur requis.' };
   return localAi.rewrite(String(text || ''));
+});
+
+ipcMain.handle('ai:cancel-current', () => {
+  if (!adminSessionUnlocked) return { ok:false, cancelled:false, error:'Accès administrateur requis.' };
+  return localAi.cancelCurrent('Fermeture du candidat');
 });
 
 require('./session-close')({

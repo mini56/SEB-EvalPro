@@ -88,6 +88,18 @@ const payload=JSON.stringify({kind:'seb-qwen-rich-context-v1',profile});
     console.log('QWEN_RICH_FALLBACK_PARAGRAPHS '+JSON.stringify((result.fallbackParagraphs||[]).map(x=>({paragraphe:x.paragraphe,errors:x.errors}))));
     console.log('QWEN_RICH_GLOBAL_FALLBACK '+String(!!result.globalFallback));
     console.log('QWEN_RICH_COVERAGE_VALIDATION: OK');
+
+    const cancelStarted=Date.now();
+    const pendingCancellation=service.rewrite(payload);
+    await new Promise((resolve)=>setTimeout(resolve,25));
+    const cancelResult=service.cancelCurrent('Fermeture du candidat — smoke test');
+    assert(cancelResult && cancelResult.ok,'L’annulation IA doit répondre ok.');
+    assert(cancelResult.cancelled,'L’annulation doit interrompre une requête ou arrêter Qwen.');
+    const cancelledRewrite=await pendingCancellation;
+    const cancelElapsed=Date.now()-cancelStarted;
+    assert(cancelledRewrite && cancelledRewrite.ok===false,'La synthèse annulée ne doit jamais être validée.');
+    assert(cancelElapsed<15000,'La synthèse annulée doit rendre la main rapidement.');
+    console.log('QWEN_CANCEL_ON_CANDIDATE_CLOSE: OK '+cancelElapsed+'ms');
   }finally{
     service.stop();
   }
