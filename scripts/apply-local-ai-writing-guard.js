@@ -42,7 +42,7 @@ const motorPrefix = source.slice(0, start);
 function writingBlockTemplate() {
   // SEB_LOCAL_AI_QWEN_DIRECT_USER_FILES
   const RICH_KIND = 'seb-qwen-rich-context-v1';
-  const DIRECT_GUARD = 'qwen-factual-frame-v4';
+  const DIRECT_GUARD = 'qwen-factual-frame-v5';
 
   function cleanModelOutput(raw) {
     let text = String(raw || '').replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
@@ -96,11 +96,13 @@ function writingBlockTemplate() {
     const civilite = String(profile?.civilite || 'Monsieur');
     const nom = String(profile?.nom || '');
     const prenom = String(profile?.prenom || '');
+    const trame=Array.isArray(profile?.trame_factuelle)?profile.trame_factuelle:[];
+    const domainesObligatoires=trame.map(x=>String(x?.domaine||'')).filter(Boolean);
     const json = JSON.stringify({
       civilite,
       nom,
       prenom,
-      trame_factuelle:Array.isArray(profile?.trame_factuelle)?profile.trame_factuelle:[],
+      trame_factuelle:trame,
       motivation_personnelle:String(profile?.motivation_personnelle||'')
     }, null, 2);
     return [
@@ -110,19 +112,22 @@ function writingBlockTemplate() {
       'RÈGLES ABSOLUES ET NON NÉGOCIABLES :',
       `1. Commence impérativement la réponse par : "${civilite} ${nom} ${prenom} a participé aux mises en situation proposées au cours du plateau technique."`,
       `2. Utilise UNIQUEMENT "${civilite}" pour désigner la personne évaluée. N'utilise jamais "il", "elle", "ce candidat", "le candidat", "le stagiaire" ou "la personne" pour parler d'elle. Les tournures réellement impersonnelles comme "Il convient de noter que" ou "Il existe" restent autorisées.`,
-      '3. Rédige 4 à 6 paragraphes continus, de longueur raisonnable. Ne cherche pas à allonger artificiellement le texte. INTERDICTION d’utiliser des titres, sous-titres, listes à puces, tirets ou énumérations.',
-      '4. INTERDICTION absolue de mentionner des chiffres, des pourcentages, des durées, des nombres d’erreurs, des scores ou des niveaux (I, II, III). Utilise uniquement des qualificatifs professionnels (ex: "rythme lent", "fiabilité à consolider", "autonomie acquise", "difficultés marquées").',
-      '5. INTERDICTION de poser un diagnostic médical ou psychologique, et INTERDICTION de suggérer une orientation professionnelle, un métier ou une formation.',
-      '6. Utilise exclusivement "trame_factuelle". Chaque domaine contient "points_appui" et "vigilances". Si "vigilances" est vide, il est FORMELLEMENT INTERDIT d’attribuer une difficulté, une limite ou un besoin à ce domaine.',
-      '7. Si "motivation_personnelle" est vide, n’évoque jamais motivation, volonté, souhait, désir de progresser, épanouissement ou projet personnel. Si elle est renseignée, reprends uniquement ce qui y figure.',
-      '8. CHAQUE élément de "domaines_reussite" est une réussite. Pour le module concerné, n’ajoute AUCUNE difficulté, limite, réserve, besoin d’étayage, accompagnement ou amélioration qui ne figure pas explicitement dans cet élément.',
-      '9. CHAQUE élément de "domaines_vigilance" est une vigilance. Décris uniquement la difficulté indiquée dans cet élément, sans l’étendre à une compétence voisine.',
-      '10. Si une activité contient à la fois des réussites et des vigilances, décris précisément ce caractère mixte. N’écris jamais "maîtrise globale", "difficultés globales" ou une conclusion équivalente sur toute l’activité.',
-      '11. Organisation logistique, planification, résolution de problèmes sous contraintes, tri, traitement de texte, messagerie, expression écrite et mathématiques sont des compétences distinctes. Un résultat faible dans l’une ne doit jamais contaminer les autres.',
-      '12. Reste strictement sur les compétences et comportements observés. Toute appréciation sur personnalité, état émotionnel, potentiel, adaptabilité, dynamisme, rigueur, motivation, concentration, confiance ou perspectives est interdite si elle n’est pas explicitement fournie.',
-      '13. N’ajoute aucune recommandation, aucun objectif de progression, aucun besoin de soutien supplémentaire et aucune notion de performance qui ne soit explicitement présente dans les données.',
-      '14. Pour un domaine mixte, cite les points d’appui puis les seules vigilances présentes dans la trame. Pour un domaine sans vigilance, reste uniquement positif et factuel.',
-      '15. Avant de répondre, vérifie chaque phrase contre "trame_factuelle". Si une affirmation ne correspond pas directement à une observation de la trame, supprime-la.',
+      `3. La trame contient ${domainesObligatoires.length} domaines. Tu dois couvrir TOUS ces domaines, dans l’ordre fourni, sans en omettre un seul : ${domainesObligatoires.join(' ; ')}.`,
+      '4. Rédige un texte continu en paragraphes naturels. Tu peux utiliser autant de paragraphes que nécessaire pour couvrir tous les domaines. INTERDICTION d’utiliser des titres, sous-titres, listes à puces, tirets ou énumérations.'
+      '5. INTERDICTION absolue de mentionner des chiffres, des pourcentages, des durées, des nombres d’erreurs, des scores ou des niveaux (I, II, III). Utilise uniquement des qualificatifs professionnels.',
+      '6. INTERDICTION de poser un diagnostic médical ou psychologique, et INTERDICTION de suggérer une orientation professionnelle, un métier ou une formation.',
+      '7. Utilise exclusivement "trame_factuelle". Pour CHAQUE domaine, tu dois reprendre toutes les observations de "points_appui" et toutes les observations de "vigilances". Aucun élément de la trame ne doit disparaître.',
+      '8. Si "vigilances" est vide pour un domaine, il est FORMELLEMENT INTERDIT d’attribuer une difficulté, une limite ou un besoin à ce domaine.'
+      '9. Si "motivation_personnelle" est vide, n’évoque jamais motivation, volonté, souhait, désir de progresser, épanouissement ou projet personnel. Si elle est renseignée, reprends uniquement ce qui y figure.',
+      '10. CHAQUE élément de "domaines_reussite" est une réussite. Pour le module concerné, n’ajoute AUCUNE difficulté, limite, réserve, besoin d’étayage, accompagnement ou amélioration qui ne figure pas explicitement dans cet élément.',
+      '11. CHAQUE élément de "domaines_vigilance" est une vigilance. Décris uniquement la difficulté indiquée dans cet élément, sans l’étendre à une compétence voisine.',
+      '12. Si une activité contient à la fois des réussites et des vigilances, décris précisément ce caractère mixte. N’écris jamais "maîtrise globale", "difficultés globales" ou une conclusion équivalente sur toute l’activité.',
+      '13. Organisation logistique, planification, résolution de problèmes sous contraintes, tri, traitement de texte, messagerie, expression écrite et mathématiques sont des compétences distinctes. Un résultat faible dans l’une ne doit jamais contaminer les autres.',
+      '14. Reste strictement sur les compétences et comportements observés. Toute appréciation sur personnalité, état émotionnel, potentiel, adaptabilité, dynamisme, rigueur, motivation, concentration, confiance ou perspectives est interdite si elle n’est pas explicitement fournie.',
+      '15. N’ajoute aucune recommandation, aucun objectif de progression, aucun besoin de soutien supplémentaire et aucune notion de performance qui ne soit explicitement présente dans les données.',
+      '16. Pour un domaine mixte, cite les points d’appui puis les seules vigilances présentes dans la trame. Pour un domaine sans vigilance, reste uniquement positif et factuel.',
+      '17. Avant de répondre, vérifie chaque phrase contre "trame_factuelle". Si une affirmation ne correspond pas directement à une observation de la trame, supprime-la.',
+      '18. Ne termine pas par une conclusion générale ou un résumé inventé. Une fois le dernier domaine couvert, arrête la réponse.'
       '',
       'Données à synthétiser :',
       json,
@@ -246,7 +251,7 @@ replacement = replacement.split('\n').map(line => line ? '  ' + line : '').join(
 source = source.slice(0, start) + replacement + source.slice(end);
 
 if (!source.startsWith(motorPrefix)) fail('le patch a modifié la zone moteur de démarrage');
-for (const required of [marker, 'qwen-factual-frame-v4', 'RÈGLES ABSOLUES ET NON NÉGOCIABLES', 'trame_factuelle', 'Si "vigilances" est vide', 'La synthèse est trop courte', 'top_k: 40', 'repeat_penalty: 1.1', 'mirostat: 0']) {
+for (const required of [marker, 'qwen-factual-frame-v5', 'RÈGLES ABSOLUES ET NON NÉGOCIABLES', 'trame_factuelle', 'Si "vigilances" est vide', 'La synthèse est trop courte', 'top_k: 40', 'repeat_penalty: 1.1', 'mirostat: 0']) {
   if (!source.includes(required)) fail('élément Qwen direct absent après patch: ' + required);
 }
 for (const forbidden of ['START_ATTEMPTS', "'--ctx-size', String(", 'totalRamGb <= 8', 'Fait obligatoire omis', 'Contrôle de fidélité Qwen refusé']) {

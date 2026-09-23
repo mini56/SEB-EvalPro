@@ -53,7 +53,7 @@ const payload=JSON.stringify({kind:'seb-qwen-rich-context-v1',profile});
     const result=await service.rewrite(payload);
     if(!result?.ok) throw new Error(result?.error||'Qwen direct: génération refusée');
     const text=String(result.text||'').trim();
-    assert.strictEqual(result.guard,'qwen-factual-frame-v4','La trame factuelle v4 doit être active.');
+    assert.strictEqual(result.guard,'qwen-factual-frame-v5','La trame factuelle v4 doit être active.');
     assert(text.startsWith('Monsieur GARCIA José a participé'),'Le début institutionnel doit être conservé.');
     assert(text.length>=700,'La synthèse ne doit pas être anormalement courte.');
     assert(text.split(/\n\s*\n/).filter(Boolean).length>=4,'La synthèse doit contenir au moins quatre paragraphes.');
@@ -70,10 +70,27 @@ const payload=JSON.stringify({kind:'seb-qwen-rich-context-v1',profile});
     assert(!/(?:potentiel professionnel|maximiser|performance|en train de progresser)/.test(norm),'Conclusion ou progression non sourcée détectée.');
     assert(!/\bil\s+(?:montre|maitrise|demontre|est capable|presente|rencontre|souffre|utilise|realise|a besoin|sait|comprend|assemble|reussit|dispose|possede)\b/.test(norm),'Pronom personnel "il" encore utilisé pour désigner le candidat.');
     const sentences=norm.split(/(?<=[.!?])\s+/);
+    for(const [label,pattern] of [
+      ['fabrication',/(fabrication|structure 3d|tracage|decoup|assembl|finition)/],
+      ['briques',/(brique|schema simple)/],
+      ['carré magique',/(carre magique|probleme structure)/],
+      ['organisation logistique',/(organisation logistique|stock)/],
+      ['planification',/(planif|ordre d.execution|restaurant)/],
+      ['tri',/(tri de chevilles|fiabilite du tri|rythme de realisation)/],
+      ['traitement de texte',/traitement de texte/],
+      ['messagerie',/(messagerie|message hierarchise)/],
+      ['expression écrite',/expression ecrite/],
+      ['mathématiques',/mathematique/]
+    ]){
+      assert(pattern.test(norm),'Domaine obligatoire omis : '+label);
+    }
+    assert(/brique[^.!?]{0,220}(?:schema|compren|decoder|identifier)/.test(norm)||/schema simple/.test(norm),'La lecture/compréhension du schéma des briques doit être couverte.');
+    assert(/assembl[^.!?]{0,180}(?:consigne|aide|etayage)/.test(norm),'La vigilance d’assemblage de la fabrication doit être couverte.');
     function noInventedDifficulty(labels,description){
       const related=sentences.filter(s=>labels.some(label=>s.includes(label)));
       for(const sentence of related){
-        assert(!/(difficult|fragil|limite|a consolider|etayage|accompagnement|soutien|amelior|incomplet|insuffisant|souffr)/.test(sentence),
+        const check=sentence.replace(/sans difficult(?:e|es)?/g,'').replace(/aucune difficult(?:e|es)?/g,'');
+        assert(!/(difficult|fragil|limite|a consolider|etayage|accompagnement|soutien|amelior|incomplet|insuffisant|souffr)/.test(check),
           description+' transformé en difficulté: '+sentence);
       }
     }
