@@ -59,7 +59,7 @@
     let a_reussi_numerique=false;
     let a_echoue_ecrit=false;
     let a_reussi_consigne_simple=false;
-    let a_echoue_contraintes_multiples=false;
+    const contraintes_vigilance=new Set();
 
     for(const ligne of Array.isArray(lignes_tableau)?lignes_tableau:[]){
       const module=norm(ligne?.module);
@@ -88,18 +88,22 @@
       }else if(niveau==='II'||niveau==='III'){
         domaines_vigilance.push(phrase);
         if(moduleLower.includes('expression écrite'))a_echoue_ecrit=true;
-        if(moduleLower.includes('contraintes')||moduleLower.includes('organisation')||moduleLower.includes('logistique')||moduleLower.includes('restaurant'))a_echoue_contraintes_multiples=true;
+        if(moduleLower.includes('organisation logistique'))contraintes_vigilance.add("l’organisation logistique");
+        else if(moduleLower.includes('restaurant'))contraintes_vigilance.add("la planification");
+        else if(moduleLower.includes('carré magique'))contraintes_vigilance.add("la résolution de problèmes sous contraintes");
       }
     }
 
     if(a_reussi_numerique&&a_echoue_ecrit){
       contrastes.push("Un contraste marqué s'observe entre la maîtrise des outils numériques et les difficultés rencontrées dans la structuration et l'orthographe de l'expression écrite.");
     }
-    if(a_reussi_consigne_simple&&a_echoue_contraintes_multiples){
-      contrastes.push("Il existe une opposition nette entre la capacité à exécuter des consignes simples et les difficultés majeures face à l'organisation, la planification ou la prise en compte de contraintes multiples.");
+    if(a_reussi_consigne_simple&&contraintes_vigilance.size){
+      const domaines=[...contraintes_vigilance];
+      const detail=domaines.length===1?domaines[0]:domaines.slice(0,-1).join(', ')+' et '+domaines[domaines.length-1];
+      contrastes.push("Un contraste est observé entre la capacité à exécuter des consignes simples et les difficultés relevées dans "+detail+".");
     }
     if(domaines_reussite.length>0&&domaines_vigilance.length>0&&!contrastes.length){
-      contrastes.push("Le profil est hétérogène, alternant des réussites nettes dans des cadres structurés et des difficultés dès que l'autonomie ou la gestion de plusieurs paramètres est requise.");
+      contrastes.push("Le parcours associe des domaines de réussite et des domaines nécessitant davantage d’étayage ou de précision.");
     }
 
     let motivation_personnelle='';

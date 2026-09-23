@@ -42,7 +42,7 @@ const motorPrefix = source.slice(0, start);
 function writingBlockTemplate() {
   // SEB_LOCAL_AI_QWEN_DIRECT_USER_FILES
   const RICH_KIND = 'seb-qwen-rich-context-v1';
-  const DIRECT_GUARD = 'qwen-direct-user-files-v1';
+  const DIRECT_GUARD = 'qwen-direct-light-factual-v2';
 
   function cleanModelOutput(raw) {
     let text = String(raw || '').replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
@@ -74,8 +74,8 @@ function writingBlockTemplate() {
     const startRe = new RegExp('^.*?(' + escapeRegExp(debut_correct) + ')', 's');
     let texte = original.replace(startRe, '$1');
 
-    texte = texte.replace(/\b[Ii]l\b/g, civilite);
-    texte = texte.replace(/\b[Ee]lle\b/g, civilite);
+    // Ne pas remplacer mécaniquement "il/elle" : cela cassait notamment "Il convient de noter".
+    // Le prompt interdit leur emploi lorsqu'ils désignent la personne évaluée.
     texte = texte.replace(/\ble candidat\b/gi, civilite);
     texte = texte.replace(/\ble stagiaire\b/gi, civilite);
     texte = texte.replace(/\bla personne\b/gi, civilite);
@@ -103,12 +103,17 @@ function writingBlockTemplate() {
       '',
       'RÈGLES ABSOLUES ET NON NÉGOCIABLES :',
       `1. Commence impérativement la réponse par : "${civilite} ${nom} ${prenom} a participé aux mises en situation proposées au cours du plateau technique."`,
-      `2. Utilise UNIQUEMENT "${civilite}" pour désigner la personne. INTERDICTION formelle d'utiliser "il", "elle", "le candidat", "le stagiaire" ou "la personne".`,
+      `2. Utilise UNIQUEMENT "${civilite}" pour désigner la personne. N'utilise jamais "il" ou "elle" pour parler de la personne évaluée, ni "le candidat", "le stagiaire" ou "la personne". Une tournure impersonnelle telle que "Il convient de noter que" reste autorisée.`,
       '3. Rédige au moins 4 à 5 paragraphes denses et continus. INTERDICTION absolue d’utiliser des titres, sous-titres, listes à puces, tirets ou énumérations.',
       '4. INTERDICTION absolue de mentionner des chiffres, des pourcentages, des durées, des nombres d’erreurs, des scores ou des niveaux (I, II, III). Utilise uniquement des qualificatifs professionnels (ex: "rythme lent", "fiabilité à consolider", "autonomie acquise", "difficultés marquées").',
       '5. INTERDICTION de poser un diagnostic médical ou psychologique, et INTERDICTION de suggérer une orientation professionnelle, un métier ou une formation.',
       '6. Ton objectif est de relier les faits de manière fluide. Utilise les éléments du tableau "contrastes" pour expliquer les nuances du parcours avec des connecteurs logiques (Toutefois, En revanche, Par ailleurs, Il convient de noter que).',
       '7. Si une "motivation_personnelle" est fournie, intègre-la dans le dernier paragraphe pour humaniser le bilan.',
+      '8. Les éléments de "domaines_reussite" doivent rester des réussites et les éléments de "domaines_vigilance" doivent rester des difficultés ou besoins d’étayage. N’inverse jamais leur sens.',
+      '9. Ne généralise jamais un domaine mixte : si une même activité contient des réussites et des vigilances, décris cette nuance. Ne présente pas toute l’activité comme maîtrisée ou toute l’activité comme difficile.',
+      '10. N’étends jamais une difficulté à une compétence voisine qui figure parmi les réussites. En particulier, organisation logistique, planification, raisonnement sous contraintes, fabrication et outils numériques doivent rester distincts selon les données.',
+      '11. N’invente aucun trait de personnalité, potentiel, stress, blocage, épanouissement, motivation, adaptabilité, dynamisme, concentration ou confiance. N’ajoute aucune recommandation de soutien, d’amélioration ou de performance si elle n’est pas explicitement portée par les données.',
+      '12. Les "contrastes" servent uniquement à relier les faits. En cas de formulation générale, les éléments détaillés de "domaines_reussite" et "domaines_vigilance" sont prioritaires et ne doivent jamais être contredits.',
       '',
       'Données à synthétiser :',
       json,
@@ -232,7 +237,7 @@ replacement = replacement.split('\n').map(line => line ? '  ' + line : '').join(
 source = source.slice(0, start) + replacement + source.slice(end);
 
 if (!source.startsWith(motorPrefix)) fail('le patch a modifié la zone moteur de démarrage');
-for (const required of [marker, 'qwen-direct-user-files-v1', 'RÈGLES ABSOLUES ET NON NÉGOCIABLES', 'La synthèse est trop courte', 'top_k: 40', 'repeat_penalty: 1.1', 'mirostat: 0']) {
+for (const required of [marker, 'qwen-direct-light-factual-v2', 'RÈGLES ABSOLUES ET NON NÉGOCIABLES', 'domaines_reussite', 'domaines_vigilance', 'N’invente aucun trait de personnalité', 'La synthèse est trop courte', 'top_k: 40', 'repeat_penalty: 1.1', 'mirostat: 0']) {
   if (!source.includes(required)) fail('élément Qwen direct absent après patch: ' + required);
 }
 for (const forbidden of ['START_ATTEMPTS', "'--ctx-size', String(", 'totalRamGb <= 8', 'Fait obligatoire omis', 'Contrôle de fidélité Qwen refusé']) {
@@ -241,4 +246,4 @@ for (const forbidden of ['START_ATTEMPTS', "'--ctx-size', String(", 'totalRamGb 
 try { new vm.Script(source); }
 catch (error) { fail('local-ai.js invalide après patch: ' + error.message); }
 fs.writeFileSync(file, source, 'utf8');
-console.log('SEB EvalPro: Qwen direct appliqué depuis les fichiers fournis, sans contrôle de fidélité paragraphe par paragraphe.');
+console.log('SEB EvalPro: Qwen direct avec garde-fous factuels légers appliqué, sans contrôle mot à mot ni réécriture automatique.');
