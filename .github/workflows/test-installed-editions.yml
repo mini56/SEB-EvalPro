@@ -1,0 +1,122 @@
+name: TEST Installed Candidat Admin Editions
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - tmp-split-candidat-admin-ai-pack
+    paths:
+      - '.github/workflows/test-installed-editions.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  installed-editions:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - name: Download stable split Setup #6
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $url = 'https://github.com/mini56/SEB-EvalPro/releases/download/seb-evalpro-split-6/SEB-eval-PRO-0.2.6-Windows-Setup.exe'
+          curl.exe -L --fail --retry 3 --retry-delay 3 -o 'SEB-EvalPro-Setup.exe' $url
+          if ($LASTEXITCODE -ne 0) { throw 'Téléchargement Setup #6 échoué.' }
+          $sha = (Get-FileHash 'SEB-EvalPro-Setup.exe' -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($sha -ne '097d3b50b10f0c6f9b031414754f38f28e7c86188ca475f44363708d370be20f') {
+            throw "SHA Setup #6 inattendu: $sha"
+          }
+          Write-Host "SETUP_6_VERIFIED: $((Get-Item 'SEB-EvalPro-Setup.exe').Length) octets"
+
+      - name: Install Candidate edition silently
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $install = 'C:\SEBEvalPro-Edition-Test'
+          Remove-Item -Recurse -Force $install -ErrorAction SilentlyContinue
+          Remove-Item 'HKCU:\Software\SEB EvalPro' -Recurse -Force -ErrorAction SilentlyContinue
+
+          $p = Start-Process -FilePath (Resolve-Path 'SEB-EvalPro-Setup.exe').Path -ArgumentList @('/S',"/D=$install") -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "Installation Candidat échouée: $($p.ExitCode)" }
+
+          if (-not (Test-Path "$install\edition-candidate.flag")) { throw 'Marqueur Candidat absent.' }
+          if (Test-Path "$install\edition-admin.flag") { throw 'Marqueur Admin présent sur installation Candidat.' }
+          $edition = Get-Content "$install\edition.json" -Raw | ConvertFrom-Json
+          if ($edition.edition -ne 'candidate') { throw "edition.json invalide: $($edition.edition)" }
+          if (Test-Path "$install\resources\ai") { throw 'Le Pack IA est embarqué dans la version Candidat.' }
+
+          $reg = Get-ItemProperty -Path 'HKCU:\Software\SEB EvalPro' -Name Edition -ErrorAction Stop
+          if ($reg.Edition -ne 'candidate') { throw 'Registre édition Candidat invalide.' }
+          Write-Host 'INSTALLED_CANDIDATE_EDITION: OK'
+
+      - name: Switch same installation to Admin edition
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $install = 'C:\SEBEvalPro-Edition-Test'
+          New-Item -Path 'HKCU:\Software\SEB EvalPro' -Force | Out-Null
+          Set-ItemProperty -Path 'HKCU:\Software\SEB EvalPro' -Name Edition -Value 'admin'
+
+          # Le test du Pack IA réel est réalisé dans le workflow dédié. Ici un fichier
+          # sentinelle évite de retélécharger 5,2 Go et vérifie seulement que le Setup
+          # Admin utilise bien le Pack persistant hors de son propre dossier.
+          $programData = [Environment]::GetFolderPath('CommonApplicationData')
+          $aiDir = Join-Path $programData 'SEB EvalPro\IA'
+          New-Item -ItemType Directory -Force -Path $aiDir | Out-Null
+          $model = Join-Path $aiDir 'Ministral-3-8B-Instruct-2512-Q4_K_M.gguf'
+          Set-Content -Path $model -Value 'SEB_EVALPRO_TEST_SENTINEL' -NoNewline
+
+          $p = Start-Process -FilePath (Resolve-Path 'SEB-EvalPro-Setup.exe').Path -ArgumentList @('/S',"/D=$install") -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "Installation Admin échouée: $($p.ExitCode)" }
+
+          if (-not (Test-Path "$install\edition-admin.flag")) { throw 'Marqueur Admin absent.' }
+          if (Test-Path "$install\edition-candidate.flag") { throw 'Ancien marqueur Candidat non supprimé.' }
+          $edition = Get-Content "$install\edition.json" -Raw | ConvertFrom-Json
+          if ($edition.edition -ne 'admin') { throw "edition.json Admin invalide: $($edition.edition)" }
+          if (-not (Test-Path $model)) { throw 'Le Pack IA persistant a été supprimé lors de la mise à jour Admin.' }
+          $sentinel = Get-Content $model -Raw
+          if ($sentinel -ne 'SEB_EVALPRO_TEST_SENTINEL') { throw 'Le Pack IA persistant a été modifié par le Setup principal.' }
+          if (Test-Path "$install\resources\ai") { throw 'Le Pack IA est embarqué dans le Setup principal.' }
+
+          $reg = Get-ItemProperty -Path 'HKCU:\Software\SEB EvalPro' -Name Edition -ErrorAction Stop
+          if ($reg.Edition -ne 'admin') { throw 'Registre édition Admin invalide.' }
+          Write-Host 'INSTALLED_ADMIN_EDITION: OK'
+          Write-Host 'PERSISTENT_EXTERNAL_AI_PACK: OK'
+
+      - name: Switch back to Candidate without touching AI Pack
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $install = 'C:\SEBEvalPro-Edition-Test'
+          Set-ItemProperty -Path 'HKCU:\Software\SEB EvalPro' -Name Edition -Value 'candidate'
+          $programData = [Environment]::GetFolderPath('CommonApplicationData')
+          $model = Join-Path $programData 'SEB EvalPro\IA\Ministral-3-8B-Instruct-2512-Q4_K_M.gguf'
+
+          $p = Start-Process -FilePath (Resolve-Path 'SEB-EvalPro-Setup.exe').Path -ArgumentList @('/S',"/D=$install") -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "Retour Candidat échoué: $($p.ExitCode)" }
+
+          if (-not (Test-Path "$install\edition-candidate.flag")) { throw 'Marqueur Candidat absent après changement d édition.' }
+          if (Test-Path "$install\edition-admin.flag") { throw 'Marqueur Admin non supprimé au retour Candidat.' }
+          if (-not (Test-Path $model)) { throw 'Le Pack IA indépendant a été supprimé par la version Candidat.' }
+          Write-Host 'EDITION_SWITCH_ADMIN_TO_CANDIDATE: OK'
+          Write-Host 'AI_PACK_SURVIVES_APP_UPDATE: OK'
+
+      - name: Verify application uninstaller preserves AI Pack
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $install = 'C:\SEBEvalPro-Edition-Test'
+          $uninstaller = Join-Path $install 'Uninstall SEB-éval-PRO.exe'
+          if (-not (Test-Path $uninstaller)) {
+            $uninstaller = Get-ChildItem $install -Filter 'Uninstall*.exe' | Select-Object -First 1 -ExpandProperty FullName
+          }
+          if (-not $uninstaller -or -not (Test-Path $uninstaller)) { throw 'Désinstallateur application introuvable.' }
+          $programData = [Environment]::GetFolderPath('CommonApplicationData')
+          $model = Join-Path $programData 'SEB EvalPro\IA\Ministral-3-8B-Instruct-2512-Q4_K_M.gguf'
+
+          $p = Start-Process -FilePath $uninstaller -ArgumentList @('/S') -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "Désinstallation application échouée: $($p.ExitCode)" }
+          if (-not (Test-Path $model)) { throw 'ERREUR: désinstaller SEB EvalPro a supprimé le Pack IA indépendant.' }
+
+          Write-Host 'APP_UNINSTALL_PRESERVES_AI_PACK: OK'
