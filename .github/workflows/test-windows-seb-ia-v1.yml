@@ -1,9 +1,6 @@
 name: TEST Windows SEB-IA Single Setup
 
 on:
-  pull_request:
-    branches:
-      - tmp-split-candidat-admin-ai-pack
   workflow_dispatch:
 
 permissions:
