@@ -42,7 +42,7 @@ const motorPrefix = source.slice(0, start);
 function writingBlockTemplate() {
   // SEB_LOCAL_AI_QWEN_DIRECT_USER_FILES
   const RICH_KIND = 'seb-qwen-rich-context-v1';
-  const DIRECT_GUARD = 'qwen-factual-frame-v6';
+  const DIRECT_GUARD = 'qwen-natural-factual-v7';
 
   function cleanModelOutput(raw) {
     let text = String(raw || '').replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
@@ -101,73 +101,51 @@ function writingBlockTemplate() {
     const nom = String(profile?.nom || '');
     const prenom = String(profile?.prenom || '');
     const trame=Array.isArray(profile?.trame_factuelle)?profile.trame_factuelle:[];
-    const domainesObligatoires=trame.map(x=>String(x?.domaine||'')).filter(Boolean);
-    const couvertureObligatoire=[];
+    const faits=[];
+    function competenceCourte(value){
+      const text=String(value||'').trim();
+      const parts=text.split(' — ');
+      return (parts.length>1?parts.slice(1).join(' — '):text).trim();
+    }
     for(const domaine of trame){
-      const nomDomaine=String(domaine?.domaine||'');
+      const nomDomaine=String(domaine?.domaine||'').trim();
       for(const item of (Array.isArray(domaine?.points_appui)?domaine.points_appui:[])){
-        couvertureObligatoire.push({
-          id:'F'+String(couvertureObligatoire.length+1).padStart(2,'0'),
-          domaine:nomDomaine,
-          type:'point_appui',
-          competence:String(item?.competence||'')
-        });
+        faits.push({id:'F'+String(faits.length+1).padStart(2,'0'),domaine:nomDomaine,type:'appui',competence:competenceCourte(item?.competence),observation:String(item?.observation||'').trim()});
       }
       for(const item of (Array.isArray(domaine?.vigilances)?domaine.vigilances:[])){
-        couvertureObligatoire.push({
-          id:'F'+String(couvertureObligatoire.length+1).padStart(2,'0'),
-          domaine:nomDomaine,
-          type:'vigilance',
-          competence:String(item?.competence||'')
-        });
+        faits.push({id:'F'+String(faits.length+1).padStart(2,'0'),domaine:nomDomaine,type:'vigilance',competence:competenceCourte(item?.competence),observation:String(item?.observation||'').trim()});
       }
     }
-    const sourceFactuel=trame.map(domaine=>{
-      const items=[];
-      for(const item of (Array.isArray(domaine?.points_appui)?domaine.points_appui:[])){
-        items.push(String(item?.competence||'')+' : '+String(item?.observation||''));
-      }
-      for(const item of (Array.isArray(domaine?.vigilances)?domaine.vigilances:[])){
-        items.push(String(item?.competence||'')+' : '+String(item?.observation||''));
-      }
-      return String(domaine?.domaine||'')+'\n'+items.join('\n');
-    }).join('\n\n');
-    const json = JSON.stringify({
-      civilite,
-      nom,
-      prenom,
-      couverture_obligatoire:couvertureObligatoire,
-      texte_source_factuel:sourceFactuel,
-      motivation_personnelle:String(profile?.motivation_personnelle||'')
-    });
+    const data=JSON.stringify({civilite,nom,prenom,faits,motivation_personnelle:String(profile?.motivation_personnelle||'')});
     return [
-      'Tu rédiges une synthèse professionnelle de plateau technique pour une équipe pluridisciplinaire.',
-      'Le texte_source_factuel est déjà validé. Ton seul travail est de reformuler ces faits en texte fluide, clair et professionnel, sans ajouter, déduire, déplacer ou généraliser le moindre contenu.',
+      'Tu rédiges une vraie synthèse professionnelle de plateau technique destinée à une équipe pluridisciplinaire.',
+      'Tu dois transformer les faits fournis en un texte naturel et synthétique. Le résultat ne doit jamais ressembler à une copie du tableau, à un compte rendu ligne par ligne ou à une liste de compétences.',
       '',
-      'RÈGLES ABSOLUES ET NON NÉGOCIABLES :',
-      `1. Commence impérativement la réponse par : "${civilite} ${nom} ${prenom} a participé aux mises en situation proposées au cours du plateau technique."`,
-      `2. Utilise UNIQUEMENT "${civilite}" pour désigner la personne évaluée. N'utilise jamais "il", "elle", "ce candidat", "le candidat", "le stagiaire" ou "la personne" pour parler d'elle. Les tournures réellement impersonnelles comme "Il convient de noter que" ou "Il existe" restent autorisées.`,
-      `3. La trame contient ${domainesObligatoires.length} domaines. Tu dois couvrir TOUS ces domaines, dans l’ordre fourni, sans en omettre un seul : ${domainesObligatoires.join(' ; ')}.`,
-      '4. Rédige un texte continu en paragraphes naturels. Tu peux utiliser autant de paragraphes que nécessaire pour couvrir tous les domaines. INTERDICTION d’utiliser des titres, sous-titres, listes à puces, tirets ou énumérations.',
-      '5. INTERDICTION absolue de mentionner des chiffres, des pourcentages, des durées, des nombres d’erreurs, des scores ou des niveaux (I, II, III). Utilise uniquement des qualificatifs professionnels.',
-      '6. INTERDICTION de poser un diagnostic médical ou psychologique, et INTERDICTION de suggérer une orientation professionnelle, un métier ou une formation.',
-      `7. "texte_source_factuel" est ton ancre de rédaction. Il contient exactement les faits autorisés, rangés par domaine. Reformule-le sans changer le sens. "couverture_obligatoire" est une checklist compacte de ${couvertureObligatoire.length} compétences identifiées F01, F02, etc. CHAQUE compétence doit apparaître, sans exception.`,
-      '8. N’ajoute jamais une difficulté, une limite ou un besoin qui ne figure pas dans texte_source_factuel.',
-      '9. Si "motivation_personnelle" est vide, n’évoque jamais motivation, volonté, souhait, désir de progresser, épanouissement ou projet personnel. Si elle est renseignée, reprends uniquement ce qui y figure.',
-      '10. Un fait positif du texte_source_factuel reste positif ; n’y ajoute aucune réserve ou difficulté.',
-      '11. Une vigilance du texte_source_factuel reste limitée à la compétence où elle apparaît ; ne l’étends jamais à une compétence voisine.',
-      '12. Si une activité contient à la fois des réussites et des vigilances, décris précisément ce caractère mixte. N’écris jamais "maîtrise globale", "difficultés globales" ou une conclusion équivalente sur toute l’activité.',
-      '13. Les domaines sont étanches. Une observation appartenant à un domaine ne peut JAMAIS être utilisée dans un autre. Exemple : les algorithmes appartiennent aux mathématiques et ne doivent jamais apparaître dans le carré magique, l’expression écrite, le tri ou un autre domaine.',
-      '14. Reste strictement sur les compétences et comportements observés. Toute appréciation sur personnalité, état émotionnel, potentiel, adaptabilité, dynamisme, rigueur, motivation, concentration, confiance, initiative, priorisation, gestion du temps, sens de l’organisation ou perspectives est interdite si elle n’est pas explicitement fournie.',
-      '15. N’ajoute aucune recommandation, aucun objectif de progression, aucun besoin de soutien supplémentaire et aucune notion de performance qui ne soit explicitement présente dans les données.',
-      '16. Pour un domaine mixte, conserve séparément les réussites et les vigilances du texte_source_factuel.',
-      `17. Avant de répondre, compare mentalement ton texte à "texte_source_factuel" ligne par ligne : (a) aucune phrase ne doit contenir une idée absente de la ligne source correspondante ; (b) les ${couvertureObligatoire.length} compétences doivent toutes être couvertes ; (c) aucun fait ne doit changer de domaine. Si une phrase contient un ajout, supprime l’ajout.`,
-      '18. Ne termine pas par une conclusion générale ou un résumé inventé. Une fois le dernier domaine couvert, arrête la réponse.',
+      'RÈGLES DE RÉDACTION :',
+      `1. Commence exactement par : "${civilite} ${nom} ${prenom} a participé aux mises en situation proposées au cours du plateau technique."`,
+      '2. Rédige entre 4 et 6 paragraphes continus et naturels, sans titre, sans sous-titre, sans liste et sans puces.',
+      '3. Regroupe les observations qui appartiennent à un même ensemble de compétences. Utilise des transitions naturelles comme "Dans les activités de fabrication", "Les exercices de raisonnement et d’organisation", "Concernant les outils numériques" ou des formulations équivalentes.',
+      '4. INTERDICTION de recopier les libellés techniques du tableau sous la forme "Domaine — compétence :" ou "Compétence : observation". N’utilise pas les identifiants F01, F02, etc. dans le texte final.',
+      '5. Tous les faits fournis doivent être présents, mais ils doivent être synthétisés. Plusieurs faits proches peuvent être réunis dans une même phrase si leur sens reste exact.',
+      '6. Pour une activité mixte, mets en évidence naturellement les points d’appui puis les difficultés réellement observées. Ne généralise jamais une réussite ou une difficulté à toute l’activité.',
+      '7. Un fait positif reste positif. Une vigilance reste limitée à la compétence concernée. Aucun fait ne peut être déplacé vers un autre domaine.',
+      '8. N’invente rien : pas de potentiel, personnalité, motivation, stress, adaptabilité, dynamisme, initiative, priorisation, concentration, confiance, gestion du temps, projet, orientation ou recommandation si ces éléments ne sont pas explicitement fournis.',
+      '9. N’ajoute aucune conclusion générale sur le profil. Termine simplement après avoir couvert les derniers faits.',
+      '10. Ne mentionne aucun chiffre, pourcentage, durée, nombre d’erreurs, score ou niveau I/II/III.',
+      `11. Pour désigner la personne, utilise "${civilite}" quand un sujet est nécessaire. Évite les répétitions : privilégie aussi les tournures impersonnelles ou nominales naturelles. N’utilise jamais "le candidat", "le stagiaire" ou "la personne".`,
+      '12. Soigne la grammaire française : chaque phrase doit avoir un sujet clair ; évite les formulations télégraphiques comme "Est capable de..." ou "Assemble les pièces...".',
       '',
-      'Données à synthétiser :',
-      json,
+      'ORGANISATION ATTENDUE :',
+      '- paragraphe 1 : introduction courte puis activités de fabrication et construction ;',
+      '- paragraphe 2 : raisonnement, organisation et planification ;',
+      '- paragraphe 3 : tri et outils numériques ;',
+      '- paragraphe 4 : expression écrite et mathématiques ;',
+      '- un cinquième ou sixième paragraphe seulement si nécessaire pour garder le texte lisible.',
       '',
-      'Synthèse détaillée :'
+      'DONNÉES FACTUELLES À RESPECTER :',
+      data,
+      '',
+      'Rédige maintenant uniquement la synthèse finale.'
     ].join('\n');
   }
 
@@ -175,11 +153,11 @@ function writingBlockTemplate() {
     const body = {
       model: MODEL_FILE,
       messages: [
-        { role: 'system', content: 'Tu es un moteur de reformulation factuelle. Tu n’inventes rien, tu ne déduis rien et tu ne déplaces jamais une observation d’un domaine vers un autre.' },
+        { role: 'system', content: 'Tu es un rédacteur professionnel de synthèses socioprofessionnelles. Tu écris un texte naturel et fluide à partir de faits strictement imposés, sans jamais en inventer ni en déplacer.' },
         { role: 'user', content: '/no_think\n\n' + buildDirectPrompt(profile) }
       ],
-      temperature: 0.35,
-      top_p: 0.65,
+      temperature: 0.45,
+      top_p: 0.75,
       top_k: 40,
       repeat_penalty: 1.1,
       mirostat: 0,
@@ -287,7 +265,7 @@ replacement = replacement.split('\n').map(line => line ? '  ' + line : '').join(
 source = source.slice(0, start) + replacement + source.slice(end);
 
 if (!source.startsWith(motorPrefix)) fail('le patch a modifié la zone moteur de démarrage');
-for (const required of [marker, 'qwen-factual-frame-v6', 'RÈGLES ABSOLUES ET NON NÉGOCIABLES', 'trame_factuelle', 'couverture_obligatoire', 'texte_source_factuel', 'La synthèse est trop courte', 'top_k: 40', 'repeat_penalty: 1.1', 'mirostat: 0']) {
+for (const required of [marker, 'qwen-natural-factual-v7', 'RÈGLES DE RÉDACTION', 'DONNÉES FACTUELLES À RESPECTER', 'Le résultat ne doit jamais ressembler à une copie du tableau', 'La synthèse est trop courte', 'top_k: 40', 'repeat_penalty: 1.1', 'mirostat: 0']) {
   if (!source.includes(required)) fail('élément Qwen direct absent après patch: ' + required);
 }
 for (const forbidden of ['START_ATTEMPTS', "'--ctx-size', String(", 'totalRamGb <= 8', 'Fait obligatoire omis', 'Contrôle de fidélité Qwen refusé']) {
