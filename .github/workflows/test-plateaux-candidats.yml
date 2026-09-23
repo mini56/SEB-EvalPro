@@ -93,7 +93,7 @@ jobs:
             'SEB_LOCAL_AI_QWEN_DIRECT_USER_FILES',
             'qwen-rich-context-v1',
             'qwen-four-blocks-v8',
-            'RÈGLES DE RÉDACTION',
+            'Rédige UN SEUL paragraphe professionnel',
             'top_k: 40',
             'repeat_penalty: 1.1',
             'mirostat: 0'
