@@ -135,7 +135,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Construction Windows échouée.' }
 
           if (Test-Path 'dist\win-unpacked\resources\ai') {
-            throw 'Le Setup contient encore le Pack IA alors qu’il doit être indépendant.'
+            throw 'Le Setup contient encore le Pack IA. Le modele doit rester independant.'
           }
 
           $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
