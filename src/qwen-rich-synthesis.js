@@ -114,6 +114,42 @@
       contrastes.push("Le parcours associe des domaines de réussite et des domaines nécessitant davantage d’étayage ou de précision.");
     }
 
+    const trameMap=new Map();
+    function nomDomaine(module){
+      const m=module.toLocaleLowerCase('fr-FR');
+      if(m.includes('fabrication d’une structure 3d'))return 'Fabrication d’une structure 3D en papier';
+      if(m.includes('construction à base de briques'))return 'Construction à base de briques';
+      if(m.includes('carré magique'))return 'Raisonnement — carré magique';
+      if(m.includes('organisation logistique'))return 'Organisation logistique — rangement du stock';
+      if(m.includes('le restaurant'))return 'Planification sous contraintes — restaurant';
+      if(m.includes('tri de chevilles'))return 'Tri de chevilles';
+      if(m.includes('traitement de texte')||m.includes('messagerie'))return 'Outils numériques';
+      if(m.includes('expression écrite'))return 'Expression écrite';
+      if(m.includes('mathématiques'))return 'Mathématiques';
+      return module;
+    }
+    for(const ligne of Array.isArray(lignes_tableau)?lignes_tableau:[]){
+      const module=norm(ligne?.module),niveau=norm(ligne?.niveau),commentaire=norm(ligne?.commentaire);
+      if(!module||!['I','II','III'].includes(niveau))continue;
+      let observation=commentaire
+        .replace(/(?:^|[.!?]\s*)(?:NE|III|II|I)\.\s*/g,' ')
+        .replace(/\bN[°º]?\s*\d+\s*:\s*\d+\s*(?:min|mn)?\s*\d*\s*s?\b/gi,' ')
+        .replace(/\b\d{1,2}\s*:\s*\d{2}(?::\d{2})?\b/g,' ')
+        .replace(/\b\d+\s*(?:min|mn|minutes?|secondes?|sec)\b/gi,' ')
+        .replace(/\b\d+(?:[.,]\d+)?\s*%\s*(?:de\s+réponses?\s+correctes?)?/gi,' ')
+        .replace(/\b\d+\s*erreur(?:\(s\)|s)?\b/gi,' ')
+        .replace(/\b\d+(?:[.,]\d+)?\s*\/\s*\d+(?:[.,]\d+)?\b/g,' ')
+        .replace(/\b\d+\s*(?:point(?:\(s\)|s)?|réponse(?:\(s\)|s)?)\b/gi,' ')
+        .replace(/\s+/g,' ').trim();
+      observation=observation.replace(/^[-–—]\s*/,'').trim();
+      if(!observation)observation=TRADUCTION_NIVEAUX[niveau]+'.';
+      const domaine=nomDomaine(module);
+      if(!trameMap.has(domaine))trameMap.set(domaine,{domaine,points_appui:[],vigilances:[]});
+      const cible=niveau==='I'?'points_appui':'vigilances';
+      trameMap.get(domaine)[cible].push({competence:module,observation});
+    }
+    const trame_factuelle=[...trameMap.values()];
+
     let motivation_personnelle='';
     const loisir=String(texte_loisir_optionnel??'');
     if(loisir&&loisir.length>50){
@@ -127,6 +163,7 @@
       domaines_reussite,
       domaines_vigilance,
       contrastes,
+      trame_factuelle,
       motivation_personnelle
     };
   }

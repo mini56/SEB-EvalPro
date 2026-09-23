@@ -28,6 +28,17 @@ const rows = {
 
 const profile=buildRichProfile({candidate:{civilite:'Monsieur',nom:'Garcia',prenom:'josé',date:'2026-09-22'},rows});
 assert(profile.domaines_reussite.some(x=>/restaurant/i.test(x)),'La planification réussie doit être dans les réussites.');
+assert(Array.isArray(profile.trame_factuelle)&&profile.trame_factuelle.length>=8,'La trame factuelle par domaines doit être construite.');
+const domaine=n=>profile.trame_factuelle.find(x=>String(x.domaine).toLowerCase().includes(n));
+assert(domaine('construction à base de briques').vigilances.length===0,'Les briques ne doivent contenir aucune vigilance.');
+assert(domaine('carré magique').vigilances.length===0,'Le carré magique ne doit contenir aucune vigilance.');
+assert(domaine('planification sous contraintes').vigilances.length===0,'La planification ne doit contenir aucune vigilance.');
+assert(domaine('tri de chevilles').vigilances.length===0,'Le tri ne doit contenir aucune vigilance.');
+assert(domaine('outils numériques').vigilances.length===0,'Les outils numériques ne doivent contenir aucune vigilance.');
+assert(domaine('expression écrite').vigilances.length===0,'L’expression écrite ne doit contenir aucune vigilance.');
+assert(domaine('mathématiques').vigilances.length===0,'Les mathématiques ne doivent contenir aucune vigilance.');
+assert(domaine('fabrication d’une structure 3d').vigilances.length===2,'La fabrication doit conserver exactement les deux vigilances observées.');
+assert(domaine('organisation logistique').vigilances.length===1,'La gestion logistique doit conserver sa vigilance.');
 assert(profile.domaines_vigilance.some(x=>/organisation logistique/i.test(x)),'Le stock doit rester en vigilance.');
 assert(!profile.domaines_vigilance.some(x=>/restaurant/i.test(x)),'La planification ne doit jamais être placée en vigilance.');
 const contrast=profile.contrastes.join(' ');
@@ -42,9 +53,9 @@ const payload=JSON.stringify({kind:'seb-qwen-rich-context-v1',profile});
     const result=await service.rewrite(payload);
     if(!result?.ok) throw new Error(result?.error||'Qwen direct: génération refusée');
     const text=String(result.text||'').trim();
-    assert.strictEqual(result.guard,'qwen-direct-light-factual-v3','Le garde-fou factuel léger v3 doit être actif.');
+    assert.strictEqual(result.guard,'qwen-factual-frame-v4','La trame factuelle v4 doit être active.');
     assert(text.startsWith('Monsieur GARCIA José a participé'),'Le début institutionnel doit être conservé.');
-    assert(text.length>=1200,'La synthèse doit respecter la densité demandée.');
+    assert(text.length>=700,'La synthèse ne doit pas être anormalement courte.');
     assert(text.split(/\n\s*\n/).filter(Boolean).length>=4,'La synthèse doit contenir au moins quatre paragraphes.');
 
     console.log('QWEN_LIGHT_FACTUAL_OUTPUT_BEGIN');
@@ -55,6 +66,8 @@ const payload=JSON.stringify({kind:'seb-qwen-rich-context-v1',profile});
       assert(!norm.includes(unsupported),'Interprétation non sourcée détectée: '+unsupported);
     }
     assert(!/\b(?:ce candidat|le candidat|le stagiaire|la personne)\b/.test(norm),'Désignation interdite de la personne évaluée.');
+    assert(!/organisation logistique[^.!?]{0,160}(?:efficace|solide|maitris|autonom)/.test(norm),'La gestion logistique en vigilance ne doit pas être présentée comme une réussite.');
+    assert(!/(?:potentiel professionnel|maximiser|performance|en train de progresser)/.test(norm),'Conclusion ou progression non sourcée détectée.');
     assert(!/\bil\s+(?:montre|maitrise|demontre|est capable|presente|rencontre|souffre|utilise|realise|a besoin|sait|comprend|assemble|reussit|dispose|possede)\b/.test(norm),'Pronom personnel "il" encore utilisé pour désigner le candidat.');
     const sentences=norm.split(/(?<=[.!?])\s+/);
     function noInventedDifficulty(labels,description){

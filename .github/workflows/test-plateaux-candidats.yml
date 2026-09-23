@@ -92,7 +92,7 @@ jobs:
             "'--n-gpu-layers', '0'",
             'SEB_LOCAL_AI_QWEN_DIRECT_USER_FILES',
             'qwen-rich-context-v1',
-            'qwen-direct-light-factual-v3',
+            'qwen-factual-frame-v4',
             'RÈGLES ABSOLUES ET NON NÉGOCIABLES',
             'top_k: 40',
             'repeat_penalty: 1.1',
@@ -183,7 +183,7 @@ jobs:
             if ($proc -and -not $proc.HasExited) { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue }
           }
 
-      - name: Smoke test Qwen light factual guard on GARCIA
+      - name: Smoke test Qwen factual frame on GARCIA
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -324,7 +324,7 @@ jobs:
           $uninstaller = (Resolve-Path "dist\SEB-eval-PRO-$version-Windows-Desinstallation.exe").Path
           $repo = "${{ github.repository }}"
           $title = "SEB EvalPro - Test Qwen garde-fous légers #${{ github.run_number }}"
-          $notes = "Test Qwen avec garde-fous factuels légers #${{ github.run_number }}. Repart strictement du Build #182. Le JSON conserve désormais les observations qualitatives sans supprimer les lettres des mots, le contraste source ne mélange plus organisation logistique et planification, les réussites et vigilances ne doivent pas être inversées, les interprétations non sourcées sont interdites, et le remplacement mécanique il/elle reste supprimé. Qwen reste libre de sa rédaction : aucun contrôle mot à mot et aucune seconde réécriture automatique. L’annulation Qwen à la fermeture du candidat reste active. Version expérimentale uniquement."
+          $notes = "Test Qwen avec garde-fous factuels légers #${{ github.run_number }}. Repart strictement du Build #182. Qwen reçoit une trame factuelle explicite par domaine avec points d’appui et vigilances. Les domaines sans vigilance ne peuvent pas être transformés en difficultés, la gestion logistique reste distincte de la planification, et aucune interprétation personnelle non sourcée ne doit être ajoutée. Qwen reste libre de sa rédaction : aucun contrôle mot à mot et aucune seconde réécriture automatique. L’annulation Qwen à la fermeture du candidat reste active. Version expérimentale uniquement."
           $setupSize = (Get-Item $setup).Length
           Write-Host "Setup à publier: $setupSize octets"
 

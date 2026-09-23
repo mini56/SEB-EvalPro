@@ -42,7 +42,7 @@ const motorPrefix = source.slice(0, start);
 function writingBlockTemplate() {
   // SEB_LOCAL_AI_QWEN_DIRECT_USER_FILES
   const RICH_KIND = 'seb-qwen-rich-context-v1';
-  const DIRECT_GUARD = 'qwen-direct-light-factual-v3';
+  const DIRECT_GUARD = 'qwen-factual-frame-v4';
 
   function cleanModelOutput(raw) {
     let text = String(raw || '').replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
@@ -66,7 +66,7 @@ function writingBlockTemplate() {
   // Adaptation JavaScript fidèle de securiser_synthese_qwen fourni.
   function securiserSyntheseQwen(texte_genere, civilite, nom, prenom) {
     const original = String(texte_genere || '');
-    if (original.length < 1200) {
+    if (original.length < 700) {
       return "ERREUR: La synthèse est trop courte. Le modèle n'a pas suivi les instructions de densité.";
     }
 
@@ -96,18 +96,24 @@ function writingBlockTemplate() {
     const civilite = String(profile?.civilite || 'Monsieur');
     const nom = String(profile?.nom || '');
     const prenom = String(profile?.prenom || '');
-    const json = JSON.stringify(profile || {}, null, 2);
+    const json = JSON.stringify({
+      civilite,
+      nom,
+      prenom,
+      trame_factuelle:Array.isArray(profile?.trame_factuelle)?profile.trame_factuelle:[],
+      motivation_personnelle:String(profile?.motivation_personnelle||'')
+    }, null, 2);
     return [
-      'Tu es un expert en évaluation médico-sociale rédigeant un bilan détaillé et explicite pour une équipe pluridisciplinaire.',
-      'Rédige une synthèse professionnelle, nuancée et de haut niveau en te basant STRICTEMENT sur les données JSON fournies.',
+      'Tu rédiges une synthèse professionnelle de plateau technique pour une équipe pluridisciplinaire.',
+      'La trame factuelle fournie est déjà validée. Ton seul travail est de la transformer en texte fluide, clair et factuel, sans ajouter de contenu.',
       '',
       'RÈGLES ABSOLUES ET NON NÉGOCIABLES :',
       `1. Commence impérativement la réponse par : "${civilite} ${nom} ${prenom} a participé aux mises en situation proposées au cours du plateau technique."`,
       `2. Utilise UNIQUEMENT "${civilite}" pour désigner la personne évaluée. N'utilise jamais "il", "elle", "ce candidat", "le candidat", "le stagiaire" ou "la personne" pour parler d'elle. Les tournures réellement impersonnelles comme "Il convient de noter que" ou "Il existe" restent autorisées.`,
-      '3. Rédige au moins 4 à 5 paragraphes denses et continus. INTERDICTION absolue d’utiliser des titres, sous-titres, listes à puces, tirets ou énumérations.',
+      '3. Rédige 4 à 6 paragraphes continus, de longueur raisonnable. Ne cherche pas à allonger artificiellement le texte. INTERDICTION d’utiliser des titres, sous-titres, listes à puces, tirets ou énumérations.',
       '4. INTERDICTION absolue de mentionner des chiffres, des pourcentages, des durées, des nombres d’erreurs, des scores ou des niveaux (I, II, III). Utilise uniquement des qualificatifs professionnels (ex: "rythme lent", "fiabilité à consolider", "autonomie acquise", "difficultés marquées").',
       '5. INTERDICTION de poser un diagnostic médical ou psychologique, et INTERDICTION de suggérer une orientation professionnelle, un métier ou une formation.',
-      '6. Ton objectif est de relier les faits de manière fluide. Utilise les éléments du tableau "contrastes" pour expliquer les nuances du parcours avec des connecteurs logiques (Toutefois, En revanche, Par ailleurs, Il convient de noter que).',
+      '6. Utilise exclusivement "trame_factuelle". Chaque domaine contient "points_appui" et "vigilances". Si "vigilances" est vide, il est FORMELLEMENT INTERDIT d’attribuer une difficulté, une limite ou un besoin à ce domaine.',
       '7. Si "motivation_personnelle" est vide, n’évoque jamais motivation, volonté, souhait, désir de progresser, épanouissement ou projet personnel. Si elle est renseignée, reprends uniquement ce qui y figure.',
       '8. CHAQUE élément de "domaines_reussite" est une réussite. Pour le module concerné, n’ajoute AUCUNE difficulté, limite, réserve, besoin d’étayage, accompagnement ou amélioration qui ne figure pas explicitement dans cet élément.',
       '9. CHAQUE élément de "domaines_vigilance" est une vigilance. Décris uniquement la difficulté indiquée dans cet élément, sans l’étendre à une compétence voisine.',
@@ -115,8 +121,8 @@ function writingBlockTemplate() {
       '11. Organisation logistique, planification, résolution de problèmes sous contraintes, tri, traitement de texte, messagerie, expression écrite et mathématiques sont des compétences distinctes. Un résultat faible dans l’une ne doit jamais contaminer les autres.',
       '12. Reste strictement sur les compétences et comportements observés. Toute appréciation sur personnalité, état émotionnel, potentiel, adaptabilité, dynamisme, rigueur, motivation, concentration, confiance ou perspectives est interdite si elle n’est pas explicitement fournie.',
       '13. N’ajoute aucune recommandation, aucun objectif de progression, aucun besoin de soutien supplémentaire et aucune notion de performance qui ne soit explicitement présente dans les données.',
-      '14. Les "contrastes" servent seulement à relier les faits. Les éléments détaillés de "domaines_reussite" et "domaines_vigilance" sont toujours prioritaires.',
-      '15. Avant de répondre, relis mentalement chaque phrase : chaque difficulté doit provenir d’un élément de "domaines_vigilance" et chaque réussite d’un élément de "domaines_reussite". Si une affirmation n’est pas directement justifiée par le JSON, supprime-la.',
+      '14. Pour un domaine mixte, cite les points d’appui puis les seules vigilances présentes dans la trame. Pour un domaine sans vigilance, reste uniquement positif et factuel.',
+      '15. Avant de répondre, vérifie chaque phrase contre "trame_factuelle". Si une affirmation ne correspond pas directement à une observation de la trame, supprime-la.',
       '',
       'Données à synthétiser :',
       json,
@@ -131,8 +137,8 @@ function writingBlockTemplate() {
       messages: [
         { role: 'user', content: '/no_think\n\n' + buildDirectPrompt(profile) }
       ],
-      temperature: 0.7,
-      top_p: 0.8,
+      temperature: 0.35,
+      top_p: 0.65,
       top_k: 40,
       repeat_penalty: 1.1,
       mirostat: 0,
@@ -240,7 +246,7 @@ replacement = replacement.split('\n').map(line => line ? '  ' + line : '').join(
 source = source.slice(0, start) + replacement + source.slice(end);
 
 if (!source.startsWith(motorPrefix)) fail('le patch a modifié la zone moteur de démarrage');
-for (const required of [marker, 'qwen-direct-light-factual-v3', 'RÈGLES ABSOLUES ET NON NÉGOCIABLES', 'CHAQUE élément de "domaines_reussite"', 'CHAQUE élément de "domaines_vigilance"', 'La synthèse est trop courte', 'top_k: 40', 'repeat_penalty: 1.1', 'mirostat: 0']) {
+for (const required of [marker, 'qwen-factual-frame-v4', 'RÈGLES ABSOLUES ET NON NÉGOCIABLES', 'trame_factuelle', 'Si "vigilances" est vide', 'La synthèse est trop courte', 'top_k: 40', 'repeat_penalty: 1.1', 'mirostat: 0']) {
   if (!source.includes(required)) fail('élément Qwen direct absent après patch: ' + required);
 }
 for (const forbidden of ['START_ATTEMPTS', "'--ctx-size', String(", 'totalRamGb <= 8', 'Fait obligatoire omis', 'Contrôle de fidélité Qwen refusé']) {
