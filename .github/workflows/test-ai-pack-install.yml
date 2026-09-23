@@ -1,0 +1,122 @@
+name: TEST Installed Ministral AI Pack
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - tmp-split-candidat-admin-ai-pack
+    paths:
+      - '.github/workflows/test-ai-pack-install.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  install-and-run:
+    runs-on: windows-latest
+    timeout-minutes: 120
+    steps:
+      - name: Download stable AI Pack release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path '_pack' | Out-Null
+          $tag = 'seb-evalpro-ai-pack-ministral3-8b-v1'
+          $repo = '${{ github.repository }}'
+          gh release download $tag --repo $repo --dir '_pack' --pattern 'SEB-EvalPro-IA-Pack-Setup.exe'
+          if ($LASTEXITCODE -ne 0) { throw 'Téléchargement installateur Pack IA échoué.' }
+          gh release download $tag --repo $repo --dir '_pack' --pattern 'Ministral-3-8B-Instruct-2512-Q4_K_M.gguf.part*'
+          if ($LASTEXITCODE -ne 0) { throw 'Téléchargement parties Pack IA échoué.' }
+
+      - name: Verify downloaded parts
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $expected = @{
+            'SEB-EvalPro-IA-Pack-Setup.exe' = 'f2145c4fea1555916a0374a8209a33fe26f17f92605433d4b5b4365a31a62c85'
+            'Ministral-3-8B-Instruct-2512-Q4_K_M.gguf.part01' = 'e248ea453f406faea1f3d3046525ee442b2aba670ae65ad28d645700503f8dd8'
+            'Ministral-3-8B-Instruct-2512-Q4_K_M.gguf.part02' = '316a901fd32000a39b591eff20aa11e4b99a050e44154cfc7e771b61931e97a1'
+            'Ministral-3-8B-Instruct-2512-Q4_K_M.gguf.part03' = 'ab5e2c77404f6227a3473b96fd5f98ea728212c5bba5289a434be9cfc2db1961'
+          }
+          foreach ($name in $expected.Keys) {
+            $path = Join-Path '_pack' $name
+            if (-not (Test-Path $path)) { throw "Fichier Pack IA absent: $name" }
+            $sha = (Get-FileHash $path -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($sha -ne $expected[$name]) { throw "SHA invalide pour $name : $sha" }
+          }
+          Write-Host 'AI_PACK_PARTS_VERIFIED: OK'
+
+      - name: Install AI Pack silently
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $setup = (Resolve-Path '_pack\SEB-EvalPro-IA-Pack-Setup.exe').Path
+          $p = Start-Process -FilePath $setup -ArgumentList '/S' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "Installation Pack IA échouée: $($p.ExitCode)" }
+
+          $root = Join-Path $env:ProgramData 'SEB EvalPro\IA'
+          $model = Join-Path $root 'Ministral-3-8B-Instruct-2512-Q4_K_M.gguf'
+          $server = Join-Path $root 'llama-server.exe'
+          if (-not (Test-Path $model)) { throw 'Modèle reconstitué absent.' }
+          if (-not (Test-Path $server)) { throw 'llama-server.exe absent du Pack installé.' }
+          $sha = (Get-FileHash $model -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($sha -ne '33e7a72cf5e6e2cfc2f2847075acc013d68bba023e35310cef86b5cf8fdca761') { throw "Modèle reconstitué invalide: $sha" }
+          Write-Host "AI_PACK_INSTALL_VERIFIED: $sha"
+
+      - name: Start installed Ministral model
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = Join-Path $env:ProgramData 'SEB EvalPro\IA'
+          $server = Join-Path $root 'llama-server.exe'
+          $model = Join-Path $root 'Ministral-3-8B-Instruct-2512-Q4_K_M.gguf'
+          $port = 39476
+          $args = @('--model',$model,'--host','127.0.0.1','--port',"$port",'--ctx-size','1024','--threads','2','--n-gpu-layers','0')
+          $proc = Start-Process -FilePath $server -ArgumentList $args -PassThru -WindowStyle Hidden -RedirectStandardOutput '_pack-server-out.log' -RedirectStandardError '_pack-server-err.log'
+          try {
+            $ready = $false
+            for ($i=0; $i -lt 360; $i++) {
+              Start-Sleep -Milliseconds 500
+              if ($proc.HasExited) { throw "llama-server Pack IA arrêté: $($proc.ExitCode)" }
+              try {
+                $health = Invoke-RestMethod -Uri "http://127.0.0.1:$port/health" -TimeoutSec 2
+                if ($health.status -eq 'ok') { $ready = $true; break }
+              } catch {}
+            }
+            if (-not $ready) { throw 'Pack IA installé : llama-server ne devient pas prêt.' }
+
+            $body = @{
+              model = 'Ministral-3-8B-Instruct-2512-Q4_K_M.gguf'
+              messages = @(
+                @{ role='system'; content='Réponds uniquement OK.' },
+                @{ role='user'; content='Réponds uniquement OK.' }
+              )
+              temperature = 0.1
+              max_tokens = 16
+              seed = 42
+              stream = $false
+            } | ConvertTo-Json -Depth 8
+            $reply = Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:$port/v1/chat/completions" -ContentType 'application/json; charset=utf-8' -Body $body -TimeoutSec 300
+            $text = [string]$reply.choices[0].message.content
+            if ([string]::IsNullOrWhiteSpace($text)) { throw 'Inférence Pack IA vide.' }
+            Write-Host "AI_PACK_REAL_INFERENCE: $text"
+          }
+          finally {
+            if ($proc -and -not $proc.HasExited) { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue }
+          }
+
+      - name: Verify separate Pack uninstaller
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = Join-Path $env:ProgramData 'SEB EvalPro\IA'
+          $uninstaller = Join-Path $root 'Desinstaller-Pack-IA.exe'
+          if (-not (Test-Path $uninstaller)) { throw 'Désinstallateur Pack IA absent.' }
+          $p = Start-Process -FilePath $uninstaller -ArgumentList '/S' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "Désinstallation Pack IA échouée: $($p.ExitCode)" }
+          Start-Sleep -Seconds 2
+          $model = Join-Path $root 'Ministral-3-8B-Instruct-2512-Q4_K_M.gguf'
+          if (Test-Path $model) { throw 'Le modèle IA est encore présent après désinstallation explicite du Pack.' }
+          Write-Host 'AI_PACK_END_TO_END: SUCCESS'
