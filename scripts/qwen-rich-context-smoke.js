@@ -53,7 +53,7 @@ const payload=JSON.stringify({kind:'seb-qwen-rich-context-v1',profile});
     const result=await service.rewrite(payload);
     if(!result?.ok) throw new Error(result?.error||'Qwen direct: génération refusée');
     const text=String(result.text||'').trim();
-    assert.strictEqual(result.guard,'qwen-factual-frame-v5','La trame factuelle v4 doit être active.');
+    assert.strictEqual(result.guard,'qwen-factual-frame-v6','La trame factuelle v6 doit être active.');
     assert(text.startsWith('Monsieur GARCIA José a participé'),'Le début institutionnel doit être conservé.');
     assert(text.length>=700,'La synthèse ne doit pas être anormalement courte.');
     assert(text.split(/\n\s*\n/).filter(Boolean).length>=4,'La synthèse doit contenir au moins quatre paragraphes.');
