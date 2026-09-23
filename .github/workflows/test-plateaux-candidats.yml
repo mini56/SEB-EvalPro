@@ -92,7 +92,7 @@ jobs:
             "'--n-gpu-layers', '0'",
             'SEB_LOCAL_AI_QWEN_DIRECT_USER_FILES',
             'qwen-rich-context-v1',
-            'qwen-factual-frame-v5',
+            'qwen-factual-frame-v6',
             'RÈGLES ABSOLUES ET NON NÉGOCIABLES',
             'top_k: 40',
             'repeat_penalty: 1.1',
@@ -103,7 +103,7 @@ jobs:
           foreach ($forbidden in @('START_ATTEMPTS','totalRamGb <= 8','ctxSize =','qwen-rich-coverage-v3','Fait obligatoire omis','Contrôle de fidélité Qwen refusé')) {
             if ($ai.Contains($forbidden)) { throw "Ancien contrôle ou régression détecté: $forbidden" }
           }
-          Write-Host 'Socle moteur #9 confirmé intact; Qwen direct conserve sa liberté rédactionnelle avec garde-fous factuels légers.'
+          Write-Host 'Socle moteur #9 confirmé intact; Qwen direct conserve sa liberté rédactionnelle avec garde-fous factuels légers et couverture complète.'
 
       - name: Prepare embedded local AI runtime
         shell: pwsh
