@@ -11,7 +11,7 @@ const source = [
 const forbidden = [
   'potentiel','autonomie marquée','précision remarquable','rigueur',
   'priorités opérationnelles','attention moins systématique','adaptabilité',
-  'dynamisme','épanouissement','stress','profil dynamique'
+  'dynamisme','épanouissement','stress','profil dynamique','scrupuleusement','précision remarquable','pertinent','pertinente','pertinents','pertinentes','appui méthodologique','avec aisance','avec justesse','à affiner','aptitude'
 ];
 
 (async()=>{
@@ -26,7 +26,9 @@ const forbidden = [
     console.log(text);
     console.log('MINISTRAL_ADMIN_REWRITE_OUTPUT_END');
 
-    assert(text.length>700,'Synthèse anormalement courte');
+    assert(text.startsWith("Monsieur GARCIA José a participé aux mises en situation proposées au cours du plateau technique."),
+      'La première phrase institutionnelle doit rester exactement identique');
+        assert(text.length>700,'Synthèse anormalement courte');
     assert(text.split(/\n\s*\n/).filter(Boolean).length>=3,'La synthèse doit rester structurée en paragraphes');
 
     const norm=text.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
