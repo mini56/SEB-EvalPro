@@ -1,0 +1,60 @@
+name: TEST Windows SEB-IA Single Setup
+
+on:
+  push:
+    branches:
+      - tmp-seb-ia-v1
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows-test:
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Validate SEB-IA
+        run: npm run test:seb-ia
+
+      - name: Set test version
+        shell: pwsh
+        run: |
+          $p = Get-Content package.json -Raw | ConvertFrom-Json
+          $p.version = '0.3.0'
+          $p | ConvertTo-Json -Depth 20 | Set-Content package.json -Encoding utf8
+
+      - name: Build single Windows Setup
+        run: npm run dist:win
+
+      - name: Verify single Setup
+        shell: pwsh
+        run: |
+          $setups = @(Get-ChildItem dist -Filter '*Windows-Setup.exe' -File)
+          if ($setups.Count -ne 1) { throw "Attendu : exactement 1 Setup Windows. Trouvé : $($setups.Count)" }
+          if (Select-String -Path build/installer.nsh -Pattern 'Ministral-3-8B-Instruct|SEB-EvalPro-IA-Pack-Setup|vc_redist.x64.exe' -Quiet) {
+            throw 'Ancienne dépendance Mistral/Pack IA encore présente dans le Setup.'
+          }
+          Write-Host "Setup unique : $($setups[0].FullName)"
+          Get-FileHash $setups[0].FullName -Algorithm SHA256 | Format-List
+
+      - name: Upload Windows test installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: SEB-EvalPro-SEB-IA-V1-Windows-Test
+          path: |
+            dist/*Windows-Setup.exe
+            dist/*Windows-Desinstallation.exe
+          if-no-files-found: error
+          retention-days: 14
