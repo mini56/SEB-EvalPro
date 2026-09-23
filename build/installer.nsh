@@ -52,8 +52,49 @@ Var SebBrandingWelcomeHandle
 Var SebBrandingFinishDialog
 Var SebBrandingFinishImage
 Var SebBrandingFinishHandle
+Var SebEdition
+Var SebEditionDialog
+Var SebEditionCandidateRadio
+Var SebEditionAdminRadio
 
 !macro customInstall
+  # Enregistrer l'édition choisie. Les anciennes installations sans marqueur restent Admin.
+  Delete "$INSTDIR\edition-admin.flag"
+  Delete "$INSTDIR\edition-candidate.flag"
+  FileOpen $9 "$INSTDIR\edition.json" w
+  ${If} $SebEdition == "admin"
+    FileWrite $9 "{$\"edition$\":$\"admin$\"}"
+    FileClose $9
+    FileOpen $9 "$INSTDIR\edition-admin.flag" w
+    FileWrite $9 "admin"
+    FileClose $9
+    WriteRegStr HKCU "Software\SEB EvalPro" "Edition" "admin"
+  ${Else}
+    FileWrite $9 "{$\"edition$\":$\"candidate$\"}"
+    FileClose $9
+    FileOpen $9 "$INSTDIR\edition-candidate.flag" w
+    FileWrite $9 "candidate"
+    FileClose $9
+    WriteRegStr HKCU "Software\SEB EvalPro" "Edition" "candidate"
+    Goto seb_install_complete
+  ${EndIf}
+
+  # Version Administrateur : le Pack IA est indépendant de l'application.
+  # S'il est déjà présent dans ProgramData, aucune copie n'est refaite.
+  IfFileExists "$COMMONAPPDATA\SEB EvalPro\IA\Ministral-3-8B-Instruct-2512-Q4_K_M.gguf" seb_ai_pack_ready 0
+  IfFileExists "$EXEDIR\SEB-EvalPro-IA-Pack\Ministral-3-8B-Instruct-2512-Q4_K_M.gguf" 0 seb_ai_pack_missing
+  CreateDirectory "$COMMONAPPDATA\SEB EvalPro\IA"
+  CopyFiles /SILENT "$EXEDIR\SEB-EvalPro-IA-Pack\*.*" "$COMMONAPPDATA\SEB EvalPro\IA"
+  IfFileExists "$COMMONAPPDATA\SEB EvalPro\IA\Ministral-3-8B-Instruct-2512-Q4_K_M.gguf" seb_ai_pack_ready seb_ai_pack_missing
+
+seb_ai_pack_missing:
+  MessageBox MB_ICONEXCLAMATION|MB_OK "SEB EvalPro Administrateur sera installé, mais le Pack IA Ministral n'a pas été trouvé.$\r$\n$\r$\nVous pourrez installer le Pack IA séparément une seule fois. Les prochaines mises à jour de SEB EvalPro ne le supprimeront pas."
+  Goto seb_ai_runtime
+
+seb_ai_pack_ready:
+  DetailPrint "Pack IA Ministral détecté : il est conservé indépendamment de SEB EvalPro."
+
+seb_ai_runtime:
   # L'IA locale llama.cpp nécessite le runtime Microsoft Visual C++ x64.
   # Le Setup embarque le redistribuable officiel Microsoft et ne le lance
   # que si le runtime v14 x64 n'est pas déjà installé.
@@ -86,16 +127,56 @@ seb_vc_runtime_failed:
 
 seb_vc_runtime_ready:
   SetRegView lastused
+
+seb_install_complete:
 !macroend
 
 !macro preInit
+  StrCpy $SebEdition "candidate"
+  ReadRegStr $0 HKCU "Software\SEB EvalPro" "Edition"
+  StrCmp $0 "admin" 0 +2
+    StrCpy $SebEdition "admin"
   InitPluginsDir
   File /oname=$PLUGINSDIR\seb-eval-pro-branding.bmp "${BUILD_RESOURCES_DIR}\installerBranding.bmp"
 !macroend
 
 !macro customWelcomePage
   Page custom SebBrandingWelcomeCreate
+  Page custom SebEditionCreate SebEditionLeave
 !macroend
+
+Function SebEditionCreate
+  nsDialogs::Create 1018
+  Pop $SebEditionDialog
+  ${If} $SebEditionDialog == error
+    Abort
+  ${EndIf}
+
+  ${NSD_CreateLabel} 0 0 100% 28u "Choisissez la version de SEB EvalPro à installer :"
+  Pop $0
+  ${NSD_CreateRadioButton} 8u 42u 92% 18u "Version Candidat — parcours + espace Admin local, sans bilan ni IA"
+  Pop $SebEditionCandidateRadio
+  ${NSD_CreateRadioButton} 8u 72u 92% 18u "Version Administrateur — toutes les fonctions + Pack IA local"
+  Pop $SebEditionAdminRadio
+  ${NSD_CreateLabel} 8u 108u 92% 55u "Le Pack IA est indépendant de SEB EvalPro. S'il est déjà installé sur ce PC, il sera conservé et ne sera pas retéléchargé lors des mises à jour."
+  Pop $0
+
+  ${If} $SebEdition == "admin"
+    ${NSD_Check} $SebEditionAdminRadio
+  ${Else}
+    ${NSD_Check} $SebEditionCandidateRadio
+  ${EndIf}
+  nsDialogs::Show
+FunctionEnd
+
+Function SebEditionLeave
+  ${NSD_GetState} $SebEditionAdminRadio $0
+  ${If} $0 == ${BST_CHECKED}
+    StrCpy $SebEdition "admin"
+  ${Else}
+    StrCpy $SebEdition "candidate"
+  ${EndIf}
+FunctionEnd
 
 Function SebBrandingWelcomeCreate
   nsDialogs::Create 1018

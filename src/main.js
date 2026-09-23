@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const { createLocalAiService } = require('./local-ai');
+const { getEditionCapabilities } = require('./edition');
 const { createCandidateStore } = require('./candidate-store-main');
 const { createCandidateTransfer } = require('./candidate-transfer-main');
 
@@ -18,7 +19,8 @@ let splashWindow = null;
 let splashStartedAt = 0;
 let adminSessionUnlocked = false;
 let downloadRoutingInstalled = false;
-const localAi = createLocalAiService({ app });
+const editionCapabilities = getEditionCapabilities();
+const localAi = editionCapabilities.canAi ? createLocalAiService({ app }) : null;
 let candidateStore = null;
 let candidateTransfer = null;
 let adminExportCandidateDir = null;
@@ -541,6 +543,8 @@ ipcMain.handle('admin:verify-password', (_event, password) => {
 });
 
 ipcMain.handle('admin:status', () => adminSessionUnlocked);
+ipcMain.on('app:edition-sync', (event) => { event.returnValue = { ...editionCapabilities }; });
+ipcMain.handle('app:edition', () => ({ ...editionCapabilities }));
 
 ipcMain.handle('admin:lock', () => {
   adminSessionUnlocked = false;
@@ -593,6 +597,7 @@ ipcMain.handle('admin:export-candidates', async () => {
 });
 
 ipcMain.handle('admin:import-candidates', async () => {
+  if (!editionCapabilities.canImport) return { ok:false, error:'Import réservé à la version Administrateur.' };
   if (!mainWindow || !adminSessionUnlocked) return { ok: false, error: 'Accès administrateur requis.' };
   try {
     const selection = await dialog.showOpenDialog(mainWindow, {
@@ -625,11 +630,12 @@ ipcMain.handle('admin:open-candidate-browser', (_event, candidateId) => {
 });
 
 ipcMain.handle('admin:return-candidate-browser', (_event, candidateId) => {
-  localAi.cancelCurrent('Fermeture du candidat');
+  if (localAi) localAi.cancelCurrent('Fermeture du candidat');
   return loadAdminCandidateBrowser(candidateId);
 });
 
 ipcMain.handle('admin:open-bilan', () => {
+  if (!editionCapabilities.canBilan) return false;
   if (!mainWindow || !adminSessionUnlocked) return false;
   adminCandidateResultsMode = false;
   const bilanPath = existingWebPage('admin-bilan.html');
@@ -654,16 +660,19 @@ ipcMain.handle('admin:return-evaluation', () => {
 });
 
 ipcMain.handle('ai:status', () => {
+  if (!editionCapabilities.canAi || !localAi) return { available:false, offline:true, edition:editionCapabilities.edition, error:'IA non disponible dans la version Candidat.' };
   if (!adminSessionUnlocked) return { available: false, offline: true, error: 'Accès administrateur requis.' };
   return localAi.status();
 });
 
 ipcMain.handle('ai:rewrite-synthesis', async (_event, text) => {
+  if (!editionCapabilities.canAi || !localAi) return { ok:false, error:'IA non disponible dans la version Candidat.' };
   if (!adminSessionUnlocked) return { ok: false, error: 'Accès administrateur requis.' };
   return localAi.rewrite(String(text || ''));
 });
 
 ipcMain.handle('ai:cancel-current', () => {
+  if (!editionCapabilities.canAi || !localAi) return { ok:true, cancelled:false, offline:true };
   if (!adminSessionUnlocked) return { ok:false, cancelled:false, error:'Accès administrateur requis.' };
   return localAi.cancelCurrent('Fermeture du candidat');
 });
@@ -685,7 +694,7 @@ app.whenReady().then(startApplication);
 app.on('before-quit', () => {
   allowApplicationExit = true;
   stopCandidateKeyGuard();
-  localAi.stop();
+  if (localAi) localAi.stop();
 });
 
 app.on('window-all-closed', () => {

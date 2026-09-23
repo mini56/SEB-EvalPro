@@ -1,7 +1,7 @@
 {
   "name": "seb-evalpro",
   "version": "0.1.0",
-  "description": "Application desktop autonome du plateau technique SEB-éval-PRO",
+  "description": "SEB EvalPro - versions Candidat et Administrateur avec Pack IA séparé",
   "main": "src/main.js",
   "author": "Sauvegarde 56",
   "license": "UNLICENSED",
@@ -29,13 +29,6 @@
       "package.json"
     ],
     "extraResources": [
-      {
-        "from": "ai-runtime",
-        "to": "ai",
-        "filter": [
-          "**/*"
-        ]
-      },
       {
         "from": "build/candidate-keyguard.exe",
         "to": "candidate-keyguard.exe"

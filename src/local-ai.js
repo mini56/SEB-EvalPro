@@ -5,12 +5,12 @@ const http = require('http');
 const net = require('net');
 const { spawn } = require('child_process');
 
-const MODEL_FILE = 'Qwen3-1.7B-Q4_K_M.gguf';
-const MODEL_LABEL = 'Qwen3-1.7B Q4_K_M';
+const MODEL_FILE = 'Ministral-3-8B-Instruct-2512-Q4_K_M.gguf';
+const MODEL_LABEL = 'Ministral 3 8B Instruct Q4_K_M';
 const RUNTIME_LABEL = 'llama.cpp b10964';
 const MAX_INPUT_CHARS = 18000;
-const START_TIMEOUT_MS = 120000;
-const REQUEST_TIMEOUT_MS = 240000;
+const START_TIMEOUT_MS = 240000;
+const REQUEST_TIMEOUT_MS = 600000;
 
 function createLocalAiService({ app }) {
   let serverProcess = null;
@@ -22,9 +22,9 @@ function createLocalAiService({ app }) {
   const activeRequests = new Set();
 
   function runtimeDir() {
-    return app.isPackaged
-      ? path.join(process.resourcesPath, 'ai')
-      : path.join(__dirname, '..', 'ai-runtime');
+    if (!app.isPackaged) return path.join(__dirname, '..', 'ai-runtime');
+    const programData = process.env.ProgramData || process.env.PROGRAMDATA || 'C:\\ProgramData';
+    return path.join(programData, 'SEB EvalPro', 'IA');
   }
 
   function runtimePaths() {
@@ -52,7 +52,7 @@ function createLocalAiService({ app }) {
       model: MODEL_LABEL,
       runtime: RUNTIME_LABEL,
       ...hardwareInfo(),
-      error: available ? '' : 'Le moteur IA local ou le modèle embarqué est introuvable.'
+      error: available ? '' : 'Pack IA Ministral absent ou incomplet. Installez le Pack IA une seule fois sur ce PC Administrateur.'
     };
   }
 
@@ -139,7 +139,7 @@ function createLocalAiService({ app }) {
     startPromise = (async () => {
       const p = runtimePaths();
       if (!fs.existsSync(p.server) || !fs.existsSync(p.model)) {
-        throw new Error('Le moteur IA local ou le modèle embarqué est introuvable.');
+        throw new Error('Pack IA Ministral absent ou incomplet. Installez le Pack IA sur ce PC Administrateur.');
       }
 
       serverPort = await findFreePort();
@@ -273,7 +273,7 @@ function createLocalAiService({ app }) {
         'Conserve l’ordre des domaines et les paragraphes du brouillon. N’ajoute aucun titre, aucune liste, aucune note et aucun commentaire sur ta réponse.',
         'Retourne uniquement la synthèse reformulée en français.'
       ].join(' ');
-      const user = `/no_think\n\nReformule uniquement le texte compris entre <bilan> et </bilan>.\n\n<bilan>\n${source}\n</bilan>`;
+      const user = `Reformule uniquement le texte compris entre <bilan> et </bilan>.\n\n<bilan>\n${source}\n</bilan>`;
 
       const body = {
         model: MODEL_FILE,

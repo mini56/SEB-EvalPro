@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { shell } = require('electron');
+const { getEditionCapabilities } = require('./edition');
 const {
   readJson,
   ensureDir,
@@ -17,6 +18,7 @@ const {
 } = require('./candidate-folder-utils');
 
 module.exports = function registerCandidateCatalog({ app, ipcMain, getAdminUnlocked, getActiveCandidate }) {
+  const editionCapabilities = getEditionCapabilities();
   const documentsPath = app.getPath('documents');
   const root = path.join(documentsPath, 'SEB EvalPro');
   const candidatesRoot = path.join(root, 'Candidats');
@@ -521,6 +523,7 @@ module.exports = function registerCandidateCatalog({ app, ipcMain, getAdminUnloc
   }
 
   ipcMain.handle('candidate-catalog:begin-bilan', (_event, candidateId) => {
+    if (!editionCapabilities.canBilan) return { ok:false, error:'Le bilan est disponible uniquement sur le PC Administrateur.' };
     if (!getAdminUnlocked()) return { ok:false, error:'Accès administrateur requis.' };
     synchronize();
     const record = findById(candidateId);

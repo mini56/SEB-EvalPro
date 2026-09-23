@@ -1,5 +1,8 @@
 const { contextBridge, ipcRenderer } = require('electron');
 const path = require('path');
+const editionCapabilities = ipcRenderer.sendSync('app:edition-sync') || {
+  edition:'admin', canBilan:true, canAi:true, canImport:true, canExport:true
+};
 
 const BAR_HEIGHT = 44;
 const HOTZONE_HEIGHT = 5;
@@ -511,8 +514,8 @@ function injectAdminBar() {
     bilanButton.hidden = true;
     returnButton.hidden = !adminUnlocked || !onAdminDetail;
     returnButton.textContent = 'Retour au candidat';
-    exportCandidatesButton.hidden = !adminUnlocked;
-    importCandidatesButton.hidden = !adminUnlocked;
+    exportCandidatesButton.hidden = !adminUnlocked || !editionCapabilities.canExport;
+    importCandidatesButton.hidden = !adminUnlocked || !editionCapabilities.canImport;
     closeSessionButton.hidden = !adminUnlocked;
     adminButton.textContent = adminUnlocked ? 'Verrouiller' : 'Administrateur';
     refreshCandidateBadge();

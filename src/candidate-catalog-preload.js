@@ -1,6 +1,7 @@
 const { ipcRenderer } = require('electron');
 const bilanHistory = require('./bilan-history-preload');
 const replayPreload = require('./replay-preload');
+const editionCapabilities = ipcRenderer.sendSync('app:edition-sync') || { edition:'admin', canBilan:true };
 
 let installed = false;
 let beforeAdminNavigate = null;
@@ -174,6 +175,16 @@ async function openCandidateDetail(candidateId, onChanged) {
       </div>
     </div>`;
   document.body.appendChild(overlay);
+
+  // SEB_EDITION_CANDIDATE_DETAIL : consultation dossiers/résultats/replay sans production de bilan.
+  if (!editionCapabilities.canBilan) {
+    const bilanSection = overlay.querySelector('#seb-cc-detail-bilans')?.closest('.seb-cc-section');
+    const wordSection = overlay.querySelector('#seb-cc-detail-exports')?.closest('.seb-cc-section');
+    const bilanAction = overlay.querySelector('#seb-cc-detail-bilan');
+    if (bilanSection) bilanSection.style.display = 'none';
+    if (wordSection) wordSection.style.display = 'none';
+    if (bilanAction) bilanAction.style.display = 'none';
+  }
 
   const bilans = overlay.querySelector('#seb-cc-detail-bilans');
   if (!result.bilans || !result.bilans.length) {
