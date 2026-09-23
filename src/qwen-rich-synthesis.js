@@ -5,240 +5,134 @@
 })(typeof globalThis!=='undefined'?globalThis:this,function(){
   'use strict';
 
+  // Adaptation SEB EvalPro du générateur Python fourni pour Qwen.
+  // Les intitulés ci-dessous servent uniquement à transformer les lignes du tableau
+  // existant en {module, niveau, commentaire}, sans modifier la logique fournie.
   const ROWS={
-    'fabrication-plan':{theme:'Compétences techniques et manuelles',exercice:'structure 3D papier',competence:'lecture de plans et compréhension de modèles'},
-    'fabrication-tracage':{theme:'Compétences techniques et manuelles',exercice:'structure 3D papier',competence:'traçage et repérage'},
-    'fabrication-decoupe':{theme:'Compétences techniques et manuelles',exercice:'structure 3D papier',competence:'opérations de découpe'},
-    'fabrication-assemblage':{theme:'Compétences techniques et manuelles',exercice:'structure 3D papier',competence:'pliage et assemblage'},
-    'fabrication-finition':{theme:'Compétences techniques et manuelles',exercice:'structure 3D papier',competence:'opérations de finition'},
-    'briques-identification':{theme:'Compétences techniques et manuelles',exercice:'briques',competence:'lecture de schéma et compréhension de modèle'},
-    'briques-manipulation':{theme:'Compétences techniques et manuelles',exercice:'briques',competence:'manipulation et assemblage'},
-    'carre':{theme:'Raisonnement et résolution de problèmes',exercice:'carré magique',competence:'résolution de problèmes structurés par contraintes'},
-    'organisation':{theme:'Organisation, logistique et rigueur',exercice:'ranger le stock',competence:'gestion de stock multicritère'},
-    'planning':{theme:'Organisation, logistique et rigueur',exercice:'le restaurant',competence:'planification de tâches sous contraintes'},
-    'tri-temps':{theme:'Organisation, logistique et rigueur',exercice:'tri de chevilles',competence:"rythme d'exécution sur tâche répétitive"},
-    'tri-erreurs':{theme:'Organisation, logistique et rigueur',exercice:'tri de chevilles',competence:'fiabilité du tri'},
-    'texte':{theme:'Savoirs fondamentaux et numérique',exercice:'traitement de texte',competence:'utilisation du traitement de texte'},
-    'mail':{theme:'Savoirs fondamentaux et numérique',exercice:'messagerie',competence:'utilisation de la messagerie électronique'},
-    'expression':{theme:'Savoirs fondamentaux et numérique',exercice:'expression écrite',competence:'expression écrite'},
-    'math-enonce':{theme:'Savoirs fondamentaux et numérique',exercice:'mathématiques',competence:'compréhension des consignes mathématiques'},
-    'math-problemes':{theme:'Savoirs fondamentaux et numérique',exercice:'mathématiques',competence:'résolution de problèmes mathématiques'}
+    'fabrication-plan':{module:'Fabrication d’une structure 3D en papier — lecture du plan et compréhension du modèle'},
+    'fabrication-tracage':{module:'Fabrication d’une structure 3D en papier — opérations de traçage et de repérage'},
+    'fabrication-decoupe':{module:'Fabrication d’une structure 3D en papier — opérations de découpe'},
+    'fabrication-assemblage':{module:'Fabrication d’une structure 3D en papier — pliage et assemblage'},
+    'fabrication-finition':{module:'Fabrication d’une structure 3D en papier — opérations de finition'},
+    'briques-identification':{module:'Construction à base de briques — lecture de schéma et compréhension de modèle'},
+    'briques-manipulation':{module:'Construction à base de briques — manipulation et assemblage'},
+    'carre':{module:'Carré magique — résolution d’un problème structuré avec contraintes'},
+    'organisation':{module:'Organisation logistique — ranger le stock de produits'},
+    'planning':{module:'Le restaurant — organisation et planification sous contraintes'},
+    'tri-temps':{module:'Tri de chevilles — rythme de réalisation'},
+    'tri-erreurs':{module:'Tri de chevilles — fiabilité du tri'},
+    'texte':{module:'Traitement de texte'},
+    'mail':{module:'Messagerie'},
+    'expression':{module:'Expression écrite'},
+    'math-enonce':{module:'Mathématiques — compréhension des consignes'},
+    'math-problemes':{module:'Mathématiques — résolution de problèmes'}
   };
 
-  // Termes sémantiques servant uniquement à vérifier qu'un fait n'a pas disparu.
-  // La validation se fait dans le paragraphe du domaine concerné, pas sur tout le texte.
-  const COVERAGE={
-    'fabrication-plan':[['plan']],
-    'fabrication-tracage':[['trac']],
-    'fabrication-decoupe':[['decoup']],
-    'fabrication-assemblage':[['pliag','assembl']],
-    'fabrication-finition':[['finit']],
-    'briques-identification':[['schem']],
-    'briques-manipulation':[['manipul']],
-    'carre':[['contraint']],
-    'organisation':[['stock']],
-    'planning':[['planif',"ordre d'execution",'restaurant']],
-    'tri-temps':[['rythme']],
-    'tri-erreurs':[['fiabil']],
-    'texte':[['traitement de texte']],
-    'mail':[['messagerie','message hierarch']],
-    'expression':[['expression ecrite','orthograph','phrase']],
-    'math-enonce':[['consigne']],
-    'math-problemes':[['pourcentage','echell','algorith','probleme mathem']]
+  const TRADUCTION_NIVEAUX={
+    I:'maîtrise avec autonomie',
+    II:'nécessite un étayage ou manque de précision',
+    III:'rencontre des difficultés marquées nécessitant un accompagnement'
   };
 
-  function norm(v){return String(v??'').replace(/\u00a0/g,' ').replace(/\r/g,'\n').replace(/[ \t]+/g,' ').replace(/\n+/g,'\n').trim()}
-  function title(v){return norm(v).toLocaleLowerCase('fr-FR').replace(/(^|[\s'’\-])([a-zà-ÿ])/g,(m,a,b)=>a+b.toLocaleUpperCase('fr-FR'))}
-  function formatDateFr(v){
-    const s=norm(v),m=s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    if(!m)return s;
-    const mois=['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
-    return Number(m[3])+' '+mois[Number(m[2])-1]+' '+m[1];
+  function norm(v){return String(v??'').replace(/\u00a0/g,' ').replace(/\r\n?/g,'\n').trim()}
+  function capitalizeLikePython(v){
+    const s=norm(v).toLocaleLowerCase('fr-FR');
+    return s?s.charAt(0).toLocaleUpperCase('fr-FR')+s.slice(1):'';
   }
-  function classify(level){
-    const n=norm(level).toUpperCase();
-    if(n==='I')return 'point_appui';
-    if(n==='II'||n==='III')return 'point_vigilance';
-    return 'neutre';
+  function commentaireLigne(row){
+    return [row?.select,row?.comment,row?.detail].map(norm).filter(Boolean).join(' ').trim();
   }
-  function importance(level){
-    const n=norm(level).toUpperCase();
-    if(n==='III')return 'prioritaire';
-    if(n==='II')return 'vigilance';
-    if(n==='I')return 'appui';
-    return 'neutre';
-  }
-  function cleanQualitative(value){
-    let s=norm(value);
-    if(!s)return '';
-    s=s.replace(/(?:^|[.!?]\s*)(?:NE|III|II|I)\s*\.\s*/g,(m)=>m.startsWith('.')?'. ':'');
-    s=s.replace(/\bN[°º]\s*\d+\s*:\s*\d+\s*(?:min|mn)?\s*\d*\s*s?\b/gi,' ');
-    s=s.replace(/\b\d{1,2}\s*:\s*\d{2}(?::\d{2})?\b/g,' ');
-    s=s.replace(/\bMoyenne\b\s*[:=-]?\s*/gi,' ');
-    s=s.replace(/\b\d+\s*(?:min|mn)\s*\d*\s*s?\b/gi,' ');
-    s=s.replace(/\b\d+(?:[.,]\d+)?\s*%\s*(?:de\s+réponses?\s+correctes?)?/gi,' ');
-    s=s.replace(/\b\d+(?:[.,]\d+)?\s*\/\s*\d+(?:[.,]\d+)?\b/g,' ');
-    s=s.replace(/\b\d+\s*erreur(?:\(s\)|s)?\b/gi,' ');
-    s=s.replace(/\b\d+\s*(?:point(?:\(s\)|s)?|réponse(?:\(s\)|s)?\s+correcte(?:\(s\)|s)?)\b/gi,' ');
-    s=s.replace(/\bniveau\s*(?:NE|III|II|I)\b/gi,' ');
-    s=s.replace(/\b(?:NE|III|II|I)\b/g,' ');
-    s=s.replace(/\b\d+(?:[.,]\d+)?\b/g,' ');
-    s=s.replace(/\s+([,.;:!?])/g,'$1').replace(/[ \t]{2,}/g,' ').replace(/\n{2,}/g,'\n').trim();
-    s=s.replace(/^[\-–—,:;.\s]+|[\-–—,:;\s]+$/g,'').trim();
-    return s;
-  }
-  function dedupe(parts){
-    const seen=new Set(),out=[];
-    for(const p0 of parts){
-      const p=cleanQualitative(p0);
-      if(!p)continue;
-      const k=p.toLocaleLowerCase('fr-FR');
-      if(seen.has(k))continue;
-      seen.add(k);out.push(p);
-    }
-    return out;
-  }
-  function lineFromRow(key,row){
-    const spec=ROWS[key]; if(!spec)return null;
-    const level=norm(row?.level).toUpperCase();
-    if(!level||level==='NE')return null;
-    const observations=dedupe([row?.select,row?.comment,row?.detail]);
-    if(!observations.length)return null;
-    return {
-      id:key,
-      theme:spec.theme,
-      exercice:spec.exercice,
-      competence:spec.competence,
-      positionnement:classify(level),
-      importance:importance(level),
-      observations_qualitatives:observations,
-      validation_couverture:COVERAGE[key]||[[spec.competence]]
-    };
-  }
-  function publicLine(line){
-    return {
-      exercice:line.exercice,
-      competence:line.competence,
-      positionnement:line.positionnement,
-      observations_qualitatives:line.observations_qualitatives
-    };
-  }
-  function groupThemes(lines){
-    const map=new Map();
-    for(const line of lines){
-      if(!map.has(line.theme))map.set(line.theme,[]);
-      map.get(line.theme).push(publicLine(line));
-    }
-    return [...map].map(([theme,observations])=>({theme,observations}));
-  }
-  function contrastes(lines){
-    const out=[];
-    const byEx=new Map();
-    for(const l of lines){
-      if(!byEx.has(l.exercice))byEx.set(l.exercice,[]);
-      byEx.get(l.exercice).push(l);
-    }
-    for(const [exercice,ls] of byEx){
-      const forts=ls.filter(x=>x.positionnement==='point_appui');
-      const vig=ls.filter(x=>x.positionnement==='point_vigilance');
-      if(forts.length&&vig.length){
-        out.push({
-          type:'contraste_intra_exercice',
-          exercice,
-          points_appui:forts.map(x=>({competence:x.competence,observations_qualitatives:x.observations_qualitatives})),
-          points_vigilance:vig.map(x=>({competence:x.competence,observations_qualitatives:x.observations_qualitatives}))
-        });
-      }
-    }
-    const find=(e)=>lines.filter(x=>x.exercice===e);
-    const rest=find('le restaurant'),carre=find('carré magique'),stock=find('ranger le stock');
-    if(rest.some(x=>x.positionnement==='point_appui')&&carre.some(x=>x.positionnement==='point_vigilance')){
-      out.push({
-        type:'contraste_inter_exercices',
-        competence_commune:'traitement de contraintes',
-        constat_qualitatif:'la planification est réussie lorsque le cadre est explicite, tandis que la résolution d’un problème abstrait structuré par contraintes reste difficile',
-        exercices_concernes:['le restaurant','carré magique']
-      });
-    }
-    if(stock.some(x=>x.positionnement==='point_vigilance')&&carre.some(x=>x.positionnement==='point_vigilance')){
-      const exercices=['ranger le stock','carré magique'];
-      if(rest.some(x=>x.positionnement==='point_vigilance'))exercices.push('le restaurant');
-      out.push({
-        type:'convergence_inter_exercices',
-        competence_commune:'organisation de plusieurs informations et contraintes',
-        constat_qualitatif:'les difficultés apparaissent dans plusieurs situations demandant de prendre en compte simultanément plusieurs informations ou contraintes',
-        exercices_concernes:exercices
-      });
-    }
-    return out;
-  }
-  function faitsSaillants(lines,position){
-    return lines.filter(x=>x.positionnement===position).map(x=>({
-      theme:x.theme,
-      exercice:x.exercice,
-      competence:x.competence,
-      observations_qualitatives:x.observations_qualitatives
+  function lignesTableau(rows){
+    const source=rows||{};
+    return Object.keys(ROWS).map(key=>({
+      module:ROWS[key].module,
+      niveau:norm(source[key]?.level).toUpperCase(),
+      commentaire:commentaireLigne(source[key])
     }));
   }
-  function abandonCoverage(record){
-    const page=norm(record?.page).toLowerCase(),qcm=norm(record?.qcmPage).toLowerCase();
-    const known={'brique.html':'briqu','stock.html':'stock','planning.html':'planif','genrenombres.html':'genre','dictee.html':'dictee','tri_de_cheville.html':'tri','nwtexte.html':'traitement de texte','nvmail.html':'messagerie','paronymes.html':'paronym','carre.html':'carre'};
-    if(known[page])return [[known[page]],['abandon']];
-    const qcmKnown={page2:'calcul',page2_1:'calcul',page3:'reception',page4:'fraction',page5:'ordonnancement',page5_1:'posture',page6:'conversion',pagetextetrous:'texte a trous',page8:'messagerie'};
-    if(qcmKnown[qcm])return [[qcmKnown[qcm]],['abandon']];
-    const words=norm(record?.exercice).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().match(/[a-z]{5,}/g)||[];
-    return [[words[0]||'exercice'],['abandon']];
+
+  function genererJsonRichePourQwen(lignes_tableau,civilite,nom,prenom,texte_loisir_optionnel=''){
+    const domaines_reussite=[];
+    const domaines_vigilance=[];
+    const contrastes=[];
+
+    let a_reussi_numerique=false;
+    let a_echoue_ecrit=false;
+    let a_reussi_consigne_simple=false;
+    let a_echoue_contraintes_multiples=false;
+
+    for(const ligne of Array.isArray(lignes_tableau)?lignes_tableau:[]){
+      const module=norm(ligne?.module);
+      const niveau=norm(ligne?.niveau);
+      const commentaire=norm(ligne?.commentaire);
+
+      if(!module||!['I','II','III'].includes(niveau))continue;
+
+      // Reproduction volontaire du nettoyage fourni, y compris ses expressions régulières.
+      let commentaire_propre=commentaire.replace(/\d+/g,'');
+      commentaire_propre=commentaire_propre.replace(/%|min|s|erreur|point|réponse|\/20|\/75/gi,'');
+      commentaire_propre=commentaire_propre.replace(/\s+/g,' ').trim();
+
+      const commentaireLower=commentaire.toLocaleLowerCase('fr-FR');
+      if(commentaireLower.includes('abandonné')||commentaireLower.includes('abandon')||commentaireLower.includes('trop difficile')){
+        commentaire_propre="a conduit à l'abandon de l'exercice en raison de sa complexité.";
+      }
+
+      const phrase=`Concernant ${module}, la personne ${TRADUCTION_NIVEAUX[niveau]}. ${commentaire_propre}`;
+      const moduleLower=module.toLocaleLowerCase('fr-FR');
+
+      if(niveau==='I'){
+        domaines_reussite.push(phrase);
+        if(moduleLower.includes('traitement de texte')||moduleLower.includes('messagerie'))a_reussi_numerique=true;
+        if(commentaireLower.includes('consigne unique')||moduleLower.includes('mathématiques'))a_reussi_consigne_simple=true;
+      }else if(niveau==='II'||niveau==='III'){
+        domaines_vigilance.push(phrase);
+        if(moduleLower.includes('expression écrite'))a_echoue_ecrit=true;
+        if(moduleLower.includes('contraintes')||moduleLower.includes('organisation')||moduleLower.includes('logistique')||moduleLower.includes('restaurant'))a_echoue_contraintes_multiples=true;
+      }
+    }
+
+    if(a_reussi_numerique&&a_echoue_ecrit){
+      contrastes.push("Un contraste marqué s'observe entre la maîtrise des outils numériques et les difficultés rencontrées dans la structuration et l'orthographe de l'expression écrite.");
+    }
+    if(a_reussi_consigne_simple&&a_echoue_contraintes_multiples){
+      contrastes.push("Il existe une opposition nette entre la capacité à exécuter des consignes simples et les difficultés majeures face à l'organisation, la planification ou la prise en compte de contraintes multiples.");
+    }
+    if(domaines_reussite.length>0&&domaines_vigilance.length>0&&!contrastes.length){
+      contrastes.push("Le profil est hétérogène, alternant des réussites nettes dans des cadres structurés et des difficultés dès que l'autonomie ou la gestion de plusieurs paramètres est requise.");
+    }
+
+    let motivation_personnelle='';
+    const loisir=String(texte_loisir_optionnel??'');
+    if(loisir&&loisir.length>50){
+      motivation_personnelle=`Sur le plan personnel, ${civilite} ${nom} ${prenom} exprime un intérêt marqué pour ${loisir.slice(0,150)}..., ce qui témoigne d'une conscience de ses besoins en termes d'apaisement ou de stimulation.`;
+    }
+
+    return {
+      civilite:String(civilite??''),
+      nom:String(nom??'').toLocaleUpperCase('fr-FR'),
+      prenom:capitalizeLikePython(prenom),
+      domaines_reussite,
+      domaines_vigilance,
+      contrastes,
+      motivation_personnelle
+    };
   }
-  function abandonFacts(records){
-    const out=[];
-    (Array.isArray(records)?records:[]).forEach((record,index)=>{
-      if(!record||typeof record!=='object')return;
-      const exercice=norm(record.exercice||record.page||'Exercice');
-      const raisons=Array.isArray(record.raisons)?record.raisons.map(norm).filter(Boolean):[];
-      const commentaire=norm(record.commentaire);
-      if(!raisons.length&&!commentaire)return;
-      const key=norm(record.key||record.page||('abandon-'+index)).replace(/[^A-Za-z0-9_-]+/g,'-');
-      out.push({id:'abandon-'+key+'-'+index,theme:'Conditions de réalisation du parcours',exercice,competence:'abandon de l’exercice',statut:'abandon',positionnement:'non_evalue',importance:'abandon',raisons_abandon:raisons,commentaire_abandon:commentaire,observations_qualitatives:['Exercice abandonné : '+exercice+'.',raisons.length?'Raison(s) renseignée(s) : '+raisons.join(' ; ')+'.':'',commentaire?'Commentaire renseigné : '+commentaire+'.':''].filter(Boolean),validation_couverture:abandonCoverage(record)});
-    });
-    return out;
-  }
-  function faitsObligatoires(lines,abandons){
-    return lines.map(x=>({id:x.id,theme:x.theme,exercice:x.exercice,competence:x.competence,positionnement:x.positionnement,importance:x.importance,observations_qualitatives:x.observations_qualitatives,validation_couverture:x.validation_couverture})).concat(abandons||[]);
-  }
-  function planCouverture(lines,abandons){
-    const ids=new Set(lines.map(x=>x.id)),keep=(list)=>list.filter(id=>ids.has(id));
-    const plan=[
-      {paragraphe:1,objet:"vue d'ensemble du parcours",obligatoire:true,faits_ids:[]},
-      {paragraphe:2,objet:'fabrication de la structure 3D et construction à base de briques',obligatoire:true,faits_ids:keep(['fabrication-plan','fabrication-tracage','fabrication-decoupe','fabrication-assemblage','fabrication-finition','briques-identification','briques-manipulation'])},
-      {paragraphe:3,objet:'raisonnement, rangement du stock et planification sous contraintes',obligatoire:true,faits_ids:keep(['carre','organisation','planning']),priorite:'les difficultés prioritaires de ce domaine ne doivent jamais être omises ni atténuées'},
-      {paragraphe:4,objet:'tri de chevilles : rythme et fiabilité',obligatoire:true,faits_ids:keep(['tri-temps','tri-erreurs'])},
-      {paragraphe:5,objet:'outils numériques : traitement de texte et messagerie',obligatoire:true,faits_ids:keep(['texte','mail'])},
-      {paragraphe:6,objet:'expression écrite et mathématiques',obligatoire:true,faits_ids:keep(['expression','math-enonce','math-problemes'])}
-    ];
-    if(Array.isArray(abandons)&&abandons.length)plan.push({paragraphe:7,objet:'exercices abandonnés et raisons renseignées dans les résultats',obligatoire:true,faits_ids:abandons.map(x=>x.id)});
-    return plan;
-  }
+
   function buildRichProfile(input){
     input=input||{};
     const candidate=input.candidate||{};
-    const lines=Object.keys(ROWS).map(k=>lineFromRow(k,(input.rows||{})[k]||{})).filter(Boolean);
-    const abandons=abandonFacts(input.abandons);
-    return {
-      identite:{
-        civilite:/^mme|madame$/i.test(norm(candidate.civilite))?'Madame':'Monsieur',
-        nom:norm(candidate.nom).toLocaleUpperCase('fr-FR'),
-        prenom:title(candidate.prenom||candidate['prénom']),
-        date_evaluation:formatDateFr(candidate.date)
-      },
-      consigne_de_lecture:'Les observations ci-dessous sont déjà qualifiées et nettoyées des scores, nombres d’erreurs, durées et niveaux. Chaque fait obligatoire doit apparaître dans son domaine sans être atténué, renforcé ou déplacé vers une autre compétence.',
-      plan_couverture:planCouverture(lines,abandons),
-      faits_obligatoires:faitsObligatoires(lines,abandons),
-      abandons,
-      points_appui:faitsSaillants(lines,'point_appui'),
-      points_vigilance:faitsSaillants(lines,'point_vigilance'),
-      domaines:groupThemes(lines),
-      contrastes_observes:contrastes(lines)
-    };
+    const civilite=/^mme|madame$/i.test(norm(candidate.civilite))?'Madame':'Monsieur';
+    const nom=norm(candidate.nom);
+    const prenom=norm(candidate.prenom||candidate['prénom']);
+    return genererJsonRichePourQwen(
+      lignesTableau(input.rows||{}),
+      civilite,
+      nom,
+      prenom,
+      String(input.texte_loisir_optionnel||'')
+    );
   }
-  return {ROWS,COVERAGE,buildRichProfile,cleanQualitative,classify,importance,abandonFacts};
+
+  return {ROWS,TRADUCTION_NIVEAUX,lignesTableau,genererJsonRichePourQwen,buildRichProfile};
 });
