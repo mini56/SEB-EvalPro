@@ -11,6 +11,7 @@ on:
       - '.github/workflows/build-ai-pack.yml'
       - '.github/workflows/test-ai-pack-install.yml'
       - '.github/workflows/test-installed-editions.yml'
+      - 'scripts/ministral-admin-rewrite-smoke.js'
       - '.github/workflows/test-split-editions.yml'
 
 permissions:
