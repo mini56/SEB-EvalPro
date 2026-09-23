@@ -421,17 +421,28 @@ function parseJs(text, label) {
     'SEB_ADMIN_HOME_PRIVACY_BUTTON_IN_BAR'
   ]) if (!preload.includes(token)) fail('interface/navigation Admin candidat incomplète: ' + token, 7);
 
-  for (const token of [
-    'Microsoft Visual C++ x64',
-    '3221225781',
-    "serverProcess.on('error'"
-  ]) if (!localAi.includes(token)) fail('diagnostic runtime IA incomplet: ' + token, 7);
+  const sebIaIntegrated = packageText.includes('build165plus-seb-ia-v1.js');
+  if (sebIaIntegrated) {
+    for (const forbidden of [
+      'Ministral-3-8B-Instruct',
+      'SEB-EvalPro-IA-Pack-Setup.exe',
+      'vc_redist.x64.exe',
+      'ExecShellWait "runas"'
+    ]) if (installer.includes(forbidden)) fail('ancien prérequis Pack IA encore présent dans le Setup SEB-IA: ' + forbidden, 7);
+    if (packageText.includes('build165plus-local-ai-prototype.js')) fail('ancien moteur Mistral encore exécuté après SEB-IA', 7);
+  } else {
+    for (const token of [
+      'Microsoft Visual C++ x64',
+      '3221225781',
+      "serverProcess.on('error'"
+    ]) if (!localAi.includes(token)) fail('diagnostic runtime IA incomplet: ' + token, 7);
 
-  for (const token of [
-    'vc_redist.x64.exe',
-    'ExecShellWait "runas"',
-    'VC\\Runtimes\\x64'
-  ]) if (!installer.includes(token)) fail('prérequis Visual C++ absent du Setup: ' + token, 7);
+    for (const token of [
+      'vc_redist.x64.exe',
+      'ExecShellWait "runas"',
+      'VC\\Runtimes\\x64'
+    ]) if (!installer.includes(token)) fail('prérequis Visual C++ absent du Setup: ' + token, 7);
+  }
 
   for (const forbidden of [
     'admin:list-results',
