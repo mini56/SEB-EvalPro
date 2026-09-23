@@ -108,13 +108,12 @@ function installUnifiedSynthesis(){
    if(!deterministic){setStatus('Aucune synthèse n’a pu être générée.');setApplied(false,false,'Aucun texte moteur disponible.');return}
    sessionStorage.setItem(SOURCE_KEY,deterministic);
    sessionStorage.setItem(FINAL_KEY,deterministic);
-   setApplied(true,false,'Qwen rédige à partir du contexte qualitatif riche…');
-   setStatus('Qwen rédige la synthèse détaillée à partir du contexte qualitatif riche…');
+   setApplied(true,false,'SEB-IA reformule la synthèse localement…');
+   setStatus('SEB-IA reformule la synthèse localement…');
    try{
     const st=await window.sebEvalPro?.localAiStatus?.();
     if(!st?.available){setStatus('Synthèse moteur conservée.');setApplied(true,false,'IA indisponible.');return}
-    const richPayload=window.sebQwenRichPayload?.();
-    const answer=await window.sebEvalPro.rewriteSynthesisLocal(richPayload||deterministic);
+    const answer=await window.sebEvalPro.rewriteSynthesisLocal(deterministic);
     if(!answer?.ok){setStatus('Synthèse moteur conservée.');setApplied(true,false,answer?.error||'Reformulation indisponible.');return}
     const finalText=stripAiWrappers(answer.text);
     if(!finalText){setStatus('Synthèse moteur conservée.');setApplied(true,false,'Reformulation vide.');return}
@@ -218,4 +217,4 @@ function sebBhInstallUnifiedSynthesis(){
   write(historyFile, js);
 }
 
-console.log('SEB EvalPro IA locale prototype: barre visible MOTEUR/IA avec ✅/❌ et avertissement de relecture.');
+console.log('SEB EvalPro IA locale: brouillon déterministe puis reformulation SEB-IA, sans pont Qwen direct.');
