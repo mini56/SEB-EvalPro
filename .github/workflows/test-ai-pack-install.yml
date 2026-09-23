@@ -7,6 +7,8 @@ on:
       - tmp-split-candidat-admin-ai-pack
     paths:
       - '.github/workflows/test-ai-pack-install.yml'
+      - 'src/local-ai.js'
+      - 'scripts/ministral-admin-rewrite-smoke.js'
 
 permissions:
   contents: read
