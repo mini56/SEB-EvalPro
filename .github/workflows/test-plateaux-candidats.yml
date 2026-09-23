@@ -94,7 +94,7 @@ jobs:
             'qwen-rich-context-v1',
             'qwen-direct-light-factual-v2',
             'RÈGLES ABSOLUES ET NON NÉGOCIABLES',
-            'N’invente aucun trait de personnalité',
+            'trait de personnalité',
             'top_k: 40',
             'repeat_penalty: 1.1',
             'mirostat: 0'
