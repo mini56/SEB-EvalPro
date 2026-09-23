@@ -1,6 +1,6 @@
 (function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;if(root)root.SEB_IA_ENGINE=api;})(typeof globalThis!=='undefined'?globalThis:this,function(){
 'use strict';
-const VERSION='SEB-IA V1.0';
+const VERSION='SEB-IA V1.1';
 const META={
 'fabrication-plan':['la lecture du plan','fabrication'],'fabrication-tracage':['le traçage','fabrication'],'fabrication-decoupe':['la découpe','fabrication'],'fabrication-assemblage':['le pliage et l’assemblage','fabrication'],'fabrication-finition':['les finitions','fabrication'],
 'briques-identification':['la lecture du schéma','briques'],'briques-manipulation':['la manipulation et l’assemblage des briques','briques'],
@@ -8,7 +8,14 @@ const META={
 'tri-temps':['le rythme du tri','tri'],'tri-erreurs':['la fiabilité du tri','tri'],'texte':['le traitement de texte','numerique'],'mail':['la messagerie électronique','numerique'],
 'expression':['l’expression écrite','fondamentaux'],'math-enonce':['la compréhension des consignes mathématiques','fondamentaux'],'math-problemes':['les calculs et la résolution de problèmes','fondamentaux']};
 const GROUPS={fabrication:['fabrication-plan','fabrication-tracage','fabrication-decoupe','fabrication-assemblage','fabrication-finition'],briques:['briques-identification','briques-manipulation'],organisation:['carre','organisation','planning'],tri:['tri-temps','tri-erreurs'],numerique:['texte','mail'],fondamentaux:['expression','math-enonce','math-problemes']};
-const TRACK=['satisfais','difficult','accompagnement','maîtris','autonom','repère','consolid','également','toutefois','revanche','correct','fragil','précision','point d’appui'];
+const TRACK=['satisfais','difficult','accompagnement','maîtris','autonom','repère','consolid','également','toutefois','revanche','cependant','correct','fragil','précision','contrôle','vérification','point d’appui','acquis','méthode','conforme'];
+const VOCABULARY={
+ support:['constitue un point d’appui','fait partie des acquis observés','est mobilisée de manière satisfaisante','est correctement appréhendée','ne fait pas apparaître de difficulté particulière'],
+ consolidation:['reste à consolider sur certains aspects','demande encore quelques vérifications','nécessite encore des repères','gagne à être davantage contrôlée','reste perfectible dans la situation proposée'],
+ difficulty:['reste difficile et nécessite un accompagnement','constitue un point de fragilité plus marqué','demande encore une méthode plus structurée','reste peu maîtrisée dans la situation proposée','nécessite des repères plus soutenus'],
+ addition:['Par ailleurs','De plus','Dans le même temps','Sur un autre registre','En complément'],
+ contrast:['Toutefois','En revanche','Cependant','À l’inverse','Pour autant']
+};
 const FORBIDDEN=[/potentiel\b/i,/profil psycholog/i,/diagnostic/i,/motivation\b/i,/épanouissement/i,/orientation professionnelle/i,/insertion professionnelle/i,/fonctionnement cognitif/i,/capacité de concentration/i,/maintenir son attention/i];
 const raw=v=>String(v==null?'':v).replace(/\u00a0/g,' ').replace(/\s+/g,' ').trim();
 const cap=v=>{const s=raw(v);return s?s[0].toUpperCase()+s.slice(1):''};
