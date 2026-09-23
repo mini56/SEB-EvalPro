@@ -166,7 +166,18 @@ jobs:
           & $makensisPath "/DAPP_VERSION=$version" 'build\standalone-uninstaller.nsi'
           if ($LASTEXITCODE -ne 0) { throw 'Compilation désinstallateur échouée.' }
 
+      - name: Upload split-edition build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SEB-EvalPro-Split-${{ github.run_number }}
+          path: |
+            dist/SEB-eval-PRO-*-Windows-Setup.exe
+            dist/SEB-eval-PRO-*-Windows-Desinstallation.exe
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Publish split-edition test release
+        continue-on-error: true
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
