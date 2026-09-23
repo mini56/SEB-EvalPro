@@ -48,18 +48,26 @@ const unsupportedConcepts = [
     assert(/planif|organisation des taches|ordre.*taches/.test(norm),
       'La réussite de planification doit être conservée');
 
-    const planSentences=norm.split(/(?<=[.!?])\s+/).filter(s=>/planif|organisation des taches|ordre.*taches/.test(s));
-    for(const sentence of planSentences){
-      assert(!/(difficult|accompagnement|erreur|fragil)/.test(sentence),
-        'La planification positive ne doit pas être transformée en difficulté: '+sentence);
+    const planMatches=[...norm.matchAll(/(?:planif|organisation des taches|ordre[^.!?]{0,30}taches)[^.!?]*/g)].map(m=>m[0]);
+    assert(planMatches.length>0,'La réussite de planification doit être couverte');
+    for(const clause of planMatches){
+      assert(!/(difficult|accompagnement|erreur|fragil)/.test(clause),
+        'La planification positive ne doit pas être transformée en difficulté: '+clause);
     }
 
-    const triSentences=norm.split(/(?<=[.!?])\s+/).filter(s=>/tri de chevilles|rythme|fiabilite/.test(s));
-    assert(triSentences.length>0,'Le tri doit être couvert');
-    for(const sentence of triSentences){
-      assert(!/(difficult|accompagnement|amelior|fragil)/.test(sentence),
-        'Le tri satisfaisant ne doit pas être transformé en difficulté: '+sentence);
+    const triMatches=[...norm.matchAll(/(?:tri de chevilles|rythme|fiabilite)[^.!?]*/g)].map(m=>m[0]);
+    assert(triMatches.length>0,'Le tri doit être couvert');
+    for(const clause of triMatches){
+      assert(!/(difficult|accompagnement|amelior|fragil)/.test(clause),
+        'Le tri satisfaisant ne doit pas être transformé en difficulté: '+clause);
     }
+
+    assert(!/decoup[^.!?]{0,120}generalement conforme/.test(norm),
+      'La découpe ne doit pas recevoir une réserve positive absente de la source');
+    assert(!/expression ecrite[^.!?]{0,180}(irreprochable|sans faute|depourvu de faute)/.test(norm),
+      'L’expression écrite correcte ne doit pas être transformée en résultat absolu');
+    assert(!/mathem[^.!?]{0,180}(systematiquement|avec rigueur|maitrise parfaite)/.test(norm),
+      'Les mathématiques ne doivent pas être intensifiées au-delà de la source');
 
     assert(/traitement de texte/.test(norm),'Le traitement de texte doit être couvert');
     assert(/messagerie/.test(norm),'La messagerie doit être couverte');

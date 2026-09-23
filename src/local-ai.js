@@ -257,11 +257,14 @@ function createLocalAiService({ app }) {
 
   async function verifySemanticFidelity(source, output) {
     const system = [
-      'Tu contrôles la fidélité factuelle d’une synthèse par rapport à sa source.',
-      'Ignore totalement les différences de style, de vocabulaire, de synonymes et de structure de phrases lorsqu’elles conservent le même sens.',
-      'Accepte par exemple « travail minutieux » et « réalisation soignée », ou « capacité à identifier » et « aptitude à repérer ».',
-      'Rejette uniquement si la synthèse ajoute ou supprime un fait, inverse une réussite et une difficulté, déplace une observation vers une autre compétence, modifie un abandon ou un élément non évalué, invente une donnée chiffrée, ou ajoute une qualité personnelle, une émotion, une motivation, un diagnostic, une orientation ou une recommandation absente de la source.',
-      'Réponds uniquement OK si le sens factuel est conservé. Sinon réponds REJET: suivi d’une raison très courte.'
+      'Tu contrôles la fidélité sémantique d’une synthèse par rapport à sa source, phrase par phrase et compétence par compétence.',
+      'Ignore les différences de style, de vocabulaire, de synonymes et de structure uniquement si elles conservent exactement le même fait ET le même degré d’appréciation.',
+      'Accepte par exemple « travail minutieux » et « réalisation soignée », ou « capacité à identifier » et « aptitude à repérer » : ce sont des équivalences de sens.',
+      'Rejette toute intensification, atténuation ou généralisation absente de la source. Un fait correct ou conforme ne doit pas devenir remarquable, irréprochable, strict, systématique, pleinement maîtrisé ou d’une grande précision si ce degré n’est pas explicitement présent.',
+      'Rejette aussi toute réserve inventée : si la source dit seulement qu’une découpe est irrégulière ou incomplète, la synthèse ne peut pas ajouter qu’elle est généralement conforme.',
+      'Rejette si la synthèse ajoute ou supprime un fait, inverse une réussite et une difficulté, déplace une observation vers une autre compétence, modifie un abandon ou un élément non évalué, invente une donnée chiffrée, ou ajoute une qualité personnelle, une émotion, une motivation, un diagnostic, une orientation ou une recommandation absente de la source.',
+      'Ne rejette pas une phrase simplement parce qu’elle regroupe deux compétences différentes, à condition que chaque compétence conserve son propre résultat sans contamination.',
+      'Réponds uniquement OK si tous les faits et leur intensité sont conservés. Sinon réponds REJET: suivi d’une raison très courte indiquant le changement de sens.'
     ].join(' ');
     const user = '<source>\n' + source + '\n</source>\n\n<synthese>\n' + output + '\n</synthese>';
     const body = {
@@ -303,6 +306,8 @@ function createLocalAiService({ app }) {
         'À partir d’un brouillon factuellement validé, rédige une synthèse naturelle, fluide et professionnelle. Évite un style mécanique ou répétitif.',
         'Tu peux varier librement le vocabulaire, employer des synonymes, modifier la structure des phrases et les connecteurs, tant que le sens reste strictement équivalent.',
         'Chaque idée de ta réponse doit être directement justifiée par le brouillon. N’ajoute aucune intensité, qualité, interprétation ou conclusion qui n’y figure pas.',
+        'Conserve aussi le degré exact des observations : « correct », « conforme » ou « satisfaisant » ne doivent pas devenir « remarquable », « irréprochable », « systématique », « pleinement maîtrisé » ou « de grande précision ». À l’inverse, ne minimise pas une difficulté.',
+        'N’ajoute jamais une réserve positive ou négative absente : une découpe décrite comme irrégulière ou incomplète ne devient pas « généralement conforme », et une réussite simple ne devient pas une performance supérieure.',
         'Une réussite doit rester une réussite. Une difficulté doit rester une difficulté et rester rattachée à la compétence où elle a été observée. Ne déplace jamais une observation vers un autre domaine.',
         'Ne déduis ni potentiel, ni personnalité, ni état émotionnel, ni engagement, ni motivation, ni diagnostic, ni orientation ou recommandation.',
         'Les éléments non évalués, abandonnés ou interrompus doivent rester clairement identifiables lorsqu’ils figurent dans le brouillon. N’invente et ne modifie aucune donnée chiffrée.',
@@ -321,7 +326,7 @@ function createLocalAiService({ app }) {
           { role: 'system', content: system },
           { role: 'user', content: user }
         ],
-        temperature: 0.35,
+        temperature: 0.30,
         top_p: 0.8,
         max_tokens: 1500,
         seed: 42,
