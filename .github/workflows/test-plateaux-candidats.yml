@@ -92,9 +92,9 @@ jobs:
             "'--n-gpu-layers', '0'",
             'SEB_LOCAL_AI_QWEN_RICH_CONTEXT',
             'qwen-rich-context-v1',
-            'top_k: 40',
-            'repeat_penalty: 1.1',
-            'mirostat: 0'
+            'top_k:40',
+            'repeat_penalty:1.1',
+            'mirostat:0'
           )) {
             if (-not $ai.Contains($required)) { throw "Socle #9 ou garde rédactionnelle absent: $required" }
           }
