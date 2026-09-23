@@ -255,31 +255,65 @@ function createLocalAiService({ app }) {
     return output;
   }
 
+  async function verifySemanticFidelity(source, output) {
+    const system = [
+      'Tu contrôles la fidélité factuelle d’une synthèse par rapport à sa source.',
+      'Ignore totalement les différences de style, de vocabulaire, de synonymes et de structure de phrases lorsqu’elles conservent le même sens.',
+      'Accepte par exemple « travail minutieux » et « réalisation soignée », ou « capacité à identifier » et « aptitude à repérer ».',
+      'Rejette uniquement si la synthèse ajoute ou supprime un fait, inverse une réussite et une difficulté, déplace une observation vers une autre compétence, modifie un abandon ou un élément non évalué, invente une donnée chiffrée, ou ajoute une qualité personnelle, une émotion, une motivation, un diagnostic, une orientation ou une recommandation absente de la source.',
+      'Réponds uniquement OK si le sens factuel est conservé. Sinon réponds REJET: suivi d’une raison très courte.'
+    ].join(' ');
+    const user = '<source>\n' + source + '\n</source>\n\n<synthese>\n' + output + '\n</synthese>';
+    const body = {
+      model: MODEL_FILE,
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: user }
+      ],
+      temperature: 0,
+      top_p: 0.8,
+      max_tokens: 120,
+      seed: 42,
+      stream: false
+    };
+    const response = await requestJson('POST', '/v1/chat/completions', body, REQUEST_TIMEOUT_MS);
+    const verdict = cleanModelOutput(response?.choices?.[0]?.message?.content || '').trim();
+    if (!/^OK\b/i.test(verdict)) {
+      throw new Error('Le contrôle de sens SEB-IA a refusé la reformulation : ' + (verdict || 'écart factuel détecté.'));
+    }
+    return true;
+  }
+
   async function rewrite(text) {
     const source = String(text || '').replace(/\r\n/g, '\n').trim();
     if (!source) return { ok: false, error: 'La synthèse sans IA est vide.' };
     if (source.length > MAX_INPUT_CHARS) return { ok: false, error: 'La synthèse est trop longue pour ce prototype IA.' };
+
+    // L’identité n’est pas un élément stylistique : elle reste strictement déterministe.
+    // On la retire de la partie confiée au modèle puis on la réinsère telle quelle.
+    const introMatch = source.match(/^([^\n]{1,240}a participé aux mises en situation proposées au cours du plateau technique\.)\s*/i);
+    const fixedIntro = introMatch ? introMatch[1].trim() : '';
+    const rewriteSource = introMatch ? source.slice(introMatch[0].length).trim() : source;
 
     const startedAt = Date.now();
     try {
       await ensureStarted();
       const system = [
         'Tu es un rédacteur professionnel de bilans d’évaluation socioprofessionnelle en français.',
-        'À partir d’un brouillon factuellement validé, rédige une synthèse naturelle, fluide et professionnelle. Le texte doit sonner humain et éviter une formulation mécanique ou répétitive.',
-        'Tu peux varier librement le vocabulaire, utiliser des synonymes, modifier la structure des phrases et les connecteurs, tant que le sens des observations reste strictement le même.',
-        'La première phrase du brouillon doit être conservée mot pour mot afin de préserver exactement l’identité du candidat.',
-        'Ne crée aucun fait qui n’existe pas dans le brouillon. Ne déduis ni potentiel, ni personnalité, ni état émotionnel, ni motivation, ni diagnostic, ni orientation ou recommandation.',
+        'À partir d’un brouillon factuellement validé, rédige une synthèse naturelle, fluide et professionnelle. Évite un style mécanique ou répétitif.',
+        'Tu peux varier librement le vocabulaire, employer des synonymes, modifier la structure des phrases et les connecteurs, tant que le sens reste strictement équivalent.',
+        'Chaque idée de ta réponse doit être directement justifiée par le brouillon. N’ajoute aucune intensité, qualité, interprétation ou conclusion qui n’y figure pas.',
         'Une réussite doit rester une réussite. Une difficulté doit rester une difficulté et rester rattachée à la compétence où elle a été observée. Ne déplace jamais une observation vers un autre domaine.',
-        'Les éléments non évalués, abandonnés ou interrompus doivent rester clairement identifiables lorsqu’ils figurent dans le brouillon.',
-        'N’invente et ne modifie aucune donnée chiffrée.',
-        'Une reformulation équivalente est autorisée : par exemple « travail minutieux » peut devenir « réalisation soignée », et « capacité à identifier » peut devenir « aptitude à repérer » si aucune idée supplémentaire n’est ajoutée.',
-        'Tu peux regrouper ou relier des observations proches lorsque cela améliore la lecture, à condition de ne rien omettre et de ne pas mélanger des compétences dont les résultats diffèrent.',
+        'Ne déduis ni potentiel, ni personnalité, ni état émotionnel, ni engagement, ni motivation, ni diagnostic, ni orientation ou recommandation.',
+        'Les éléments non évalués, abandonnés ou interrompus doivent rester clairement identifiables lorsqu’ils figurent dans le brouillon. N’invente et ne modifie aucune donnée chiffrée.',
+        'Exemples de reformulations équivalentes autorisées : « travail minutieux » peut devenir « réalisation soignée » ; « capacité à identifier » peut devenir « aptitude à repérer ».',
+        'Exemples de changements de sens interdits : « a participé » ne doit pas devenir « s’est pleinement investi » ou « a démontré son engagement » ; « conforme aux consignes » ne doit pas devenir « rigoureux », « précis » ou « scrupuleux » si ces qualités ne sont pas observées ; « réalisé de manière adaptée » ne doit pas devenir « méthode efficace » ; « rythme satisfaisant » ne doit pas devenir « rythme soutenu ».',
+        'Tu peux regrouper ou relier des observations proches pour améliorer la lecture, à condition de ne rien omettre et de ne pas mélanger des compétences dont les résultats diffèrent.',
         'Corrige l’orthographe, la grammaire et la formulation des textes libres sans en changer le sens.',
-        'Varie les formulations et les enchaînements afin que la synthèse ne ressemble pas à une succession de phrases standardisées.',
         'Conserve globalement l’ordre des grands domaines du brouillon. N’ajoute aucun titre, aucune liste, aucune note ni commentaire sur ta réponse.',
         'Retourne uniquement la synthèse reformulée en français.'
       ].join(' ');
-      const user = `Reformule uniquement le texte compris entre <bilan> et </bilan>.\n\n<bilan>\n${source}\n</bilan>`;
+      const user = `Reformule uniquement le texte compris entre <bilan> et </bilan>.\n\n<bilan>\n${rewriteSource}\n</bilan>`;
 
       const body = {
         model: MODEL_FILE,
@@ -287,7 +321,7 @@ function createLocalAiService({ app }) {
           { role: 'system', content: system },
           { role: 'user', content: user }
         ],
-        temperature: 0.45,
+        temperature: 0.35,
         top_p: 0.8,
         max_tokens: 1500,
         seed: 42,
@@ -296,7 +330,9 @@ function createLocalAiService({ app }) {
 
       const response = await requestJson('POST', '/v1/chat/completions', body, REQUEST_TIMEOUT_MS);
       const raw = response?.choices?.[0]?.message?.content || '';
-      const output = validateRewrite(source, cleanModelOutput(raw));
+      const rewrittenBody = cleanModelOutput(raw);
+      const output = validateRewrite(source, fixedIntro ? fixedIntro + '\n\n' + rewrittenBody : rewrittenBody);
+      await verifySemanticFidelity(source, output);
       return {
         ok: true,
         text: output,

@@ -10,7 +10,8 @@ const source = [
 
 const unsupportedConcepts = [
   'potentiel','stress','motivation','épanouissement','diagnostic',
-  'orientation professionnelle','recommandation de formation','profil psychologique'
+  'orientation professionnelle','recommandation de formation','profil psychologique',
+  'engagement concret','pleinement investi'
 ];
 
 (async()=>{
