@@ -85,6 +85,8 @@ function words(text){return String(text||'').trim().split(/\s+/).filter(Boolean)
   assert(!/\bet\s+et\b/i.test(out.text),'enchaînement "et et" interdit');
   assert(!/\b(?:Toutefois|Cependant|En revanche)\b[^.]{0,220}\b\1\b/i.test(out.text),'connecteur contrastif répété dans une même phrase');
   assert(!/[ \t]{2,}/.test(out.text),'espaces multiples interdits');
+  assert(!/\bà le\b|\bde le\b/i.test(out.text),'contractions françaises incorrectes');
+  assert(!/\S;/.test(out.text),'espace française avant point-virgule absente');
   const sentences=out.text.match(/[^.!?]+[.!?]+/g)||[];
   assert(!sentences.some((s)=>s.trim().length>240),'phrase trop longue');
 })();
@@ -131,7 +133,9 @@ function words(text){return String(text||'').trim().split(/\s+/).filter(Boolean)
   assert(/messagerie|message/i.test(out.text),'messagerie absente');
   for(const pct of ['59','100','93'])assert(out.text.includes(pct+' %'),'pourcentage '+pct+' % non intégré');
   assert(!/excellent|parfait|exceptionnel|remarquable/i.test(out.text),'intensification non justifiée');
-  assert(words(out.text)<290,'cas DURANT trop long: '+words(out.text)+' mots');
+  assert(!/\bà le\b|\bde le\b/i.test(out.text),'contraction française incorrecte');
+  assert(!/0 min 03 s|6 erreurs/i.test(out.text),'métriques de tri recopiées sans utilité');
+  assert(words(out.text)<250,'cas DURANT trop long: '+words(out.text)+' mots');
   console.log('SEB-IA DURANT: '+words(out.text)+' mots.\n'+out.text);
 })();
 
