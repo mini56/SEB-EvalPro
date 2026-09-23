@@ -53,14 +53,19 @@ const payload=JSON.stringify({kind:'seb-qwen-rich-context-v1',profile});
     const result=await service.rewrite(payload);
     if(!result?.ok) throw new Error(result?.error||'Qwen direct: génération refusée');
     const text=String(result.text||'').trim();
-    assert.strictEqual(result.guard,'qwen-factual-frame-v6','La trame factuelle v6 doit être active.');
+    assert.strictEqual(result.guard,'qwen-natural-factual-v7','La rédaction naturelle factuelle v7 doit être active.');
     assert(text.startsWith('Monsieur GARCIA José a participé'),'Le début institutionnel doit être conservé.');
     assert(text.length>=700,'La synthèse ne doit pas être anormalement courte.');
-    assert(text.split(/\n\s*\n/).filter(Boolean).length>=4,'La synthèse doit contenir au moins quatre paragraphes.');
+    const paragraphs=text.split(/\n\s*\n/).map(x=>x.trim()).filter(Boolean);
+    assert(paragraphs.length>=4&&paragraphs.length<=6,'La synthèse doit contenir entre quatre et six paragraphes naturels.');
 
     console.log('QWEN_LIGHT_FACTUAL_OUTPUT_BEGIN');
     console.log(text);
     console.log('QWEN_LIGHT_FACTUAL_OUTPUT_END');
+    assert(!/\b(?:Fabrication d’une structure 3D en papier|Construction à base de briques|Raisonnement — carré magique|Organisation logistique — rangement du stock|Planification sous contraintes — restaurant|Outils numériques|Expression écrite|Mathématiques)\s*:/i.test(text),
+      'La synthèse ne doit pas recopier les intitulés du tableau comme des rubriques.');
+    assert(!/\bF\d{2}\b/.test(text),'Les identifiants techniques ne doivent jamais apparaître.');
+    assert(!/^[^\n]{3,120}\s*:\s/m.test(text),'La synthèse ne doit pas prendre la forme de lignes libellé : observation.');
     const norm=text.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
     for(const unsupported of ['stress','blocage','potentiel','epanouissement','profil dynamique','adaptable','maximiser','performance optimale','motivation personnelle','volonte de','desir de progresser','initiative','priorisation','organisation efficace','bonne gestion du temps','bon sens de l’organisation']){
       assert(!norm.includes(unsupported),'Interprétation non sourcée détectée: '+unsupported);
