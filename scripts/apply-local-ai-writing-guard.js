@@ -42,7 +42,7 @@ const motorPrefix = source.slice(0, start);
 function writingBlockTemplate() {
   // SEB_LOCAL_AI_QWEN_DIRECT_USER_FILES
   const RICH_KIND = 'seb-qwen-rich-context-v1';
-  const DIRECT_GUARD = 'qwen-natural-factual-v7';
+  const DIRECT_GUARD = 'qwen-four-blocks-v8';
 
   function cleanModelOutput(raw) {
     let text = String(raw || '').replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
@@ -96,77 +96,80 @@ function writingBlockTemplate() {
     return texte.trim();
   }
 
-  function buildDirectPrompt(profile) {
-    const civilite = String(profile?.civilite || 'Monsieur');
-    const nom = String(profile?.nom || '');
-    const prenom = String(profile?.prenom || '');
+  function paragraphGroups(profile) {
     const trame=Array.isArray(profile?.trame_factuelle)?profile.trame_factuelle:[];
-    const faits=[];
-    function competenceCourte(value){
-      const text=String(value||'').trim();
-      const parts=text.split(' — ');
-      return (parts.length>1?parts.slice(1).join(' — '):text).trim();
-    }
-    for(const domaine of trame){
-      const nomDomaine=String(domaine?.domaine||'').trim();
+    const groups=[
+      {label:'fabrication et construction',match:d=>/Fabrication|Construction à base de briques/i.test(d)},
+      {label:'raisonnement, organisation et planification',match:d=>/Raisonnement|Organisation logistique|Planification/i.test(d)},
+      {label:'tri et outils numériques',match:d=>/Tri de chevilles|Outils numériques/i.test(d)},
+      {label:'expression écrite et mathématiques',match:d=>/Expression écrite|Mathématiques/i.test(d)}
+    ];
+    return groups.map(group=>({
+      label:group.label,
+      domains:trame.filter(d=>group.match(String(d?.domaine||'')))
+    })).filter(group=>group.domains.length);
+  }
+
+  function compactFacts(group) {
+    const facts=[];
+    for(const domaine of group.domains){
       for(const item of (Array.isArray(domaine?.points_appui)?domaine.points_appui:[])){
-        faits.push({id:'F'+String(faits.length+1).padStart(2,'0'),domaine:nomDomaine,type:'appui',competence:competenceCourte(item?.competence),observation:String(item?.observation||'').trim()});
+        facts.push({domaine:String(domaine?.domaine||''),type:'appui',competence:String(item?.competence||''),observation:String(item?.observation||'')});
       }
       for(const item of (Array.isArray(domaine?.vigilances)?domaine.vigilances:[])){
-        faits.push({id:'F'+String(faits.length+1).padStart(2,'0'),domaine:nomDomaine,type:'vigilance',competence:competenceCourte(item?.competence),observation:String(item?.observation||'').trim()});
+        facts.push({domaine:String(domaine?.domaine||''),type:'vigilance',competence:String(item?.competence||''),observation:String(item?.observation||'')});
       }
     }
-    const data=JSON.stringify({civilite,nom,prenom,faits,motivation_personnelle:String(profile?.motivation_personnelle||'')});
+    return facts;
+  }
+
+  function buildParagraphPrompt(profile,group,index,total) {
+    const civilite=String(profile?.civilite||'Monsieur');
+    const nom=String(profile?.nom||'');
+    const prenom=String(profile?.prenom||'');
+    const facts=compactFacts(group);
     return [
-      'Tu rédiges une vraie synthèse professionnelle de plateau technique destinée à une équipe pluridisciplinaire.',
-      'Tu dois transformer les faits fournis en un texte naturel et synthétique. Le résultat ne doit jamais ressembler à une copie du tableau, à un compte rendu ligne par ligne ou à une liste de compétences.',
-      '',
-      'RÈGLES DE RÉDACTION :',
-      `1. Commence exactement par : "${civilite} ${nom} ${prenom} a participé aux mises en situation proposées au cours du plateau technique."`,
-      '2. Rédige entre 4 et 6 paragraphes continus et naturels, sans titre, sans sous-titre, sans liste et sans puces.',
-      '3. Regroupe les observations qui appartiennent à un même ensemble de compétences. Utilise des transitions naturelles comme "Dans les activités de fabrication", "Les exercices de raisonnement et d’organisation", "Concernant les outils numériques" ou des formulations équivalentes.',
-      '4. INTERDICTION de recopier les libellés techniques du tableau sous la forme "Domaine — compétence :" ou "Compétence : observation". N’utilise pas les identifiants F01, F02, etc. dans le texte final.',
-      '5. Tous les faits fournis doivent être présents, mais ils doivent être synthétisés. Plusieurs faits proches peuvent être réunis dans une même phrase si leur sens reste exact.',
-      '6. Pour une activité mixte, mets en évidence naturellement les points d’appui puis les difficultés réellement observées. Ne généralise jamais une réussite ou une difficulté à toute l’activité.',
-      '7. Un fait positif reste positif. Une vigilance reste limitée à la compétence concernée. Aucun fait ne peut être déplacé vers un autre domaine.',
-      '8. N’invente rien : pas de potentiel, personnalité, motivation, stress, adaptabilité, dynamisme, initiative, priorisation, concentration, confiance, gestion du temps, projet, orientation ou recommandation si ces éléments ne sont pas explicitement fournis.',
-      '9. N’ajoute aucune conclusion générale sur le profil. Termine simplement après avoir couvert les derniers faits.',
-      '10. Ne mentionne aucun chiffre, pourcentage, durée, nombre d’erreurs, score ou niveau I/II/III.',
-      `11. Pour désigner la personne, utilise "${civilite}" quand un sujet est nécessaire. Évite les répétitions : privilégie aussi les tournures impersonnelles ou nominales naturelles. N’utilise jamais "le candidat", "le stagiaire" ou "la personne".`,
-      '12. Soigne la grammaire française : chaque phrase doit avoir un sujet clair ; évite les formulations télégraphiques comme "Est capable de..." ou "Assemble les pièces...".',
-      '',
-      'ORGANISATION ATTENDUE :',
-      '- paragraphe 1 : introduction courte puis activités de fabrication et construction ;',
-      '- paragraphe 2 : raisonnement, organisation et planification ;',
-      '- paragraphe 3 : tri et outils numériques ;',
-      '- paragraphe 4 : expression écrite et mathématiques ;',
-      '- un cinquième ou sixième paragraphe seulement si nécessaire pour garder le texte lisible.',
-      '',
-      'DONNÉES FACTUELLES À RESPECTER :',
-      data,
-      '',
-      'Rédige maintenant uniquement la synthèse finale.'
+      'Rédige UN SEUL paragraphe professionnel, naturel et fluide à partir des faits ci-dessous.',
+      'Tu n’as pas à analyser le profil : tu dois uniquement rédiger ces faits.',
+      index===0?`Commence exactement par : "${civilite} ${nom} ${prenom} a participé aux mises en situation proposées au cours du plateau technique."`:'Ne répète pas le nom ni le prénom. Utilise "'+civilite+'" uniquement lorsque le sujet est nécessaire.',
+      'Intègre TOUS les faits fournis. N’en omets aucun. N’en invente aucun. Ne transfère jamais un fait vers une autre compétence.',
+      'Les éléments de type "appui" sont des réussites. Les éléments de type "vigilance" sont uniquement les difficultés réellement constatées.',
+      'Ne cite aucun chiffre, score, pourcentage, durée, nombre d’erreurs ni niveau I/II/III.',
+      'Ne recopie pas les noms techniques sous forme de rubrique, de liste ou de "libellé : observation". Fais de vraies phrases liées entre elles.',
+      'N’ajoute aucune appréciation sur le potentiel, la personnalité, la motivation, le stress, l’adaptabilité, le dynamisme, la rigueur, l’initiative, la priorisation, la concentration, la gestion du temps ou une orientation.',
+      'Ne donne aucune recommandation et ne fais aucune conclusion générale.',
+      'Soigne la grammaire : aucune phrase télégraphique du type "Est capable de..." ou "Assemble les pièces...".',
+      `Ce paragraphe est le bloc ${index+1} sur ${total} : ${group.label}.`,
+      'FAITS : '+JSON.stringify(facts),
+      'Retourne uniquement le paragraphe rédigé.'
     ].join('\n');
   }
 
   async function completeDirect(profile) {
-    const body = {
-      model: MODEL_FILE,
-      messages: [
-        { role: 'system', content: 'Tu es un rédacteur professionnel de synthèses socioprofessionnelles. Tu écris un texte naturel et fluide à partir de faits strictement imposés, sans jamais en inventer ni en déplacer.' },
-        { role: 'user', content: '/no_think\n\n' + buildDirectPrompt(profile) }
-      ],
-      temperature: 0.45,
-      top_p: 0.75,
-      top_k: 40,
-      repeat_penalty: 1.1,
-      mirostat: 0,
-      max_tokens: 1800,
-      seed: 42,
-      stream: false
-    };
-    const response = await requestJson('POST', '/v1/chat/completions', body, REQUEST_TIMEOUT_MS);
-    return cleanModelOutput(response?.choices?.[0]?.message?.content || '');
+    const groups=paragraphGroups(profile);
+    const paragraphs=[];
+    for(let i=0;i<groups.length;i++){
+      const body={
+        model:MODEL_FILE,
+        messages:[
+          {role:'system',content:'Tu es un rédacteur professionnel de bilans socioprofessionnels. Tu reformules fidèlement des faits imposés en français naturel, sans aucune invention.'},
+          {role:'user',content:'/no_think\n\n'+buildParagraphPrompt(profile,groups[i],i,groups.length)}
+        ],
+        temperature:0.35,
+        top_p:0.7,
+        top_k:40,
+        repeat_penalty:1.1,
+        mirostat:0,
+        max_tokens:650,
+        seed:42+i,
+        stream:false
+      };
+      const response=await requestJson('POST','/v1/chat/completions',body,REQUEST_TIMEOUT_MS);
+      const paragraph=cleanModelOutput(response?.choices?.[0]?.message?.content||'').replace(/\n+/g,' ').replace(/\s+/g,' ').trim();
+      if(!paragraph)throw new Error('Qwen a produit un paragraphe vide pour '+groups[i].label+'.');
+      paragraphs.push(paragraph);
+    }
+    return paragraphs.join('\n\n');
   }
 
   async function legacyRewrite(sourceText) {
@@ -265,7 +268,7 @@ replacement = replacement.split('\n').map(line => line ? '  ' + line : '').join(
 source = source.slice(0, start) + replacement + source.slice(end);
 
 if (!source.startsWith(motorPrefix)) fail('le patch a modifié la zone moteur de démarrage');
-for (const required of [marker, 'qwen-natural-factual-v7', 'RÈGLES DE RÉDACTION', 'DONNÉES FACTUELLES À RESPECTER', 'Le résultat ne doit jamais ressembler à une copie du tableau', 'La synthèse est trop courte', 'top_k: 40', 'repeat_penalty: 1.1', 'mirostat: 0']) {
+for (const required of [marker, 'qwen-four-blocks-v8', 'paragraphGroups', 'Rédige UN SEUL paragraphe professionnel', 'Intègre TOUS les faits fournis', 'max_tokens:650', 'La synthèse est trop courte', 'top_k:40', 'repeat_penalty:1.1', 'mirostat:0']) {
   if (!source.includes(required)) fail('élément Qwen direct absent après patch: ' + required);
 }
 for (const forbidden of ['START_ATTEMPTS', "'--ctx-size', String(", 'totalRamGb <= 8', 'Fait obligatoire omis', 'Contrôle de fidélité Qwen refusé']) {
