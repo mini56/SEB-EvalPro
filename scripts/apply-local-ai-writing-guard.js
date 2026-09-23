@@ -237,7 +237,7 @@ replacement = replacement.split('\n').map(line => line ? '  ' + line : '').join(
 source = source.slice(0, start) + replacement + source.slice(end);
 
 if (!source.startsWith(motorPrefix)) fail('le patch a modifié la zone moteur de démarrage');
-for (const required of [marker, 'qwen-direct-light-factual-v2', 'RÈGLES ABSOLUES ET NON NÉGOCIABLES', 'domaines_reussite', 'domaines_vigilance', 'N’invente aucun trait de personnalité', 'La synthèse est trop courte', 'top_k: 40', 'repeat_penalty: 1.1', 'mirostat: 0']) {
+for (const required of [marker, 'qwen-direct-light-factual-v2', 'RÈGLES ABSOLUES ET NON NÉGOCIABLES', 'domaines_reussite', 'domaines_vigilance', 'Toute appréciation sur la personnalité', 'La synthèse est trop courte', 'top_k: 40', 'repeat_penalty: 1.1', 'mirostat: 0']) {
   if (!source.includes(required)) fail('élément Qwen direct absent après patch: ' + required);
 }
 for (const forbidden of ['START_ATTEMPTS', "'--ctx-size', String(", 'totalRamGb <= 8', 'Fait obligatoire omis', 'Contrôle de fidélité Qwen refusé']) {
