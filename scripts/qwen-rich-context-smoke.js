@@ -62,7 +62,7 @@ const payload=JSON.stringify({kind:'seb-qwen-rich-context-v1',profile});
     console.log(text);
     console.log('QWEN_LIGHT_FACTUAL_OUTPUT_END');
     const norm=text.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
-    for(const unsupported of ['stress','blocage','potentiel','epanouissement','profil dynamique','adaptable','maximiser','performance optimale','motivation personnelle','volonte de','desir de progresser']){
+    for(const unsupported of ['stress','blocage','potentiel','epanouissement','profil dynamique','adaptable','maximiser','performance optimale','motivation personnelle','volonte de','desir de progresser','initiative','priorisation','organisation efficace','bonne gestion du temps','bon sens de l’organisation']){
       assert(!norm.includes(unsupported),'Interprétation non sourcée détectée: '+unsupported);
     }
     assert(!/\b(?:ce candidat|le candidat|le stagiaire|la personne)\b/.test(norm),'Désignation interdite de la personne évaluée.');
@@ -107,6 +107,11 @@ const payload=JSON.stringify({kind:'seb-qwen-rich-context-v1',profile});
     assert(fabricationSentences.some(s=>/assembl/.test(s)&&/consigne|etayage|aide/.test(s)),'La vigilance réelle sur l’assemblage doit être conservée.');
     assert(!fabricationSentences.some(s=>/maitrise avancee|maitrise complete|maitrise globale/.test(s)),
       'La fabrication mixte ne doit pas être généralisée comme une maîtrise globale.');
+    const nonMathWithAlgo=sentences.filter(s=>s.includes('algorith')&&!s.includes('mathematique'));
+    assert(nonMathWithAlgo.length===0,'Les algorithmes ne doivent apparaître que dans le domaine mathématiques.');
+    assert(!fabricationSentences.some(s=>/decoup[^.!?]{0,80}(?:precise|conforme|maitris)/.test(s)&&!/manque de precision|pas droite|incomplete/.test(s)),
+      'La vigilance réelle sur la découpe ne doit pas être transformée en réussite.');
+
     const org=sentences.filter(s=>s.includes('organisation logistique')||s.includes('stock'));
     assert(org.some(s=>/difficult|accompagnement|etayage|erreur/.test(s)),'La difficulté réelle de gestion logistique doit être présente.');
     assert(!/monsieur convient de noter/.test(norm),'La tournure impersonnelle "Il convient" ne doit plus être cassée.');
