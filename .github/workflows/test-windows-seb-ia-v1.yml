@@ -51,7 +51,7 @@ jobs:
             $brush = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(0,112,192))
             $g.FillRectangle($brush,0,0,$Width,[Math]::Max(18,[int]($Height*0.28)))
             $fontSize = [Math]::Max(8,[Math]::Min(22,[int]($Width/10)))
-            $font = New-Object System.Drawing.Font 'Arial',$fontSize,[System.Drawing.FontStyle]::Bold
+            $font = [System.Drawing.Font]::new('Arial',[single]$fontSize,[System.Drawing.FontStyle]::Bold)
             $g.DrawString('SEB EvalPro',$font,$brush,8,[Math]::Max(22,[int]($Height*0.38)))
             $bmp.Save($Path,[System.Drawing.Imaging.ImageFormat]::Bmp)
             $font.Dispose(); $brush.Dispose(); $g.Dispose(); $bmp.Dispose()
@@ -63,7 +63,7 @@ jobs:
           $bmp = New-Object System.Drawing.Bitmap 256,256
           $g = [System.Drawing.Graphics]::FromImage($bmp)
           $g.Clear([System.Drawing.Color]::FromArgb(0,112,192))
-          $font = New-Object System.Drawing.Font 'Arial',70,[System.Drawing.FontStyle]::Bold
+          $font = [System.Drawing.Font]::new('Arial',[single]70,[System.Drawing.FontStyle]::Bold)
           $white = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::White)
           $g.DrawString('SEB',$font,$white,22,72)
           $hIcon = $bmp.GetHicon()
