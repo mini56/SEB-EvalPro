@@ -191,6 +191,39 @@ function createLocalAiService({ app }) {
     return startPromise;
   }
 
+  function cancelCurrent(reason = 'Fermeture du candidat') {
+    const message = 'Génération IA annulée : ' + String(reason || 'fermeture du candidat') + '.';
+    let requestsCancelled = 0;
+    for (const req of Array.from(activeRequests)) {
+      try {
+        requestsCancelled += 1;
+        req.destroy(new Error(message));
+      } catch (_) {}
+    }
+    activeRequests.clear();
+
+    const processToStop = serverProcess;
+    let processStopped = false;
+    try {
+      if (processToStop && !processToStop.killed) {
+        processToStop.kill();
+        processStopped = true;
+      }
+    } catch (_) {}
+    if (serverProcess === processToStop) {
+      serverProcess = null;
+      serverPort = 0;
+    }
+
+    return {
+      ok: true,
+      cancelled: requestsCancelled > 0 || processStopped,
+      requestsCancelled,
+      processStopped,
+      offline: true
+    };
+  }
+
   function cleanModelOutput(raw) {
     let text = String(raw || '').replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
     text = text.replace(/^```(?:text|markdown)?\s*/i, '').replace(/\s*```$/i, '').trim();
@@ -276,39 +309,6 @@ function createLocalAiService({ app }) {
         offline: true
       };
     }
-  }
-
-  function cancelCurrent(reason = 'Fermeture du candidat') {
-    const message = 'Génération IA annulée : ' + String(reason || 'fermeture du candidat') + '.';
-    let requestsCancelled = 0;
-    for (const req of Array.from(activeRequests)) {
-      try {
-        requestsCancelled += 1;
-        req.destroy(new Error(message));
-      } catch (_) {}
-    }
-    activeRequests.clear();
-
-    const processToStop = serverProcess;
-    let processStopped = false;
-    try {
-      if (processToStop && !processToStop.killed) {
-        processToStop.kill();
-        processStopped = true;
-      }
-    } catch (_) {}
-    if (serverProcess === processToStop) {
-      serverProcess = null;
-      serverPort = 0;
-    }
-
-    return {
-      ok: true,
-      cancelled: requestsCancelled > 0 || processStopped,
-      requestsCancelled,
-      processStopped,
-      offline: true
-    };
   }
 
   function stop() {
