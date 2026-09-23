@@ -68,10 +68,18 @@
 
       if(!module||!['I','II','III'].includes(niveau))continue;
 
-      // Reproduction volontaire du nettoyage fourni, y compris ses expressions régulières.
-      let commentaire_propre=commentaire.replace(/\d+/g,'');
-      commentaire_propre=commentaire_propre.replace(/%|min|s|erreur|point|réponse|\/20|\/75/gi,'');
-      commentaire_propre=commentaire_propre.replace(/\s+/g,' ').trim();
+      // Nettoyage adapté aux observations SEB EvalPro :
+      // on retire uniquement les éléments quantitatifs sans altérer les mots.
+      let commentaire_propre=commentaire
+        .replace(/(?:^|[.!?]\s*)(?:NE|III|II|I)\.\s*/g,' ')
+        .replace(/\bN[°º]?\s*\d+\s*:\s*\d+\s*(?:min|mn)?\s*\d*\s*s?\b/gi,' ')
+        .replace(/\b\d{1,2}\s*:\s*\d{2}(?::\d{2})?\b/g,' ')
+        .replace(/\b\d+\s*(?:min|mn|minutes?|secondes?|sec)\b/gi,' ')
+        .replace(/\b\d+(?:[.,]\d+)?\s*%\s*(?:de\s+réponses?\s+correctes?)?/gi,' ')
+        .replace(/\b\d+\s*erreur(?:\(s\)|s)?\b/gi,' ')
+        .replace(/\b\d+(?:[.,]\d+)?\s*\/\s*\d+(?:[.,]\d+)?\b/g,' ')
+        .replace(/\b\d+\s*(?:point(?:\(s\)|s)?|réponse(?:\(s\)|s)?)\b/gi,' ')
+        .replace(/\s+/g,' ').trim();
 
       const commentaireLower=commentaire.toLocaleLowerCase('fr-FR');
       if(commentaireLower.includes('abandonné')||commentaireLower.includes('abandon')||commentaireLower.includes('trop difficile')){

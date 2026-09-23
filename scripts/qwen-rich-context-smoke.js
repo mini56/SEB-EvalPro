@@ -42,7 +42,7 @@ const payload=JSON.stringify({kind:'seb-qwen-rich-context-v1',profile});
     const result=await service.rewrite(payload);
     if(!result?.ok) throw new Error(result?.error||'Qwen direct: génération refusée');
     const text=String(result.text||'').trim();
-    assert.strictEqual(result.guard,'qwen-direct-light-factual-v2','Le garde-fou léger v2 doit être actif.');
+    assert.strictEqual(result.guard,'qwen-direct-light-factual-v3','Le garde-fou factuel léger v3 doit être actif.');
     assert(text.startsWith('Monsieur GARCIA José a participé'),'Le début institutionnel doit être conservé.');
     assert(text.length>=1200,'La synthèse doit respecter la densité demandée.');
     assert(text.split(/\n\s*\n/).filter(Boolean).length>=4,'La synthèse doit contenir au moins quatre paragraphes.');
@@ -51,20 +51,34 @@ const payload=JSON.stringify({kind:'seb-qwen-rich-context-v1',profile});
     console.log(text);
     console.log('QWEN_LIGHT_FACTUAL_OUTPUT_END');
     const norm=text.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
-    for(const unsupported of ['stress','blocage','potentiel','epanouissement','profil dynamique','adaptable','maximiser','performance optimale']){
+    for(const unsupported of ['stress','blocage','potentiel','epanouissement','profil dynamique','adaptable','maximiser','performance optimale','motivation personnelle','volonte de','desir de progresser']){
       assert(!norm.includes(unsupported),'Interprétation non sourcée détectée: '+unsupported);
     }
+    assert(!/\b(?:ce candidat|le candidat|le stagiaire|la personne)\b/.test(norm),'Désignation interdite de la personne évaluée.');
+    assert(!/\bil\s+(?:montre|maitrise|demontre|est capable|presente|rencontre|souffre|utilise|realise|a besoin|sait|comprend|assemble|reussit|dispose|possede)\b/.test(norm),'Pronom personnel "il" encore utilisé pour désigner le candidat.');
     const sentences=norm.split(/(?<=[.!?])\s+/);
-    const planningSentences=sentences.filter(s=>s.includes('planif')||s.includes('ordre d’execution')||s.includes('restaurant'));
-    for(const sentence of planningSentences){
-      assert(!/(difficult|fragil|a consolider|accompagnement|soutien supplementaire|amelior)/.test(sentence),
-        'La planification réussie a été transformée en difficulté: '+sentence);
+    function noInventedDifficulty(labels,description){
+      const related=sentences.filter(s=>labels.some(label=>s.includes(label)));
+      for(const sentence of related){
+        assert(!/(difficult|fragil|limite|a consolider|etayage|accompagnement|soutien|amelior|incomplet|insuffisant|souffr)/.test(sentence),
+          description+' transformé en difficulté: '+sentence);
+      }
     }
-    const fabricationSentences=sentences.filter(s=>s.includes('fabrication')||s.includes('structure 3d'));
-    for(const sentence of fabricationSentences){
-      assert(!/maitrise avancee|maitrise complete|maitrise globale/.test(sentence),
-        'La fabrication mixte a été généralisée comme une maîtrise globale: '+sentence);
-    }
+    noInventedDifficulty(['brique','schema simple'],'La construction à base de briques');
+    noInventedDifficulty(['carre magique','probleme structure'],'Le carré magique');
+    noInventedDifficulty(['planif','ordre d’execution','restaurant'],'La planification');
+    noInventedDifficulty(['tri de chevilles','fiabilite du tri','rythme de realisation'],'Le tri');
+    noInventedDifficulty(['traitement de texte'],'Le traitement de texte');
+    noInventedDifficulty(['messagerie'],'La messagerie');
+    noInventedDifficulty(['expression ecrite'],'L’expression écrite');
+    noInventedDifficulty(['mathematique'],'Les mathématiques');
+    const fabricationSentences=sentences.filter(s=>s.includes('fabrication')||s.includes('structure 3d')||s.includes('decoupe')||s.includes('assemblage'));
+    assert(fabricationSentences.some(s=>/decoup/.test(s)&&/difficult|precision|etayage|incomplet|droite/.test(s)),'La vigilance réelle sur la découpe doit être conservée.');
+    assert(fabricationSentences.some(s=>/assembl/.test(s)&&/consigne|etayage|aide/.test(s)),'La vigilance réelle sur l’assemblage doit être conservée.');
+    assert(!fabricationSentences.some(s=>/maitrise avancee|maitrise complete|maitrise globale/.test(s)),
+      'La fabrication mixte ne doit pas être généralisée comme une maîtrise globale.');
+    const org=sentences.filter(s=>s.includes('organisation logistique')||s.includes('stock'));
+    assert(org.some(s=>/difficult|accompagnement|etayage|erreur/.test(s)),'La difficulté réelle de gestion logistique doit être présente.');
     assert(!/monsieur convient de noter/.test(norm),'La tournure impersonnelle "Il convient" ne doit plus être cassée.');
     assert(!/qu['’]monsieur/.test(norm),'Le remplacement mécanique il/elle ne doit plus produire qu’Monsieur.');
 

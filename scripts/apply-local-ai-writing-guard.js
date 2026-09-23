@@ -42,7 +42,7 @@ const motorPrefix = source.slice(0, start);
 function writingBlockTemplate() {
   // SEB_LOCAL_AI_QWEN_DIRECT_USER_FILES
   const RICH_KIND = 'seb-qwen-rich-context-v1';
-  const DIRECT_GUARD = 'qwen-direct-light-factual-v2';
+  const DIRECT_GUARD = 'qwen-direct-light-factual-v3';
 
   function cleanModelOutput(raw) {
     let text = String(raw || '').replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
@@ -103,17 +103,20 @@ function writingBlockTemplate() {
       '',
       'RÈGLES ABSOLUES ET NON NÉGOCIABLES :',
       `1. Commence impérativement la réponse par : "${civilite} ${nom} ${prenom} a participé aux mises en situation proposées au cours du plateau technique."`,
-      `2. Utilise UNIQUEMENT "${civilite}" pour désigner la personne. N'utilise jamais "il" ou "elle" pour parler de la personne évaluée, ni "le candidat", "le stagiaire" ou "la personne". Une tournure impersonnelle telle que "Il convient de noter que" reste autorisée.`,
+      `2. Utilise UNIQUEMENT "${civilite}" pour désigner la personne évaluée. N'utilise jamais "il", "elle", "ce candidat", "le candidat", "le stagiaire" ou "la personne" pour parler d'elle. Les tournures réellement impersonnelles comme "Il convient de noter que" ou "Il existe" restent autorisées.`,
       '3. Rédige au moins 4 à 5 paragraphes denses et continus. INTERDICTION absolue d’utiliser des titres, sous-titres, listes à puces, tirets ou énumérations.',
       '4. INTERDICTION absolue de mentionner des chiffres, des pourcentages, des durées, des nombres d’erreurs, des scores ou des niveaux (I, II, III). Utilise uniquement des qualificatifs professionnels (ex: "rythme lent", "fiabilité à consolider", "autonomie acquise", "difficultés marquées").',
       '5. INTERDICTION de poser un diagnostic médical ou psychologique, et INTERDICTION de suggérer une orientation professionnelle, un métier ou une formation.',
       '6. Ton objectif est de relier les faits de manière fluide. Utilise les éléments du tableau "contrastes" pour expliquer les nuances du parcours avec des connecteurs logiques (Toutefois, En revanche, Par ailleurs, Il convient de noter que).',
-      '7. Si une "motivation_personnelle" est fournie, intègre-la dans le dernier paragraphe pour humaniser le bilan.',
-      '8. Les éléments de "domaines_reussite" doivent rester des réussites et les éléments de "domaines_vigilance" doivent rester des difficultés ou besoins d’étayage. N’inverse jamais leur sens.',
-      '9. Ne généralise jamais un domaine mixte : si une même activité contient des réussites et des vigilances, décris cette nuance. Ne présente pas toute l’activité comme maîtrisée ou toute l’activité comme difficile.',
-      '10. N’étends jamais une difficulté à une compétence voisine qui figure parmi les réussites. En particulier, organisation logistique, planification, raisonnement sous contraintes, fabrication et outils numériques doivent rester distincts selon les données.',
-      '11. Reste strictement sur les compétences, comportements observés et besoins explicitement présents dans les données. Toute appréciation sur la personnalité, l’état émotionnel, les qualités globales, le potentiel ou les perspectives est interdite si elle n’est pas fournie. Ne formule aucune recommandation, aucun objectif de progression ni aucun besoin supplémentaire qui ne soit explicitement présent dans les données.',
-      '12. Les "contrastes" servent uniquement à relier les faits. En cas de formulation générale, les éléments détaillés de "domaines_reussite" et "domaines_vigilance" sont prioritaires et ne doivent jamais être contredits.',
+      '7. Si "motivation_personnelle" est vide, n’évoque jamais motivation, volonté, souhait, désir de progresser, épanouissement ou projet personnel. Si elle est renseignée, reprends uniquement ce qui y figure.',
+      '8. CHAQUE élément de "domaines_reussite" est une réussite. Pour le module concerné, n’ajoute AUCUNE difficulté, limite, réserve, besoin d’étayage, accompagnement ou amélioration qui ne figure pas explicitement dans cet élément.',
+      '9. CHAQUE élément de "domaines_vigilance" est une vigilance. Décris uniquement la difficulté indiquée dans cet élément, sans l’étendre à une compétence voisine.',
+      '10. Si une activité contient à la fois des réussites et des vigilances, décris précisément ce caractère mixte. N’écris jamais "maîtrise globale", "difficultés globales" ou une conclusion équivalente sur toute l’activité.',
+      '11. Organisation logistique, planification, résolution de problèmes sous contraintes, tri, traitement de texte, messagerie, expression écrite et mathématiques sont des compétences distinctes. Un résultat faible dans l’une ne doit jamais contaminer les autres.',
+      '12. Reste strictement sur les compétences et comportements observés. Toute appréciation sur personnalité, état émotionnel, potentiel, adaptabilité, dynamisme, rigueur, motivation, concentration, confiance ou perspectives est interdite si elle n’est pas explicitement fournie.',
+      '13. N’ajoute aucune recommandation, aucun objectif de progression, aucun besoin de soutien supplémentaire et aucune notion de performance qui ne soit explicitement présente dans les données.',
+      '14. Les "contrastes" servent seulement à relier les faits. Les éléments détaillés de "domaines_reussite" et "domaines_vigilance" sont toujours prioritaires.',
+      '15. Avant de répondre, relis mentalement chaque phrase : chaque difficulté doit provenir d’un élément de "domaines_vigilance" et chaque réussite d’un élément de "domaines_reussite". Si une affirmation n’est pas directement justifiée par le JSON, supprime-la.',
       '',
       'Données à synthétiser :',
       json,
@@ -237,7 +240,7 @@ replacement = replacement.split('\n').map(line => line ? '  ' + line : '').join(
 source = source.slice(0, start) + replacement + source.slice(end);
 
 if (!source.startsWith(motorPrefix)) fail('le patch a modifié la zone moteur de démarrage');
-for (const required of [marker, 'qwen-direct-light-factual-v2', 'RÈGLES ABSOLUES ET NON NÉGOCIABLES', 'domaines_reussite', 'domaines_vigilance', 'Toute appréciation sur la personnalité', 'La synthèse est trop courte', 'top_k: 40', 'repeat_penalty: 1.1', 'mirostat: 0']) {
+for (const required of [marker, 'qwen-direct-light-factual-v3', 'RÈGLES ABSOLUES ET NON NÉGOCIABLES', 'CHAQUE élément de "domaines_reussite"', 'CHAQUE élément de "domaines_vigilance"', 'La synthèse est trop courte', 'top_k: 40', 'repeat_penalty: 1.1', 'mirostat: 0']) {
   if (!source.includes(required)) fail('élément Qwen direct absent après patch: ' + required);
 }
 for (const forbidden of ['START_ATTEMPTS', "'--ctx-size', String(", 'totalRamGb <= 8', 'Fait obligatoire omis', 'Contrôle de fidélité Qwen refusé']) {
