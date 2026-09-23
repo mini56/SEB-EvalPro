@@ -1,0 +1,174 @@
+name: TEST Split Candidat Admin + Pack IA
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - tmp-split-candidat-admin-ai-pack
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Set test version
+        shell: pwsh
+        run: |
+          $pkg = Get-Content package.json -Raw | ConvertFrom-Json
+          $pkg.version = "0.2.${{ github.run_number }}"
+          $pkg | ConvertTo-Json -Depth 20 | Set-Content package.json -Encoding UTF8
+          Write-Host "Version test: $($pkg.version)"
+
+      - name: Validate edition architecture before preparation
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $env:SEB_EVALPRO_EDITION = 'candidate'
+          node -e "const e=require('./src/edition').getEditionCapabilities(); if(e.edition!=='candidate'||e.canBilan||e.canAi||e.canImport||!e.canExport) process.exit(2); console.log('CANDIDATE_EDITION: OK',e)"
+          if ($LASTEXITCODE -ne 0) { throw 'Mode Candidat invalide.' }
+          $env:SEB_EVALPRO_EDITION = 'admin'
+          node -e "const e=require('./src/edition').getEditionCapabilities(); if(e.edition!=='admin'||!e.canBilan||!e.canAi||!e.canImport||!e.canExport) process.exit(2); console.log('ADMIN_EDITION: OK',e)"
+          if ($LASTEXITCODE -ne 0) { throw 'Mode Admin invalide.' }
+          Remove-Item Env:SEB_EVALPRO_EDITION -ErrorAction SilentlyContinue
+
+          $pkg = Get-Content package.json -Raw | ConvertFrom-Json
+          $embeddedAi = @($pkg.build.extraResources | Where-Object { $_.from -eq 'ai-runtime' })
+          if ($embeddedAi.Count -ne 0) { throw 'Le modèle IA ne doit plus être embarqué dans le Setup SEB EvalPro.' }
+
+          $installer = Get-Content build\installer.nsh -Raw
+          foreach ($required in @('Version Candidat','Version Administrateur','SEB-EvalPro-IA-Pack','edition-candidate.flag','edition-admin.flag','COMMONAPPDATA\SEB EvalPro\IA')) {
+            if (-not $installer.Contains($required)) { throw "Architecture installateur absente: $required" }
+          }
+          Write-Host 'ARCHITECTURE_SPLIT: OK'
+
+      - name: Prepare final application
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          npm run prepare:web
+          if ($LASTEXITCODE -ne 0) { throw 'prepare:web a échoué.' }
+
+          foreach ($file in @('src/main.js','src/preload.js','src/local-ai.js','src/edition.js','src/candidate-catalog-main.js','src/candidate-catalog-preload.js')) {
+            node --check $file
+            if ($LASTEXITCODE -ne 0) { throw "JavaScript invalide: $file" }
+          }
+
+          $main = Get-Content src\main.js -Raw
+          foreach ($required in @('app:edition-sync','editionCapabilities.canBilan','editionCapabilities.canImport','IA non disponible dans la version Candidat')) {
+            if (-not $main.Contains($required)) { throw "Garde édition absente après préparation: $required" }
+          }
+
+          $catalog = Get-Content src\candidate-catalog-preload.js -Raw
+          if (-not $catalog.Contains('SEB_EDITION_CANDIDATE_DETAIL')) { throw 'Masquage bilan/Word Candidat absent.' }
+
+          $ai = Get-Content src\local-ai.js -Raw
+          foreach ($required in @('Ministral-3-8B-Instruct-2512-Q4_K_M.gguf','ProgramData','Pack IA Ministral')) {
+            if (-not $ai.Contains($required)) { throw "Pack IA externe mal configuré: $required" }
+          }
+          if ($ai.Contains("path.join(process.resourcesPath, 'ai')")) { throw 'Ancien modèle IA embarqué encore référencé.' }
+
+          Write-Host 'FINAL_EDITION_GUARDS: OK'
+
+      - name: Ensure ImageMagick
+        shell: pwsh
+        run: |
+          if (-not (Get-Command magick -ErrorAction SilentlyContinue)) {
+            choco install imagemagick --no-progress -y
+          }
+
+      - name: Generate installer branding
+        shell: pwsh
+        run: ./scripts/generate-installer-branding.ps1
+
+      - name: Prepare Microsoft Visual C++ x64 runtime
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $vcPath = 'build\vc_redist.x64.exe'
+          curl.exe -L --fail --retry 3 --retry-delay 3 -o $vcPath 'https://aka.ms/vc14/vc_redist.x64.exe'
+          if ($LASTEXITCODE -ne 0) { throw 'Téléchargement VC++ échoué.' }
+          $signature = Get-AuthenticodeSignature $vcPath
+          if ($signature.Status -ne 'Valid' -or -not $signature.SignerCertificate -or $signature.SignerCertificate.Subject -notmatch 'Microsoft') {
+            throw 'Runtime VC++ non signé correctement.'
+          }
+
+      - name: Build native candidate keyboard guard
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          if (-not (Test-Path $vswhere)) { throw 'vswhere.exe introuvable.' }
+          $install = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (-not $install) { throw 'Visual C++ Build Tools introuvables.' }
+          $vcvars = Join-Path $install 'VC\Auxiliary\Build\vcvars64.bat'
+          $compile = 'call "' + $vcvars + '" && cl.exe /nologo /O2 /EHsc /DUNICODE /D_UNICODE native\candidate-keyguard.cpp /Fe:build\candidate-keyguard.exe user32.lib'
+          cmd.exe /d /c $compile
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path 'build\candidate-keyguard.exe')) { throw 'Compilation candidate-keyguard.exe échouée.' }
+
+      - name: Normalize NSIS encodings
+        shell: pwsh
+        run: |
+          $utf8Bom = New-Object System.Text.UTF8Encoding($true)
+          foreach ($relativePath in @('build\installer.nsh','build\standalone-uninstaller.nsi')) {
+            $path = (Resolve-Path $relativePath).Path
+            $text = [System.IO.File]::ReadAllText($path)
+            [System.IO.File]::WriteAllText($path, $text, $utf8Bom)
+          }
+
+      - name: Build selector installer
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          npx electron-builder --win --publish never
+          if ($LASTEXITCODE -ne 0) { throw 'Construction Windows échouée.' }
+
+          if (Test-Path 'dist\win-unpacked\resources\ai') {
+            throw 'Le Setup contient encore le Pack IA alors qu’il doit être indépendant.'
+          }
+
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $setup = "dist\SEB-eval-PRO-$version-Windows-Setup.exe"
+          if (-not (Test-Path $setup)) { throw "Setup absent: $setup" }
+          Write-Host "SETUP_SPLIT_OK: $((Get-Item $setup).Length) octets"
+
+      - name: Build standalone uninstaller
+        shell: pwsh
+        run: |
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $makensis = Get-Command makensis.exe -ErrorAction SilentlyContinue
+          if (-not $makensis) {
+            choco install nsis --no-progress -y
+            $candidate = Join-Path ${env:ProgramFiles(x86)} 'NSIS\makensis.exe'
+            if (Test-Path $candidate) { $makensis = Get-Item $candidate }
+          }
+          if (-not $makensis) { throw 'makensis.exe introuvable.' }
+          $makensisPath = if ($makensis.Source) { $makensis.Source } else { $makensis.FullName }
+          & $makensisPath "/DAPP_VERSION=$version" 'build\standalone-uninstaller.nsi'
+          if ($LASTEXITCODE -ne 0) { throw 'Compilation désinstallateur échouée.' }
+
+      - name: Publish split-edition test release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $tag = "seb-evalpro-split-${{ github.run_number }}"
+          $setup = "dist\SEB-eval-PRO-$version-Windows-Setup.exe"
+          $uninstaller = "dist\SEB-eval-PRO-$version-Windows-Desinstallation.exe"
+          $title = "SEB EvalPro - Candidat/Admin #${{ github.run_number }}"
+          $notes = "Architecture test issue du Build #199 : un même Setup propose Candidat ou Administrateur. Candidat conserve dossiers/résultats/replay/export mais bloque bilan, IA et import. Administrateur conserve toutes les fonctions actuelles. Le Pack IA Ministral est séparé et persistant dans ProgramData ; il n’est pas republié à chaque mise à jour."
+          gh release create $tag $setup $uninstaller --target "${{ github.sha }}" --title $title --notes $notes --prerelease --repo "${{ github.repository }}"
+          if ($LASTEXITCODE -ne 0) { throw 'Publication Release échouée.' }
