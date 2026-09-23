@@ -1,9 +1,11 @@
 const assert = require('assert');
-const { buildRichProfile } = require('../src/qwen-rich-synthesis');
+const { buildRichProfile, genererJsonRichePourQwen } = require('../src/qwen-rich-synthesis');
 const { createLocalAiService } = require('../src/local-ai');
 const fs=require('fs'),path=require('path');
+
 const bridge=fs.readFileSync(path.join(__dirname,'build-qwen-rich-context.js'),'utf8');
-assert(bridge.includes("sessionStorage.getItem('seb_evalpro_abandons')"),'Le pont bilan doit lire les raisons d’abandon des Résultats.');
+assert(bridge.includes("texte_loisir_optionnel:''"),'Le pont bilan doit laisser vide le champ optionnel non présent dans SEB EvalPro.');
+assert(!bridge.includes("seb_evalpro_abandons"),'Le pont ne doit pas réintroduire le contrôleur d’abandon précédent.');
 
 const rows = {
   'fabrication-plan': {level:'I',select:"I. La personne n'a pas besoin d'aide pour commencer l'exercice."},
@@ -25,33 +27,23 @@ const rows = {
   'math-problemes': {level:'I',select:'I. Est capable de calculer, mettre en œuvre des algorithmes et de traiter des problèmes de pourcentages et d’échelles liés à la vie courante.',detail:'93 % de réussite'}
 };
 
-const profile=buildRichProfile({
-  candidate:{nom:'DURANT',prenom:'JEAN',date:'2026-09-19'},rows,
-  abandons:[{key:'planning.html',page:'planning.html',qcmPage:'',exercice:'Planification — Le restaurant',raisons:["L’exercice est trop difficile"],commentaire:''}]
-});
+const profile=buildRichProfile({candidate:{civilite:'Monsieur',nom:'durant',prenom:'JEAN',date:'2026-09-19'},rows});
+assert.deepStrictEqual(Object.keys(profile),['civilite','nom','prenom','domaines_reussite','domaines_vigilance','contrastes','motivation_personnelle']);
+assert.strictEqual(profile.civilite,'Monsieur');
+assert.strictEqual(profile.nom,'DURANT');
+assert.strictEqual(profile.prenom,'Jean');
+assert(profile.domaines_reussite.length>0,'Le JSON doit contenir les domaines de réussite.');
+assert(profile.domaines_vigilance.length>0,'Le JSON doit contenir les domaines de vigilance.');
+assert(profile.contrastes.length>0,'Le générateur fourni doit produire ses contrastes quand les conditions sont réunies.');
+assert.strictEqual(profile.motivation_personnelle,'','Aucun texte personnel équivalent n’est injecté artificiellement.');
 
-assert.strictEqual(profile.faits_obligatoires.length,17,'Tous les faits évalués doivent être présents.');
-for(const id of ['carre','organisation']){
-  const fact=profile.faits_obligatoires.find(x=>x.id===id);assert(fact,'Fait obligatoire absent: '+id);assert.strictEqual(fact.importance,'prioritaire','Priorité III perdue pour '+id);
-}
-const abandon=profile.faits_obligatoires.find(x=>x.statut==='abandon');
-assert(abandon,'L’abandon issu des Résultats doit être conservé.');
-assert.deepStrictEqual(abandon.raisons_abandon,["L’exercice est trop difficile"],'La raison d’abandon doit rester exacte.');
-assert(!profile.faits_obligatoires.some(x=>x.id==='planning'),'Une ligne NE abandonnée ne doit pas devenir un fait évalué normal.');
-const requiredPlan=profile.plan_couverture.filter(x=>x.obligatoire);assert.strictEqual(requiredPlan.length,7,'Plan attendu: six domaines + abandon.');
-
-const qualitative=JSON.stringify({
-  faits_obligatoires:profile.faits_obligatoires,
-  contrastes_observes:profile.contrastes_observes
-});
-for(const forbidden of [
-  /\b\d+(?:[.,]\d+)?\s*%/,
-  /\b\d+\s*erreur(?:\(s\)|s)?\b/i,
-  /\b\d+(?:[.,]\d+)?\s*\/\s*\d+(?:[.,]\d+)?\b/,
-  /\b(?:niveau\s*)?(?:NE|III|II|I)\b/
-]){
-  assert(!forbidden.test(qualitative),'Le JSON riche contient encore un élément quantitatif/niveau interdit: '+forbidden);
-}
+// Parité explicite avec les choix du Python fourni, notamment le nettoyage radical.
+const parity=genererJsonRichePourQwen([
+  {module:'Traitement de texte',niveau:'I',commentaire:'I. Réalise 4 points sans erreur en 3 min.'},
+  {module:'Expression écrite',niveau:'II',commentaire:'II. Structure des phrases et orthographe à consolider. 59 %.'}
+],'Monsieur','durant','JEAN','');
+assert.strictEqual(parity.domaines_reussite[0],'Concernant Traitement de texte, la personne maîtrise avec autonomie. I. Réalie an en .');
+assert.strictEqual(parity.domaines_vigilance[0],'Concernant Expression écrite, la personne nécessite un étayage ou manque de précision. II. tructure de phrae et orthographe à conolider. .');
 
 const payload=JSON.stringify({kind:'seb-qwen-rich-context-v1',profile});
 
@@ -61,32 +53,33 @@ const payload=JSON.stringify({kind:'seb-qwen-rich-context-v1',profile});
     const result=await service.rewrite(payload);
     if(result?.ok){
       const text=String(result.text||'').trim();
-      assert(text,'Qwen riche: synthèse vide');
+      assert(text,'Qwen direct: synthèse vide');
+      assert.strictEqual(result.guard,'qwen-direct-user-files-v1','L’ancien garde de fidélité ne doit plus être utilisé.');
+      assert(text.startsWith('Monsieur DURANT Jean a participé'),'Le début demandé par les fichiers fournis doit être conservé.');
+      assert(text.length>=1200,'La sécurisation fournie impose une synthèse d’au moins 1200 caractères.');
       const paragraphs=text.split(/\n\s*\n/).map(x=>x.trim()).filter(Boolean);
-      assert.strictEqual(paragraphs.length,7,'La synthèse doit couvrir les six domaines et l’abandon.');
-      assert(text.includes("L’exercice est trop difficile"),'La raison d’abandon connue doit apparaître.');
-      assert(!/%/.test(text),'Aucun résidu de pourcentage ne doit rester.');
-      assert.deepStrictEqual(result.validationErrors||[],[],'La synthèse finale ne doit conserver aucune erreur de fidélité.');
+      assert(paragraphs.length>=4,'Le prompt fourni demande au moins quatre paragraphes denses.');
       for(const forbidden of [
-        /\b(?:vous|votre|vos)\b/i,
-        /\b(?:le candidat|la candidate|le stagiaire|la stagiaire)\b/i,
         /\b(?:il|elle)\b/i,
-        /\b\d+(?:[.,]\d+)?\s*%/,
-        /\b\d+\s*erreur(?:\(s\)|s)?\b/i
-      ]) assert(!forbidden.test(text),'Sortie finale interdite: '+forbidden);
-      console.log('QWEN_RICH_OUTPUT_BEGIN');
+        /\b(?:le candidat|le stagiaire|la personne)\b/i,
+        /\b\d+\s*%\b/,
+        /\b\d+\s*(?:erreur|minute|seconde|heure|réponse|point)\b/i,
+        /\bniveau\s*[IVX]+\b/i
+      ]) assert(!forbidden.test(text),'Sortie finale interdite par la sécurisation fournie: '+forbidden);
+      console.log('QWEN_DIRECT_OUTPUT_BEGIN');
       console.log(text);
-      console.log('QWEN_RICH_OUTPUT_END');
-      console.log('QWEN_RICH_COVERAGE_VALIDATION: OK');
+      console.log('QWEN_DIRECT_OUTPUT_END');
+      console.log('QWEN_DIRECT_USER_FILES: OK');
     }else{
       const error=String(result?.error||'');
-      assert(/Contrôle de fidélité Qwen refusé/i.test(error),'Un refus Qwen doit provenir du garde de fidélité.');
-      console.log('QWEN_RICH_FIDELITY_REJECTION: OK');
-      console.log('QWEN_RICH_ERRORS '+JSON.stringify(result?.validationErrors||[]));
+      assert(!/Contrôle de fidélité Qwen|Fait obligatoire omis/i.test(error),'L’ancien contrôle de fidélité ne doit plus exister.');
+      assert(/synthèse est trop courte|moteur IA|annul/i.test(error),'Refus inattendu du Qwen direct: '+error);
+      console.log('QWEN_DIRECT_USER_FILES_RESULT: '+error);
     }
-    console.log('QWEN_RICH_PROFILE_BEGIN');
+
+    console.log('QWEN_DIRECT_PROFILE_BEGIN');
     console.log(JSON.stringify(profile,null,2));
-    console.log('QWEN_RICH_PROFILE_END');
+    console.log('QWEN_DIRECT_PROFILE_END');
 
     const cancelStarted=Date.now();
     const pendingCancellation=service.rewrite(payload);
