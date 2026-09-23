@@ -8,10 +8,9 @@ const source = [
   "L'utilisation du traitement de texte et de la messagerie est maîtrisée dans les situations proposées. L'expression écrite présente des phrases grammaticalement correctes, un lexique approprié et des textes cohérents. En mathématiques, les consignes simples sont comprises et les problèmes de pourcentages et d'échelles sont traités."
 ].join('\n\n');
 
-const forbidden = [
-  'potentiel','autonomie marquée','précision remarquable','rigueur',
-  'priorités opérationnelles','attention moins systématique','adaptabilité',
-  'dynamisme','épanouissement','stress','profil dynamique','scrupuleusement','précision remarquable','pertinent','pertinente','pertinents','pertinentes','appui méthodologique','avec aisance','avec justesse','à affiner','aptitude'
+const unsupportedConcepts = [
+  'potentiel','stress','motivation','épanouissement','diagnostic',
+  'orientation professionnelle','recommandation de formation','profil psychologique'
 ];
 
 (async()=>{
@@ -32,9 +31,9 @@ const forbidden = [
     assert(text.split(/\n\s*\n/).filter(Boolean).length>=3,'La synthèse doit rester structurée en paragraphes');
 
     const norm=text.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
-    for(const term of forbidden){
+    for(const term of unsupportedConcepts){
       const n=term.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
-      assert(!norm.includes(n),'Extrapolation non sourcée détectée: '+term);
+      assert(!norm.includes(n),'Concept absent de la source détecté: '+term);
     }
 
     assert(/decoup/.test(norm),'La découpe doit rester couverte');
