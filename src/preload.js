@@ -794,6 +794,5 @@ window.addEventListener('beforeunload', () => {
 contextBridge.exposeInMainWorld('sebEvalPro', {
   save: () => saveNow(false),
   verifyAdminPassword: (password) => ipcRenderer.invoke('admin:verify-password', password),
-  localAiStatus: () => ipcRenderer.invoke('ai:status'),
-  rewriteSynthesisLocal: (text) => ipcRenderer.invoke('ai:rewrite-synthesis', String(text || ''))
+  sebIaStatus: () => ipcRenderer.invoke('ai:status')
 });

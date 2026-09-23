@@ -79,70 +79,7 @@ Var SebEditionAdminRadio
     Goto seb_install_complete
   ${EndIf}
 
-  # Version Administrateur : le Pack IA est indépendant de l'application.
-  # Résoudre explicitement le dossier système ProgramData (NSIS/electron-builder
-  # ne fournit pas $COMMONAPPDATA dans cette configuration).
-  ReadEnvStr $8 "ProgramData"
-  StrCmp $8 "" 0 +2
-    StrCpy $8 "C:\ProgramData"
-
-  # S'il est déjà présent dans ProgramData, aucune copie ni téléchargement n'est refait.
-  IfFileExists "$8\SEB EvalPro\IA\Ministral-3-8B-Instruct-2512-Q4_K_M.gguf" seb_ai_pack_ready 0
-
-  # Installation automatique du Pack IA séparé s'il est placé à côté du Setup.
-  IfFileExists "$EXEDIR\SEB-EvalPro-IA-Pack-Setup.exe" 0 seb_ai_try_flat_pack
-  DetailPrint "Installation du Pack IA Ministral séparé..."
-  ExecWait '"$EXEDIR\SEB-EvalPro-IA-Pack-Setup.exe" /S' $7
-  StrCmp $7 0 0 seb_ai_pack_missing
-  IfFileExists "$8\SEB EvalPro\IA\Ministral-3-8B-Instruct-2512-Q4_K_M.gguf" seb_ai_pack_ready seb_ai_pack_missing
-
-seb_ai_try_flat_pack:
-  # Compatibilité clé USB : un dossier déjà reconstitué peut aussi être copié.
-  IfFileExists "$EXEDIR\SEB-EvalPro-IA-Pack\Ministral-3-8B-Instruct-2512-Q4_K_M.gguf" 0 seb_ai_pack_missing
-  CreateDirectory "$8\SEB EvalPro\IA"
-  CopyFiles /SILENT "$EXEDIR\SEB-EvalPro-IA-Pack\*.*" "$8\SEB EvalPro\IA"
-  IfFileExists "$8\SEB EvalPro\IA\Ministral-3-8B-Instruct-2512-Q4_K_M.gguf" seb_ai_pack_ready seb_ai_pack_missing
-
-seb_ai_pack_missing:
-  MessageBox MB_ICONEXCLAMATION|MB_OK "SEB EvalPro Administrateur sera installé, mais le Pack IA Ministral n'a pas été trouvé.$\r$\n$\r$\nVous pourrez installer le Pack IA séparément une seule fois. Les prochaines mises à jour de SEB EvalPro ne le supprimeront pas."
-  Goto seb_ai_runtime
-
-seb_ai_pack_ready:
-  DetailPrint "Pack IA Ministral détecté : il est conservé indépendamment de SEB EvalPro."
-
-seb_ai_runtime:
-  # L'IA locale llama.cpp nécessite le runtime Microsoft Visual C++ x64.
-  # Le Setup embarque le redistribuable officiel Microsoft et ne le lance
-  # que si le runtime v14 x64 n'est pas déjà installé.
-  StrCpy $0 0
-  SetRegView 32
-  ReadRegDWORD $0 HKLM "SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64" "Installed"
-  StrCmp $0 1 seb_vc_runtime_ready
-  SetRegView 64
-  ReadRegDWORD $0 HKLM "SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64" "Installed"
-  StrCmp $0 1 seb_vc_runtime_ready
-
-  InitPluginsDir
-  File /oname=$PLUGINSDIR\vc_redist.x64.exe "${BUILD_RESOURCES_DIR}\vc_redist.x64.exe"
-  DetailPrint "Installation du composant Microsoft Visual C++ x64 requis par l'IA locale..."
-  ClearErrors
-  ExecShellWait "runas" "$PLUGINSDIR\vc_redist.x64.exe" "/install /quiet /norestart" SW_HIDE
-  IfErrors seb_vc_runtime_failed
-
-  StrCpy $0 0
-  SetRegView 32
-  ReadRegDWORD $0 HKLM "SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64" "Installed"
-  StrCmp $0 1 seb_vc_runtime_ready
-  SetRegView 64
-  ReadRegDWORD $0 HKLM "SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64" "Installed"
-  StrCmp $0 1 seb_vc_runtime_ready
-
-seb_vc_runtime_failed:
-  MessageBox MB_ICONSTOP|MB_OK "Le composant Microsoft Visual C++ x64 requis par l'IA locale n'a pas pu être installé.$\r$\n$\r$\nRelancez le Setup SEB EvalPro et acceptez la demande Windows d'administration."
-  Abort
-
-seb_vc_runtime_ready:
-  SetRegView lastused
+  # Version Administrateur : SEB-IA est intégrée au programme. Aucun Pack externe n'est requis.
 
 seb_install_complete:
 !macroend
@@ -170,11 +107,11 @@ Function SebEditionCreate
 
   ${NSD_CreateLabel} 0 0 100% 28u "Choisissez la version de SEB EvalPro à installer :"
   Pop $0
-  ${NSD_CreateRadioButton} 8u 42u 92% 18u "Version Candidat — parcours + espace Admin local, sans bilan ni IA"
+  ${NSD_CreateRadioButton} 8u 42u 92% 18u "Version Candidat — parcours + espace Admin local, sans bilan"
   Pop $SebEditionCandidateRadio
-  ${NSD_CreateRadioButton} 8u 72u 92% 18u "Version Administrateur — toutes les fonctions + Pack IA local"
+  ${NSD_CreateRadioButton} 8u 72u 92% 18u "Version Administrateur — toutes les fonctions + SEB-IA intégrée"
   Pop $SebEditionAdminRadio
-  ${NSD_CreateLabel} 8u 108u 92% 55u "Le Pack IA est indépendant de SEB EvalPro. S'il est déjà installé sur ce PC, il sera conservé et ne sera pas retéléchargé lors des mises à jour."
+  ${NSD_CreateLabel} 8u 108u 92% 55u "SEB-IA est intégrée directement à SEB EvalPro Administrateur. Aucun modèle, Pack IA ou composant séparé n'est nécessaire."
   Pop $0
 
   ${If} $SebEdition == "admin"

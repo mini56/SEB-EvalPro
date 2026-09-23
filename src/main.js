@@ -3,7 +3,6 @@ const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
-const { createLocalAiService } = require('./local-ai');
 const { getEditionCapabilities } = require('./edition');
 const { createCandidateStore } = require('./candidate-store-main');
 const { createCandidateTransfer } = require('./candidate-transfer-main');
@@ -20,7 +19,6 @@ let splashStartedAt = 0;
 let adminSessionUnlocked = false;
 let downloadRoutingInstalled = false;
 const editionCapabilities = getEditionCapabilities();
-const localAi = editionCapabilities.canAi ? createLocalAiService({ app }) : null;
 let candidateStore = null;
 let candidateTransfer = null;
 let adminExportCandidateDir = null;
@@ -630,7 +628,6 @@ ipcMain.handle('admin:open-candidate-browser', (_event, candidateId) => {
 });
 
 ipcMain.handle('admin:return-candidate-browser', (_event, candidateId) => {
-  if (localAi) localAi.cancelCurrent('Fermeture du candidat');
   return loadAdminCandidateBrowser(candidateId);
 });
 
@@ -660,22 +657,20 @@ ipcMain.handle('admin:return-evaluation', () => {
 });
 
 ipcMain.handle('ai:status', () => {
-  if (!editionCapabilities.canAi || !localAi) return { available:false, offline:true, edition:editionCapabilities.edition, error:'IA non disponible dans la version Candidat.' };
-  if (!adminSessionUnlocked) return { available: false, offline: true, error: 'Accès administrateur requis.' };
-  return localAi.status();
+  if (!editionCapabilities.canAi) {
+    return { available:false, offline:true, integrated:false, edition:editionCapabilities.edition, error:'SEB-IA est réservée à la version Administrateur.' };
+  }
+  if (!adminSessionUnlocked) return { available:false, offline:true, integrated:true, error:'Accès administrateur requis.' };
+  return { available:true, offline:true, integrated:true, model:'SEB-IA V1', runtime:'moteur rédactionnel intégré' };
 });
 
-ipcMain.handle('ai:rewrite-synthesis', async (_event, text) => {
-  if (!editionCapabilities.canAi || !localAi) return { ok:false, error:'IA non disponible dans la version Candidat.' };
-  if (!adminSessionUnlocked) return { ok: false, error: 'Accès administrateur requis.' };
-  return localAi.rewrite(String(text || ''));
+ipcMain.handle('ai:rewrite-synthesis', async () => {
+  if (!editionCapabilities.canAi) return { ok:false, error:'SEB-IA est réservée à la version Administrateur.' };
+  if (!adminSessionUnlocked) return { ok:false, error:'Accès administrateur requis.' };
+  return { ok:false, integrated:true, error:'SEB-IA génère directement la synthèse à partir du tableau ; aucune reformulation externe n’est nécessaire.' };
 });
 
-ipcMain.handle('ai:cancel-current', () => {
-  if (!editionCapabilities.canAi || !localAi) return { ok:true, cancelled:false, offline:true };
-  if (!adminSessionUnlocked) return { ok:false, cancelled:false, error:'Accès administrateur requis.' };
-  return localAi.cancelCurrent('Fermeture du candidat');
-});
+ipcMain.handle('ai:cancel-current', () => ({ ok:true, cancelled:false, offline:true, integrated:true }));
 
 require('./session-close')({
   app,
@@ -694,7 +689,6 @@ app.whenReady().then(startApplication);
 app.on('before-quit', () => {
   allowApplicationExit = true;
   stopCandidateKeyGuard();
-  if (localAi) localAi.stop();
 });
 
 app.on('window-all-closed', () => {
