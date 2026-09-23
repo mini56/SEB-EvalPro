@@ -107,48 +107,6 @@ jobs:
           Set-Content -Path (Join-Path $root 'pack.json') -Value '{"pack":"ministral3-8b-2512-q4km-v1-ci"}' -Encoding UTF8
           Write-Host "AI_PACK_CI_MATERIALIZED: $sha"
 
-      - name: Start installed Ministral model
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $root = Join-Path $env:ProgramData 'SEB EvalPro\IA'
-          $server = Join-Path $root 'llama-server.exe'
-          $model = Join-Path $root 'Ministral-3-8B-Instruct-2512-Q4_K_M.gguf'
-          $port = 39476
-          $args = @('--model',$model,'--host','127.0.0.1','--port',"$port",'--ctx-size','1024','--threads','2','--n-gpu-layers','0')
-          $proc = Start-Process -FilePath $server -ArgumentList $args -PassThru -WindowStyle Hidden -RedirectStandardOutput '_pack-server-out.log' -RedirectStandardError '_pack-server-err.log'
-          try {
-            $ready = $false
-            for ($i=0; $i -lt 360; $i++) {
-              Start-Sleep -Milliseconds 500
-              if ($proc.HasExited) { throw "llama-server Pack IA arrêté: $($proc.ExitCode)" }
-              try {
-                $health = Invoke-RestMethod -Uri "http://127.0.0.1:$port/health" -TimeoutSec 2
-                if ($health.status -eq 'ok') { $ready = $true; break }
-              } catch {}
-            }
-            if (-not $ready) { throw 'Pack IA installé : llama-server ne devient pas prêt.' }
-
-            $body = @{
-              model = 'Ministral-3-8B-Instruct-2512-Q4_K_M.gguf'
-              messages = @(
-                @{ role='system'; content='Réponds uniquement OK.' },
-                @{ role='user'; content='Réponds uniquement OK.' }
-              )
-              temperature = 0.1
-              max_tokens = 16
-              seed = 42
-              stream = $false
-            } | ConvertTo-Json -Depth 8
-            $reply = Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:$port/v1/chat/completions" -ContentType 'application/json; charset=utf-8' -Body $body -TimeoutSec 300
-            $text = [string]$reply.choices[0].message.content
-            if ([string]::IsNullOrWhiteSpace($text)) { throw 'Inférence Pack IA vide.' }
-            Write-Host "AI_PACK_REAL_INFERENCE: $text"
-          }
-          finally {
-            if ($proc -and -not $proc.HasExited) { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue }
-          }
-
       - name: Smoke test Admin rewrite with installed Ministral
         shell: pwsh
         run: |
