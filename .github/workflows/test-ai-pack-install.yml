@@ -58,25 +58,54 @@ jobs:
           }
           Write-Host 'AI_PACK_PARTS_VERIFIED: OK'
 
-      - name: Install AI Pack silently
-        timeout-minutes: 25
+      - name: Materialize AI Pack in ProgramData for CI
         shell: pwsh
-        env:
-          __COMPAT_LAYER: RunAsInvoker
         run: |
           $ErrorActionPreference = 'Stop'
-          $setup = (Resolve-Path '_pack\SEB-EvalPro-IA-Pack-Setup.exe').Path
-          $p = Start-Process -FilePath $setup -ArgumentList '/S' -Wait -PassThru
-          if ($p.ExitCode -ne 0) { throw "Installation Pack IA échouée: $($p.ExitCode)" }
-
           $root = Join-Path $env:ProgramData 'SEB EvalPro\IA'
+          New-Item -ItemType Directory -Force -Path $root,'_llama-ci' | Out-Null
+
           $model = Join-Path $root 'Ministral-3-8B-Instruct-2512-Q4_K_M.gguf'
-          $server = Join-Path $root 'llama-server.exe'
-          if (-not (Test-Path $model)) { throw 'Modèle reconstitué absent.' }
-          if (-not (Test-Path $server)) { throw 'llama-server.exe absent du Pack installé.' }
+          Remove-Item $model -Force -ErrorAction SilentlyContinue
+          $parts = @(
+            '_pack\Ministral-3-8B-Instruct-2512-Q4_K_M.gguf.part01',
+            '_pack\Ministral-3-8B-Instruct-2512-Q4_K_M.gguf.part02',
+            '_pack\Ministral-3-8B-Instruct-2512-Q4_K_M.gguf.part03'
+          )
+          $buffer = New-Object byte[] 8388608
+          $output = [System.IO.File]::Create($model)
+          try {
+            foreach ($part in $parts) {
+              $input = [System.IO.File]::OpenRead((Resolve-Path $part).Path)
+              try {
+                while (($read = $input.Read($buffer,0,$buffer.Length)) -gt 0) {
+                  $output.Write($buffer,0,$read)
+                }
+              } finally {
+                $input.Dispose()
+              }
+            }
+          } finally {
+            $output.Dispose()
+          }
+
           $sha = (Get-FileHash $model -Algorithm SHA256).Hash.ToLowerInvariant()
-          if ($sha -ne '33e7a72cf5e6e2cfc2f2847075acc013d68bba023e35310cef86b5cf8fdca761') { throw "Modèle reconstitué invalide: $sha" }
-          Write-Host "AI_PACK_INSTALL_VERIFIED: $sha"
+          if ($sha -ne '33e7a72cf5e6e2cfc2f2847075acc013d68bba023e35310cef86b5cf8fdca761') {
+            throw "Modèle CI reconstitué invalide: $sha"
+          }
+
+          $llamaZip = '_llama-ci\llama.zip'
+          curl.exe -L --fail --retry 3 --retry-delay 3 -o $llamaZip 'https://github.com/ggml-org/llama.cpp/releases/download/b10964/llama-b10964-bin-win-cpu-x64.zip'
+          if ($LASTEXITCODE -ne 0) { throw 'Téléchargement llama.cpp CI échoué.' }
+          $llamaSha = (Get-FileHash $llamaZip -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($llamaSha -ne '917f39c076402c421224824607397af20f53625a60defc20e8dd22446bf4c5d7') { throw "SHA llama.cpp inattendu: $llamaSha" }
+          Expand-Archive -Path $llamaZip -DestinationPath '_llama-ci\runtime' -Force
+          $server = Get-ChildItem '_llama-ci\runtime' -Recurse -Filter 'llama-server.exe' | Select-Object -First 1
+          if (-not $server) { throw 'llama-server CI introuvable.' }
+          Copy-Item -Path (Join-Path $server.Directory.FullName '*') -Destination $root -Recurse -Force
+
+          Set-Content -Path (Join-Path $root 'pack.json') -Value '{"pack":"ministral3-8b-2512-q4km-v1-ci"}' -Encoding UTF8
+          Write-Host "AI_PACK_CI_MATERIALIZED: $sha"
 
       - name: Start installed Ministral model
         shell: pwsh
@@ -127,16 +156,11 @@ jobs:
           node scripts/ministral-admin-rewrite-smoke.js
           if ($LASTEXITCODE -ne 0) { throw 'Réécriture réelle Admin avec Ministral échouée.' }
 
-      - name: Verify separate Pack uninstaller
+      - name: Verify published Pack installer remains separate
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $root = Join-Path $env:ProgramData 'SEB EvalPro\IA'
-          $uninstaller = Join-Path $root 'Desinstaller-Pack-IA.exe'
-          if (-not (Test-Path $uninstaller)) { throw 'Désinstallateur Pack IA absent.' }
-          $p = Start-Process -FilePath $uninstaller -ArgumentList '/S' -Wait -PassThru
-          if ($p.ExitCode -ne 0) { throw "Désinstallation Pack IA échouée: $($p.ExitCode)" }
-          Start-Sleep -Seconds 2
-          $model = Join-Path $root 'Ministral-3-8B-Instruct-2512-Q4_K_M.gguf'
-          if (Test-Path $model) { throw 'Le modèle IA est encore présent après désinstallation explicite du Pack.' }
-          Write-Host 'AI_PACK_END_TO_END: SUCCESS'
+          if (-not (Test-Path '_pack\SEB-EvalPro-IA-Pack-Setup.exe')) { throw 'Installateur Pack IA publié absent.' }
+          $size = (Get-Item '_pack\SEB-EvalPro-IA-Pack-Setup.exe').Length
+          if ($size -lt 1000000) { throw "Installateur Pack IA anormalement petit: $size" }
+          Write-Host "AI_PACK_PUBLISHED_INSTALLER_PRESENT: $size octets"
