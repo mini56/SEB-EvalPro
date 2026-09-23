@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - tmp-seb-ia-v1
+  pull_request:
+    branches:
+      - tmp-split-candidat-admin-ai-pack
   workflow_dispatch:
 
 permissions:
