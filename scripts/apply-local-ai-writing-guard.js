@@ -74,11 +74,15 @@ function writingBlockTemplate() {
     const startRe = new RegExp('^.*?(' + escapeRegExp(debut_correct) + ')', 's');
     let texte = original.replace(startRe, '$1');
 
-    // Ne pas remplacer mécaniquement "il/elle" : cela cassait notamment "Il convient de noter".
-    // Le prompt interdit leur emploi lorsqu'ils désignent la personne évaluée.
+    // Remplacement ciblé des pronoms personnels uniquement lorsqu'ils introduisent
+    // clairement une action/description de la personne. Les tournures impersonnelles
+    // "Il convient", "Il existe", etc. restent intactes.
     texte = texte.replace(/\ble candidat\b/gi, civilite);
     texte = texte.replace(/\ble stagiaire\b/gi, civilite);
     texte = texte.replace(/\bla personne\b/gi, civilite);
+    const verbesPersonnels='(?:a|est|présente|montre|réalise|réussit|rencontre|utilise|sait|comprend|assemble|dispose|possède|peut|doit|nécessite|effectue|travaille)';
+    texte = texte.replace(new RegExp('\\b(?:il|elle)\\s+(?='+verbesPersonnels+'\\b)','gi'), civilite+' ');
+    texte = texte.replace(new RegExp("\\bqu['’](?:il|elle)\\s+(?="+verbesPersonnels+"\\b)",'gi'), 'que '+civilite+' ');
 
     texte = texte.replace(/^#+\s.*$/gm, '');
     texte = texte.replace(/\*\*/g, '');
@@ -106,8 +110,7 @@ function writingBlockTemplate() {
           id:'F'+String(couvertureObligatoire.length+1).padStart(2,'0'),
           domaine:nomDomaine,
           type:'point_appui',
-          competence:String(item?.competence||''),
-          observation:String(item?.observation||'')
+          competence:String(item?.competence||'')
         });
       }
       for(const item of (Array.isArray(domaine?.vigilances)?domaine.vigilances:[])){
@@ -115,8 +118,7 @@ function writingBlockTemplate() {
           id:'F'+String(couvertureObligatoire.length+1).padStart(2,'0'),
           domaine:nomDomaine,
           type:'vigilance',
-          competence:String(item?.competence||''),
-          observation:String(item?.observation||'')
+          competence:String(item?.competence||'')
         });
       }
     }
@@ -139,7 +141,7 @@ function writingBlockTemplate() {
       '4. Rédige un texte continu en paragraphes naturels. Tu peux utiliser autant de paragraphes que nécessaire pour couvrir tous les domaines. INTERDICTION d’utiliser des titres, sous-titres, listes à puces, tirets ou énumérations.',
       '5. INTERDICTION absolue de mentionner des chiffres, des pourcentages, des durées, des nombres d’erreurs, des scores ou des niveaux (I, II, III). Utilise uniquement des qualificatifs professionnels.',
       '6. INTERDICTION de poser un diagnostic médical ou psychologique, et INTERDICTION de suggérer une orientation professionnelle, un métier ou une formation.',
-      `7. Utilise exclusivement "trame_factuelle" et "couverture_obligatoire". "couverture_obligatoire" contient ${couvertureObligatoire.length} faits identifiés F01, F02, etc. CHAQUE fait doit apparaître dans la synthèse, sans exception. Tu peux reformuler, mais tu ne peux ni fusionner au point de faire disparaître une compétence, ni omettre une observation.`,
+      `7. Utilise exclusivement "trame_factuelle" pour les observations. "couverture_obligatoire" est une checklist compacte de ${couvertureObligatoire.length} compétences identifiées F01, F02, etc. CHAQUE compétence doit apparaître dans la synthèse, sans exception. Les observations correspondantes restent celles de "trame_factuelle". Tu peux reformuler, mais tu ne peux ni fusionner au point de faire disparaître une compétence, ni omettre son observation.`,
       '8. Si "vigilances" est vide pour un domaine, il est FORMELLEMENT INTERDIT d’attribuer une difficulté, une limite ou un besoin à ce domaine.',
       '9. Si "motivation_personnelle" est vide, n’évoque jamais motivation, volonté, souhait, désir de progresser, épanouissement ou projet personnel. Si elle est renseignée, reprends uniquement ce qui y figure.',
       '10. CHAQUE élément de "domaines_reussite" est une réussite. Pour le module concerné, n’ajoute AUCUNE difficulté, limite, réserve, besoin d’étayage, accompagnement ou amélioration qui ne figure pas explicitement dans cet élément.',
