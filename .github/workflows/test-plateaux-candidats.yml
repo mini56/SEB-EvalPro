@@ -92,7 +92,7 @@ jobs:
             "'--n-gpu-layers', '0'",
             'SEB_LOCAL_AI_QWEN_DIRECT_USER_FILES',
             'qwen-rich-context-v1',
-            'qwen-natural-factual-v7',
+            'qwen-four-blocks-v8',
             'RÈGLES DE RÉDACTION',
             'top_k: 40',
             'repeat_penalty: 1.1',
@@ -103,7 +103,7 @@ jobs:
           foreach ($forbidden in @('START_ATTEMPTS','totalRamGb <= 8','ctxSize =','qwen-rich-coverage-v3','Fait obligatoire omis','Contrôle de fidélité Qwen refusé')) {
             if ($ai.Contains($forbidden)) { throw "Ancien contrôle ou régression détecté: $forbidden" }
           }
-          Write-Host 'Socle moteur #9 confirmé intact; Qwen produit une synthèse naturelle en 4 à 6 paragraphes avec faits structurés en amont et garde-fous factuels légers.'
+          Write-Host 'Socle moteur #9 confirmé intact; Qwen rédige quatre paragraphes factuels séparément puis les assemble en synthèse naturelle.'
 
       - name: Prepare embedded local AI runtime
         shell: pwsh
@@ -324,7 +324,7 @@ jobs:
           $uninstaller = (Resolve-Path "dist\SEB-eval-PRO-$version-Windows-Desinstallation.exe").Path
           $repo = "${{ github.repository }}"
           $title = "SEB EvalPro - Test Qwen garde-fous légers #${{ github.run_number }}"
-          $notes = "Test Qwen synthèse naturelle #${{ github.run_number }}. Repart du Build #199. Les faits sont structurés et protégés en amont, puis Qwen doit les transformer en 4 à 6 paragraphes professionnels sans recopier les intitulés du tableau, sans invention et sans déplacement de faits entre domaines. Aucun contrôle mot à mot et aucune seconde réécriture automatique. L’annulation Qwen à la fermeture du candidat reste active. Version expérimentale uniquement."
+          $notes = "Test Qwen synthèse naturelle en quatre blocs #${{ github.run_number }}. Repart du Build #199. Chaque groupe de compétences est rédigé séparément par Qwen à partir de faits structurés, puis les quatre paragraphes sont assemblés. Objectif : conserver tous les faits sans invention tout en produisant une vraie synthèse professionnelle et non une copie du tableau. L’annulation Qwen à la fermeture du candidat reste active. Version expérimentale uniquement."
           $setupSize = (Get-Item $setup).Length
           Write-Host "Setup à publier: $setupSize octets"
 
