@@ -1,0 +1,120 @@
+name: TEST Ministral 8B vs Qwen GARCIA
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - tmp-ministral8b-garcia
+    paths:
+      - '.github/workflows/test-ministral8b-garcia.yml'
+      - 'scripts/compare-local-model-garcia.js'
+
+permissions:
+  contents: read
+
+jobs:
+  compare-models:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout Build 199 test branch
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Prepare llama.cpp runtime
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path 'ai-runtime','_download','_llama' | Out-Null
+          $url = 'https://github.com/ggml-org/llama.cpp/releases/download/b10964/llama-b10964-bin-win-cpu-x64.zip'
+          $zip = '_download\llama-win-cpu-x64.zip'
+          curl.exe -L --fail --retry 3 --retry-delay 3 -o $zip $url
+          if ($LASTEXITCODE -ne 0) { throw 'Téléchargement llama.cpp échoué.' }
+          $sha = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($sha -ne '917f39c076402c421224824607397af20f53625a60defc20e8dd22446bf4c5d7') { throw "SHA llama.cpp inattendu: $sha" }
+          Expand-Archive -Path $zip -DestinationPath '_llama' -Force
+          $server = Get-ChildItem '_llama' -Recurse -Filter 'llama-server.exe' | Select-Object -First 1
+          if (-not $server) { throw 'llama-server.exe introuvable.' }
+          Copy-Item -Path (Join-Path $server.Directory.FullName '*') -Destination 'ai-runtime' -Recurse -Force
+          Write-Host 'llama.cpp prêt.'
+
+      - name: Compare Qwen 1.7B
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $model = '_download\Qwen3-1.7B-Q4_K_M.gguf'
+          $url = 'https://huggingface.co/ggml-org/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q4_K_M.gguf?download=true'
+          curl.exe -L --fail --retry 3 --retry-delay 5 -o $model $url
+          if ($LASTEXITCODE -ne 0) { throw 'Téléchargement Qwen 1.7B échoué.' }
+          $sha = (Get-FileHash $model -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($sha -ne 'd2387ca2dbfee2ffabce7120d3770dadca0b293052bc2f0e138fdc940d9bc7b5') { throw "SHA Qwen inattendu: $sha" }
+
+          $port = 39473
+          $args = @('--model',(Resolve-Path $model).Path,'--host','127.0.0.1','--port',"$port",'--ctx-size','4096','--threads','4','--n-gpu-layers','0')
+          $proc = Start-Process -FilePath (Resolve-Path 'ai-runtime\llama-server.exe').Path -ArgumentList $args -PassThru -WindowStyle Hidden -RedirectStandardOutput '_qwen-server-out.log' -RedirectStandardError '_qwen-server-err.log'
+          try {
+            $ready = $false
+            for ($i=0; $i -lt 240; $i++) {
+              Start-Sleep -Milliseconds 500
+              if ($proc.HasExited) { throw "Qwen llama-server arrêté: $($proc.ExitCode)" }
+              try {
+                $health = Invoke-RestMethod -Uri "http://127.0.0.1:$port/health" -TimeoutSec 2
+                if ($health.status -eq 'ok') { $ready = $true; break }
+              } catch {}
+            }
+            if (-not $ready) { throw 'Qwen serveur non prêt.' }
+            $env:MODEL_PORT = "$port"
+            $env:MODEL_NAME = 'Qwen3-1.7B-Q4_K_M.gguf'
+            $env:MODEL_LABEL = 'Qwen 1.7B Q4_K_M'
+            node scripts/compare-local-model-garcia.js
+            if ($LASTEXITCODE -ne 0) { throw 'Génération Qwen échouée.' }
+          }
+          finally {
+            if ($proc -and -not $proc.HasExited) { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue }
+            Remove-Item $model -Force -ErrorAction SilentlyContinue
+          }
+
+      - name: Compare Ministral 3 8B
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $model = '_download\Ministral-3-8B-Instruct-2512-Q4_K_M.gguf'
+          $url = 'https://huggingface.co/mistralai/Ministral-3-8B-Instruct-2512-GGUF/resolve/main/Ministral-3-8B-Instruct-2512-Q4_K_M.gguf?download=true'
+          curl.exe -L --fail --retry 3 --retry-delay 5 -o $model $url
+          if ($LASTEXITCODE -ne 0) { throw 'Téléchargement Ministral 8B échoué.' }
+          $sha = (Get-FileHash $model -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($sha -ne '33e7a72cf5e6e2cfc2f2847075acc013d68bba023e35310cef86b5cf8fdca761') { throw "SHA Ministral inattendu: $sha" }
+
+          $port = 39474
+          $args = @('--model',(Resolve-Path $model).Path,'--host','127.0.0.1','--port',"$port",'--ctx-size','4096','--threads','4','--n-gpu-layers','0')
+          $proc = Start-Process -FilePath (Resolve-Path 'ai-runtime\llama-server.exe').Path -ArgumentList $args -PassThru -WindowStyle Hidden -RedirectStandardOutput '_ministral-server-out.log' -RedirectStandardError '_ministral-server-err.log'
+          try {
+            $ready = $false
+            for ($i=0; $i -lt 360; $i++) {
+              Start-Sleep -Milliseconds 500
+              if ($proc.HasExited) { throw "Ministral llama-server arrêté: $($proc.ExitCode)" }
+              try {
+                $health = Invoke-RestMethod -Uri "http://127.0.0.1:$port/health" -TimeoutSec 2
+                if ($health.status -eq 'ok') { $ready = $true; break }
+              } catch {}
+            }
+            if (-not $ready) { throw 'Ministral serveur non prêt.' }
+            $env:MODEL_PORT = "$port"
+            $env:MODEL_NAME = 'Ministral-3-8B-Instruct-2512-Q4_K_M.gguf'
+            $env:MODEL_LABEL = 'Ministral 3 8B Instruct Q4_K_M'
+            node scripts/compare-local-model-garcia.js
+            if ($LASTEXITCODE -ne 0) { throw 'Génération Ministral échouée.' }
+          }
+          finally {
+            if ($proc -and -not $proc.HasExited) { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue }
+            Remove-Item $model -Force -ErrorAction SilentlyContinue
+          }
+
+      - name: Comparison complete
+        shell: pwsh
+        run: |
+          Write-Host 'MINISTRAL8B_GARCIA_COMPARISON: COMPLETE'
