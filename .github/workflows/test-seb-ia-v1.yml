@@ -1,0 +1,46 @@
+name: TEST SEB-IA V1
+
+on:
+  push:
+    branches:
+      - tmp-seb-ia-v1
+  pull_request:
+    branches:
+      - tmp-split-candidat-admin-ai-pack
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  seb-ia-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Test SEB-IA engine
+        run: npm run test:seb-ia
+
+      - name: Generate web application
+        run: npm run prepare:web
+
+      - name: Verify integrated SEB-IA output
+        shell: bash
+        run: |
+          test -f src/seb-ia-engine.js
+          grep -q "seb-ia-v1-integration" app/web/admin-bilan.html
+          grep -q "SEB_HISTORY_SEB_IA_V1" src/bilan-history-preload.js
+          ! grep -q "build165plus-local-ai-prototype.js" package.json
+          ! grep -q "Ministral-3-8B-Instruct" build/installer.nsh
+          echo "SEB-IA V1 integration checks passed."
