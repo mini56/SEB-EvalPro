@@ -11,11 +11,21 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: test-installed-ministral-ai-pack
+  cancel-in-progress: true
+
 jobs:
   install-and-run:
     runs-on: windows-latest
     timeout-minutes: 120
     steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
       - name: Download stable AI Pack release
         shell: pwsh
         env:
@@ -49,7 +59,10 @@ jobs:
           Write-Host 'AI_PACK_PARTS_VERIFIED: OK'
 
       - name: Install AI Pack silently
+        timeout-minutes: 25
         shell: pwsh
+        env:
+          __COMPAT_LAYER: RunAsInvoker
         run: |
           $ErrorActionPreference = 'Stop'
           $setup = (Resolve-Path '_pack\SEB-EvalPro-IA-Pack-Setup.exe').Path
@@ -106,6 +119,13 @@ jobs:
           finally {
             if ($proc -and -not $proc.HasExited) { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue }
           }
+
+      - name: Smoke test Admin rewrite with installed Ministral
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          node scripts/ministral-admin-rewrite-smoke.js
+          if ($LASTEXITCODE -ne 0) { throw 'Réécriture réelle Admin avec Ministral échouée.' }
 
       - name: Verify separate Pack uninstaller
         shell: pwsh
