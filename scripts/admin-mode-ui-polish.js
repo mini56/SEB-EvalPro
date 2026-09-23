@@ -42,7 +42,9 @@ function checkJs(source, label) {
       }
     );
 
-    const anchor = "const localAi = createLocalAiService({ app });";
+    const anchor = out.includes("const localAi = editionCapabilities.canAi ? createLocalAiService({ app }) : null;")
+      ? "const localAi = editionCapabilities.canAi ? createLocalAiService({ app }) : null;"
+      : "const localAi = createLocalAiService({ app });";
     const helper = `
 
 ${marker}
