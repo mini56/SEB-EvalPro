@@ -543,7 +543,6 @@ ipcMain.handle('admin:verify-password', (_event, password) => {
 ipcMain.handle('admin:status', () => adminSessionUnlocked);
 
 ipcMain.handle('admin:lock', () => {
-  localAi.cancelCurrent('Verrouillage de l’espace administrateur');
   adminSessionUnlocked = false;
   adminExportCandidateDir = null;
   if (mainWindow && !mainWindow.isDestroyed()) {
