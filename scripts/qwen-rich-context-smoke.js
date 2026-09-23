@@ -53,11 +53,11 @@ const payload=JSON.stringify({kind:'seb-qwen-rich-context-v1',profile});
     const result=await service.rewrite(payload);
     if(!result?.ok) throw new Error(result?.error||'Qwen direct: génération refusée');
     const text=String(result.text||'').trim();
-    assert.strictEqual(result.guard,'qwen-natural-factual-v7','La rédaction naturelle factuelle v7 doit être active.');
+    assert.strictEqual(result.guard,'qwen-four-blocks-v8','La rédaction naturelle factuelle v7 doit être active.');
     assert(text.startsWith('Monsieur GARCIA José a participé'),'Le début institutionnel doit être conservé.');
     assert(text.length>=700,'La synthèse ne doit pas être anormalement courte.');
     const paragraphs=text.split(/\n\s*\n/).map(x=>x.trim()).filter(Boolean);
-    assert(paragraphs.length>=4&&paragraphs.length<=6,'La synthèse doit contenir entre quatre et six paragraphes naturels.');
+    assert.strictEqual(paragraphs.length,4,'La synthèse finale doit contenir exactement quatre paragraphes naturels.');
 
     console.log('QWEN_LIGHT_FACTUAL_OUTPUT_BEGIN');
     console.log(text);
