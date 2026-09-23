@@ -12,7 +12,7 @@ const rows = {
   'briques-manipulation': {level:'I',select:'I. Assemble les pièces sans difficultés.',detail:'- 1 erreur'},
   'carre': {level:'III',select:"III. A des difficultés à identifier les contraintes d'un problème structuré et à établir les relations entre ses éléments.",detail:'- 10 erreurs'},
   'organisation': {level:'III',select:'III. Réalise la tâche avec de nombreuses erreurs nécessitant un accompagnement.',detail:'- 30 erreurs'},
-  'planning': {level:'III',select:"III. N’est pas en capacité de déterminer l’ordre d’exécution de tâches les unes par rapport aux autres.",detail:'- 11 / 23 points'},
+  'planning': {level:'III',select:"III. N’est pas en capacité de déterminer l’ordre d’exécution de tâches les unes par rapport aux autres.",detail:'- 12 erreurs'},
   'tri-temps': {level:'I',comment:'Le rythme de réalisation est satisfaisant.',detail:'Moyenne 00:03'},
   'tri-erreurs': {level:'I',comment:'Fiabilité satisfaisante.',detail:'6 erreurs'},
   'texte': {level:'II',select:"II. A besoin d’aide pour utiliser un logiciel de traitement de texte pour produire un travail individuel présentable à un tiers.",detail:'- 4 erreurs'},
@@ -27,15 +27,17 @@ const profile=buildRichProfile({
   rows
 });
 
-assert(profile.domaines.length >= 4, 'Les grandes thématiques ne sont pas toutes présentes.');
-assert(profile.points_appui.length > 0, 'Points d’appui absents.');
-assert(profile.points_vigilance.length > 0, 'Points de vigilance absents.');
-assert(profile.contrastes_observes.length > 0, 'Contrastes absents.');
+assert.strictEqual(profile.faits_obligatoires.length,17,'Tous les faits évalués doivent être présents.');
+for(const id of ['carre','organisation','planning']){
+  const fact=profile.faits_obligatoires.find(x=>x.id===id);
+  assert(fact,'Fait obligatoire absent: '+id);
+  assert.strictEqual(fact.importance,'prioritaire','Priorité III perdue pour '+id);
+}
+const requiredPlan=profile.plan_couverture.filter(x=>x.obligatoire);
+assert.strictEqual(requiredPlan.length,6,'Plan de couverture attendu: six paragraphes obligatoires.');
 
 const qualitative=JSON.stringify({
-  points_appui:profile.points_appui,
-  points_vigilance:profile.points_vigilance,
-  domaines:profile.domaines,
+  faits_obligatoires:profile.faits_obligatoires,
   contrastes_observes:profile.contrastes_observes
 });
 for(const forbidden of [
@@ -44,7 +46,7 @@ for(const forbidden of [
   /\b\d+(?:[.,]\d+)?\s*\/\s*\d+(?:[.,]\d+)?\b/,
   /\b(?:niveau\s*)?(?:NE|III|II|I)\b/
 ]){
-  assert(!forbidden.test(qualitative), 'Le JSON riche contient encore un élément quantitatif/niveau interdit: '+forbidden);
+  assert(!forbidden.test(qualitative),'Le JSON riche contient encore un élément quantitatif/niveau interdit: '+forbidden);
 }
 
 const payload=JSON.stringify({kind:'seb-qwen-rich-context-v1',profile});
@@ -62,14 +64,24 @@ const payload=JSON.stringify({kind:'seb-qwen-rich-context-v1',profile});
     const text=String(result.text||'').trim();
     assert(text,'Qwen riche: synthèse vide');
     const paragraphs=text.split(/\n\s*\n/).map(x=>x.trim()).filter(Boolean);
-    assert(paragraphs.length>=5,'Qwen riche: moins de cinq paragraphes');
+    assert.strictEqual(paragraphs.length,6,'La synthèse doit couvrir exactement les six paragraphes prévus.');
+    assert.deepStrictEqual(result.validationErrors||[],[],'La synthèse finale ne doit conserver aucune erreur de fidélité.');
+    for(const forbidden of [
+      /\b(?:vous|votre|vos)\b/i,
+      /\b(?:le candidat|la candidate|le stagiaire|la stagiaire)\b/i,
+      /\b(?:il|elle)\b/i,
+      /\b\d+(?:[.,]\d+)?\s*%/,
+      /\b\d+\s*erreur(?:\(s\)|s)?\b/i
+    ]) assert(!forbidden.test(text),'Sortie finale interdite: '+forbidden);
     console.log('QWEN_RICH_PROFILE_BEGIN');
     console.log(JSON.stringify(profile,null,2));
     console.log('QWEN_RICH_PROFILE_END');
     console.log('QWEN_RICH_OUTPUT_BEGIN');
     console.log(text);
     console.log('QWEN_RICH_OUTPUT_END');
-    console.log('QWEN_RICH_VALIDATION: OK');
+    console.log('QWEN_RICH_FALLBACK_PARAGRAPHS '+JSON.stringify((result.fallbackParagraphs||[]).map(x=>({paragraphe:x.paragraphe,errors:x.errors}))));
+    console.log('QWEN_RICH_GLOBAL_FALLBACK '+String(!!result.globalFallback));
+    console.log('QWEN_RICH_COVERAGE_VALIDATION: OK');
   }finally{
     service.stop();
   }

@@ -25,6 +25,28 @@
     'math-problemes':{theme:'Savoirs fondamentaux et numérique',exercice:'mathématiques',competence:'résolution de problèmes mathématiques'}
   };
 
+  // Termes sémantiques servant uniquement à vérifier qu'un fait n'a pas disparu.
+  // La validation se fait dans le paragraphe du domaine concerné, pas sur tout le texte.
+  const COVERAGE={
+    'fabrication-plan':[['plan']],
+    'fabrication-tracage':[['trac']],
+    'fabrication-decoupe':[['decoup']],
+    'fabrication-assemblage':[['pliag','assembl']],
+    'fabrication-finition':[['finit']],
+    'briques-identification':[['schem']],
+    'briques-manipulation':[['manipul']],
+    'carre':[['contraint']],
+    'organisation':[['stock']],
+    'planning':[['planif',"ordre d'execution",'restaurant']],
+    'tri-temps':[['rythme']],
+    'tri-erreurs':[['fiabil']],
+    'texte':[['traitement de texte']],
+    'mail':[['messagerie','message hierarch']],
+    'expression':[['expression ecrite','orthograph','phrase']],
+    'math-enonce':[['consigne']],
+    'math-problemes':[['pourcentage','echell','algorith','probleme mathem']]
+  };
+
   function norm(v){return String(v??'').replace(/\u00a0/g,' ').replace(/\r/g,'\n').replace(/[ \t]+/g,' ').replace(/\n+/g,'\n').trim()}
   function title(v){return norm(v).toLocaleLowerCase('fr-FR').replace(/(^|[\s'’\-])([a-zà-ÿ])/g,(m,a,b)=>a+b.toLocaleUpperCase('fr-FR'))}
   function formatDateFr(v){
@@ -39,19 +61,27 @@
     if(n==='II'||n==='III')return 'point_vigilance';
     return 'neutre';
   }
+  function importance(level){
+    const n=norm(level).toUpperCase();
+    if(n==='III')return 'prioritaire';
+    if(n==='II')return 'vigilance';
+    if(n==='I')return 'appui';
+    return 'neutre';
+  }
   function cleanQualitative(value){
     let s=norm(value);
     if(!s)return '';
     s=s.replace(/(?:^|[.!?]\s*)(?:NE|III|II|I)\s*\.\s*/g,(m)=>m.startsWith('.')?'. ':'');
     s=s.replace(/\bN[°º]\s*\d+\s*:\s*\d+\s*(?:min|mn)?\s*\d*\s*s?\b/gi,' ');
+    s=s.replace(/\b\d{1,2}\s*:\s*\d{2}(?::\d{2})?\b/g,' ');
+    s=s.replace(/\bMoyenne\b\s*[:=-]?\s*/gi,' ');
     s=s.replace(/\b\d+\s*(?:min|mn)\s*\d*\s*s?\b/gi,' ');
     s=s.replace(/\b\d+(?:[.,]\d+)?\s*%\b/g,' ');
     s=s.replace(/\b\d+(?:[.,]\d+)?\s*\/\s*\d+(?:[.,]\d+)?\b/g,' ');
     s=s.replace(/\b\d+\s*erreur(?:\(s\)|s)?\b/gi,' ');
     s=s.replace(/\b\d+\s*(?:point(?:\(s\)|s)?|réponse(?:\(s\)|s)?\s+correcte(?:\(s\)|s)?)\b/gi,' ');
     s=s.replace(/\b(?:niveau\s*)?(?:NE|III|II|I)\b/gi,' ');
-    s=s.replace(/(?:^|\s)[\-–—]?\s*\d+(?:[.,]\d+)?\s*(?:à|-)\s*\d+(?:[.,]\d+)?\s*(?:min|mn|s)?\b/gi,' ');
-    s=s.replace(/(?:^|\s)[\-–—]?\s*\d+(?:[.,]\d+)?\b/g,' ');
+    s=s.replace(/\b\d+(?:[.,]\d+)?\b/g,' ');
     s=s.replace(/\s+([,.;:!?])/g,'$1').replace(/[ \t]{2,}/g,' ').replace(/\n{2,}/g,'\n').trim();
     s=s.replace(/^[\-–—,:;.\s]+|[\-–—,:;\s]+$/g,'').trim();
     return s;
@@ -69,26 +99,34 @@
   }
   function lineFromRow(key,row){
     const spec=ROWS[key]; if(!spec)return null;
+    const level=norm(row?.level).toUpperCase();
+    if(!level||level==='NE')return null;
     const observations=dedupe([row?.select,row?.comment,row?.detail]);
-    if(!observations.length && !norm(row?.level))return null;
+    if(!observations.length)return null;
     return {
+      id:key,
       theme:spec.theme,
       exercice:spec.exercice,
       competence:spec.competence,
-      positionnement:classify(row?.level),
-      observations_qualitatives:observations
+      positionnement:classify(level),
+      importance:importance(level),
+      observations_qualitatives:observations,
+      validation_couverture:COVERAGE[key]||[[spec.competence]]
+    };
+  }
+  function publicLine(line){
+    return {
+      exercice:line.exercice,
+      competence:line.competence,
+      positionnement:line.positionnement,
+      observations_qualitatives:line.observations_qualitatives
     };
   }
   function groupThemes(lines){
     const map=new Map();
     for(const line of lines){
       if(!map.has(line.theme))map.set(line.theme,[]);
-      map.get(line.theme).push({
-        exercice:line.exercice,
-        competence:line.competence,
-        positionnement:line.positionnement,
-        observations_qualitatives:line.observations_qualitatives
-      });
+      map.get(line.theme).push(publicLine(line));
     }
     return [...map].map(([theme,observations])=>({theme,observations}));
   }
@@ -112,7 +150,7 @@
       }
     }
     const find=(e)=>lines.filter(x=>x.exercice===e);
-    const rest=find('le restaurant'),carre=find('carré magique');
+    const rest=find('le restaurant'),carre=find('carré magique'),stock=find('ranger le stock');
     if(rest.some(x=>x.positionnement==='point_appui')&&carre.some(x=>x.positionnement==='point_vigilance')){
       out.push({
         type:'contraste_inter_exercices',
@@ -121,13 +159,14 @@
         exercices_concernes:['le restaurant','carré magique']
       });
     }
-    const stock=find('ranger le stock');
     if(stock.some(x=>x.positionnement==='point_vigilance')&&carre.some(x=>x.positionnement==='point_vigilance')){
+      const exercices=['ranger le stock','carré magique'];
+      if(rest.some(x=>x.positionnement==='point_vigilance'))exercices.push('le restaurant');
       out.push({
         type:'convergence_inter_exercices',
         competence_commune:'organisation de plusieurs informations et contraintes',
         constat_qualitatif:'les difficultés apparaissent dans plusieurs situations demandant de prendre en compte simultanément plusieurs informations ou contraintes',
-        exercices_concernes:['ranger le stock','carré magique']
+        exercices_concernes:exercices
       });
     }
     return out;
@@ -140,6 +179,30 @@
       observations_qualitatives:x.observations_qualitatives
     }));
   }
+  function faitsObligatoires(lines){
+    return lines.map(x=>({
+      id:x.id,
+      theme:x.theme,
+      exercice:x.exercice,
+      competence:x.competence,
+      positionnement:x.positionnement,
+      importance:x.importance,
+      observations_qualitatives:x.observations_qualitatives,
+      validation_couverture:x.validation_couverture
+    }));
+  }
+  function planCouverture(lines){
+    const ids=new Set(lines.map(x=>x.id));
+    const keep=(list)=>list.filter(id=>ids.has(id));
+    return [
+      {paragraphe:1,objet:"vue d'ensemble du parcours",obligatoire:true,faits_ids:[]},
+      {paragraphe:2,objet:'fabrication de la structure 3D et construction à base de briques',obligatoire:true,faits_ids:keep(['fabrication-plan','fabrication-tracage','fabrication-decoupe','fabrication-assemblage','fabrication-finition','briques-identification','briques-manipulation'])},
+      {paragraphe:3,objet:'raisonnement, rangement du stock et planification sous contraintes',obligatoire:true,faits_ids:keep(['carre','organisation','planning']),priorite:'les difficultés prioritaires de ce domaine ne doivent jamais être omises ni atténuées'},
+      {paragraphe:4,objet:'tri de chevilles : rythme et fiabilité',obligatoire:true,faits_ids:keep(['tri-temps','tri-erreurs'])},
+      {paragraphe:5,objet:'outils numériques : traitement de texte et messagerie',obligatoire:true,faits_ids:keep(['texte','mail'])},
+      {paragraphe:6,objet:'expression écrite et mathématiques',obligatoire:true,faits_ids:keep(['expression','math-enonce','math-problemes'])}
+    ];
+  }
   function buildRichProfile(input){
     input=input||{};
     const candidate=input.candidate||{};
@@ -151,15 +214,14 @@
         prenom:title(candidate.prenom||candidate['prénom']),
         date_evaluation:formatDateFr(candidate.date)
       },
-      consigne_de_lecture:'Les observations ci-dessous sont déjà qualifiées et nettoyées des scores, nombres d’erreurs, durées et niveaux. Elles doivent toutes être prises en compte sans en modifier l’intensité ni en déduire un trait psychologique.',
+      consigne_de_lecture:'Les observations ci-dessous sont déjà qualifiées et nettoyées des scores, nombres d’erreurs, durées et niveaux. Chaque fait obligatoire doit apparaître dans son domaine sans être atténué, renforcé ou déplacé vers une autre compétence.',
+      plan_couverture:planCouverture(lines),
+      faits_obligatoires:faitsObligatoires(lines),
       points_appui:faitsSaillants(lines,'point_appui'),
       points_vigilance:faitsSaillants(lines,'point_vigilance'),
       domaines:groupThemes(lines),
       contrastes_observes:contrastes(lines)
     };
   }
-  function collectForbiddenNumbers(profile){
-    return (JSON.stringify(profile).match(/\b\d+(?:[.,]\d+)?\b/g)||[]);
-  }
-  return {ROWS,buildRichProfile,cleanQualitative,classify,collectForbiddenNumbers};
+  return {ROWS,COVERAGE,buildRichProfile,cleanQualitative,classify,importance};
 });
