@@ -57,12 +57,12 @@ jobs:
           node scripts/candidate-catalog-smoke.js
           if ($LASTEXITCODE -ne 0) { throw 'Smoke test migration/catalogue candidats échoué.' }
 
-      - name: Apply writing-only guard on working #9 engine
+      - name: Apply direct Qwen rules from supplied files
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           node scripts/apply-local-ai-writing-guard.js
-          if ($LASTEXITCODE -ne 0) { throw 'Patch rédactionnel isolé échoué.' }
+          if ($LASTEXITCODE -ne 0) { throw 'Adaptation directe des règles Qwen échouée.' }
 
       - name: Check Electron IA sources
         shell: pwsh
@@ -90,18 +90,20 @@ jobs:
             "const REQUEST_TIMEOUT_MS = 240000;",
             "'--ctx-size', '4096'",
             "'--n-gpu-layers', '0'",
-            'SEB_LOCAL_AI_QWEN_RICH_CONTEXT',
+            'SEB_LOCAL_AI_QWEN_DIRECT_USER_FILES',
             'qwen-rich-context-v1',
-            'top_k:40',
-            'repeat_penalty:1.1',
-            'mirostat:0'
+            'qwen-direct-user-files-v1',
+            'RÈGLES ABSOLUES ET NON NÉGOCIABLES',
+            'top_k: 40',
+            'repeat_penalty: 1.1',
+            'mirostat: 0'
           )) {
             if (-not $ai.Contains($required)) { throw "Socle #9 ou garde rédactionnelle absent: $required" }
           }
-          foreach ($forbidden in @('START_ATTEMPTS','totalRamGb <= 8','ctxSize =')) {
-            if ($ai.Contains($forbidden)) { throw "Régression de démarrage postérieure au #9 détectée: $forbidden" }
+          foreach ($forbidden in @('START_ATTEMPTS','totalRamGb <= 8','ctxSize =','qwen-rich-coverage-v3','Fait obligatoire omis','Contrôle de fidélité Qwen refusé')) {
+            if ($ai.Contains($forbidden)) { throw "Ancien contrôle ou régression détecté: $forbidden" }
           }
-          Write-Host 'Socle moteur #9 confirmé intact; synthèse Qwen contexte riche présente.'
+          Write-Host 'Socle moteur #9 confirmé intact; règles Qwen fournies appliquées directement sans ancien contrôle de fidélité.'
 
       - name: Prepare embedded local AI runtime
         shell: pwsh
@@ -181,12 +183,12 @@ jobs:
             if ($proc -and -not $proc.HasExited) { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue }
           }
 
-      - name: Smoke test Qwen rich qualitative synthesis
+      - name: Smoke test direct Qwen supplied rules
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           node scripts/qwen-rich-context-smoke.js
-          if ($LASTEXITCODE -ne 0) { throw 'Test réel Qwen contexte riche échoué.' }
+          if ($LASTEXITCODE -ne 0) { throw 'Test réel des règles Qwen fournies échoué.' }
 
       - name: Ensure ImageMagick
         shell: pwsh
@@ -321,8 +323,8 @@ jobs:
           $setup = (Resolve-Path "dist\SEB-eval-PRO-$version-Windows-Setup.exe").Path
           $uninstaller = (Resolve-Path "dist\SEB-eval-PRO-$version-Windows-Desinstallation.exe").Path
           $repo = "${{ github.repository }}"
-          $title = "SEB EvalPro - Test Qwen contexte riche #${{ github.run_number }}"
-          $notes = "Test Qwen contexte riche + contrôle de fidélité #${{ github.run_number }}. Repart strictement du Build #150. Le JSON riche est conservé et complété par des faits obligatoires, une priorité forte pour les difficultés majeures, un plan de couverture par domaines et une validation paragraphe par paragraphe. Si Qwen omet, atténue ou invente un élément, seul le paragraphe concerné revient au texte factuel construit depuis les observations sources. Version expérimentale uniquement."
+          $title = "SEB EvalPro - Test Qwen direct #${{ github.run_number }}"
+          $notes = "Test Qwen direct #${{ github.run_number }}. Repart strictement du Build #177 pour le socle candidat et Qwen. Le JSON, le prompt et la sécurisation appliquent les fichiers Qwen fournis tels quels, adaptés uniquement aux champs SEB EvalPro. L’ancien contrôle de fidélité paragraphe par paragraphe est retiré afin d’évaluer directement le texte produit par Qwen. L’annulation de Qwen à la fermeture du candidat reste active. Version expérimentale uniquement."
           $setupSize = (Get-Item $setup).Length
           Write-Host "Setup à publier: $setupSize octets"
 
