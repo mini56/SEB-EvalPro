@@ -113,11 +113,11 @@ function writingBlockTemplate() {
       `1. Commence impérativement la réponse par : "${civilite} ${nom} ${prenom} a participé aux mises en situation proposées au cours du plateau technique."`,
       `2. Utilise UNIQUEMENT "${civilite}" pour désigner la personne évaluée. N'utilise jamais "il", "elle", "ce candidat", "le candidat", "le stagiaire" ou "la personne" pour parler d'elle. Les tournures réellement impersonnelles comme "Il convient de noter que" ou "Il existe" restent autorisées.`,
       `3. La trame contient ${domainesObligatoires.length} domaines. Tu dois couvrir TOUS ces domaines, dans l’ordre fourni, sans en omettre un seul : ${domainesObligatoires.join(' ; ')}.`,
-      '4. Rédige un texte continu en paragraphes naturels. Tu peux utiliser autant de paragraphes que nécessaire pour couvrir tous les domaines. INTERDICTION d’utiliser des titres, sous-titres, listes à puces, tirets ou énumérations.'
+      '4. Rédige un texte continu en paragraphes naturels. Tu peux utiliser autant de paragraphes que nécessaire pour couvrir tous les domaines. INTERDICTION d’utiliser des titres, sous-titres, listes à puces, tirets ou énumérations.',
       '5. INTERDICTION absolue de mentionner des chiffres, des pourcentages, des durées, des nombres d’erreurs, des scores ou des niveaux (I, II, III). Utilise uniquement des qualificatifs professionnels.',
       '6. INTERDICTION de poser un diagnostic médical ou psychologique, et INTERDICTION de suggérer une orientation professionnelle, un métier ou une formation.',
       '7. Utilise exclusivement "trame_factuelle". Pour CHAQUE domaine, tu dois reprendre toutes les observations de "points_appui" et toutes les observations de "vigilances". Aucun élément de la trame ne doit disparaître.',
-      '8. Si "vigilances" est vide pour un domaine, il est FORMELLEMENT INTERDIT d’attribuer une difficulté, une limite ou un besoin à ce domaine.'
+      '8. Si "vigilances" est vide pour un domaine, il est FORMELLEMENT INTERDIT d’attribuer une difficulté, une limite ou un besoin à ce domaine.',
       '9. Si "motivation_personnelle" est vide, n’évoque jamais motivation, volonté, souhait, désir de progresser, épanouissement ou projet personnel. Si elle est renseignée, reprends uniquement ce qui y figure.',
       '10. CHAQUE élément de "domaines_reussite" est une réussite. Pour le module concerné, n’ajoute AUCUNE difficulté, limite, réserve, besoin d’étayage, accompagnement ou amélioration qui ne figure pas explicitement dans cet élément.',
       '11. CHAQUE élément de "domaines_vigilance" est une vigilance. Décris uniquement la difficulté indiquée dans cet élément, sans l’étendre à une compétence voisine.',
@@ -127,7 +127,7 @@ function writingBlockTemplate() {
       '15. N’ajoute aucune recommandation, aucun objectif de progression, aucun besoin de soutien supplémentaire et aucune notion de performance qui ne soit explicitement présente dans les données.',
       '16. Pour un domaine mixte, cite les points d’appui puis les seules vigilances présentes dans la trame. Pour un domaine sans vigilance, reste uniquement positif et factuel.',
       '17. Avant de répondre, vérifie chaque phrase contre "trame_factuelle". Si une affirmation ne correspond pas directement à une observation de la trame, supprime-la.',
-      '18. Ne termine pas par une conclusion générale ou un résumé inventé. Une fois le dernier domaine couvert, arrête la réponse.'
+      '18. Ne termine pas par une conclusion générale ou un résumé inventé. Une fois le dernier domaine couvert, arrête la réponse.',
       '',
       'Données à synthétiser :',
       json,
