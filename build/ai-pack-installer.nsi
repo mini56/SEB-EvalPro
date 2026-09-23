@@ -18,7 +18,7 @@ SetCompressor /SOLID lzma
 !define PART3 "${MODEL_NAME}.part03"
 
 Name "SEB EvalPro - Pack IA Ministral 8B"
-OutFile "dist\SEB-EvalPro-IA-Pack-Setup.exe"
+OutFile "..\dist\SEB-EvalPro-IA-Pack-Setup.exe"
 BrandingText "SEB EvalPro - Sauvegarde 56"
 ShowInstDetails show
 ShowUninstDetails show
