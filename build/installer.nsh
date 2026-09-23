@@ -80,12 +80,18 @@ Var SebEditionAdminRadio
   ${EndIf}
 
   # Version Administrateur : le Pack IA est indépendant de l'application.
+  # Résoudre explicitement le dossier système ProgramData (NSIS/electron-builder
+  # ne fournit pas $COMMONAPPDATA dans cette configuration).
+  ReadEnvStr $8 "ProgramData"
+  StrCmp $8 "" 0 +2
+    StrCpy $8 "C:\ProgramData"
+
   # S'il est déjà présent dans ProgramData, aucune copie n'est refaite.
-  IfFileExists "$COMMONAPPDATA\SEB EvalPro\IA\Ministral-3-8B-Instruct-2512-Q4_K_M.gguf" seb_ai_pack_ready 0
+  IfFileExists "$8\SEB EvalPro\IA\Ministral-3-8B-Instruct-2512-Q4_K_M.gguf" seb_ai_pack_ready 0
   IfFileExists "$EXEDIR\SEB-EvalPro-IA-Pack\Ministral-3-8B-Instruct-2512-Q4_K_M.gguf" 0 seb_ai_pack_missing
-  CreateDirectory "$COMMONAPPDATA\SEB EvalPro\IA"
-  CopyFiles /SILENT "$EXEDIR\SEB-EvalPro-IA-Pack\*.*" "$COMMONAPPDATA\SEB EvalPro\IA"
-  IfFileExists "$COMMONAPPDATA\SEB EvalPro\IA\Ministral-3-8B-Instruct-2512-Q4_K_M.gguf" seb_ai_pack_ready seb_ai_pack_missing
+  CreateDirectory "$8\SEB EvalPro\IA"
+  CopyFiles /SILENT "$EXEDIR\SEB-EvalPro-IA-Pack\*.*" "$8\SEB EvalPro\IA"
+  IfFileExists "$8\SEB EvalPro\IA\Ministral-3-8B-Instruct-2512-Q4_K_M.gguf" seb_ai_pack_ready seb_ai_pack_missing
 
 seb_ai_pack_missing:
   MessageBox MB_ICONEXCLAMATION|MB_OK "SEB EvalPro Administrateur sera installé, mais le Pack IA Ministral n'a pas été trouvé.$\r$\n$\r$\nVous pourrez installer le Pack IA séparément une seule fois. Les prochaines mises à jour de SEB EvalPro ne le supprimeront pas."

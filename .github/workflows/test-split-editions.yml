@@ -48,7 +48,7 @@ jobs:
           if ($embeddedAi.Count -ne 0) { throw 'Le modèle IA ne doit plus être embarqué dans le Setup SEB EvalPro.' }
 
           $installer = Get-Content build\installer.nsh -Raw
-          foreach ($required in @('Version Candidat','Version Administrateur','SEB-EvalPro-IA-Pack','edition-candidate.flag','edition-admin.flag','COMMONAPPDATA\SEB EvalPro\IA')) {
+          foreach ($required in @('Version Candidat','Version Administrateur','SEB-EvalPro-IA-Pack','edition-candidate.flag','edition-admin.flag','ReadEnvStr $8 "ProgramData"','$8\SEB EvalPro\IA')) {
             if (-not $installer.Contains($required)) { throw "Architecture installateur absente: $required" }
           }
           Write-Host 'ARCHITECTURE_SPLIT: OK'
