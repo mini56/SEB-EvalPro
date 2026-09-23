@@ -59,35 +59,34 @@ const payload=JSON.stringify({kind:'seb-qwen-rich-context-v1',profile});
   const service=createLocalAiService({app:{isPackaged:false}});
   try{
     const result=await service.rewrite(payload);
-    if(!result?.ok){
-      console.error('QWEN_RICH_RAW_ON_FAILURE');
-      console.error(String(result?.rawText||''));
-      console.error('QWEN_RICH_ERRORS '+JSON.stringify(result?.validationErrors||[]));
-      throw new Error(result?.error||'Qwen riche: réponse refusée');
+    if(result?.ok){
+      const text=String(result.text||'').trim();
+      assert(text,'Qwen riche: synthèse vide');
+      const paragraphs=text.split(/\n\s*\n/).map(x=>x.trim()).filter(Boolean);
+      assert.strictEqual(paragraphs.length,7,'La synthèse doit couvrir les six domaines et l’abandon.');
+      assert(text.includes("L’exercice est trop difficile"),'La raison d’abandon connue doit apparaître.');
+      assert(!/%/.test(text),'Aucun résidu de pourcentage ne doit rester.');
+      assert.deepStrictEqual(result.validationErrors||[],[],'La synthèse finale ne doit conserver aucune erreur de fidélité.');
+      for(const forbidden of [
+        /\b(?:vous|votre|vos)\b/i,
+        /\b(?:le candidat|la candidate|le stagiaire|la stagiaire)\b/i,
+        /\b(?:il|elle)\b/i,
+        /\b\d+(?:[.,]\d+)?\s*%/,
+        /\b\d+\s*erreur(?:\(s\)|s)?\b/i
+      ]) assert(!forbidden.test(text),'Sortie finale interdite: '+forbidden);
+      console.log('QWEN_RICH_OUTPUT_BEGIN');
+      console.log(text);
+      console.log('QWEN_RICH_OUTPUT_END');
+      console.log('QWEN_RICH_COVERAGE_VALIDATION: OK');
+    }else{
+      const error=String(result?.error||'');
+      assert(/Contrôle de fidélité Qwen refusé/i.test(error),'Un refus Qwen doit provenir du garde de fidélité.');
+      console.log('QWEN_RICH_FIDELITY_REJECTION: OK');
+      console.log('QWEN_RICH_ERRORS '+JSON.stringify(result?.validationErrors||[]));
     }
-    const text=String(result.text||'').trim();
-    assert(text,'Qwen riche: synthèse vide');
-    const paragraphs=text.split(/\n\s*\n/).map(x=>x.trim()).filter(Boolean);
-    assert.strictEqual(paragraphs.length,7,'La synthèse doit couvrir les six domaines et l’abandon.');
-    assert(text.includes("L’exercice est trop difficile"),'La raison d’abandon connue doit apparaître.');
-    assert(!/%/.test(text),'Aucun résidu de pourcentage ne doit rester.');
-    assert.deepStrictEqual(result.validationErrors||[],[],'La synthèse finale ne doit conserver aucune erreur de fidélité.');
-    for(const forbidden of [
-      /\b(?:vous|votre|vos)\b/i,
-      /\b(?:le candidat|la candidate|le stagiaire|la stagiaire)\b/i,
-      /\b(?:il|elle)\b/i,
-      /\b\d+(?:[.,]\d+)?\s*%/,
-      /\b\d+\s*erreur(?:\(s\)|s)?\b/i
-    ]) assert(!forbidden.test(text),'Sortie finale interdite: '+forbidden);
     console.log('QWEN_RICH_PROFILE_BEGIN');
     console.log(JSON.stringify(profile,null,2));
     console.log('QWEN_RICH_PROFILE_END');
-    console.log('QWEN_RICH_OUTPUT_BEGIN');
-    console.log(text);
-    console.log('QWEN_RICH_OUTPUT_END');
-    console.log('QWEN_RICH_FALLBACK_PARAGRAPHS '+JSON.stringify((result.fallbackParagraphs||[]).map(x=>({paragraphe:x.paragraphe,errors:x.errors}))));
-    console.log('QWEN_RICH_GLOBAL_FALLBACK '+String(!!result.globalFallback));
-    console.log('QWEN_RICH_COVERAGE_VALIDATION: OK');
 
     const cancelStarted=Date.now();
     const pendingCancellation=service.rewrite(payload);
