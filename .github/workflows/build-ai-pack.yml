@@ -1,0 +1,141 @@
+name: BUILD Pack IA Ministral 8B
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - tmp-split-candidat-admin-ai-pack
+    paths:
+      - '.github/workflows/build-ai-pack.yml'
+      - 'build/ai-pack-installer.nsi'
+      - 'build/verify-ai-pack.ps1'
+
+permissions:
+  contents: write
+
+jobs:
+  build-ai-pack:
+    runs-on: windows-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare llama.cpp runtime
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path '_ai-download','_ai-llama','ai-pack-runtime','dist' | Out-Null
+          $url = 'https://github.com/ggml-org/llama.cpp/releases/download/b10964/llama-b10964-bin-win-cpu-x64.zip'
+          $zip = '_ai-download\llama-win-cpu-x64.zip'
+          curl.exe -L --fail --retry 3 --retry-delay 3 -o $zip $url
+          if ($LASTEXITCODE -ne 0) { throw 'Téléchargement llama.cpp échoué.' }
+          $sha = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($sha -ne '917f39c076402c421224824607397af20f53625a60defc20e8dd22446bf4c5d7') { throw "SHA llama.cpp inattendu: $sha" }
+          Expand-Archive -Path $zip -DestinationPath '_ai-llama' -Force
+          $server = Get-ChildItem '_ai-llama' -Recurse -Filter 'llama-server.exe' | Select-Object -First 1
+          if (-not $server) { throw 'llama-server.exe introuvable.' }
+          Copy-Item -Path (Join-Path $server.Directory.FullName '*') -Destination 'ai-pack-runtime' -Recurse -Force
+          if (-not (Test-Path 'ai-pack-runtime\llama-server.exe')) { throw 'Runtime IA incomplet.' }
+
+      - name: Build external AI Pack installer
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $makensis = Get-Command makensis.exe -ErrorAction SilentlyContinue
+          if (-not $makensis) {
+            choco install nsis --no-progress -y
+            $candidate = Join-Path ${env:ProgramFiles(x86)} 'NSIS\makensis.exe'
+            if (Test-Path $candidate) { $makensis = Get-Item $candidate }
+          }
+          if (-not $makensis) { throw 'makensis.exe introuvable.' }
+          $exe = if ($makensis.Source) { $makensis.Source } else { $makensis.FullName }
+          $runtime = (Resolve-Path 'ai-pack-runtime').Path
+          $verify = (Resolve-Path 'build\verify-ai-pack.ps1').Path
+          & $exe "/DAI_RUNTIME_DIR=$runtime" "/DVERIFY_SCRIPT=$verify" 'build\ai-pack-installer.nsi'
+          if ($LASTEXITCODE -ne 0) { throw 'Compilation Pack IA échouée.' }
+          if (-not (Test-Path 'dist\SEB-EvalPro-IA-Pack-Setup.exe')) { throw 'Installateur Pack IA absent.' }
+
+      - name: Create stable AI Pack release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tag = 'seb-evalpro-ai-pack-ministral3-8b-v1'
+          $repo = '${{ github.repository }}'
+          gh release view $tag --repo $repo *> $null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $tag --target '${{ github.sha }}' --title 'SEB EvalPro - Pack IA Ministral 3 8B v1' --notes 'Pack IA local indépendant de SEB EvalPro. À installer une seule fois sur le PC Administrateur. Conserver l installateur et les 3 parties du modèle dans le même dossier.' --prerelease --repo $repo
+            if ($LASTEXITCODE -ne 0) { throw 'Création Release Pack IA échouée.' }
+          }
+          gh release upload $tag 'dist\SEB-EvalPro-IA-Pack-Setup.exe' --clobber --repo $repo
+          if ($LASTEXITCODE -ne 0) { throw 'Upload installateur Pack IA échoué.' }
+
+      - name: Download and verify Ministral model
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $model = '_ai-download\Ministral-3-8B-Instruct-2512-Q4_K_M.gguf'
+          $url = 'https://huggingface.co/mistralai/Ministral-3-8B-Instruct-2512-GGUF/resolve/main/Ministral-3-8B-Instruct-2512-Q4_K_M.gguf?download=true'
+          curl.exe -L --fail --retry 3 --retry-delay 5 -o $model $url
+          if ($LASTEXITCODE -ne 0) { throw 'Téléchargement Ministral 8B échoué.' }
+          $sha = (Get-FileHash $model -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($sha -ne '33e7a72cf5e6e2cfc2f2847075acc013d68bba023e35310cef86b5cf8fdca761') { throw "SHA Ministral inattendu: $sha" }
+          Write-Host "MINISTRAL_MODEL_VERIFIED: $((Get-Item $model).Length) octets"
+
+      - name: Split and upload model parts
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tag = 'seb-evalpro-ai-pack-ministral3-8b-v1'
+          $repo = '${{ github.repository }}'
+          $model = (Resolve-Path '_ai-download\Ministral-3-8B-Instruct-2512-Q4_K_M.gguf').Path
+          $chunkSize = [int64]1800000000
+          $buffer = New-Object byte[] 8388608
+          $manifest = New-Object System.Collections.Generic.List[string]
+          $manifest.Add('SEB EvalPro - Pack IA Ministral 3 8B v1')
+          $manifest.Add('Model SHA256: 33e7a72cf5e6e2cfc2f2847075acc013d68bba023e35310cef86b5cf8fdca761')
+          $manifest.Add('Placez le Setup Pack IA et les 3 parties dans le meme dossier puis lancez le Setup.')
+
+          $input = [System.IO.File]::OpenRead($model)
+          try {
+            $part = 1
+            while ($input.Position -lt $input.Length) {
+              $partName = ('Ministral-3-8B-Instruct-2512-Q4_K_M.gguf.part{0:D2}' -f $part)
+              $partPath = Join-Path '_ai-download' $partName
+              $remaining = [Math]::Min($chunkSize, $input.Length - $input.Position)
+              $output = [System.IO.File]::Create($partPath)
+              try {
+                while ($remaining -gt 0) {
+                  $want = [int][Math]::Min([int64]$buffer.Length, $remaining)
+                  $read = $input.Read($buffer, 0, $want)
+                  if ($read -le 0) { throw 'Lecture modèle interrompue.' }
+                  $output.Write($buffer, 0, $read)
+                  $remaining -= $read
+                }
+              } finally {
+                $output.Dispose()
+              }
+
+              $partSize = (Get-Item $partPath).Length
+              $partSha = (Get-FileHash $partPath -Algorithm SHA256).Hash.ToLowerInvariant()
+              $manifest.Add("$partName | $partSize octets | sha256 $partSha")
+              Write-Host "Upload $partName ($partSize octets)"
+              gh release upload $tag $partPath --clobber --repo $repo
+              if ($LASTEXITCODE -ne 0) { throw "Upload échoué: $partName" }
+              Remove-Item $partPath -Force
+              $part++
+            }
+            if (($part - 1) -ne 3) { throw "Nombre de parties inattendu: $($part - 1)" }
+          } finally {
+            $input.Dispose()
+          }
+
+          $manifestPath = '_ai-download\SEB-EvalPro-IA-Pack-SHA256.txt'
+          $manifest | Set-Content $manifestPath -Encoding UTF8
+          gh release upload $tag $manifestPath --clobber --repo $repo
+          if ($LASTEXITCODE -ne 0) { throw 'Upload manifeste Pack IA échoué.' }
+          Remove-Item $model -Force
+          Write-Host 'AI_PACK_RELEASE_COMPLETE'

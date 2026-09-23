@@ -86,8 +86,18 @@ Var SebEditionAdminRadio
   StrCmp $8 "" 0 +2
     StrCpy $8 "C:\ProgramData"
 
-  # S'il est déjà présent dans ProgramData, aucune copie n'est refaite.
+  # S'il est déjà présent dans ProgramData, aucune copie ni téléchargement n'est refait.
   IfFileExists "$8\SEB EvalPro\IA\Ministral-3-8B-Instruct-2512-Q4_K_M.gguf" seb_ai_pack_ready 0
+
+  # Installation automatique du Pack IA séparé s'il est placé à côté du Setup.
+  IfFileExists "$EXEDIR\SEB-EvalPro-IA-Pack-Setup.exe" 0 seb_ai_try_flat_pack
+  DetailPrint "Installation du Pack IA Ministral séparé..."
+  ExecWait '"$EXEDIR\SEB-EvalPro-IA-Pack-Setup.exe" /S' $7
+  StrCmp $7 0 0 seb_ai_pack_missing
+  IfFileExists "$8\SEB EvalPro\IA\Ministral-3-8B-Instruct-2512-Q4_K_M.gguf" seb_ai_pack_ready seb_ai_pack_missing
+
+seb_ai_try_flat_pack:
+  # Compatibilité clé USB : un dossier déjà reconstitué peut aussi être copié.
   IfFileExists "$EXEDIR\SEB-EvalPro-IA-Pack\Ministral-3-8B-Instruct-2512-Q4_K_M.gguf" 0 seb_ai_pack_missing
   CreateDirectory "$8\SEB EvalPro\IA"
   CopyFiles /SILENT "$EXEDIR\SEB-EvalPro-IA-Pack\*.*" "$8\SEB EvalPro\IA"
