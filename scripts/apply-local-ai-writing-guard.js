@@ -102,7 +102,8 @@ function writingBlockTemplate() {
     out=out.replace(/^#+\s.*$/gm,'');
     out=out.replace(/^\s*\*\*.*\*\*\s*$/gm,'');
     out=out.replace(/^\s*[-*]\s+/gm,'');
-    out=out.replace(/\b\d+(?:[.,]\d+)?\s*%\b/g,'');
+    out=out.replace(/\b\d+(?:[.,]\d+)?\s*%\s*(?:de\s+réponses?\s+correctes?)?/gi,'');
+    out=out.replace(/%/g,'');
     out=out.replace(/\b\d+\s*erreur(?:\(s\)|s)?\b/gi,'');
     out=out.replace(/\b\d+(?:[.,]\d+)?\s*\/\s*\d+(?:[.,]\d+)?\b/g,'');
     out=out.replace(/\b\d{1,2}\s*:\s*\d{2}(?::\d{2})?\b/g,'');
@@ -222,7 +223,7 @@ function writingBlockTemplate() {
     if(!String(text||'').trim())errors.push('Texte vide');
     if(/<think>|\x60\x60\x60/i.test(text))errors.push('Format technique inattendu');
     if(/^\s*#+\s/m.test(text)||/^\s*\*\*.*\*\*\s*$/m.test(text))errors.push('Présence de titres');
-    if(/\b\d+(?:[.,]\d+)?\s*%/.test(text))errors.push('Présence de pourcentages');
+    if(/\b\d+(?:[.,]\d+)?\s*%/.test(text)||/%/.test(text))errors.push('Présence de pourcentages');
     if(/\b\d+\s*erreur(?:\(s\)|s)?\b/i.test(text))errors.push('Présence de nombres d’erreurs');
     if(/\b(?:niveau\s*)?(?:NE|III|II|I)\b/.test(text))errors.push('Présence de niveaux');
     if(/\b(?:vous|votre|vos)\b/i.test(text))errors.push('Adresse directe au candidat');
@@ -235,19 +236,28 @@ function writingBlockTemplate() {
     const errors=basicErrors(text);
     errors.push(...forbiddenInventions(text,facts));
     for(const fact of facts){
-      if(!factCovered(text,fact)){
-        errors.push('Fait obligatoire omis : '+String(fact?.competence||fact?.id||'inconnu'));
+      if(!factCovered(text,fact)){errors.push('Fait obligatoire omis : '+String(fact?.competence||fact?.id||'inconnu'));continue}
+      if(fact?.statut==='abandon'){
+        const n=checkNorm(text);
+        for(const raison of (Array.isArray(fact?.raisons_abandon)?fact.raisons_abandon:[]))if(!n.includes(checkNorm(raison)))errors.push('Raison d’abandon modifiée ou omise : '+raison);
+        const commentaire=String(fact?.commentaire_abandon||'').trim();
+        if(commentaire&&!n.includes(checkNorm(commentaire)))errors.push('Commentaire d’abandon modifié ou omis');
         continue;
       }
-      for(const e of intensityErrors(text,fact)){
-        errors.push(String(fact?.competence||fact?.id||'inconnu')+' : '+e);
-      }
+      for(const e of intensityErrors(text,fact))errors.push(String(fact?.competence||fact?.id||'inconnu')+' : '+e);
     }
     return [...new Set(errors)];
   }
 
   function factSentence(fact,profile) {
     const id=identity(profile);
+    if(fact?.statut==='abandon'){
+      const exercice=String(fact?.exercice||'cet exercice').trim(),raisons=Array.isArray(fact?.raisons_abandon)?fact.raisons_abandon.filter(Boolean):[],commentaire=String(fact?.commentaire_abandon||'').trim();
+      let sentence='L’exercice '+exercice+' a été abandonné.';
+      if(raisons.length)sentence+=' Raison(s) renseignée(s) : '+raisons.join(' ; ')+'.';
+      if(commentaire)sentence+=' Commentaire renseigné : '+commentaire+'.';
+      return sentence;
+    }
     const competence=String(fact?.competence||'cette compétence').trim();
     const observations=Array.isArray(fact?.observations_qualitatives)?fact.observations_qualitatives:[];
     let obs=observations.join(' ').trim();
@@ -269,6 +279,7 @@ function writingBlockTemplate() {
       case 4:return 'Lors de l’activité de tri, les observations portent sur le rythme de réalisation et la fiabilité du travail.';
       case 5:return 'Concernant les outils numériques, le traitement de texte et la messagerie électronique ont été observés.';
       case 6:return 'En expression écrite et en mathématiques, plusieurs savoirs fondamentaux ont été évalués.';
+      case 7:return 'Les raisons des exercices abandonnés sont reprises à partir des informations enregistrées dans les résultats.';
       default:return '';
     }
   }
@@ -332,6 +343,19 @@ function writingBlockTemplate() {
     return complete([{role:'system',content:system},{role:'user',content:user}],0.3,0.9,700);
   }
 
+  async function repairOneParagraph(profile,planItem,sourceParagraph,rejectedText,errors) {
+    const system=[
+      "Tu corriges UN SEUL paragraphe d'une synthèse médico-sociale.",
+      "La première reformulation a été refusée. Repars du paragraphe_source et corrige uniquement les erreurs signalées.",
+      'Conserve chaque compétence, chaque observation, chaque négation et le même degré de difficulté ou de réussite.',
+      'N’ajoute aucune interprétation, qualité personnelle, diagnostic, motivation, concentration, confiance, potentiel ou orientation.',
+      'N’ajoute aucun chiffre, score, pourcentage, durée ou niveau. Utilise Monsieur ou Madame ; jamais il, elle, le candidat, le stagiaire, vous, votre ou vos.',
+      'Aucun titre, aucune liste. Retourne uniquement le paragraphe corrigé.'
+    ].join('\n');
+    const user='/no_think\n\n'+JSON.stringify({identite:profile?.identite||{},objet:planItem?.objet||'',erreurs_a_corriger:errors,paragraphe_refuse:rejectedText,paragraphe_source:sourceParagraph});
+    return complete([{role:'system',content:system},{role:'user',content:user}],0.2,0.9,700);
+  }
+
   function deterministicSynthesis(profile) {
     const id=identity(profile);
     const intro=[id.civilite,id.nom,id.prenom].filter(Boolean).join(' ') +
@@ -349,44 +373,27 @@ function writingBlockTemplate() {
 
   async function richDraft(profile) {
     const id=identity(profile);
-    const intro=[id.civilite,id.nom,id.prenom].filter(Boolean).join(' ') +
-      ' a participé aux mises en situation proposées au cours du plateau technique. Le parcours met en évidence des points d’appui et des besoins d’accompagnement variables selon les situations.';
-    const plan=(Array.isArray(profile?.plan_couverture)?profile.plan_couverture:[])
-      .filter(p=>p?.obligatoire&&Number(p?.paragraphe)>=2)
-      .sort((a,b)=>Number(a.paragraphe)-Number(b.paragraphe));
-    const parts=[intro];
-    const rawParts=[];
-    const fallbackParagraphs=[];
-    let passes=0;
+    const intro=[id.civilite,id.nom,id.prenom].filter(Boolean).join(' ')+' a participé aux mises en situation proposées au cours du plateau technique. Le parcours met en évidence des points d’appui et des besoins d’accompagnement variables selon les situations.';
+    const plan=(Array.isArray(profile?.plan_couverture)?profile.plan_couverture:[]).filter(p=>p?.obligatoire&&Number(p?.paragraphe)>=2).sort((a,b)=>Number(a.paragraphe)-Number(b.paragraphe));
+    const parts=[intro],rawParts=[],failedParagraphs=[];let passes=0;
     for(const item of plan){
-      const facts=factsForPlan(profile,item);
-      if(!facts.length)continue;
+      const facts=factsForPlan(profile,item);if(!facts.length)continue;
       const sourceParagraph=buildSourceParagraph(profile,item,facts);
-      let raw='';
-      let candidate='';
-      let errors=[];
+      if(facts.every(f=>f?.statut==='abandon')){parts.push(sourceParagraph);continue}
+      let raw='',candidate='',errors=[];
       try{
-        raw=await draftOneParagraph(profile,item,facts,sourceParagraph);
-        passes+=1;
-        candidate=postProcessParagraph(raw,profile);
-        errors=validateParagraph(candidate,facts);
-      }catch(error){
-        errors=['Erreur Qwen : '+String(error?.message||error)];
-      }
-      if(errors.length){
-        parts.push(sourceParagraph);
-        fallbackParagraphs.push({paragraphe:Number(item.paragraphe),errors,raw});
-      }else{
-        parts.push(candidate);
-      }
+        raw=await draftOneParagraph(profile,item,facts,sourceParagraph);passes+=1;
+        candidate=postProcessParagraph(raw,profile);errors=validateParagraph(candidate,facts);
+        if(errors.length){
+          rawParts.push(raw);
+          raw=await repairOneParagraph(profile,item,sourceParagraph,candidate,errors);passes+=1;
+          candidate=postProcessParagraph(raw,profile);errors=validateParagraph(candidate,facts);
+        }
+      }catch(error){errors=['Erreur Qwen : '+String(error?.message||error)]}
       rawParts.push(raw);
+      if(errors.length){failedParagraphs.push({paragraphe:Number(item.paragraphe),errors,raw});parts.push(sourceParagraph)}else parts.push(candidate);
     }
-    return {
-      text:parts.join('\n\n'),
-      rawText:rawParts.filter(Boolean).join('\n\n'),
-      passes,
-      fallbackParagraphs
-    };
+    return {text:parts.join('\n\n'),rawText:rawParts.filter(Boolean).join('\n\n'),passes,failedParagraphs};
   }
 
   function validateRichOutput(text,profile) {
@@ -428,46 +435,14 @@ function writingBlockTemplate() {
       await ensureStarted();
       const rich=parseRichPayload(sourceText);
       if(rich){
-        const drafted=await richDraft(rich.profile);
-        passes=drafted.passes;
-        let finalText=postProcessRich(drafted.text,rich.profile);
-        let validationErrors=validateRichOutput(finalText,rich.profile);
-        let globalFallback=false;
-        if(validationErrors.length){
-          globalFallback=true;
-          finalText=postProcessRich(deterministicSynthesis(rich.profile),rich.profile);
-          validationErrors=validateRichOutput(finalText,rich.profile);
+        const drafted=await richDraft(rich.profile);passes=drafted.passes;
+        if(drafted.failedParagraphs.length){
+          const validationErrors=drafted.failedParagraphs.flatMap(p=>p.errors.map(e=>'Paragraphe '+p.paragraphe+' : '+e));
+          return {ok:false,error:'Contrôle de fidélité Qwen refusé après une correction ciblée : '+validationErrors.join(' ; '),rawText:drafted.rawText,validationErrors,failedParagraphs:drafted.failedParagraphs,elapsedMs:Date.now()-startedAt,model:MODEL_LABEL,runtime:RUNTIME_LABEL,offline:true,passes,guard:'qwen-rich-coverage-v3'};
         }
-        if(validationErrors.length){
-          return {
-            ok:false,
-            error:'Contrôle de fidélité Qwen refusé : '+validationErrors.join(' ; '),
-            rawText:drafted.rawText,
-            validationErrors,
-            fallbackParagraphs:drafted.fallbackParagraphs,
-            elapsedMs:Date.now()-startedAt,
-            model:MODEL_LABEL,
-            runtime:RUNTIME_LABEL,
-            offline:true,
-            passes,
-            guard:'qwen-rich-coverage-v2'
-          };
-        }
-        return {
-          ok:true,
-          text:finalText,
-          rawText:drafted.rawText,
-          validationErrors:[],
-          fallback:drafted.fallbackParagraphs.length>0||globalFallback,
-          fallbackParagraphs:drafted.fallbackParagraphs,
-          globalFallback,
-          elapsedMs:Date.now()-startedAt,
-          model:MODEL_LABEL,
-          runtime:RUNTIME_LABEL,
-          offline:true,
-          passes,
-          guard:'qwen-rich-coverage-v2'
-        };
+        const finalText=postProcessRich(drafted.text,rich.profile),validationErrors=validateRichOutput(finalText,rich.profile);
+        if(validationErrors.length)return {ok:false,error:'Contrôle de fidélité Qwen refusé : '+validationErrors.join(' ; '),rawText:drafted.rawText,validationErrors,elapsedMs:Date.now()-startedAt,model:MODEL_LABEL,runtime:RUNTIME_LABEL,offline:true,passes,guard:'qwen-rich-coverage-v3'};
+        return {ok:true,text:finalText,rawText:drafted.rawText,validationErrors:[],fallback:false,elapsedMs:Date.now()-startedAt,model:MODEL_LABEL,runtime:RUNTIME_LABEL,offline:true,passes,guard:'qwen-rich-coverage-v3'};
       }
 
       const legacy=await legacyRewrite(sourceText);
@@ -492,7 +467,7 @@ function writingBlockTemplate() {
         model:MODEL_LABEL,
         offline:true,
         passes,
-        guard:'qwen-rich-coverage-v2'
+        guard:'qwen-rich-coverage-v3'
       };
     }
   }
@@ -507,7 +482,7 @@ replacement=replacement.split('\n').map(line=>line?'  '+line:'').join('\n');
 source=source.slice(0,start)+replacement+source.slice(end);
 
 if(!source.startsWith(motorPrefix))fail('le patch a modifié la zone moteur de démarrage');
-for(const required of [marker,'qwen-rich-coverage-v2','top_k:40','repeat_penalty:1.1','mirostat:0','Fait obligatoire omis']){
+for(const required of [marker,'qwen-rich-coverage-v3','top_k:40','repeat_penalty:1.1','mirostat:0','Fait obligatoire omis']){
   if(!source.includes(required))fail('élément Qwen riche absent après patch: '+required);
 }
 for(const forbidden of ['START_ATTEMPTS',"'--ctx-size', String(",'totalRamGb <= 8']){
@@ -516,4 +491,4 @@ for(const forbidden of ['START_ATTEMPTS',"'--ctx-size', String(",'totalRamGb <= 
 try{new vm.Script(source)}
 catch(error){fail('local-ai.js invalide après patch: '+error.message)}
 fs.writeFileSync(file,source,'utf8');
-console.log('SEB EvalPro: contrôle de fidélité Qwen v2 appliqué (faits obligatoires, priorité des difficultés, couverture et repli paragraphe).');
+console.log('SEB EvalPro: contrôle de fidélité Qwen v3 appliqué (correction ciblée unique, motifs d’abandon issus des Résultats, aucun repli mécanique visible).');

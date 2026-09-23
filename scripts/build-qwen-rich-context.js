@@ -22,6 +22,9 @@ const block = '<script id="seb-qwen-rich-context-engine">\n' + browserEngine + '
  'use strict';
  const KIND='seb-qwen-rich-context-v1';
  function candidate(){try{return JSON.parse(sessionStorage.getItem('candidat_data')||'{}')||{}}catch(_){return{}}}
+ function abandons(){
+   try{const parsed=JSON.parse(sessionStorage.getItem('seb_evalpro_abandons')||'[]');return Array.isArray(parsed)?parsed:[]}catch(_){return[]}
+ }
  function rows(){
    const out={};
    for(const key of Object.keys(window.SebQwenRich.ROWS||{})){
@@ -36,7 +39,7 @@ const block = '<script id="seb-qwen-rich-context-engine">\n' + browserEngine + '
    return out;
  }
  window.sebQwenRichPayload=()=>{
-   const profile=window.SebQwenRich.buildRichProfile({candidate:candidate(),rows:rows()});
+   const profile=window.SebQwenRich.buildRichProfile({candidate:candidate(),rows:rows(),abandons:abandons()});
    const payload={kind:KIND,profile};
    try{sessionStorage.setItem('seb_evalpro_qwen_rich_profile_v1',JSON.stringify(payload))}catch(_){ }
    window.sebQwenRichLastProfile=profile;

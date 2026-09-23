@@ -76,11 +76,12 @@
     s=s.replace(/\b\d{1,2}\s*:\s*\d{2}(?::\d{2})?\b/g,' ');
     s=s.replace(/\bMoyenne\b\s*[:=-]?\s*/gi,' ');
     s=s.replace(/\b\d+\s*(?:min|mn)\s*\d*\s*s?\b/gi,' ');
-    s=s.replace(/\b\d+(?:[.,]\d+)?\s*%\b/g,' ');
+    s=s.replace(/\b\d+(?:[.,]\d+)?\s*%\s*(?:de\s+réponses?\s+correctes?)?/gi,' ');
     s=s.replace(/\b\d+(?:[.,]\d+)?\s*\/\s*\d+(?:[.,]\d+)?\b/g,' ');
     s=s.replace(/\b\d+\s*erreur(?:\(s\)|s)?\b/gi,' ');
     s=s.replace(/\b\d+\s*(?:point(?:\(s\)|s)?|réponse(?:\(s\)|s)?\s+correcte(?:\(s\)|s)?)\b/gi,' ');
-    s=s.replace(/\b(?:niveau\s*)?(?:NE|III|II|I)\b/gi,' ');
+    s=s.replace(/\bniveau\s*(?:NE|III|II|I)\b/gi,' ');
+    s=s.replace(/\b(?:NE|III|II|I)\b/g,' ');
     s=s.replace(/\b\d+(?:[.,]\d+)?\b/g,' ');
     s=s.replace(/\s+([,.;:!?])/g,'$1').replace(/[ \t]{2,}/g,' ').replace(/\n{2,}/g,'\n').trim();
     s=s.replace(/^[\-–—,:;.\s]+|[\-–—,:;\s]+$/g,'').trim();
@@ -179,22 +180,34 @@
       observations_qualitatives:x.observations_qualitatives
     }));
   }
-  function faitsObligatoires(lines){
-    return lines.map(x=>({
-      id:x.id,
-      theme:x.theme,
-      exercice:x.exercice,
-      competence:x.competence,
-      positionnement:x.positionnement,
-      importance:x.importance,
-      observations_qualitatives:x.observations_qualitatives,
-      validation_couverture:x.validation_couverture
-    }));
+  function abandonCoverage(record){
+    const page=norm(record?.page).toLowerCase(),qcm=norm(record?.qcmPage).toLowerCase();
+    const known={'brique.html':'briqu','stock.html':'stock','planning.html':'planif','genrenombres.html':'genre','dictee.html':'dictee','tri_de_cheville.html':'tri','nwtexte.html':'traitement de texte','nvmail.html':'messagerie','paronymes.html':'paronym','carre.html':'carre'};
+    if(known[page])return [[known[page]],['abandon']];
+    const qcmKnown={page2:'calcul',page2_1:'calcul',page3:'reception',page4:'fraction',page5:'ordonnancement',page5_1:'posture',page6:'conversion',pagetextetrous:'texte a trous',page8:'messagerie'};
+    if(qcmKnown[qcm])return [[qcmKnown[qcm]],['abandon']];
+    const words=norm(record?.exercice).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().match(/[a-z]{5,}/g)||[];
+    return [[words[0]||'exercice'],['abandon']];
   }
-  function planCouverture(lines){
-    const ids=new Set(lines.map(x=>x.id));
-    const keep=(list)=>list.filter(id=>ids.has(id));
-    return [
+  function abandonFacts(records){
+    const out=[];
+    (Array.isArray(records)?records:[]).forEach((record,index)=>{
+      if(!record||typeof record!=='object')return;
+      const exercice=norm(record.exercice||record.page||'Exercice');
+      const raisons=Array.isArray(record.raisons)?record.raisons.map(norm).filter(Boolean):[];
+      const commentaire=norm(record.commentaire);
+      if(!raisons.length&&!commentaire)return;
+      const key=norm(record.key||record.page||('abandon-'+index)).replace(/[^A-Za-z0-9_-]+/g,'-');
+      out.push({id:'abandon-'+key+'-'+index,theme:'Conditions de réalisation du parcours',exercice,competence:'abandon de l’exercice',statut:'abandon',positionnement:'non_evalue',importance:'abandon',raisons_abandon:raisons,commentaire_abandon:commentaire,observations_qualitatives:['Exercice abandonné : '+exercice+'.',raisons.length?'Raison(s) renseignée(s) : '+raisons.join(' ; ')+'.':'',commentaire?'Commentaire renseigné : '+commentaire+'.':''].filter(Boolean),validation_couverture:abandonCoverage(record)});
+    });
+    return out;
+  }
+  function faitsObligatoires(lines,abandons){
+    return lines.map(x=>({id:x.id,theme:x.theme,exercice:x.exercice,competence:x.competence,positionnement:x.positionnement,importance:x.importance,observations_qualitatives:x.observations_qualitatives,validation_couverture:x.validation_couverture})).concat(abandons||[]);
+  }
+  function planCouverture(lines,abandons){
+    const ids=new Set(lines.map(x=>x.id)),keep=(list)=>list.filter(id=>ids.has(id));
+    const plan=[
       {paragraphe:1,objet:"vue d'ensemble du parcours",obligatoire:true,faits_ids:[]},
       {paragraphe:2,objet:'fabrication de la structure 3D et construction à base de briques',obligatoire:true,faits_ids:keep(['fabrication-plan','fabrication-tracage','fabrication-decoupe','fabrication-assemblage','fabrication-finition','briques-identification','briques-manipulation'])},
       {paragraphe:3,objet:'raisonnement, rangement du stock et planification sous contraintes',obligatoire:true,faits_ids:keep(['carre','organisation','planning']),priorite:'les difficultés prioritaires de ce domaine ne doivent jamais être omises ni atténuées'},
@@ -202,11 +215,14 @@
       {paragraphe:5,objet:'outils numériques : traitement de texte et messagerie',obligatoire:true,faits_ids:keep(['texte','mail'])},
       {paragraphe:6,objet:'expression écrite et mathématiques',obligatoire:true,faits_ids:keep(['expression','math-enonce','math-problemes'])}
     ];
+    if(Array.isArray(abandons)&&abandons.length)plan.push({paragraphe:7,objet:'exercices abandonnés et raisons renseignées dans les résultats',obligatoire:true,faits_ids:abandons.map(x=>x.id)});
+    return plan;
   }
   function buildRichProfile(input){
     input=input||{};
     const candidate=input.candidate||{};
     const lines=Object.keys(ROWS).map(k=>lineFromRow(k,(input.rows||{})[k]||{})).filter(Boolean);
+    const abandons=abandonFacts(input.abandons);
     return {
       identite:{
         civilite:/^mme|madame$/i.test(norm(candidate.civilite))?'Madame':'Monsieur',
@@ -215,13 +231,14 @@
         date_evaluation:formatDateFr(candidate.date)
       },
       consigne_de_lecture:'Les observations ci-dessous sont déjà qualifiées et nettoyées des scores, nombres d’erreurs, durées et niveaux. Chaque fait obligatoire doit apparaître dans son domaine sans être atténué, renforcé ou déplacé vers une autre compétence.',
-      plan_couverture:planCouverture(lines),
-      faits_obligatoires:faitsObligatoires(lines),
+      plan_couverture:planCouverture(lines,abandons),
+      faits_obligatoires:faitsObligatoires(lines,abandons),
+      abandons,
       points_appui:faitsSaillants(lines,'point_appui'),
       points_vigilance:faitsSaillants(lines,'point_vigilance'),
       domaines:groupThemes(lines),
       contrastes_observes:contrastes(lines)
     };
   }
-  return {ROWS,COVERAGE,buildRichProfile,cleanQualitative,classify,importance};
+  return {ROWS,COVERAGE,buildRichProfile,cleanQualitative,classify,importance,abandonFacts};
 });

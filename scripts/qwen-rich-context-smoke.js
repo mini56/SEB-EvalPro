@@ -1,6 +1,9 @@
 const assert = require('assert');
 const { buildRichProfile } = require('../src/qwen-rich-synthesis');
 const { createLocalAiService } = require('../src/local-ai');
+const fs=require('fs'),path=require('path');
+const bridge=fs.readFileSync(path.join(__dirname,'build-qwen-rich-context.js'),'utf8');
+assert(bridge.includes("sessionStorage.getItem('seb_evalpro_abandons')"),'Le pont bilan doit lire les raisons d’abandon des Résultats.');
 
 const rows = {
   'fabrication-plan': {level:'I',select:"I. La personne n'a pas besoin d'aide pour commencer l'exercice."},
@@ -12,7 +15,7 @@ const rows = {
   'briques-manipulation': {level:'I',select:'I. Assemble les pièces sans difficultés.',detail:'- 1 erreur'},
   'carre': {level:'III',select:"III. A des difficultés à identifier les contraintes d'un problème structuré et à établir les relations entre ses éléments.",detail:'- 10 erreurs'},
   'organisation': {level:'III',select:'III. Réalise la tâche avec de nombreuses erreurs nécessitant un accompagnement.',detail:'- 30 erreurs'},
-  'planning': {level:'III',select:"III. N’est pas en capacité de déterminer l’ordre d’exécution de tâches les unes par rapport aux autres.",detail:'- 12 erreurs'},
+  'planning': {level:'NE',select:'NE. Non évalué.'},
   'tri-temps': {level:'I',comment:'Le rythme de réalisation est satisfaisant.',detail:'Moyenne 00:03'},
   'tri-erreurs': {level:'I',comment:'Fiabilité satisfaisante.',detail:'6 erreurs'},
   'texte': {level:'II',select:"II. A besoin d’aide pour utiliser un logiciel de traitement de texte pour produire un travail individuel présentable à un tiers.",detail:'- 4 erreurs'},
@@ -23,18 +26,19 @@ const rows = {
 };
 
 const profile=buildRichProfile({
-  candidate:{nom:'DURANT',prenom:'JEAN',date:'2026-09-19'},
-  rows
+  candidate:{nom:'DURANT',prenom:'JEAN',date:'2026-09-19'},rows,
+  abandons:[{key:'planning.html',page:'planning.html',qcmPage:'',exercice:'Planification — Le restaurant',raisons:["L’exercice est trop difficile"],commentaire:''}]
 });
 
 assert.strictEqual(profile.faits_obligatoires.length,17,'Tous les faits évalués doivent être présents.');
-for(const id of ['carre','organisation','planning']){
-  const fact=profile.faits_obligatoires.find(x=>x.id===id);
-  assert(fact,'Fait obligatoire absent: '+id);
-  assert.strictEqual(fact.importance,'prioritaire','Priorité III perdue pour '+id);
+for(const id of ['carre','organisation']){
+  const fact=profile.faits_obligatoires.find(x=>x.id===id);assert(fact,'Fait obligatoire absent: '+id);assert.strictEqual(fact.importance,'prioritaire','Priorité III perdue pour '+id);
 }
-const requiredPlan=profile.plan_couverture.filter(x=>x.obligatoire);
-assert.strictEqual(requiredPlan.length,6,'Plan de couverture attendu: six paragraphes obligatoires.');
+const abandon=profile.faits_obligatoires.find(x=>x.statut==='abandon');
+assert(abandon,'L’abandon issu des Résultats doit être conservé.');
+assert.deepStrictEqual(abandon.raisons_abandon,["L’exercice est trop difficile"],'La raison d’abandon doit rester exacte.');
+assert(!profile.faits_obligatoires.some(x=>x.id==='planning'),'Une ligne NE abandonnée ne doit pas devenir un fait évalué normal.');
+const requiredPlan=profile.plan_couverture.filter(x=>x.obligatoire);assert.strictEqual(requiredPlan.length,7,'Plan attendu: six domaines + abandon.');
 
 const qualitative=JSON.stringify({
   faits_obligatoires:profile.faits_obligatoires,
@@ -64,7 +68,9 @@ const payload=JSON.stringify({kind:'seb-qwen-rich-context-v1',profile});
     const text=String(result.text||'').trim();
     assert(text,'Qwen riche: synthèse vide');
     const paragraphs=text.split(/\n\s*\n/).map(x=>x.trim()).filter(Boolean);
-    assert.strictEqual(paragraphs.length,6,'La synthèse doit couvrir exactement les six paragraphes prévus.');
+    assert.strictEqual(paragraphs.length,7,'La synthèse doit couvrir les six domaines et l’abandon.');
+    assert(text.includes("L’exercice est trop difficile"),'La raison d’abandon connue doit apparaître.');
+    assert(!/%/.test(text),'Aucun résidu de pourcentage ne doit rester.');
     assert.deepStrictEqual(result.validationErrors||[],[],'La synthèse finale ne doit conserver aucune erreur de fidélité.');
     for(const forbidden of [
       /\b(?:vous|votre|vos)\b/i,
