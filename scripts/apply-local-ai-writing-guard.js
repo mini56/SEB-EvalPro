@@ -122,17 +122,28 @@ function writingBlockTemplate() {
         });
       }
     }
+    const sourceFactuel=trame.map(domaine=>{
+      const items=[];
+      for(const item of (Array.isArray(domaine?.points_appui)?domaine.points_appui:[])){
+        items.push(String(item?.competence||'')+' : '+String(item?.observation||''));
+      }
+      for(const item of (Array.isArray(domaine?.vigilances)?domaine.vigilances:[])){
+        items.push(String(item?.competence||'')+' : '+String(item?.observation||''));
+      }
+      return String(domaine?.domaine||'')+'\n'+items.join('\n');
+    }).join('\n\n');
     const json = JSON.stringify({
       civilite,
       nom,
       prenom,
       trame_factuelle:trame,
       couverture_obligatoire:couvertureObligatoire,
+      texte_source_factuel:sourceFactuel,
       motivation_personnelle:String(profile?.motivation_personnelle||'')
     }, null, 2);
     return [
       'Tu rédiges une synthèse professionnelle de plateau technique pour une équipe pluridisciplinaire.',
-      'La trame factuelle fournie est déjà validée. Ton seul travail est de la transformer en texte fluide, clair et factuel, sans ajouter de contenu.',
+      'La trame factuelle et le texte_source_factuel sont déjà validés. Ton seul travail est de reformuler ces faits en texte fluide, clair et professionnel, sans ajouter, déduire, déplacer ou généraliser le moindre contenu.',
       '',
       'RÈGLES ABSOLUES ET NON NÉGOCIABLES :',
       `1. Commence impérativement la réponse par : "${civilite} ${nom} ${prenom} a participé aux mises en situation proposées au cours du plateau technique."`,
@@ -141,17 +152,17 @@ function writingBlockTemplate() {
       '4. Rédige un texte continu en paragraphes naturels. Tu peux utiliser autant de paragraphes que nécessaire pour couvrir tous les domaines. INTERDICTION d’utiliser des titres, sous-titres, listes à puces, tirets ou énumérations.',
       '5. INTERDICTION absolue de mentionner des chiffres, des pourcentages, des durées, des nombres d’erreurs, des scores ou des niveaux (I, II, III). Utilise uniquement des qualificatifs professionnels.',
       '6. INTERDICTION de poser un diagnostic médical ou psychologique, et INTERDICTION de suggérer une orientation professionnelle, un métier ou une formation.',
-      `7. Utilise exclusivement "trame_factuelle" pour les observations. "couverture_obligatoire" est une checklist compacte de ${couvertureObligatoire.length} compétences identifiées F01, F02, etc. CHAQUE compétence doit apparaître dans la synthèse, sans exception. Les observations correspondantes restent celles de "trame_factuelle". Tu peux reformuler, mais tu ne peux ni fusionner au point de faire disparaître une compétence, ni omettre son observation.`,
+      `7. "texte_source_factuel" est ton ancre de rédaction. Il contient exactement les faits autorisés, rangés par domaine. Reformule-le sans changer le sens. "couverture_obligatoire" est une checklist compacte de ${couvertureObligatoire.length} compétences identifiées F01, F02, etc. CHAQUE compétence doit apparaître, sans exception.`,
       '8. Si "vigilances" est vide pour un domaine, il est FORMELLEMENT INTERDIT d’attribuer une difficulté, une limite ou un besoin à ce domaine.',
       '9. Si "motivation_personnelle" est vide, n’évoque jamais motivation, volonté, souhait, désir de progresser, épanouissement ou projet personnel. Si elle est renseignée, reprends uniquement ce qui y figure.',
       '10. CHAQUE élément de "domaines_reussite" est une réussite. Pour le module concerné, n’ajoute AUCUNE difficulté, limite, réserve, besoin d’étayage, accompagnement ou amélioration qui ne figure pas explicitement dans cet élément.',
       '11. CHAQUE élément de "domaines_vigilance" est une vigilance. Décris uniquement la difficulté indiquée dans cet élément, sans l’étendre à une compétence voisine.',
       '12. Si une activité contient à la fois des réussites et des vigilances, décris précisément ce caractère mixte. N’écris jamais "maîtrise globale", "difficultés globales" ou une conclusion équivalente sur toute l’activité.',
-      '13. Organisation logistique, planification, résolution de problèmes sous contraintes, tri, traitement de texte, messagerie, expression écrite et mathématiques sont des compétences distinctes. Un résultat faible dans l’une ne doit jamais contaminer les autres.',
-      '14. Reste strictement sur les compétences et comportements observés. Toute appréciation sur personnalité, état émotionnel, potentiel, adaptabilité, dynamisme, rigueur, motivation, concentration, confiance ou perspectives est interdite si elle n’est pas explicitement fournie.',
+      '13. Les domaines sont étanches. Une observation appartenant à un domaine ne peut JAMAIS être utilisée dans un autre. Exemple : les algorithmes appartiennent aux mathématiques et ne doivent jamais apparaître dans le carré magique, l’expression écrite, le tri ou un autre domaine.',
+      '14. Reste strictement sur les compétences et comportements observés. Toute appréciation sur personnalité, état émotionnel, potentiel, adaptabilité, dynamisme, rigueur, motivation, concentration, confiance, initiative, priorisation, gestion du temps, sens de l’organisation ou perspectives est interdite si elle n’est pas explicitement fournie.',
       '15. N’ajoute aucune recommandation, aucun objectif de progression, aucun besoin de soutien supplémentaire et aucune notion de performance qui ne soit explicitement présente dans les données.',
       '16. Pour un domaine mixte, cite les points d’appui puis les seules vigilances présentes dans la trame. Pour un domaine sans vigilance, reste uniquement positif et factuel.',
-      `17. Avant de répondre, fais mentalement deux contrôles : (a) chaque phrase doit correspondre à "trame_factuelle" ; (b) les ${couvertureObligatoire.length} identifiants de "couverture_obligatoire" doivent tous être couverts. Si une affirmation n’est pas sourcée, supprime-la ; si un fait manque, ajoute-le dans le paragraphe de son domaine.`,
+      `17. Avant de répondre, compare mentalement ton texte à "texte_source_factuel" ligne par ligne : (a) aucune phrase ne doit contenir une idée absente de la ligne source correspondante ; (b) les ${couvertureObligatoire.length} compétences doivent toutes être couvertes ; (c) aucun fait ne doit changer de domaine. Si une phrase contient un ajout, supprime l’ajout.`,
       '18. Ne termine pas par une conclusion générale ou un résumé inventé. Une fois le dernier domaine couvert, arrête la réponse.',
       '',
       'Données à synthétiser :',
@@ -165,6 +176,7 @@ function writingBlockTemplate() {
     const body = {
       model: MODEL_FILE,
       messages: [
+        { role: 'system', content: 'Tu es un moteur de reformulation factuelle. Tu n’inventes rien, tu ne déduis rien et tu ne déplaces jamais une observation d’un domaine vers un autre.' },
         { role: 'user', content: '/no_think\n\n' + buildDirectPrompt(profile) }
       ],
       temperature: 0.35,
