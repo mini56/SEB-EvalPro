@@ -232,53 +232,6 @@ function createLocalAiService({ app }) {
     return text;
   }
 
-  function semanticDegreeGuard(source, output) {
-    const normalize = (value) => String(value || '')
-      .normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('fr-FR');
-
-    const src = normalize(source);
-    const out = normalize(output);
-
-    // Les termes ci-dessous ne sont pas interdits en eux-mêmes. Ils sont refusés
-    // seulement quand ils apparaissent dans la synthèse sans degré équivalent
-    // dans la source, car cela transforme le sens plutôt que le style.
-    const strongerTerms = [
-      ['excellent', /\bexcellent(?:e|es|s)?\b/],
-      ['remarquable', /\bremarquable(?:s)?\b/],
-      ['exceptionnel', /\bexceptionnel(?:le|les|s)?\b/],
-      ['parfait', /\bparfait(?:e|es|s)?\b/],
-      ['systematique', /\bsystematiquement\b|\bsystematique(?:s)?\b/],
-      ['pleinement', /\bpleinement\b/],
-      ['totalement', /\btotalement\b/],
-      ['sans ambiguite', /\bsans ambiguite\b/],
-      ['grande rigueur', /\bgrande?\s+rigueur\b/],
-      ['grande precision', /\bgrande?\s+precision\b/],
-      ['tres', /\btres\b/]
-    ];
-
-    const sourceHasStrongDegree = /\b(?:excellent|remarquable|exceptionnel|parfait|systematique|pleinement|totalement|sans ambiguite|tres|particulierement|fortement|grande?\s+(?:rigueur|precision))\b/.test(src);
-
-    if (!sourceHasStrongDegree) {
-      for (const [label, re] of strongerTerms) {
-        if (re.test(out) && !re.test(src)) {
-          throw new Error('La reformulation IA a intensifié une observation absente de la source (' + label + '). Le texte sans IA est conservé.');
-        }
-      }
-    }
-
-    // Une réussite simple ne doit pas devenir une qualité générale de la personne.
-    const personalQualities = [
-      /\b(?:engagement|investissement)\s+(?:fort|marque|remarquable|concret)\b/,
-      /\bprofil\s+(?:dynamique|adapte|polyvalent)\b/,
-      /\b(?:personne|individu|candidat)\s+(?:rigoureux|dynamique|autonome|adapte|polyvalent)\b/
-    ];
-    for (const re of personalQualities) {
-      if (re.test(out) && !re.test(src)) {
-        throw new Error('La reformulation IA a ajouté une qualité générale absente de la source. Le texte sans IA est conservé.');
-      }
-    }
-  }
-
   function validateRewrite(source, output) {
     if (!output) throw new Error('L’IA locale n’a produit aucun texte.');
     const ratio = output.length / Math.max(1, source.length);
@@ -299,20 +252,19 @@ function createLocalAiService({ app }) {
     if (/(abandonn|interromp)/i.test(source) && !/(abandonn|interromp)/i.test(output)) {
       throw new Error('La reformulation IA ne conserve pas clairement l’activité interrompue.');
     }
-    semanticDegreeGuard(source, output);
     return output;
   }
 
   async function verifySemanticFidelity(source, output) {
     const system = [
-      'Tu contrôles la fidélité sémantique d’une synthèse par rapport à sa source, phrase par phrase et compétence par compétence.',
-      'Ignore les différences de style, de vocabulaire, de synonymes et de structure uniquement si elles conservent exactement le même fait ET le même degré d’appréciation.',
-      'Accepte par exemple « travail minutieux » et « réalisation soignée », ou « capacité à identifier » et « aptitude à repérer » : ce sont des équivalences de sens.',
-      'Rejette toute intensification, atténuation ou généralisation absente de la source. Un fait correct ou conforme ne doit pas devenir remarquable, irréprochable, strict, systématique, pleinement maîtrisé ou d’une grande précision si ce degré n’est pas explicitement présent.',
-      'Rejette aussi toute réserve inventée : si la source dit seulement qu’une découpe est irrégulière ou incomplète, la synthèse ne peut pas ajouter qu’elle est généralement conforme.',
-      'Rejette si la synthèse ajoute ou supprime un fait, inverse une réussite et une difficulté, déplace une observation vers une autre compétence, modifie un abandon ou un élément non évalué, invente une donnée chiffrée, ou ajoute une qualité personnelle, une émotion, une motivation, un diagnostic, une orientation ou une recommandation absente de la source.',
-      'Ne rejette pas une phrase simplement parce qu’elle regroupe deux compétences différentes, à condition que chaque compétence conserve son propre résultat sans contamination.',
-      'Réponds uniquement OK si tous les faits et leur intensité sont conservés. Sinon réponds REJET: suivi d’une raison très courte indiquant le changement de sens.'
+      'Tu compares une synthèse avec sa source pour vérifier uniquement l’équivalence de sens.',
+      'Ne juge jamais un mot isolément. Évalue chaque formulation dans son contexte et demande-toi si elle exprime réellement la même observation que la source.',
+      'Les synonymes, changements de vocabulaire, changements de structure et formulations plus naturelles sont autorisés lorsque le sens reste équivalent.',
+      'Une formulation apparemment plus forte peut être acceptable si le niveau exprimé est réellement soutenu par la source. Exemple : une autonomie importante peut être décrite si la source montre explicitement une réalisation sans aide sur les tâches concernées.',
+      'Inversement, refuse une formulation si elle ajoute un degré ou une idée que la source ne permet pas de soutenir. Le critère est le sens produit, jamais la présence d’un mot particulier.',
+      'Vérifie surtout : faits présents, réussite ou difficulté conservée, compétence correcte, intensité cohérente avec la source, abandon ou non-évalué conservé, absence d’invention psychologique, de motivation, de diagnostic, d’orientation ou de recommandation.',
+      'Une même phrase peut regrouper plusieurs compétences si chacune conserve son propre résultat sans contamination.',
+      'Réponds uniquement OK si le sens factuel est conservé. Sinon réponds REJET: suivi d’une raison très courte décrivant précisément le changement de sens.'
     ].join(' ');
     const user = '<source>\n' + source + '\n</source>\n\n<synthese>\n' + output + '\n</synthese>';
     const body = {
@@ -354,8 +306,8 @@ function createLocalAiService({ app }) {
         'À partir d’un brouillon factuellement validé, rédige une synthèse naturelle, fluide et professionnelle. Évite un style mécanique ou répétitif.',
         'Tu peux varier librement le vocabulaire, employer des synonymes, modifier la structure des phrases et les connecteurs, tant que le sens reste strictement équivalent.',
         'Chaque idée de ta réponse doit être directement justifiée par le brouillon. N’ajoute aucune intensité, qualité, interprétation ou conclusion qui n’y figure pas.',
-        'Conserve aussi le degré exact des observations : « correct », « conforme » ou « satisfaisant » ne doivent pas devenir « remarquable », « irréprochable », « systématique », « pleinement maîtrisé » ou « de grande précision ». À l’inverse, ne minimise pas une difficulté.',
-        'N’ajoute jamais une réserve positive ou négative absente : une découpe décrite comme irrégulière ou incomplète ne devient pas « généralement conforme », et une réussite simple ne devient pas une performance supérieure.',
+        'Conserve le niveau réel exprimé par les observations. Tu peux employer un vocabulaire différent, y compris plus soutenu, si la nouvelle formulation reste justifiée par les faits de la source et n’ajoute pas un niveau de réussite ou de difficulté qui n’y figure pas.',
+        'N’ajoute jamais une réserve positive ou négative absente. Toute nuance nouvelle doit être directement soutenue par la source.',
         'Une réussite doit rester une réussite. Une difficulté doit rester une difficulté et rester rattachée à la compétence où elle a été observée. Ne déplace jamais une observation vers un autre domaine.',
         'Ne déduis ni potentiel, ni personnalité, ni état émotionnel, ni engagement, ni motivation, ni diagnostic, ni orientation ou recommandation.',
         'Les éléments non évalués, abandonnés ou interrompus doivent rester clairement identifiables lorsqu’ils figurent dans le brouillon. N’invente et ne modifie aucune donnée chiffrée.',
