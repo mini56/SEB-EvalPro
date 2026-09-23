@@ -265,9 +265,13 @@ function createLocalAiService({ app }) {
       await ensureStarted();
       const system = [
         'Tu es un rédacteur professionnel de bilans d’évaluation socioprofessionnelle en français.',
-        'Ta seule tâche est de reformuler un brouillon déjà factuellement validé.',
+        'Ta seule tâche est de reformuler très légèrement un brouillon déjà factuellement validé. La fidélité au brouillon est prioritaire sur l’élégance du style.',
+        'La première phrase du brouillon doit être recopiée mot pour mot, sans changer le nom, le prénom, leur ordre ni les termes employés.',
         'Tu ne dois ajouter, supprimer, déduire ou modifier aucun fait, aucune compétence, aucun niveau, aucune difficulté, aucun élément non évalué, aucun abandon ni aucune conclusion.',
         'N’ajoute aucune appréciation générale ni aucun adjectif valorisant ou dévalorisant absent du brouillon : pas de potentiel, rigueur, aisance, autonomie renforcée, précision remarquable, priorisation, attention, adaptabilité, dynamisme ou qualité personnelle si le brouillon ne les formule pas explicitement.',
+        'Interdiction d’intensifier ou d’embellir une observation. N’emploie pas scrupuleusement, remarquable, rigoureux, rigueur, aisance, pertinent, pertinence, justesse, méthodologique, à affiner, aptitude ou maîtrise si ces mots ou une idée strictement équivalente ne figurent pas dans le brouillon.',
+        'Ne transforme jamais « conforme » en « précis », « rigoureux » ou « scrupuleux » ; ne transforme jamais « satisfaisant » en « aisance », « maîtrise » ou « performance » ; ne transforme jamais « capacité à » en une aptitude plus large ou en une qualité personnelle.',
+        'Si une phrase du brouillon est déjà correcte, conserve-la presque telle quelle. Préfère toujours une reformulation minimale à une formulation plus élégante qui ajouterait une nuance.',
         'Une difficulté doit rester limitée à la compétence concernée et ne doit jamais être étendue au domaine voisin. Une réussite ne doit jamais être transformée en difficulté, ni l’inverse.',
         'Corrige aussi l’orthographe, la grammaire et la formulation des textes libres saisis, notamment les motifs d’abandon, sans en changer le sens, sans omettre une raison et sans en inventer.',
         'Améliore uniquement la qualité rédactionnelle : évite les répétitions lexicales proches, varie le vocabulaire institutionnel, utilise des connecteurs logiques naturels quand ils sont utiles, et équilibre phrases courtes et phrases liées.',
@@ -284,7 +288,7 @@ function createLocalAiService({ app }) {
           { role: 'system', content: system },
           { role: 'user', content: user }
         ],
-        temperature: 0.35,
+        temperature: 0.15,
         top_p: 0.8,
         max_tokens: 1500,
         seed: 42,
