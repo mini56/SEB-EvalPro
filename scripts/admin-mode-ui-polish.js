@@ -42,9 +42,11 @@ function checkJs(source, label) {
       }
     );
 
-    const anchor = out.includes("const localAi = editionCapabilities.canAi ? createLocalAiService({ app }) : null;")
-      ? "const localAi = editionCapabilities.canAi ? createLocalAiService({ app }) : null;"
-      : "const localAi = createLocalAiService({ app });";
+    const anchor = out.includes("let stateWriteCounter = 0;")
+      ? "let stateWriteCounter = 0;"
+      : (out.includes("const localAi = editionCapabilities.canAi ? createLocalAiService({ app }) : null;")
+        ? "const localAi = editionCapabilities.canAi ? createLocalAiService({ app }) : null;"
+        : "const localAi = createLocalAiService({ app });");
     const helper = `
 
 ${marker}
