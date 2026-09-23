@@ -10,6 +10,7 @@ on:
       - 'build/verify-ai-pack.ps1'
       - '.github/workflows/build-ai-pack.yml'
       - '.github/workflows/test-ai-pack-install.yml'
+      - '.github/workflows/test-installed-editions.yml'
       - '.github/workflows/test-split-editions.yml'
 
 permissions:
