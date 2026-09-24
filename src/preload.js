@@ -23,6 +23,8 @@ let lastSaveErrorShown = '';
 let adminCandidateWorkspace = null;
 let adminCandidateResultsWorkspace = null;
 let adminNavigationLeaving = false;
+let candidateJourneyCompleted = false;
+let candidateCompletionInFlight = false;
 
 function objectToStorage(storage, values) {
   if (!storage || !values || typeof values !== 'object') return;
@@ -111,6 +113,7 @@ function handleSaveResult(result) {
 }
 
 function saveNow(sync = false) {
+  if (candidateJourneyCompleted) return sync ? { ok:true, completed:true } : Promise.resolve({ ok:true, completed:true });
   if (closingSession || adminNavigationLeaving) return null;
   if (isAdminCandidatesPage()) {
     const adminResult = { ok:true, adminNavigation:true };
@@ -253,10 +256,10 @@ function createSessionCloseDialog() {
       <div class="seb-session-close-card" role="dialog" aria-modal="true" aria-label="Fermer cette session">
         <div class="seb-session-close-title">Fermer cette session ?</div>
         <div class="seb-session-close-text">
-          L'évaluation active sera fermée.
-          Au prochain démarrage, SEB EvalPro commencera sur une nouvelle évaluation vierge.
+          SEB EvalPro va quitter proprement après vérification des sauvegardes en cours.
+          Si un parcours candidat n'est pas terminé, il restera reprenable au prochain démarrage.
         </div>
-        <div class="seb-session-close-warning">Le dossier du candidat et les données déjà sauvegardées seront conservés dans Documents\\SEB EvalPro\\Candidats.</div>
+        <div class="seb-session-close-warning">Cette action ne termine pas le parcours du candidat.</div>
         <div class="seb-session-close-actions">
           <button type="button" id="seb-session-close-cancel">Annuler</button>
           <button type="button" id="seb-session-close-ok" class="danger">Fermer cette session</button>
@@ -289,6 +292,51 @@ function createSessionCloseDialog() {
       if (event.key === 'Enter') finish(true);
     });
     backdrop.querySelector('#seb-session-close-cancel').focus();
+  });
+}
+
+
+function createCandidateFinishDialog() {
+  return new Promise((resolve) => {
+    const backdrop = document.createElement('div');
+    backdrop.id = 'seb-evalpro-finish-candidate-dialog';
+    backdrop.innerHTML = `
+      <div class="seb-session-close-card" role="dialog" aria-modal="true" aria-label="Terminer le parcours du candidat">
+        <div class="seb-session-close-title">Terminer définitivement le parcours en cours ?</div>
+        <div class="seb-session-close-text">
+          Le candidat ne pourra plus reprendre son évaluation sur ce PC.
+          Les réponses déjà enregistrées seront conservées et le dossier deviendra exportable.
+        </div>
+        <div class="seb-session-close-actions">
+          <button type="button" id="seb-finish-candidate-cancel">Annuler</button>
+          <button type="button" id="seb-finish-candidate-ok" class="danger">Terminer le parcours</button>
+        </div>
+      </div>`;
+
+    const style = document.createElement('style');
+    style.textContent = `
+      #seb-evalpro-finish-candidate-dialog{position:fixed;inset:0;z-index:2147483647;background:rgba(0,0,0,.42);display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif}
+      #seb-evalpro-finish-candidate-dialog .seb-session-close-card{width:460px;max-width:calc(100vw - 40px);background:#fff;border:1px solid #aaa;border-radius:8px;padding:20px;box-shadow:0 10px 35px rgba(0,0,0,.3);box-sizing:border-box}
+      #seb-evalpro-finish-candidate-dialog .seb-session-close-title{font-size:20px;font-weight:700;color:#c00000;margin-bottom:12px}
+      #seb-evalpro-finish-candidate-dialog .seb-session-close-text{font-size:14px;line-height:1.45;color:#222}
+      #seb-evalpro-finish-candidate-dialog .seb-session-close-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
+      #seb-evalpro-finish-candidate-dialog button{font-family:Arial,sans-serif;font-size:14px;padding:8px 14px;border:1px solid #999;border-radius:4px;background:#f2f2f2;cursor:pointer}
+      #seb-evalpro-finish-candidate-dialog button.danger{background:#c00000;color:#fff;border-color:#c00000}
+    `;
+    backdrop.appendChild(style);
+    document.body.appendChild(backdrop);
+
+    const finish = (value) => {
+      backdrop.remove();
+      resolve(value);
+    };
+    backdrop.querySelector('#seb-finish-candidate-cancel').addEventListener('click', () => finish(false));
+    backdrop.querySelector('#seb-finish-candidate-ok').addEventListener('click', () => finish(true));
+    backdrop.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') finish(false);
+      if (event.key === 'Enter') finish(true);
+    });
+    backdrop.querySelector('#seb-finish-candidate-cancel').focus();
   });
 }
 
@@ -495,6 +543,7 @@ function injectAdminBar() {
     <button id="seb-evalpro-bilan" type="button" hidden>Bilan</button>
     <button id="seb-evalpro-export-candidates" type="button" hidden>Exporter dossiers</button>
     <button id="seb-evalpro-import-candidates" type="button" hidden>Importer dossiers</button>
+    <button id="seb-evalpro-finish-candidate" type="button" hidden>Terminer le parcours du candidat</button>
     <button id="seb-evalpro-close-session" type="button" hidden>Fermer cette session</button>
     <button id="seb-evalpro-admin" type="button">Administrateur</button>`;
 
@@ -515,6 +564,7 @@ function injectAdminBar() {
     #seb-evalpro-topbar .seb-evalpro-spacer{flex:1}
     #seb-evalpro-topbar button{font-family:Arial,sans-serif;font-size:14px;font-weight:400;padding:6px 12px;border:1px solid rgba(255,255,255,.75);border-radius:4px;background:#fff;color:#0070c0;cursor:pointer}
     #seb-evalpro-topbar button:hover{background:#f2f2f2}
+    #seb-evalpro-topbar #seb-evalpro-finish-candidate{background:#fff4e5;color:#8a4b00;border-color:#fff}
     #seb-evalpro-topbar #seb-evalpro-close-session{background:#c00000;color:#fff;border-color:#fff}
     #seb-evalpro-topbar #seb-evalpro-close-session:hover{background:#a00000}
   `;
@@ -528,6 +578,7 @@ function injectAdminBar() {
   const returnButton = bar.querySelector('#seb-evalpro-return');
   const exportCandidatesButton = bar.querySelector('#seb-evalpro-export-candidates');
   const importCandidatesButton = bar.querySelector('#seb-evalpro-import-candidates');
+  const finishCandidateButton = bar.querySelector('#seb-evalpro-finish-candidate');
   const closeSessionButton = bar.querySelector('#seb-evalpro-close-session');
 
   const showBar = () => {
@@ -606,9 +657,15 @@ function injectAdminBar() {
     returnButton.textContent = 'Retour au candidat';
     exportCandidatesButton.hidden = !adminUnlocked || !editionCapabilities.canExport;
     importCandidatesButton.hidden = !adminUnlocked || !editionCapabilities.canImport;
+    finishCandidateButton.hidden = true;
     closeSessionButton.hidden = !adminUnlocked;
     adminButton.textContent = adminUnlocked ? 'Verrouiller' : 'Administrateur';
     refreshCandidateBadge();
+    if (adminUnlocked) {
+      ipcRenderer.invoke('candidate:active').then((active) => {
+        finishCandidateButton.hidden = !active;
+      }).catch(() => { finishCandidateButton.hidden = true; });
+    }
   };
 
   adminButton.addEventListener('click', async () => {
@@ -756,6 +813,41 @@ function injectAdminBar() {
       importCandidatesButton.disabled = false;
       scheduleHideBar();
     }
+  });
+
+  finishCandidateButton.addEventListener('click', async () => {
+    showBar();
+    const active = await ipcRenderer.invoke('candidate:active').catch(() => null);
+    if (!active) {
+      finishCandidateButton.hidden = true;
+      await showTransferMessage('Parcours candidat', 'Aucun parcours candidat n’est actuellement en cours sur ce PC.');
+      scheduleHideBar();
+      return;
+    }
+
+    const confirmed = await createCandidateFinishDialog();
+    if (!confirmed) {
+      scheduleHideBar();
+      return;
+    }
+
+    const result = await ipcRenderer.invoke('candidate:complete-active', 'admin-manual').catch((error) => ({
+      ok:false,
+      error:String(error && error.message ? error.message : error)
+    }));
+    if (!result || !result.ok) {
+      await showTransferMessage('Fin de parcours impossible', result && result.error ? result.error : 'Le parcours n’a pas pu être terminé.', true);
+      scheduleHideBar();
+      return;
+    }
+
+    finishCandidateButton.hidden = true;
+    await showTransferMessage(
+      'Parcours terminé',
+      'Le parcours candidat est maintenant terminé. Il ne pourra plus être repris et son dossier est désormais exportable.'
+    );
+    refreshCandidateBadge();
+    scheduleHideBar();
   });
 
   closeSessionButton.addEventListener('click', async () => {
