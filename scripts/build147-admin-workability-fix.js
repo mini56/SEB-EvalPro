@@ -158,14 +158,15 @@ function replaceOnce(text, search, replacement, label) {
   const oldBlock = `  document.addEventListener('input', scheduleSave, true);\n  document.addEventListener('change', scheduleSave, true);\n  document.addEventListener('click', scheduleSave, true);\n  periodicSaveTimer = setInterval(() => saveNow(false), SAVE_CHECKPOINT_MS);`;
   const newBlock = `  if (!isAdminBilanPage()) {\n    document.addEventListener('input', scheduleSave, true);\n    document.addEventListener('change', scheduleSave, true);\n    document.addEventListener('click', scheduleSave, true);\n    periodicSaveTimer = setInterval(() => saveNow(false), SAVE_CHECKPOINT_MS);\n  }`;
   const guardedBlock = "if (!isAdminBilanPage()) {\n    document.addEventListener('input', scheduleSave, true);";
+  const nestedGuardedBlock = "if (!isAdminBilanPage()) {\n      document.addEventListener('input', scheduleSave, true);";
   const resultsOldBlock = "  } else {\n    document.addEventListener('input', scheduleSave, true);\n    document.addEventListener('change', scheduleSave, true);\n    document.addEventListener('click', scheduleSave, true);\n    periodicSaveTimer = setInterval(() => saveNow(false), SAVE_CHECKPOINT_MS);\n  }";
   const resultsGuardedBlock = "  } else if (!isAdminBilanPage()) {\n    document.addEventListener('input', scheduleSave, true);\n    document.addEventListener('change', scheduleSave, true);\n    document.addEventListener('click', scheduleSave, true);\n    periodicSaveTimer = setInterval(() => saveNow(false), SAVE_CHECKPOINT_MS);\n  }";
   if (out.includes(oldBlock)) out = out.replace(oldBlock, newBlock);
   else if (out.includes(resultsOldBlock)) out = out.replace(resultsOldBlock, resultsGuardedBlock);
-  else if (!out.includes(guardedBlock) && !out.includes(resultsGuardedBlock)) {
+  else if (!out.includes(guardedBlock) && !out.includes(nestedGuardedBlock) && !out.includes(resultsGuardedBlock)) {
     fail('bloc sauvegarde globale DOM introuvable', 12);
   }
-  if (!out.includes(guardedBlock) && !out.includes(resultsGuardedBlock)) {
+  if (!out.includes(guardedBlock) && !out.includes(nestedGuardedBlock) && !out.includes(resultsGuardedBlock)) {
     fail('sauvegarde globale encore active à chaque frappe en Admin', 13);
   }
   try { new vm.Script(out); } catch (error) { fail('preload.js invalide: ' + error.message, 14); }
