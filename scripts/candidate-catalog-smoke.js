@@ -4,6 +4,7 @@ const os = require('os');
 const path = require('path');
 const registerCandidateCatalog = require('../src/candidate-catalog-main');
 const registerBilanHistory = require('../src/bilan-history-main');
+const { codedFolderName } = require('../src/candidate-folder-utils');
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'seb-evalpro-candidate-catalog-'));
 const documentsPath = path.join(root, 'Documents');
@@ -117,7 +118,7 @@ try {
   assert.strictEqual(first[0].replayCount, 1, 'Le parcours historique doit être rattaché au dossier candidat.');
   assert.strictEqual(first[0].bilanCount, 1, 'Le bilan historique doit être rattaché au dossier candidat.');
 
-  const newDir = path.join(sebRoot, 'Candidats', 'XX_YY_Lorient_7');
+  const newDir = path.join(sebRoot, 'Candidats', codedFolderName('candidate-xx'));
   assert(fs.existsSync(newDir), 'La copie autonome du candidat doit exister.');
   assert(fs.existsSync(legacyDir), 'Le dossier historique Admin doit rester intact.');
   assert(fs.existsSync(path.join(newDir, 'replay', replayName)), 'Le replay doit être migré dans le dossier candidat.');
@@ -125,7 +126,7 @@ try {
   assert(fs.existsSync(path.join(newDir, 'bilan', 'exports', legacyWordName)), 'Un ancien Word associable sans ambiguïté doit être copié dans le dossier candidat.');
   assert(fs.existsSync(path.join(sebRoot, 'Bilans', legacyWordName)), 'L’ancien Word global doit rester intact pendant la migration de sécurité.');
 
-  const duplicateDir = path.join(sebRoot, 'Candidats', 'XX_YY_Lorient_7_2');
+  const duplicateDir = path.join(sebRoot, 'Candidats', codedFolderName('candidate-xx') + '_2');
   for (const rel of ['donnees','resultats','replay',path.join('bilan','historique'),path.join('bilan','exports')]) {
     fs.mkdirSync(path.join(duplicateDir, rel), { recursive:true });
   }
@@ -162,7 +163,7 @@ try {
   assert.strictEqual(fs.existsSync(duplicateDir), false, 'Le doublon ne doit plus rester dans Candidats.');
   const duplicateArchiveRoot = path.join(sebRoot, 'Corbeille', 'Doublons');
   assert(fs.existsSync(duplicateArchiveRoot), 'Le doublon doit être archivé sans destruction.');
-  assert(fs.readdirSync(duplicateArchiveRoot).some((name) => name.startsWith('XX_YY_Lorient_7_2__')), 'Le dossier doublon complet doit être conservé dans Corbeille\\Doublons.');
+  assert(fs.readdirSync(duplicateArchiveRoot).some((name) => name.startsWith(codedFolderName('candidate-xx-duplicate') + '__DUP-')), 'Le dossier doublon complet doit être conservé dans Corbeille\\Doublons sous un nom codé.');
   const mergedDuplicateResponses = JSON.parse(fs.readFileSync(path.join(newDir, 'resultats', 'reponses.json'), 'utf8'));
   assert.strictEqual(mergedDuplicateResponses.duplicate_only, 'OK', 'Les réponses présentes uniquement dans le doublon doivent être récupérées.');
   const mergedState = JSON.parse(fs.readFileSync(path.join(newDir, 'donnees', 'evaluation-state.json'), 'utf8'));
