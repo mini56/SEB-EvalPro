@@ -110,6 +110,8 @@ function words(text){return String(text||'').trim().split(/\s+/).filter(Boolean)
   assert(!/\S;/.test(out.text),'espace française avant point-virgule absente');
   const sentences=out.text.match(/[^.!?]+[.!?]+/g)||[];
   assert(!sentences.some((s)=>s.trim().length>240),'phrase trop longue');
+  const starts=sentences.map(s=>String(s).trim().toLocaleLowerCase('fr-FR').replace(/^[^a-zà-ÿ]+/i,'').split(/\s+/).slice(0,3).join(' '));
+  for(let i=2;i<starts.length;i++)assert(!(starts[i]&&starts[i]===starts[i-1]&&starts[i]===starts[i-2]),'trois phrases consécutives avec le même départ: '+starts[i]);
 })();
 
 
@@ -279,6 +281,8 @@ function words(text){return String(text||'').trim().split(/\s+/).filter(Boolean)
     assert(!/pliage et l[’']assemblage et les finitions/i.test(p.out.text),p.name+': coordination répétée');
     assert(!/(?:volet fabrication|opérations de fabrication)\.\s+(?:Une|Des)/i.test(p.out.text),p.name+': ouverture fabrication isolée');
     assert(!/opérations de fabrication, les différentes opérations/i.test(p.out.text),p.name+': répétition opérations de fabrication');
+    assert((p.out.text.match(/\bLa compétence liée\b/g)||[]).length<=5,p.name+': forme « La compétence liée » trop répétée');
+    assert((p.out.text.match(/\bLa mise en œuvre\b/g)||[]).length<=4,p.name+': forme « La mise en œuvre » trop répétée');
     console.log('\nSEB-IA PROFIL REALISTE ['+p.name+'] — '+wc+' mots\n'+p.out.text+'\n');
   }
   const byName=Object.fromEntries(profiles.map(p=>[p.name,p.out.text]));
@@ -308,6 +312,7 @@ function words(text){return String(text||'').trim().split(/\s+/).filter(Boolean)
     assert(wc<380,'synthèse anormalement longue au stress '+i+' : '+wc+' mots');
     assert((out.text.match(/\bnécessite(?:nt)?\b/gi)||[]).length<=5,'tournure « nécessite » trop répétée au stress '+i);
     assert((out.text.match(/\bdemande(?:nt)?\b/gi)||[]).length<=5,'tournure « demande » trop répétée au stress '+i);
+    assert((out.text.match(/\bLa compétence liée\b/g)||[]).length<=6,'forme « La compétence liée » trop répétée au stress '+i);
     seen.add(out.text);totalWords+=words(out.text);
   }
   assert(seen.size>=295,'diversité rédactionnelle insuffisante');
