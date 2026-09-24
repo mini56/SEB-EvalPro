@@ -82,7 +82,7 @@ function specific(k,r,id,st){
  }
  if(k==='carre'){
    if(/identifier les contraintes.*analyser les relations.*déduire une solution/i.test(s))out.push(pick('carre-i',[{text:'les contraintes sont identifiées, mises en relation et permettent d’aboutir à une solution',family:'raisonnement'},{text:'le problème structuré est traité en identifiant les contraintes et leurs relations',family:'raisonnement'}]));
-   else if(/résoudre partiellement les relations/i.test(s))out.push(pick('carre-ii',[{text:'les contraintes sont identifiées, mais leur mise en relation reste partielle',family:'contraintes'},{text:'le raisonnement permet d’identifier les contraintes sans résoudre complètement leurs relations',family:'consolidation'}]));
+   else if(/résoudre partiellement les relations/i.test(s))out.push(pick('carre-ii',[{text:'les contraintes sont identifiées, mais leur mise en relation reste partielle',family:'contraintes'},{text:'le raisonnement permet d’identifier les contraintes, mais la résolution de leurs relations reste partielle',family:'consolidation'}]));
    else if(/difficult.*identifier|contraintes?.*relations?/i.test(s))out.push(pick('contraintes',[{text:'l’identification des contraintes et leur mise en relation restent difficiles',family:'contraintes'},{text:'le raisonnement sur les contraintes demande encore une méthode plus explicite',family:'methode'},{text:'la mise en relation des différents éléments du problème reste fragile',family:'fragilite'}]));
  }
  if(k==='organisation'){
