@@ -20,8 +20,8 @@ try {
     version: 1,
     sessionStorage: {
       candidat_data: JSON.stringify({
-        nom: 'DUPONT',
-        'prénom': 'Jean',
+        nom: 'XX',
+        'prénom': 'YY',
         lieu: 'Lorient',
         groupe: '7',
         date: '2026-09-18'
@@ -36,7 +36,7 @@ try {
 
   const first = store.saveSnapshot(state);
   assert(first, 'Le dossier candidat doit être créé.');
-  assert.strictEqual(first.folderName, 'DUPONT_Jean_Lorient_7');
+  assert.strictEqual(first.folderName, 'XX_YY_Lorient_7');
   assert(fs.existsSync(path.join(first.candidateDir, 'manifest.json')));
   assert(fs.existsSync(path.join(first.candidateDir, 'donnees', 'candidat.json')));
   assert(fs.existsSync(path.join(first.candidateDir, 'donnees', 'evaluation-state.json')));
@@ -56,7 +56,7 @@ try {
   assert.strictEqual(second.candidateDir, first.candidateDir, 'Une sauvegarde suivante ne doit pas créer de doublon.');
 
   const active = store.getActiveCandidate();
-  assert(active && active.displayName === 'Jean DUPONT');
+  assert(active && active.displayName === 'YY XX');
   assert.strictEqual(store.getActiveExportDir(), path.join(first.candidateDir, 'bilan', 'exports'));
 
   const closed = store.closeActiveCandidate({
