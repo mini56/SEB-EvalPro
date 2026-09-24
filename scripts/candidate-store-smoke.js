@@ -61,12 +61,12 @@ try {
   assert(active && active.displayName === 'YYPRENOMSECRET XXNOMSECRET');
   assert.strictEqual(store.getActiveExportDir(), path.join(first.candidateDir, 'bilan', 'exports'));
 
-  const closed = store.closeActiveCandidate({
+  const closed = store.completeActiveCandidate({
     ...state,
     lastPage: 'pageFinale.html',
     lastEvaluationPage: 'pageFinale.html'
   });
-  assert(closed && closed.status === 'SESSION_FERMEE');
+  assert(closed && closed.status === 'TERMINE');
   assert.strictEqual(store.getActiveCandidate(), null, 'Le pointeur actif doit être supprimé après fermeture.');
 
   const rawManifest = fs.readFileSync(path.join(first.candidateDir, 'manifest.json'), 'utf8');
