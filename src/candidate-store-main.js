@@ -225,6 +225,7 @@ function createCandidateStore(options = {}) {
       const candidateDir = path.join(candidatesRoot, entry.name);
       const manifest = readManifest(candidateDir);
       if (!manifest || !manifest.candidateId) continue;
+      if (['TERMINE', 'SESSION_FERMEE'].includes(String(manifest.status || ''))) continue;
       if (candidateIdentityKey(manifest.candidat || {}) !== expectedKey) continue;
       records.push({ candidateDir, folderName:entry.name, manifest });
     }
