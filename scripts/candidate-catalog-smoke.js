@@ -110,7 +110,7 @@ try {
   const deleteCandidate = handlers.get('candidate-catalog:delete');
   const saveCurrentBilan = handlers.get('bilan-history:save-current');
   const saveBilanRevision = handlers.get('bilan-history:save-revision');
-  assert(list && detail && loadBilan && beginBilan && beginResults && endResults && loadResultsWorkspaceSync && saveWorkspace && endBilan && loadWorkspaceSync && saveWorkspaceSync && sync && deleteCandidate && saveCurrentBilan && saveBilanRevision, 'Handlers catalogue/bilan/résultats/suppression absents.');
+  assert(list && detail && loadBilan && beginBilan && beginResults && endResults && loadResultsWorkspaceSync && saveWorkspace && endBilan && loadWorkspaceSync && saveWorkspaceSync && sync && deleteCandidate && saveCurrentBilan && saveBilanRevision, 'Handlers catalogue/bilan/résultats/protection suppression absents.');
 
   const first = list();
   assert.strictEqual(first.length, 1, 'Le candidat historique doit être migré une seule fois.');
@@ -126,13 +126,41 @@ try {
   assert(fs.existsSync(path.join(newDir, 'bilan', 'exports', legacyWordName)), 'Un ancien Word associable sans ambiguïté doit être copié dans le dossier candidat.');
   assert(fs.existsSync(path.join(sebRoot, 'Bilans', legacyWordName)), 'L’ancien Word global doit rester intact pendant la migration de sécurité.');
 
+  // Une nouvelle évaluation de la même personne doit rester un dossier distinct.
+  const separateDir = path.join(sebRoot, 'Candidats', codedFolderName('candidate-xx-second'));
+  for (const rel of ['donnees','resultats','replay',path.join('bilan','historique'),path.join('bilan','exports')]) {
+    fs.mkdirSync(path.join(separateDir, rel), { recursive:true });
+  }
+  const secondCandidate = { ...candidate, date:'2026-09-20' };
+  writeJson(path.join(separateDir, 'manifest.json'), {
+    schemaVersion:1,
+    candidateId:'candidate-xx-second',
+    folderName:path.basename(separateDir),
+    status:'TERMINE',
+    createdAt:'2026-09-20T08:00:00.000Z',
+    updatedAt:'2026-09-20T10:00:00.000Z',
+    candidat:{ ...secondCandidate, 'prénom':secondCandidate.prenom }
+  });
+  writeJson(path.join(separateDir, 'donnees', 'candidat.json'), { ...secondCandidate, 'prénom':secondCandidate.prenom });
+  writeJson(path.join(separateDir, 'donnees', 'evaluation-state.json'), { version:1, sessionStorage:{ candidat_data:JSON.stringify(secondCandidate) }, localStorage:{}, lastPage:'pageFinale.html', lastEvaluationPage:'pageFinale.html' });
+  writeJson(path.join(separateDir, 'donnees', 'progression.json'), { lastPage:'pageFinale.html', lastEvaluationPage:'pageFinale.html' });
+  writeJson(path.join(separateDir, 'resultats', 'reponses.json'), { second_evaluation:true });
+  writeJson(path.join(separateDir, 'resultats', 'scores.json'), { second_evaluation:1 });
+
+  const separateSync = sync();
+  assert(separateSync && separateSync.ok && separateSync.consolidatedDuplicates === 0, 'Deux candidateId différents ne doivent jamais être fusionnés.');
+  assert(fs.existsSync(newDir), 'Le premier parcours doit rester intact.');
+  assert(fs.existsSync(separateDir), 'La seconde évaluation doit rester intacte.');
+  assert.strictEqual(list().length, 2, 'La même personne évaluée à nouveau doit apparaître dans deux dossiers distincts.');
+  fs.rmSync(separateDir, { recursive:true, force:true });
+
   const duplicateDir = path.join(sebRoot, 'Candidats', codedFolderName('candidate-xx') + '_2');
   for (const rel of ['donnees','resultats','replay',path.join('bilan','historique'),path.join('bilan','exports')]) {
     fs.mkdirSync(path.join(duplicateDir, rel), { recursive:true });
   }
   writeJson(path.join(duplicateDir, 'manifest.json'), {
     schemaVersion:1,
-    candidateId:'candidate-xx-duplicate',
+    candidateId:'candidate-xx',
     folderName:path.basename(duplicateDir),
     status:'EN_COURS',
     createdAt:'2026-09-19T08:00:00.000Z',
@@ -163,7 +191,7 @@ try {
   assert.strictEqual(fs.existsSync(duplicateDir), false, 'Le doublon ne doit plus rester dans Candidats.');
   const duplicateArchiveRoot = path.join(sebRoot, 'Corbeille', 'Doublons');
   assert(fs.existsSync(duplicateArchiveRoot), 'Le doublon doit être archivé sans destruction.');
-  assert(fs.readdirSync(duplicateArchiveRoot).some((name) => name.startsWith(codedFolderName('candidate-xx-duplicate') + '__DUP-')), 'Le dossier doublon complet doit être conservé dans Corbeille\\Doublons sous un nom codé.');
+  assert(fs.readdirSync(duplicateArchiveRoot).some((name) => name.startsWith(codedFolderName('candidate-xx') + '__DUP-')), 'Le doublon technique du même candidateId doit être conservé dans Corbeille\\Doublons sous un nom codé.');
   const mergedDuplicateResponses = JSON.parse(fs.readFileSync(path.join(newDir, 'resultats', 'reponses.json'), 'utf8'));
   assert.strictEqual(mergedDuplicateResponses.duplicate_only, 'OK', 'Les réponses présentes uniquement dans le doublon doivent être récupérées.');
   const mergedState = JSON.parse(fs.readFileSync(path.join(newDir, 'donnees', 'evaluation-state.json'), 'utf8'));
@@ -296,16 +324,17 @@ try {
   });
 
   const deleted = deleteCandidate(null, 'candidate-xx');
-  assert(deleted && deleted.ok, 'La suppression administrateur du candidat doit réussir.');
-  assert.strictEqual(fs.existsSync(newDir), false, 'Le dossier candidat complet doit être supprimé.');
-  assert.strictEqual(fs.existsSync(legacyDir), false, 'La copie historique Admin du même candidat doit être supprimée.');
-  assert.strictEqual(fs.existsSync(path.join(replayRoot, replayName)), false, 'Le replay historique du candidat doit être supprimé.');
-  assert.strictEqual(fs.existsSync(path.join(bilanRoot, bilanName)), false, 'Le bilan historique global du candidat doit être supprimé.');
-  assert.strictEqual(fs.existsSync(path.join(sebRoot, 'Bilans', legacyWordName)), false, 'Le Word historique global du candidat doit être supprimé.');
-  assert.strictEqual(fs.existsSync(path.join(userDataPath, 'evaluation-state.json')), false, 'L’état local du candidat supprimé ne doit pas permettre sa recréation.');
-  assert.strictEqual(list().length, 0, 'Un candidat supprimé ne doit pas réapparaître après synchronisation.');
+  assert(deleted && deleted.ok === false, 'La suppression administrateur d’un candidat doit être refusée.');
+  assert(/désactivée|perte de données/i.test(String(deleted.error || '')), 'Le refus de suppression doit être explicite.');
+  assert.strictEqual(fs.existsSync(newDir), true, 'Le dossier candidat doit rester intact.');
+  assert.strictEqual(fs.existsSync(legacyDir), true, 'La copie historique Admin doit rester intacte.');
+  assert.strictEqual(fs.existsSync(path.join(replayRoot, replayName)), true, 'Le replay historique doit rester intact.');
+  assert.strictEqual(fs.existsSync(path.join(bilanRoot, bilanName)), true, 'Le bilan historique global doit rester intact.');
+  assert.strictEqual(fs.existsSync(path.join(sebRoot, 'Bilans', legacyWordName)), true, 'Le Word historique global doit rester intact.');
+  assert.strictEqual(fs.existsSync(path.join(userDataPath, 'evaluation-state.json')), true, 'L’état local ne doit pas être supprimé.');
+  assert.strictEqual(list().length, 1, 'Le candidat doit rester disponible après une tentative de suppression.');
 
-  console.log('Candidate Catalog Authoritative Folder + Erasure Test: OK');
+  console.log('Candidate Catalog Separate Evaluations + No Erasure Test: OK');
 } finally {
   fs.rmSync(root, { recursive:true, force:true });
 }
