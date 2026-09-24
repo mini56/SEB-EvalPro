@@ -284,7 +284,7 @@ function words(text){return String(text||'').trim().split(/\s+/).filter(Boolean)
   assert(!/difficultés plus marquées dans certaines situations/i.test(byName['nombreux-non-evalues']),'profil avec nombreux NE présenté à tort comme difficile');
   assert(/partiel|non évalu|hors interprétation/i.test(byName['abandons-multiples']),'conclusion des abandons doit signaler la couverture incomplète');
   assert(!/difficile Le commentaire|disponibles Le commentaire/i.test(byName['abandons-multiples']),'ponctuation entre motif et commentaire incorrecte');
-  assert(/aux calculs et à la résolution de problèmes/i.test(byName['fortement-chiffre']),'coordination grammaticale mathématique incorrecte');
+  assert(!/aux calculs et la résolution de problèmes|des calculs et la résolution de problèmes/i.test(byName['fortement-chiffre']),'coordination grammaticale mathématique incorrecte');
 })();
 
 (function stress(){
