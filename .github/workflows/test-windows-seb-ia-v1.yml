@@ -36,6 +36,20 @@ jobs:
       - name: Test candidate data security
         run: npm run test:security
 
+      - name: Test direct USB drive root export and import
+        shell: pwsh
+        run: |
+          $usbDir = Join-Path $env:RUNNER_TEMP 'seb-usb-root-drive'
+          New-Item -ItemType Directory -Force -Path $usbDir | Out-Null
+          subst R: $usbDir
+          try {
+            $env:SEB_USB_ROOT = 'R:\'
+            node scripts/candidate-windows-drive-root-smoke.js
+          }
+          finally {
+            subst R: /D
+          }
+
       - name: Generate web application and verify preserved parcours names
         shell: pwsh
         run: |
