@@ -373,7 +373,7 @@ function createCandidateStore(options = {}) {
       candidateId: active.candidateId,
       shortId: active.shortId,
       folderName: active.folderName,
-      status: manifest.status === 'SESSION_FERMEE' ? 'SESSION_FERMEE' : 'EN_COURS',
+      status: ['TERMINE', 'SESSION_FERMEE'].includes(String(manifest.status || '')) ? String(manifest.status) : 'EN_COURS',
       updatedAt: now().toISOString(),
       candidat: identity ? identity.original : manifest.candidat
     });
@@ -410,7 +410,7 @@ function createCandidateStore(options = {}) {
     return ensureDirectory(path.join(active.candidateDir, 'bilan', 'exports'));
   }
 
-  function closeActiveCandidate(state) {
+  function completeActiveCandidate(state, completionReason = 'admin-manual') {
     const active = readActivePointer();
     if (!active) return null;
 
@@ -419,16 +419,18 @@ function createCandidateStore(options = {}) {
     }
 
     const manifest = readManifest(active.candidateDir) || {};
-    const closedAt = now().toISOString();
+    const completedAt = now().toISOString();
     writeManifest(active.candidateDir, {
       ...manifest,
       schemaVersion: 1,
       candidateId: active.candidateId,
       shortId: active.shortId,
       folderName: active.folderName,
-      status: 'SESSION_FERMEE',
-      updatedAt: closedAt,
-      closedAt
+      status: 'TERMINE',
+      updatedAt: completedAt,
+      completedAt,
+      completionReason: String(completionReason || 'admin-manual'),
+      closedAt: manifest.closedAt || completedAt
     });
 
     removeFile(activePointerPath);
@@ -437,8 +439,14 @@ function createCandidateStore(options = {}) {
       candidateId: active.candidateId,
       folderName: active.folderName,
       candidateDir: active.candidateDir,
-      status: 'SESSION_FERMEE'
+      status: 'TERMINE',
+      completedAt,
+      completionReason: String(completionReason || 'admin-manual')
     };
+  }
+
+  function closeActiveCandidate(state) {
+    return completeActiveCandidate(state, 'legacy-close');
   }
 
   return {
@@ -447,6 +455,7 @@ function createCandidateStore(options = {}) {
     saveSnapshot,
     getActiveCandidate,
     getActiveExportDir,
+    completeActiveCandidate,
     closeActiveCandidate,
     candidateIdentityFromState,
     migrateCandidateFolderNames,
