@@ -240,7 +240,18 @@ jobs:
           Write-Host 'REAL_INSTALL_UNINSTALL: OK'
           Write-Host 'DOCUMENTS_BILANS_PRESERVED: OK'
 
+      - name: Upload Windows 0.3.1 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SEB-EvalPro-0.3.1-Full-Windows
+          path: |
+            dist/SEB-eval-PRO-0.3.1-Windows-Setup.exe
+            dist/SEB-eval-PRO-0.3.1-Windows-Desinstallation.exe
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Publish 0.3.1 test release
+        continue-on-error: true
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
@@ -254,13 +265,3 @@ jobs:
           gh release create $tag $setup $uninstaller --target "${{ github.sha }}" --title $title --notes $notes --prerelease --repo "${{ github.repository }}"
           if ($LASTEXITCODE -ne 0) { throw 'Publication Release test 0.3.1 échouée.' }
           Write-Host "RELEASE_TAG=$tag"
-
-      - name: Upload Windows 0.3.1 artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: SEB-EvalPro-0.3.1-Full-Windows
-          path: |
-            dist/SEB-eval-PRO-0.3.1-Windows-Setup.exe
-            dist/SEB-eval-PRO-0.3.1-Windows-Desinstallation.exe
-          if-no-files-found: error
-          retention-days: 14
