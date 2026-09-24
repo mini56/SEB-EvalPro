@@ -404,8 +404,44 @@ function createCandidateTransfer(options = {}) {
   }
 
   function portableFileName(record) {
-    const token = String(record && record.candidateId || '').replace(/[^A-Za-z0-9]+/g, '').toUpperCase().slice(0, 12) || crypto.randomBytes(6).toString('hex').toUpperCase();
+    const candidateId = String(record && record.candidateId || '').trim();
+    if (!candidateId) return 'CAND-' + crypto.randomBytes(12).toString('hex').toUpperCase() + '.seb';
+    const token = crypto
+      .createHash('sha256')
+      .update('SEB-EvalPro/candidate-transfer-file/v2\0' + candidateId, 'utf8')
+      .digest('hex')
+      .toUpperCase()
+      .slice(0, 24);
     return 'CAND-' + token + '.seb';
+  }
+
+  function existingTransferCandidateIds(destinationRoot, password) {
+    const ids = new Set();
+    let entries = [];
+    try { entries = fs.readdirSync(destinationRoot, { withFileTypes:true }); } catch (_) { entries = []; }
+    for (const entry of entries) {
+      if (!entry.isFile() || !entry.name.toLowerCase().endsWith('.seb')) continue;
+      try {
+        const payload = decryptTransferPayload(fs.readFileSync(path.join(destinationRoot, entry.name), 'utf8'), password);
+        if (payload && payload.candidateId) ids.add(String(payload.candidateId));
+      } catch (_) {
+        // Un fichier .seb protégé par un autre mot de passe ou endommagé
+        // ne doit jamais être écrasé ni empêcher un nouvel export.
+      }
+    }
+    return ids;
+  }
+
+  function uniquePortableTarget(destinationRoot, record) {
+    const filename = portableFileName(record);
+    const parsed = path.parse(filename);
+    let target = path.join(destinationRoot, filename);
+    let index = 2;
+    while (fs.existsSync(target)) {
+      target = path.join(destinationRoot, parsed.name + '-' + index + parsed.ext);
+      index += 1;
+    }
+    return target;
   }
 
   function writePortableAtomic(target, text) {
@@ -428,14 +464,16 @@ function createCandidateTransfer(options = {}) {
       .filter((record) => isCompletedStatus(record.manifest && record.manifest.status));
     let added = 0, skipped = 0, verifiedFiles = 0;
     const copied = [];
+    const existingCandidateIds = existingTransferCandidateIds(destinationRoot, password);
 
     for (const source of sourceRecords) {
-      const filename = portableFileName(source);
-      const target = path.join(destinationRoot, filename);
-      if (fs.existsSync(target)) {
+      const sourceId = String(source.candidateId || '');
+      if (existingCandidateIds.has(sourceId)) {
         skipped += 1;
         continue;
       }
+      const target = uniquePortableTarget(destinationRoot, source);
+      const filename = path.basename(target);
       const payload = packCandidate(source);
       const encrypted = encryptTransferPayload(payload, password);
       writePortableAtomic(target, encrypted);
@@ -445,6 +483,7 @@ function createCandidateTransfer(options = {}) {
         throw new Error('Vérification de l’export chiffré échouée.');
       }
       added += 1;
+      existingCandidateIds.add(sourceId);
       verifiedFiles += payload.entries.filter((entry) => entry.type !== 'dir').length;
       copied.push({ candidateId:source.candidateId, filename, transferFile:target });
     }
