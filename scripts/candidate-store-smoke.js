@@ -3,11 +3,13 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { createCandidateStore } = require('../src/candidate-store-main');
+const { configureLocalKey, readJsonFile, LOCAL_PREFIX } = require('../src/candidate-data-crypto');
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'seb-evalpro-candidate-store-'));
 const documentsPath = path.join(root, 'Documents');
 const userDataPath = path.join(root, 'AppData');
 const fixedNow = new Date('2026-09-18T18:00:00.000Z');
+configureLocalKey(Buffer.alloc(32, 7));
 
 try {
   const store = createCandidateStore({
@@ -67,7 +69,10 @@ try {
   assert(closed && closed.status === 'SESSION_FERMEE');
   assert.strictEqual(store.getActiveCandidate(), null, 'Le pointeur actif doit être supprimé après fermeture.');
 
-  const manifest = JSON.parse(fs.readFileSync(path.join(first.candidateDir, 'manifest.json'), 'utf8'));
+  const rawManifest = fs.readFileSync(path.join(first.candidateDir, 'manifest.json'), 'utf8');
+  assert(rawManifest.startsWith(LOCAL_PREFIX), 'Le manifeste candidat doit être chiffré sur disque.');
+  assert(!rawManifest.includes('Lorient') && !rawManifest.includes('YY') && !rawManifest.includes('XX'), 'Aucune identité candidat ne doit rester en clair dans le manifeste.');
+  const manifest = readJsonFile(path.join(first.candidateDir, 'manifest.json'));
   assert.strictEqual(manifest.status, 'SESSION_FERMEE');
   assert(manifest.closedAt, 'La date de fermeture doit être enregistrée.');
   assert(fs.existsSync(first.candidateDir), 'Le dossier candidat ne doit jamais être supprimé à la fermeture.');
