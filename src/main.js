@@ -6,7 +6,8 @@ const crypto = require('crypto');
 const { getEditionCapabilities } = require('./edition');
 const { createCandidateStore } = require('./candidate-store-main');
 const { createCandidateTransfer } = require('./candidate-transfer-main');
-const { configureLocalKey, readJsonFile, encodeJson, migrateJsonFile, migrateJsonTree } = require('./candidate-data-crypto');
+const { LOCAL_PREFIX, configureLocalKey, readJsonFile, encodeJson, migrateJsonFile, migrateJsonTree } = require('./candidate-data-crypto');
+const { createCandidateLocalProtection } = require('./candidate-local-protection');
 
 const ADMIN_PASSWORD_SHA256 = 'c800892ba3f11b33d36eedf7d3c4297f2b6c02e2c347dda8954b4c577f6666b5';
 const STATE_VERSION = 1;
@@ -22,6 +23,7 @@ let downloadRoutingInstalled = false;
 const editionCapabilities = getEditionCapabilities();
 let candidateStore = null;
 let candidateTransfer = null;
+let candidateProtection = null;
 let adminExportCandidateDir = null;
 let adminCandidateResultsMode = false;
 let lastCandidateSaveError = '';
@@ -65,52 +67,55 @@ function stateFilePath() {
   return path.join(app.getPath('userData'), 'evaluation-state.json');
 }
 
-function candidateLocalKeyPath() {
-  return path.join(app.getPath('userData'), 'candidate-local-key.sebkey');
+function getCandidateProtection() {
+  if (!candidateProtection) {
+    candidateProtection = createCandidateLocalProtection({
+      documentsPath: app.getPath('documents'),
+      userDataPath: app.getPath('userData'),
+      safeStorage
+    });
+  }
+  return candidateProtection;
+}
+
+function assertEncryptedCandidateAccess() {
+  const root = path.join(app.getPath('documents'), 'SEB EvalPro', 'Candidats');
+  if (!fs.existsSync(root)) return true;
+  for (const entry of fs.readdirSync(root, { withFileTypes:true })) {
+    if (!entry.isDirectory() || entry.name.startsWith('.')) continue;
+    const manifestPath = path.join(root, entry.name, 'manifest.json');
+    if (!fs.existsSync(manifestPath)) continue;
+    let raw = '';
+    try { raw = fs.readFileSync(manifestPath, 'utf8'); } catch (_) { continue; }
+    if (!raw.startsWith(LOCAL_PREFIX)) continue;
+    if (!readJsonFile(manifestPath)) {
+      throw new Error(
+        'La clé locale présente sur ce PC ne permet pas de lire un dossier candidat chiffré. ' +
+        'SEB EvalPro bloque la migration afin de ne modifier aucune donnée.'
+      );
+    }
+  }
+  return true;
 }
 
 function initializeCandidateSecurity() {
-  if (!safeStorage || !safeStorage.isEncryptionAvailable()) {
-    throw new Error('La protection Windows des données candidat n’est pas disponible sur ce poste.');
-  }
-
-  const keyFile = candidateLocalKeyPath();
-  fs.mkdirSync(path.dirname(keyFile), { recursive:true });
-  let localKey = null;
-
-  if (fs.existsSync(keyFile)) {
-    try {
-      const wrapper = JSON.parse(fs.readFileSync(keyFile, 'utf8'));
-      const protectedBytes = Buffer.from(String(wrapper.protectedKey || ''), 'base64');
-      const keyBase64 = safeStorage.decryptString(protectedBytes);
-      localKey = Buffer.from(keyBase64, 'base64');
-    } catch (error) {
-      throw new Error('La clé locale des données candidat est illisible sur ce PC.');
-    }
-  } else {
-    localKey = crypto.randomBytes(32);
-    const protectedBytes = safeStorage.encryptString(localKey.toString('base64'));
-    const wrapper = {
-      schemaVersion:1,
-      protection:'Windows safeStorage/DPAPI',
-      protectedKey:protectedBytes.toString('base64'),
-      createdAt:new Date().toISOString()
-    };
-    const temp = keyFile + '.tmp';
-    fs.writeFileSync(temp, JSON.stringify(wrapper, null, 2), 'utf8');
-    fs.renameSync(temp, keyFile);
-  }
-
+  const protection = getCandidateProtection();
+  const localKey = protection.initializeKey();
   if (!Buffer.isBuffer(localKey) || localKey.length !== 32) {
     throw new Error('Clé locale des données candidat invalide.');
   }
+
   configureLocalKey(localKey);
+  localKey.fill(0);
+  protection.restoreStateFromBackupIfNeeded();
+  assertEncryptedCandidateAccess();
 
   const store = getCandidateStore();
   const folders = store.migrateCandidateFolderNames();
   const migrated = migrateJsonTree(store.paths.candidatesRoot);
   migrateJsonFile(stateFilePath());
-  console.log('SEB EvalPro confidentialité candidat: clé locale Windows active, dossiers codés=' + folders.renamed + ', JSON chiffrés=' + migrated.files + '.');
+  protection.backupState();
+  console.log('SEB EvalPro confidentialité candidat: clé locale Windows protégée et sauvegardée, dossiers codés=' + folders.renamed + ', JSON chiffrés=' + migrated.files + '.');
 }
 
 function sebDocumentsRoot() {
@@ -206,7 +211,12 @@ function defaultState() {
 
 function readState() {
   try {
-    const parsed = readJsonFile(stateFilePath());
+    const protection = getCandidateProtection();
+    protection.restoreStateFromBackupIfNeeded();
+    let parsed = readJsonFile(stateFilePath());
+    if ((!parsed || typeof parsed !== 'object') && fs.existsSync(protection.paths.backupStatePath)) {
+      parsed = readJsonFile(protection.paths.backupStatePath);
+    }
     return parsed && typeof parsed === 'object' ? { ...defaultState(), ...parsed } : defaultState();
   } catch (_) {
     return defaultState();
@@ -250,6 +260,7 @@ function writeState(nextState) {
 
   try {
     getCandidateStore().saveSnapshot(safeState);
+    getCandidateProtection().backupState();
     lastCandidateSaveError = '';
   } catch (error) {
     lastCandidateSaveError = error && error.message ? error.message : String(error);
