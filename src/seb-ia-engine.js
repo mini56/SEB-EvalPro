@@ -66,6 +66,16 @@ function conclusion(rows,st){
  const supports=assessed.filter(x=>x.status==='support').map(x=>x.label);
  const mixed=assessed.filter(x=>x.status==='mixed').map(x=>x.label);
  const difficult=assessed.filter(x=>x.status==='difficulty').map(x=>x.label);
+ if(supports.length>=4&&!mixed.length&&!difficult.length)return para([st.pick('conclusion-all-support',[
+   {text:'Dans l’ensemble, les compétences évaluées sont correctement mobilisées dans les différents domaines du plateau technique',family:'conclusion-globale-positive'},
+   {text:'Au terme du parcours, les différents domaines évalués font apparaître des acquis globalement bien installés',family:'conclusion-globale-positive'},
+   {text:'L’ensemble des domaines évalués met en évidence des compétences mobilisées de manière satisfaisante',family:'conclusion-globale-positive'}
+ ])]);
+ if(difficult.length>=4&&!supports.length&&!mixed.length)return para([st.pick('conclusion-all-difficulty',[
+   {text:'Dans l’ensemble, les difficultés concernent plusieurs domaines évalués et nécessitent encore des repères réguliers',family:'conclusion-globale-difficulte'},
+   {text:'Au terme du parcours, plusieurs domaines restent difficiles à mobiliser et demandent un accompagnement plus soutenu',family:'conclusion-globale-difficulte'},
+   {text:'Les résultats mettent en évidence des difficultés étendues à plusieurs domaines du plateau technique',family:'conclusion-globale-difficulte'}
+ ])]);
  const a=[];
  if(supports.length)a.push(st.pick('conclusion-support',[
    {text:'Dans l’ensemble, '+join(supports,st,'conclusion-support')+' '+(supports.length>1?'constituent des points d’appui':'constitue un point d’appui'),family:'conclusion-support'},
