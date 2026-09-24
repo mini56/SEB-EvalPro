@@ -274,8 +274,17 @@ function words(text){return String(text||'').trim().split(/\s+/).filter(Boolean)
     assert(wc<380,p.name+': synthèse trop longue ('+wc+' mots)');
     for(const re of p.must)assert(re.test(p.out.text),p.name+': information attendue absente: '+re);
     assert(!/potentiel|diagnostic|profil psychologique|fonctionnement cognitif|orientation professionnelle/i.test(p.out.text),p.name+': inférence interdite');
+    assert(!/la lecture du plan constituent/i.test(p.out.text),p.name+': accord singulier/pluriel incorrect');
+    assert(!/la découpe demandent/i.test(p.out.text),p.name+': accord singulier/pluriel incorrect');
+    assert(!/pliage et l[’']assemblage et les finitions/i.test(p.out.text),p.name+': coordination répétée');
+    assert(!/(?:volet fabrication|opérations de fabrication)\.\s+(?:Une|Des)/i.test(p.out.text),p.name+': ouverture fabrication isolée');
     console.log('\nSEB-IA PROFIL REALISTE ['+p.name+'] — '+wc+' mots\n'+p.out.text+'\n');
   }
+  const byName=Object.fromEntries(profiles.map(p=>[p.name,p.out.text]));
+  assert(!/difficultés plus marquées dans certaines situations/i.test(byName['nombreux-non-evalues']),'profil avec nombreux NE présenté à tort comme difficile');
+  assert(/partiel|non évalu|hors interprétation/i.test(byName['abandons-multiples']),'conclusion des abandons doit signaler la couverture incomplète');
+  assert(!/difficile Le commentaire|disponibles Le commentaire/i.test(byName['abandons-multiples']),'ponctuation entre motif et commentaire incorrecte');
+  assert(/aux calculs et à la résolution de problèmes/i.test(byName['fortement-chiffre']),'coordination grammaticale mathématique incorrecte');
 })();
 
 (function stress(){
