@@ -275,7 +275,11 @@ function parseJs(text, label) {
     'skipped',
     'updated:0',
     'sameCandidate',
-    'candidateShapeValid'
+    'candidateShapeValid',
+    'SEB-EVALPRO-USB-1',
+    'aes-256-gcm',
+    'scryptSync',
+    'Mot de passe incorrect ou fichier de transfert endommagé'
   ]) if (!transfer.includes(token)) fail('transfert USB sécurisé incomplet: ' + token, 7);
 
   for (const forbidden of [
@@ -285,12 +289,14 @@ function parseJs(text, label) {
   ]) if (transfer.includes(forbidden)) fail('ancien comportement de fusion/écrasement encore présent: ' + forbidden, 7);
 
   for (const token of [
-    "sanitizeSegment(identity.groupe)",
-    "const baseFolderName = buildFolderName(identity)",
+    "function buildFolderName(candidateId, shortId = '')",
+    "const baseFolderName = buildFolderName(candidateId, shortId)",
     "function candidateIdentityKey(candidate)",
     "function existingCandidateForIdentity(identity)",
-    "return activateExistingCandidate(existing, identity)"
-  ]) if (!store.includes(token)) fail('unicité dossier candidat incomplète: ' + token, 7);
+    "return activateExistingCandidate(existing, identity)",
+    "function migrateCandidateFolderNames()",
+    "codedFolderName"
+  ]) if (!store.includes(token)) fail('unicité/confidentialité dossier candidat incomplète: ' + token, 7);
 
   for (const token of [
     "candidate-catalog:list",
@@ -399,7 +405,10 @@ function parseJs(text, label) {
     'admin:open-candidate-browser',
     'admin:return-candidate-browser',
     'admin-candidats.html',
-    'isAdminNavigationPage(page)'
+    'isAdminNavigationPage(page)',
+    'initializeCandidateSecurity',
+    'safeStorage',
+    'candidate-local-key.sebkey'
   ]) if (!main.includes(token)) fail('confinement/navigation Admin incomplet: ' + token, 7);
 
   for (const token of [
@@ -418,7 +427,9 @@ function parseJs(text, label) {
     'candidateCatalog.install({ beforeNavigate: () => saveNow(true) });',
     'SEB_ADMIN_EXPORT_REQUIRES_CLOSED_CANDIDATE',
     'Fermez le dossier candidat avant de lancer l’export.',
-    'SEB_ADMIN_HOME_PRIVACY_BUTTON_IN_BAR'
+    'SEB_ADMIN_HOME_PRIVACY_BUTTON_IN_BAR',
+    'createTransferPasswordDialog',
+    'Afficher le mot de passe'
   ]) if (!preload.includes(token)) fail('interface/navigation Admin candidat incomplète: ' + token, 7);
 
   const sebIaIntegrated = packageText.includes('build165plus-seb-ia-v1.js');
