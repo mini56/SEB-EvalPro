@@ -11,7 +11,7 @@ RequestExecutionLevel admin
 ShowInstDetails show
 Icon "app-icon.ico"
 
-VIProductVersion "0.1.0.0"
+VIProductVersion "${APP_VERSION}.0"
 VIAddVersionKey /LANG=1036 "ProductName" "SEB-éval-PRO - Désinstallation"
 VIAddVersionKey /LANG=1036 "FileDescription" "Désinstallation complète de SEB-éval-PRO"
 VIAddVersionKey /LANG=1036 "ProductVersion" "${APP_VERSION}"

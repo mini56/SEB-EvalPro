@@ -1,4 +1,4 @@
-name: TEST Windows SEB-IA Single Setup
+name: TEST Windows SEB-IA Full Setup
 
 on:
   workflow_dispatch:
@@ -9,7 +9,7 @@ permissions:
 jobs:
   build-windows-test:
     runs-on: windows-latest
-    timeout-minutes: 35
+    timeout-minutes: 60
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -22,70 +22,245 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund
 
+      - name: Validate version
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          if ($version -ne '0.3.1') { throw "Version attendue 0.3.1, trouvée : $version" }
+          Write-Host "SEB_VERSION: $version"
+
       - name: Validate SEB-IA
         run: npm run test:seb-ia
 
-      - name: Set test version
+      - name: Ensure ImageMagick
         shell: pwsh
         run: |
-          $p = Get-Content package.json -Raw | ConvertFrom-Json
-          $p.version = '0.3.0'
-          $p | ConvertTo-Json -Depth 20 | Set-Content package.json -Encoding utf8
+          if (-not (Get-Command magick -ErrorAction SilentlyContinue)) {
+            choco install imagemagick --no-progress -y
+          }
+          if (-not (Get-Command magick -ErrorAction SilentlyContinue)) {
+            throw 'ImageMagick introuvable.'
+          }
 
-      - name: Generate installer resources
+      - name: Generate official Sauvegarde 56 installer branding and icon
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
+          ./scripts/generate-installer-branding.ps1
+          foreach ($path in @('build/app-icon.ico','build/installerHeader.bmp','build/installerBranding.bmp')) {
+            if (-not (Test-Path $path)) { throw "Ressource installateur absente : $path" }
+          }
+          $brandingGeometry = (& magick identify -format '%wx%h' 'build/installerBranding.bmp').Trim()
+          $headerGeometry = (& magick identify -format '%wx%h' 'build/installerHeader.bmp').Trim()
+          if ($brandingGeometry -ne '450x228') { throw "Branding invalide : $brandingGeometry" }
+          if ($headerGeometry -ne '150x57') { throw "Bandeau invalide : $headerGeometry" }
+          $icoInfo = (& magick identify -format "%wx%h`n" 'build/app-icon.ico') -join "`n"
+          foreach ($size in @(16,20,24,32,40,48,64,96,128,256)) {
+            if ($icoInfo -notmatch "(?m)^$($size)x$($size)$") {
+              throw "Trame icône officielle absente : $($size)x$($size)"
+            }
+          }
+          Write-Host 'ICON_OFFICIELLE_MULTI_RESOLUTION: OK'
+          Write-Host 'INSTALLATEUR_SAUVEGARDE56: OK'
+
+      - name: Build native candidate keyboard guard
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          if (-not (Test-Path $vswhere)) { throw 'vswhere.exe introuvable.' }
+          $install = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (-not $install) { throw 'Visual C++ Build Tools introuvables.' }
+          $vcvars = Join-Path $install 'VC\Auxiliary\Build\vcvars64.bat'
+          $compile = 'call "' + $vcvars + '" && cl.exe /nologo /O2 /EHsc /DUNICODE /D_UNICODE native\candidate-keyguard.cpp /Fe:build\candidate-keyguard.exe user32.lib'
+          cmd.exe /d /c $compile
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path 'build\candidate-keyguard.exe')) {
+            throw 'Compilation candidate-keyguard.exe échouée.'
+          }
+          Write-Host 'CANDIDATE_KEYGUARD: OK'
+
+      - name: Normalize Windows NSIS encodings
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $utf8Bom = New-Object System.Text.UTF8Encoding($true)
+          foreach ($relativePath in @('build\installer.nsh','build\standalone-uninstaller.nsi')) {
+            $path = (Resolve-Path $relativePath).Path
+            $text = [System.IO.File]::ReadAllText($path)
+            [System.IO.File]::WriteAllText($path, $text, $utf8Bom)
+          }
+
+      - name: Build Windows Setup 0.3.1
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          npm run dist:win
+          if ($LASTEXITCODE -ne 0) { throw 'Construction Windows échouée.' }
+          $setup = 'dist\SEB-eval-PRO-0.3.1-Windows-Setup.exe'
+          if (-not (Test-Path $setup)) { throw "Setup 0.3.1 absent : $setup" }
+          if (Test-Path 'dist\win-unpacked\resources\ai') {
+            throw 'Un ancien Pack IA externe est encore embarqué.'
+          }
+          if (-not (Test-Path 'dist\win-unpacked\resources\candidate-keyguard.exe')) {
+            throw 'candidate-keyguard.exe absent du programme empaqueté.'
+          }
+          Write-Host "SETUP_031: $((Resolve-Path $setup).Path)"
+
+      - name: Build standalone Windows uninstaller 0.3.1
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $makensis = Get-Command makensis.exe -ErrorAction SilentlyContinue
+          if (-not $makensis) {
+            choco install nsis --no-progress -y
+            $candidate = Join-Path ${env:ProgramFiles(x86)} 'NSIS\makensis.exe'
+            if (Test-Path $candidate) { $makensis = Get-Item $candidate }
+          }
+          if (-not $makensis) { throw 'makensis.exe introuvable.' }
+          $makensisPath = if ($makensis.Source) { $makensis.Source } else { $makensis.FullName }
+          & $makensisPath '/DAPP_VERSION=0.3.1' 'build\standalone-uninstaller.nsi'
+          if ($LASTEXITCODE -ne 0) { throw "Compilation désinstallateur échouée : $LASTEXITCODE" }
+          $uninstaller = 'dist\SEB-eval-PRO-0.3.1-Windows-Desinstallation.exe'
+          if (-not (Test-Path $uninstaller)) { throw "Désinstallateur absent : $uninstaller" }
+          Write-Host 'STANDALONE_UNINSTALLER_031: OK'
+
+      - name: Verify Setup identity and hashes
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $setup = (Resolve-Path 'dist\SEB-eval-PRO-0.3.1-Windows-Setup.exe').Path
+          $uninstaller = (Resolve-Path 'dist\SEB-eval-PRO-0.3.1-Windows-Desinstallation.exe').Path
+
+          $installer = Get-Content 'build\installer.nsh' -Raw
+          foreach ($required in @('Version Candidat','Version Administrateur','SEB-IA est intégrée','edition-candidate.flag','edition-admin.flag')) {
+            if (-not $installer.Contains($required)) { throw "Fonction installateur absente : $required" }
+          }
+          if ($installer -match 'Ministral-3-8B-Instruct|SEB-EvalPro-IA-Pack-Setup|vc_redist\.x64\.exe') {
+            throw 'Ancienne dépendance Mistral/Pack IA/VC++ encore présente dans le Setup.'
+          }
+
+          $setupHash = (Get-FileHash $setup -Algorithm SHA256).Hash
+          $uninstallHash = (Get-FileHash $uninstaller -Algorithm SHA256).Hash
+          Write-Host "SETUP_SHA256=$setupHash"
+          Write-Host "UNINSTALLER_SHA256=$uninstallHash"
+
+      - name: Test real install shortcuts icon version and uninstall
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
           Add-Type -AssemblyName System.Drawing
-          New-Item -ItemType Directory -Force -Path build | Out-Null
 
-          function New-Bmp([string]$Path,[int]$Width,[int]$Height) {
-            $bmp = New-Object System.Drawing.Bitmap $Width,$Height
-            $g = [System.Drawing.Graphics]::FromImage($bmp)
-            $g.Clear([System.Drawing.Color]::White)
-            $brush = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(0,112,192))
-            $g.FillRectangle($brush,0,0,$Width,[Math]::Max(18,[int]($Height*0.28)))
-            $fontSize = [Math]::Max(8,[Math]::Min(22,[int]($Width/10)))
-            $font = [System.Drawing.Font]::new('Arial',[single]$fontSize,[System.Drawing.FontStyle]::Bold)
-            $g.DrawString('SEB EvalPro',$font,$brush,8,[Math]::Max(22,[int]($Height*0.38)))
-            $bmp.Save($Path,[System.Drawing.Imaging.ImageFormat]::Bmp)
-            $font.Dispose(); $brush.Dispose(); $g.Dispose(); $bmp.Dispose()
+          $setup = (Resolve-Path 'dist\SEB-eval-PRO-0.3.1-Windows-Setup.exe').Path
+          $uninstaller = (Resolve-Path 'dist\SEB-eval-PRO-0.3.1-Windows-Desinstallation.exe').Path
+          $installDir = 'C:\SEBEvalPro-031-CI'
+          Remove-Item -Recurse -Force $installDir -ErrorAction SilentlyContinue
+          Remove-Item 'HKCU:\Software\SEB EvalPro' -Recurse -Force -ErrorAction SilentlyContinue
+
+          $documents = [Environment]::GetFolderPath('MyDocuments')
+          $preservedFile = Join-Path $documents 'SEB EvalPro\Bilans\ci-preserve-031.txt'
+          New-Item -ItemType Directory -Force -Path (Split-Path -Parent $preservedFile) | Out-Null
+          Set-Content -LiteralPath $preservedFile -Value 'must survive uninstall' -Encoding ascii
+
+          $p = Start-Process -FilePath $setup -ArgumentList @('/S',"/D=$installDir") -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "Installation silencieuse échouée : $($p.ExitCode)" }
+
+          $exe = Join-Path $installDir 'SEB-éval-PRO.exe'
+          if (-not (Test-Path $exe)) {
+            $exe = Get-ChildItem $installDir -Filter '*.exe' | Where-Object { $_.Name -notmatch '^Uninstall' } | Select-Object -First 1 -ExpandProperty FullName
+          }
+          if (-not $exe -or -not (Test-Path $exe)) { throw 'Exécutable SEB-éval-PRO installé introuvable.' }
+
+          if (-not (Test-Path (Join-Path $installDir 'resources\candidate-keyguard.exe'))) {
+            throw 'Garde clavier Candidat absent après installation.'
+          }
+          if (-not (Test-Path (Join-Path $installDir 'edition-candidate.flag'))) {
+            throw 'Installation silencieuse par défaut non marquée Candidat.'
           }
 
-          New-Bmp 'build/installerHeader.bmp' 150 57
-          New-Bmp 'build/installerBranding.bmp' 164 314
+          $productVersion = (Get-Item $exe).VersionInfo.ProductVersion
+          if (-not $productVersion -or -not $productVersion.StartsWith('0.3.1')) {
+            throw "Version de l'exécutable incorrecte : $productVersion"
+          }
+          Write-Host "INSTALLED_VERSION=$productVersion"
 
-          $bmp = New-Object System.Drawing.Bitmap 256,256
-          $g = [System.Drawing.Graphics]::FromImage($bmp)
-          $g.Clear([System.Drawing.Color]::FromArgb(0,112,192))
-          $font = [System.Drawing.Font]::new('Arial',[single]70,[System.Drawing.FontStyle]::Bold)
-          $white = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::White)
-          $g.DrawString('SEB',$font,$white,22,72)
-          $hIcon = $bmp.GetHicon()
-          $icon = [System.Drawing.Icon]::FromHandle($hIcon)
-          $fs = [System.IO.File]::Open('build/app-icon.ico',[System.IO.FileMode]::Create)
-          $icon.Save($fs)
-          $fs.Dispose(); $icon.Dispose(); $white.Dispose(); $font.Dispose(); $g.Dispose(); $bmp.Dispose()
+          $icon = [System.Drawing.Icon]::ExtractAssociatedIcon($exe)
+          if (-not $icon -or $icon.Width -lt 16 -or $icon.Height -lt 16) {
+            throw 'Icône Windows associée à SEB-éval-PRO invalide.'
+          }
+          $icon.Dispose()
+          Write-Host 'INSTALLED_PROGRAM_ICON: OK'
 
-      - name: Build single Windows Setup
-        run: npm run dist:win
+          $desktopCandidates = @(
+            (Join-Path ([Environment]::GetFolderPath('Desktop')) 'SEB-éval-PRO.lnk'),
+            (Join-Path ([Environment]::GetFolderPath('CommonDesktopDirectory')) 'SEB-éval-PRO.lnk')
+          ) | Select-Object -Unique
+          $desktopLink = $desktopCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $desktopLink) { throw 'Raccourci Bureau SEB-éval-PRO absent.' }
 
-      - name: Verify single Setup
+          $startCandidates = @(
+            (Join-Path ([Environment]::GetFolderPath('Programs')) 'SEB-éval-PRO.lnk'),
+            (Join-Path ([Environment]::GetFolderPath('CommonPrograms')) 'SEB-éval-PRO.lnk')
+          ) | Select-Object -Unique
+          $startLink = $startCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $startLink) { throw 'Raccourci Menu Démarrer SEB-éval-PRO absent.' }
+
+          $ws = New-Object -ComObject WScript.Shell
+          foreach ($link in @($desktopLink,$startLink)) {
+            $sc = $ws.CreateShortcut($link)
+            if (-not (Test-Path $sc.TargetPath)) { throw "Cible raccourci invalide : $link -> $($sc.TargetPath)" }
+          }
+          Write-Host 'DESKTOP_SHORTCUT: OK'
+          Write-Host 'START_MENU_SHORTCUT: OK'
+
+          $cacheProbePaths = @(
+            (Join-Path $env:APPDATA 'SEB-éval-PRO'),
+            (Join-Path $env:LOCALAPPDATA 'SEB-éval-PRO')
+          )
+          foreach ($path in $cacheProbePaths) {
+            New-Item -ItemType Directory -Force -Path $path | Out-Null
+            Set-Content -LiteralPath (Join-Path $path 'ci-cleanup-probe.txt') -Value 'remove me' -Encoding ascii
+          }
+
+          $u = Start-Process -FilePath $uninstaller -ArgumentList '/S' -Wait -PassThru
+          if ($u.ExitCode -ne 0) { throw "Désinstallation autonome échouée : $($u.ExitCode)" }
+          Start-Sleep -Seconds 2
+
+          if (Test-Path $installDir) { throw "Dossier d'installation encore présent : $installDir" }
+          foreach ($path in $cacheProbePaths) {
+            if (Test-Path $path) { throw "Cache encore présent : $path" }
+          }
+          if (-not (Test-Path $preservedFile)) {
+            throw 'Documents\SEB EvalPro\Bilans a été supprimé à tort.'
+          }
+          foreach ($link in @($desktopCandidates + $startCandidates)) {
+            if (Test-Path $link) { throw "Raccourci encore présent après désinstallation : $link" }
+          }
+
+          Write-Host 'REAL_INSTALL_UNINSTALL: OK'
+          Write-Host 'DOCUMENTS_BILANS_PRESERVED: OK'
+
+      - name: Publish 0.3.1 test release
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          $setups = @(Get-ChildItem dist -Filter '*Windows-Setup.exe' -File)
-          if ($setups.Count -ne 1) { throw "Attendu : exactement 1 Setup Windows. Trouvé : $($setups.Count)" }
-          if (Select-String -Path build/installer.nsh -Pattern 'Ministral-3-8B-Instruct|SEB-EvalPro-IA-Pack-Setup|vc_redist.x64.exe' -Quiet) {
-            throw 'Ancienne dépendance Mistral/Pack IA encore présente dans le Setup.'
-          }
-          Write-Host "Setup unique : $($setups[0].FullName)"
-          Get-FileHash $setups[0].FullName -Algorithm SHA256 | Format-List
+          $ErrorActionPreference = 'Stop'
+          $tag = "seb-evalpro-seb-ia-031-build-${{ github.run_number }}"
+          $setup = 'dist\SEB-eval-PRO-0.3.1-Windows-Setup.exe'
+          $uninstaller = 'dist\SEB-eval-PRO-0.3.1-Windows-Desinstallation.exe'
+          $title = "SEB EvalPro 0.3.1 - SEB-IA - Build #${{ github.run_number }}"
+          $notes = "Setup complet SEB-éval-PRO 0.3.1 avec identité Sauvegarde 56, icône officielle, raccourcis Bureau/Menu Démarrer, garde clavier Candidat, SEB-IA intégrée et désinstallateur autonome. Installation/désinstallation réelle et conservation des bilans/Documents validées automatiquement."
+          gh release create $tag $setup $uninstaller --target "${{ github.sha }}" --title $title --notes $notes --prerelease --repo "${{ github.repository }}"
+          if ($LASTEXITCODE -ne 0) { throw 'Publication Release test 0.3.1 échouée.' }
+          Write-Host "RELEASE_TAG=$tag"
 
-      - name: Upload Windows test installer
+      - name: Upload Windows 0.3.1 artifact
         uses: actions/upload-artifact@v4
         with:
-          name: SEB-EvalPro-SEB-IA-V1-Windows-Test
+          name: SEB-EvalPro-0.3.1-Full-Windows
           path: |
-            dist/*Windows-Setup.exe
-            dist/*Windows-Desinstallation.exe
+            dist/SEB-eval-PRO-0.3.1-Windows-Setup.exe
+            dist/SEB-eval-PRO-0.3.1-Windows-Desinstallation.exe
           if-no-files-found: error
           retention-days: 14
