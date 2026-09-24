@@ -179,8 +179,8 @@ function words(text){return String(text||'').trim().split(/\s+/).filter(Boolean)
   set(list,'expression','II','Structure des phrases et orthographe globalement correcte. Idées présentées de manière ordonnée. - 59 % de réponses correctes.');
   set(list,'math-enonce','I','Comprend et exécute une consigne unique. - 100 % de réponses correctes.');
   set(list,'math-problemes','I','Est capable de calculer, mettre en œuvre des algorithmes et de traiter des problèmes de pourcentages et d’échelles liés à la vie courante. - 93 % de réponses correctes.');
-  const out=make({civilite:'M.',nom:'DURANT',prenom:'JEAN',date:'2026-09-19'},list);
-  assert(out.ok,'cas DURANT refusé: '+out.validation.errors.join(' | '));
+  const out=make({civilite:'M.',nom:'XX',prenom:'YY',date:'2026-09-19'},list);
+  assert(out.ok,'cas XX refusé: '+out.validation.errors.join(' | '));
   assert(!/la découpe et le pliage et l[’']assemblage/i.test(out.text),'double coordination "et" réintroduite');
   assert(!/En expression écrite,\s+l[’']expression écrite/i.test(out.text),'répétition expression écrite réintroduite');
   assert((out.text.match(/demande encore une méthode plus structurée/gi)||[]).length<=1,'même structure répétée pour organisation/planification');
@@ -194,10 +194,10 @@ function words(text){return String(text||'').trim().split(/\s+/).filter(Boolean)
   assert(!/excellent|parfait|exceptionnel|remarquable/i.test(out.text),'intensification non justifiée');
   assert(!/\bà le\b|\bde le\b/i.test(out.text),'contraction française incorrecte');
   assert(!/0 min 03 s|6 erreurs/i.test(out.text),'métriques de tri recopiées sans utilité');
-  assert(words(out.text)>=250,'cas DURANT devenu trop court: '+words(out.text)+' mots');
-  assert(words(out.text)<320,'cas DURANT trop long: '+words(out.text)+' mots');
+  assert(words(out.text)>=250,'cas XX devenu trop court: '+words(out.text)+' mots');
+  assert(words(out.text)<320,'cas XX trop long: '+words(out.text)+' mots');
   assert(/Dans l’ensemble|Au terme du parcours|Les acquis|Les résultats/i.test(out.text),'conclusion descriptive absente');
-  console.log('SEB-IA DURANT: '+words(out.text)+' mots.\n'+out.text);
+  console.log('SEB-IA XX: '+words(out.text)+' mots.\n'+out.text);
 })();
 
 
