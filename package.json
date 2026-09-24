@@ -11,7 +11,8 @@
     "dist:win": "npm run prepare:web && electron-builder --win --publish never",
     "dist:linux": "npm run prepare:web && electron-builder --linux AppImage --publish never",
     "test:seb-ia": "node scripts/test-seb-ia-v1.js && node scripts/audit-repository-names.js",
-    "audit:names": "node scripts/audit-repository-names.js"
+    "audit:names": "node scripts/audit-repository-names.js",
+    "test:security": "node scripts/candidate-store-smoke.js && node scripts/candidate-transfer-smoke.js"
   },
   "dependencies": {
     "quill": "2.0.3"
