@@ -645,21 +645,57 @@ ipcMain.handle('candidate:complete-active', (_event, mode) => {
   }
 });
 
-ipcMain.handle('admin:export-candidates', async (_event, password) => {
+ipcMain.handle('admin:export-candidates', async (_event, password, destinationOptions = {}) => {
   if (!mainWindow || !adminSessionUnlocked) return { ok: false, error: 'Accès administrateur requis.' };
   try {
+    const mode = String(destinationOptions && destinationOptions.mode || 'existing');
+
+    if (mode === 'create') {
+      const rawFolderName = String(destinationOptions && destinationOptions.folderName || '').trim();
+      const folderName = rawFolderName.replace(/[<>:"/\\|?*\u0000-\u001F]/g, '_').replace(/[. ]+$/g, '').trim();
+      if (!folderName || folderName === '.' || folderName === '..') {
+        return { ok:false, error:'Le nom du dossier d’export est invalide.' };
+      }
+
+      const selection = await dialog.showOpenDialog(mainWindow, {
+        title: 'Choisir la clé USB où créer le nouveau dossier',
+        buttonLabel: 'Créer le dossier ici',
+        properties: ['openDirectory']
+      });
+      if (selection.canceled || !selection.filePaths || !selection.filePaths[0]) {
+        return { ok:false, cancelled:true };
+      }
+
+      const parent = selection.filePaths[0];
+      const destination = path.join(parent, folderName);
+      if (fs.existsSync(destination)) {
+        return {
+          ok:false,
+          error:'Ce dossier existe déjà sur la clé. Choisissez « Choisir un dossier existant » pour y ajouter les nouveaux candidats.'
+        };
+      }
+      fs.mkdirSync(destination, { recursive:false });
+      const result = getCandidateTransfer().exportAll(destination, password);
+      return { ok:true, ...result, createdExportFolder:true };
+    }
+
+    if (mode !== 'existing') {
+      return { ok:false, error:'Choix de destination d’export invalide.' };
+    }
+
     const selection = await dialog.showOpenDialog(mainWindow, {
-      title: 'Choisir la clé USB',
-      buttonLabel: 'Exporter sur cette clé',
+      title: 'Choisir un dossier existant sur la clé USB',
+      buttonLabel: 'Exporter dans ce dossier',
       properties: ['openDirectory']
     });
     if (selection.canceled || !selection.filePaths || !selection.filePaths[0]) {
-      return { ok: false, cancelled: true };
+      return { ok:false, cancelled:true };
     }
+
     const result = getCandidateTransfer().exportAll(selection.filePaths[0], password);
-    return { ok: true, ...result };
+    return { ok:true, ...result, createdExportFolder:false };
   } catch (error) {
-    return { ok: false, error: error && error.message ? error.message : String(error) };
+    return { ok:false, error:error && error.message ? error.message : String(error) };
   }
 });
 
