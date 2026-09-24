@@ -43,6 +43,9 @@ const engineSource=read(engineFile);
 function sebIaCandidate(){
   try{return JSON.parse(sessionStorage.getItem('candidat_data')||'{}')||{}}catch(_){return{}}
 }
+function sebIaAbandons(){
+  try{const value=JSON.parse(sessionStorage.getItem('seb_evalpro_abandons')||'[]');return Array.isArray(value)?value:[]}catch(_){return[]}
+}
 function sebIaRow(key){
   const row=document.querySelector('tr[data-r="'+key+'"]');
   if(!row)return{key,level:'',comment:'',detail:'',moduleText:''};
@@ -58,7 +61,8 @@ function sebIaSnapshot(){
   const api=window.SEB_IA_ENGINE;
   return{
     candidate:sebIaCandidate(),
-    rows:Object.keys(api.META).map(sebIaRow)
+    rows:Object.keys(api.META).map(sebIaRow),
+    abandons:sebIaAbandons()
   };
 }
 function sebIaInstall(){
@@ -80,7 +84,7 @@ function sebIaInstall(){
   button.addEventListener('click',()=>{
     button.disabled=true;
     const status=document.getElementById('seb-synthese-status');
-    if(status)status.textContent='SEB-IA construit la synthèse à partir du tableau…';
+    if(status)status.textContent='SEB-IA construit la synthèse à partir du tableau et des données du parcours…';
     try{
       const result=api.generate(sebIaSnapshot());
       if(!result||!result.ok){
@@ -94,7 +98,7 @@ function sebIaInstall(){
       sessionStorage.setItem('seb_evalpro_bilan_synthese_fingerprint',result.fingerprint||'');
       area.dispatchEvent(new Event('input',{bubbles:true}));
       if(window.sebEvalPro&&window.sebEvalPro.save)window.sebEvalPro.save();
-      if(status)status.textContent=(result.version||'SEB-IA')+' — synthèse générée et contrôlée à partir du tableau. Vous pouvez la modifier.';
+      if(status)status.textContent=(result.version||'SEB-IA')+' — synthèse générée et contrôlée à partir du tableau et des données du parcours. Vous pouvez la modifier.';
     }catch(error){
       if(status)status.textContent='SEB-IA : '+String(error&&error.message?error.message:error);
     }finally{

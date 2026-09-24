@@ -52,6 +52,27 @@ function words(text){return String(text||'').trim().split(/\s+/).filter(Boolean)
   assert(/pas pu être évalu|hors interprétation|interromp/i.test(out.text),'NE doit rester visible');
 })();
 
+(function abandonReasonFromJourney(){
+  const list=rows('I');
+  set(list,'planning','NE','Non évalué.');
+  const out=engine.generate({
+    candidate:{civilite:'Mme',nom:'MOTIF'},
+    rows:list,
+    abandons:[{
+      key:'planning.html',
+      exercice:'Planification — Le restaurant',
+      raisons:['Je ne comprends pas la consigne','L’exercice est trop difficile'],
+      commentaire:'La personne souhaite arrêter cet exercice.'
+    }]
+  });
+  assert(out.ok,out.validation.errors.join(' | '));
+  assert(/Planification — Le restaurant/i.test(out.text),'exercice abandonné absent de la synthèse');
+  assert(/Je ne comprends pas la consigne/i.test(out.text),'premier motif du parcours perdu');
+  assert(/L’exercice est trop difficile/i.test(out.text),'second motif du parcours perdu');
+  assert(/La personne souhaite arrêter cet exercice/i.test(out.text),'commentaire d’abandon perdu');
+  assert.strictEqual(out.stats.abandoned,1,'abandon du parcours non comptabilisé');
+})();
+
 (function attribution(){
   const list=rows('I');
   set(list,'tri-erreurs','II',"Entre 1.1 et 2% d'erreur. 8 erreurs. Monsieur indique que cet exercice est éprouvant pour lui.");
