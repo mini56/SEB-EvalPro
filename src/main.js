@@ -649,9 +649,9 @@ ipcMain.handle('admin:export-candidates', async (_event, password) => {
   if (!mainWindow || !adminSessionUnlocked) return { ok: false, error: 'Accès administrateur requis.' };
   try {
     const selection = await dialog.showOpenDialog(mainWindow, {
-      title: 'Choisir la clé USB ou son dossier racine',
-      buttonLabel: 'Exporter ici',
-      properties: ['openDirectory', 'createDirectory']
+      title: 'Choisir la clé USB',
+      buttonLabel: 'Exporter sur cette clé',
+      properties: ['openDirectory']
     });
     if (selection.canceled || !selection.filePaths || !selection.filePaths[0]) {
       return { ok: false, cancelled: true };
@@ -668,8 +668,8 @@ ipcMain.handle('admin:import-candidates', async (_event, password) => {
   if (!mainWindow || !adminSessionUnlocked) return { ok: false, error: 'Accès administrateur requis.' };
   try {
     const selection = await dialog.showOpenDialog(mainWindow, {
-      title: 'Choisir la racine de la clé USB contenant les dossiers candidats',
-      buttonLabel: 'Importer',
+      title: 'Choisir la clé USB contenant les fichiers candidats .seb',
+      buttonLabel: 'Importer depuis cette clé',
       properties: ['openDirectory']
     });
     if (selection.canceled || !selection.filePaths || !selection.filePaths[0]) {
