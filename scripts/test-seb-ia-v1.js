@@ -281,6 +281,8 @@ function words(text){return String(text||'').trim().split(/\s+/).filter(Boolean)
     assert(!/pliage et l[’']assemblage et les finitions/i.test(p.out.text),p.name+': coordination répétée');
     assert(!/(?:volet fabrication|opérations de fabrication)\.\s+(?:Une|Des)/i.test(p.out.text),p.name+': ouverture fabrication isolée');
     assert(!/opérations de fabrication, les différentes opérations/i.test(p.out.text),p.name+': répétition opérations de fabrication');
+    assert(!/Concernant les outils numériques,\s+(?:concernant|pour)\b/i.test(p.out.text),p.name+': double cadrage outils numériques');
+    assert(!/En mathématiques,\s+dans cette situation\b/i.test(p.out.text),p.name+': cadrage mathématique lourd');
     assert((p.out.text.match(/\bLa compétence liée\b/g)||[]).length<=5,p.name+': forme « La compétence liée » trop répétée');
     assert((p.out.text.match(/\bLa mise en œuvre\b/g)||[]).length<=4,p.name+': forme « La mise en œuvre » trop répétée');
     console.log('\nSEB-IA PROFIL REALISTE ['+p.name+'] — '+wc+' mots\n'+p.out.text+'\n');
