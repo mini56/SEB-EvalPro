@@ -60,6 +60,15 @@ try {
   const active = store.getActiveCandidate();
   assert(active && active.displayName === 'YYPRENOMSECRET XXNOMSECRET');
   assert.strictEqual(store.getActiveExportDir(), path.join(first.candidateDir, 'bilan', 'exports'));
+  assert(fs.existsSync(store.paths.activePointerPath), 'Le pointeur actif principal doit exister.');
+  assert(fs.existsSync(store.paths.activePointerBackupPath), 'La copie de récupération du pointeur actif doit exister dans Documents.');
+
+  // Simulation d'un nettoyage AppData pendant une mise à jour.
+  fs.rmSync(store.paths.activePointerPath, { force:true });
+  assert.strictEqual(fs.existsSync(store.paths.activePointerPath), false);
+  const recoveredActive = store.getActiveCandidate();
+  assert(recoveredActive && recoveredActive.candidateId === first.candidateId, 'Le parcours actif doit être restauré depuis Documents.');
+  assert(fs.existsSync(store.paths.activePointerPath), 'Le pointeur AppData doit être recréé depuis sa sauvegarde.');
 
   const closed = store.completeActiveCandidate({
     ...state,
@@ -68,6 +77,8 @@ try {
   });
   assert(closed && closed.status === 'TERMINE');
   assert.strictEqual(store.getActiveCandidate(), null, 'Le pointeur actif doit être supprimé après fermeture.');
+  assert.strictEqual(fs.existsSync(store.paths.activePointerPath), false, 'Le pointeur AppData doit être supprimé après fin du parcours.');
+  assert.strictEqual(fs.existsSync(store.paths.activePointerBackupPath), false, 'La copie de récupération doit aussi être supprimée après fin du parcours.');
 
   const rawManifest = fs.readFileSync(path.join(first.candidateDir, 'manifest.json'), 'utf8');
   assert(rawManifest.startsWith(LOCAL_PREFIX), 'Le manifeste candidat doit être chiffré sur disque.');
