@@ -278,6 +278,7 @@ function words(text){return String(text||'').trim().split(/\s+/).filter(Boolean)
     assert(!/la découpe demandent/i.test(p.out.text),p.name+': accord singulier/pluriel incorrect');
     assert(!/pliage et l[’']assemblage et les finitions/i.test(p.out.text),p.name+': coordination répétée');
     assert(!/(?:volet fabrication|opérations de fabrication)\.\s+(?:Une|Des)/i.test(p.out.text),p.name+': ouverture fabrication isolée');
+    assert(!/opérations de fabrication, les différentes opérations/i.test(p.out.text),p.name+': répétition opérations de fabrication');
     console.log('\nSEB-IA PROFIL REALISTE ['+p.name+'] — '+wc+' mots\n'+p.out.text+'\n');
   }
   const byName=Object.fromEntries(profiles.map(p=>[p.name,p.out.text]));
