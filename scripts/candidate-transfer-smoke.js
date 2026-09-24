@@ -56,11 +56,11 @@ try {
   const pc1 = createCandidateTransfer({ documentsPath:pc1Documents, now:() => new Date(fixedNow) });
   fs.mkdirSync(pc1.paths.candidatesRoot, { recursive:true });
 
-  makeCandidate(pc1.paths.candidatesRoot, 'OLD_DUPONT_FOLDER', 'candidate-1', 'pc1-v1', {
-    nom:'DUPONT', 'prénom':'Jean', lieu:'Lorient', groupe:'7', date:'2026-09-18'
+  makeCandidate(pc1.paths.candidatesRoot, 'OLD_XX_FOLDER', 'candidate-1', 'pc1-v1', {
+    nom:'XX', 'prénom':'YY', lieu:'Lorient', groupe:'7', date:'2026-09-18'
   });
-  makeCandidate(pc1.paths.candidatesRoot, 'OLD_MARTIN_FOLDER', 'candidate-2', 'pc1-v1', {
-    nom:'MARTIN', 'prénom':'Léa', lieu:'Lorient', groupe:'7', date:'2026-09-18'
+  makeCandidate(pc1.paths.candidatesRoot, 'OLD_ZZ_FOLDER', 'candidate-2', 'pc1-v1', {
+    nom:'ZZ', 'prénom':'WW', lieu:'Lorient', groupe:'7', date:'2026-09-18'
   });
 
   fs.mkdirSync(usbRoot, { recursive:true });
@@ -75,21 +75,21 @@ try {
 
   const usbCandidates1 = pc1.listCandidateRecords(usbRoot, false);
   assert.strictEqual(usbCandidates1.length, 2);
-  assert(usbCandidates1.some((r) => r.folderName === 'DUPONT_Jean_Lorient_7'));
-  assert(usbCandidates1.some((r) => r.folderName === 'MARTIN_Lea_Lorient_7'));
+  assert(usbCandidates1.some((r) => r.folderName === 'XX_YY_Lorient_7'));
+  assert(usbCandidates1.some((r) => r.folderName === 'ZZ_Lea_Lorient_7'));
 
   // Un second export du même candidat doit être IGNORÉ : aucune fusion,
   // aucun écrasement, même si la copie locale a évolué.
-  fs.writeFileSync(path.join(pc1.paths.candidatesRoot, 'OLD_DUPONT_FOLDER', 'donnees', 'marker.txt'), 'pc1-v2', 'utf8');
+  fs.writeFileSync(path.join(pc1.paths.candidatesRoot, 'OLD_XX_FOLDER', 'donnees', 'marker.txt'), 'pc1-v2', 'utf8');
   const secondExport = pc1.exportAll(usbRoot);
   assert.strictEqual(secondExport.total, 2);
   assert.strictEqual(secondExport.added, 0);
   assert.strictEqual(secondExport.updated, 0);
   assert.strictEqual(secondExport.skipped, 2);
 
-  const dupontUsb = pc1.listCandidateRecords(usbRoot, false).find((item) => item.candidateId === 'candidate-1');
+  const candidateOneUsb = pc1.listCandidateRecords(usbRoot, false).find((item) => item.candidateId === 'candidate-1');
   assert.strictEqual(
-    fs.readFileSync(path.join(dupontUsb.candidateDir, 'donnees', 'marker.txt'), 'utf8'),
+    fs.readFileSync(path.join(candidateOneUsb.candidateDir, 'donnees', 'marker.txt'), 'utf8'),
     'pc1-v1',
     'Un dossier déjà présent sur la clé ne doit jamais être écrasé.'
   );
@@ -97,19 +97,19 @@ try {
   const pc2 = createCandidateTransfer({ documentsPath:pc2Documents, now:() => new Date(fixedNow) });
   fs.mkdirSync(pc2.paths.candidatesRoot, { recursive:true });
   makeCandidate(pc2.paths.candidatesRoot, 'ANY_OLD_NAME', 'candidate-3', 'pc2-v1', {
-    nom:'LE GOFF', 'prénom':'Anne', lieu:'Vannes', groupe:'4', date:'2026-09-18'
+    nom:'VV', 'prénom':'UU', lieu:'Vannes', groupe:'4', date:'2026-09-18'
   });
   const anotherExport = pc2.exportAll(usbRoot);
   assert.strictEqual(anotherExport.added, 1);
   assert.strictEqual(pc1.listCandidateRecords(usbRoot, false).length, 3, 'La clé doit accumuler les candidats de plusieurs PC.');
 
   // Dossier incomplet volontaire : présent à la racine mais refusé à l'import.
-  const bad = path.join(usbRoot, 'INCOMPLET_Test_Lorient_9');
+  const bad = path.join(usbRoot, 'INCOMPLET_TT_Lorient_9');
   fs.mkdirSync(path.join(bad, 'donnees'), { recursive:true });
   writeJson(path.join(bad, 'manifest.json'), {
     schemaVersion:1,
     candidateId:'candidate-bad',
-    candidat:{ nom:'INCOMPLET', prenom:'Test', lieu:'Lorient', groupe:'9' }
+    candidat:{ nom:'INCOMPLET', prenom:'TT', lieu:'Lorient', groupe:'9' }
   });
 
   const admin = createCandidateTransfer({ documentsPath:adminDocuments, now:() => new Date(fixedNow) });
@@ -121,8 +121,8 @@ try {
   assert.strictEqual(imported.verified, true);
   assert.strictEqual(admin.listCandidateRecords(imported.destinationRoot, false).length, 3);
 
-  const dupontAdmin = admin.listCandidateRecords(imported.destinationRoot, false).find((item) => item.candidateId === 'candidate-1');
-  fs.writeFileSync(path.join(dupontAdmin.candidateDir, 'bilan', 'historique', 'admin-only.json'), '{"admin":true}', 'utf8');
+  const candidateOneAdmin = admin.listCandidateRecords(imported.destinationRoot, false).find((item) => item.candidateId === 'candidate-1');
+  fs.writeFileSync(path.join(candidateOneAdmin.candidateDir, 'bilan', 'historique', 'admin-only.json'), '{"admin":true}', 'utf8');
 
   // Nouvel import : dossiers déjà présents = ignorés, sans fusion.
   const importedAgain = admin.importAll(usbRoot);
@@ -132,7 +132,7 @@ try {
   assert.strictEqual(importedAgain.skipped, 3);
   assert.strictEqual(admin.listCandidateRecords(importedAgain.destinationRoot, false).length, 3);
   assert(
-    fs.existsSync(path.join(dupontAdmin.candidateDir, 'bilan', 'historique', 'admin-only.json')),
+    fs.existsSync(path.join(candidateOneAdmin.candidateDir, 'bilan', 'historique', 'admin-only.json')),
     'Les données créées sur le PC Admin doivent rester intactes.'
   );
   assert.strictEqual(tempArtifacts(admin.paths.candidatesRoot).length, 0);
