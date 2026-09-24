@@ -22,8 +22,8 @@ try {
     version: 1,
     sessionStorage: {
       candidat_data: JSON.stringify({
-        nom: 'XX',
-        'prénom': 'YY',
+        nom: 'XXNOMSECRET',
+        'prénom': 'YYPRENOMSECRET',
         lieu: 'Lorient',
         groupe: '7',
         date: '2026-09-18'
@@ -58,7 +58,7 @@ try {
   assert.strictEqual(second.candidateDir, first.candidateDir, 'Une sauvegarde suivante ne doit pas créer de doublon.');
 
   const active = store.getActiveCandidate();
-  assert(active && active.displayName === 'YY XX');
+  assert(active && active.displayName === 'YYPRENOMSECRET XXNOMSECRET');
   assert.strictEqual(store.getActiveExportDir(), path.join(first.candidateDir, 'bilan', 'exports'));
 
   const closed = store.closeActiveCandidate({
@@ -71,7 +71,7 @@ try {
 
   const rawManifest = fs.readFileSync(path.join(first.candidateDir, 'manifest.json'), 'utf8');
   assert(rawManifest.startsWith(LOCAL_PREFIX), 'Le manifeste candidat doit être chiffré sur disque.');
-  assert(!rawManifest.includes('Lorient') && !rawManifest.includes('YY') && !rawManifest.includes('XX'), 'Aucune identité candidat ne doit rester en clair dans le manifeste.');
+  assert(!rawManifest.includes('Lorient') && !rawManifest.includes('YYPRENOMSECRET') && !rawManifest.includes('XXNOMSECRET'), 'Aucune identité candidat ne doit rester en clair dans le manifeste.');
   const manifest = readJsonFile(path.join(first.candidateDir, 'manifest.json'));
   assert.strictEqual(manifest.status, 'SESSION_FERMEE');
   assert(manifest.closedAt, 'La date de fermeture doit être enregistrée.');
