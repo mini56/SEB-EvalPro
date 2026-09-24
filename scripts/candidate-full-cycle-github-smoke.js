@@ -126,8 +126,8 @@ try {
     'ANCIEN_DOSSIER_UNIQUE',
     'legacy-candidate-3',
     { nom:'XXC', 'prénom':'YYC', lieu:'Auray', groupe:'3', date:'2026-08-02' },
-    '',
-    true
+    'TERMINE',
+    false
   );
 
   // Candidat 4 : ancien stockage Admin, session fermée, structure partielle.
@@ -141,12 +141,23 @@ try {
     true
   );
 
-  // Candidat 5 : ancien EN_COURS mais sans pointeur actif : doit être normalisé comme ancien parcours terminé.
+  // Candidat 5 : ancien dossier explicitement terminé.
   writeLegacyCandidate(
     legacyCandidateRoot,
-    'ANCIEN_EN_COURS_ORPHELIN',
+    'ANCIEN_TERMINE',
     'legacy-candidate-5',
     { nom:'XXE', 'prénom':'YYE', lieu:'Hennebont', groupe:'5', date:'2026-08-04' },
+    'TERMINE',
+    false
+  );
+
+  // Candidat 7 : EN_COURS sans pointeur actif. Il ne doit JAMAIS être converti
+  // automatiquement en terminé ni partir dans un export.
+  writeLegacyCandidate(
+    legacyCandidateRoot,
+    'EN_COURS_SANS_POINTEUR',
+    'orphan-active-candidate-7',
+    { nom:'XXG', 'prénom':'YYG', lieu:'Ploemeur', groupe:'7', date:'2026-09-23' },
     'EN_COURS',
     false
   );
@@ -204,11 +215,17 @@ try {
 
   const usbHashes = new Map(usbSebFiles.map((name) => [name, sha256(path.join(usbRoot, name))]));
 
-  // Les 6 candidats visibles/exploitables côté source doivent correspondre aux 6 exports.
+  // Six candidats terminés sont transférés. Le septième, EN_COURS sans pointeur,
+  // doit rester local, non modifié et non exporté.
   const sourceRecords = sourceTransfer.listCandidateRecords(sourceTransfer.paths.candidatesRoot, false);
-  assert.strictEqual(sourceRecords.length, 6, 'Le PC source doit contenir 6 dossiers candidats après migration/normalisation.');
-  const sourceIds = sourceRecords.map((r) => String(r.candidateId)).sort();
-  assert(sourceRecords.every((r) => String(r.manifest.status) === 'TERMINE'), 'Tous les candidats source doivent être terminés avant le transfert final.');
+  assert.strictEqual(sourceRecords.length, 7, 'Le PC source doit conserver les 7 dossiers candidats, y compris le parcours EN_COURS protégé.');
+  const orphan = sourceRecords.find((r) => String(r.candidateId) === 'orphan-active-candidate-7');
+  assert(orphan && String(orphan.manifest.status) === 'EN_COURS', 'Un EN_COURS sans pointeur ne doit jamais être transformé automatiquement en TERMINE.');
+  const sourceIds = sourceRecords
+    .filter((r) => String(r.manifest.status) === 'TERMINE')
+    .map((r) => String(r.candidateId))
+    .sort();
+  assert.strictEqual(sourceIds.length, 6, 'Exactement 6 parcours terminés doivent être exportables.');
 
   // PC cible : autre clé locale.
   configureLocalKey(Buffer.alloc(32, 52));
@@ -274,6 +291,7 @@ try {
   console.log('FULL_CYCLE_WRONG_PASSWORD_NO_IMPORT=OK');
   console.log('FULL_CYCLE_RESTART_RESUME=OK');
   console.log('FULL_CYCLE_LEGACY_MIGRATION=OK');
+  console.log('FULL_CYCLE_ORPHAN_EN_COURS_NOT_EXPORTED=OK');
   console.log('Candidate Full Cycle GitHub Simulation: OK');
 } finally {
   fs.rmSync(root, { recursive:true, force:true });
