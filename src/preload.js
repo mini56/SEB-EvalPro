@@ -992,10 +992,12 @@ window.addEventListener('DOMContentLoaded', async () => {
   if (adminCandidateResultsWorkspace) {
     showReadOnlyCandidateResults();
   } else {
-    document.addEventListener('input', scheduleSave, true);
-    document.addEventListener('change', scheduleSave, true);
-    document.addEventListener('click', scheduleSave, true);
-    periodicSaveTimer = setInterval(() => saveNow(false), SAVE_CHECKPOINT_MS);
+    if (!isAdminBilanPage()) {
+      document.addEventListener('input', scheduleSave, true);
+      document.addEventListener('change', scheduleSave, true);
+      document.addEventListener('click', scheduleSave, true);
+      periodicSaveTimer = setInterval(() => saveNow(false), SAVE_CHECKPOINT_MS);
+    }
 
     const finalPage = document.getElementById('pageFinale');
     if (finalPage && !isAdminCandidatesPage() && !isAdminBilanPage()) {
