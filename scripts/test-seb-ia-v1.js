@@ -124,6 +124,42 @@ function words(text){return String(text||'').trim().split(/\s+/).filter(Boolean)
   assert(engine.VOCABULARY.addition.length>=5,'connecteurs d’ajout trop pauvres');
 })();
 
+
+(function realTableCommentsCoverage(){
+  const list=rows('I');
+  set(list,'fabrication-plan','III',"A besoin qu'on lui montre un exemple ou d'utiliser un gabarit pour commencer l'exercice.");
+  set(list,'fabrication-tracage','III','Les traits ne sont pas droits et pas aux dimensions attendues.');
+  set(list,'fabrication-decoupe','III','La personne n’utilise pas toujours les ciseaux de manière adaptée.');
+  set(list,'fabrication-assemblage','II','La personne demande des consignes supplémentaires pour assembler.');
+  set(list,'fabrication-finition','III',"L’aspect du produit n'est pas conforme aux exigences, pas ou peu de finition.");
+  set(list,'briques-identification','III',"La personne a besoin de consignes supplémentaires et qu'on lui montre un exemple pour commencer l'exercice.");
+  set(list,'briques-manipulation','II','Reconnait les pièces mais les assemble avec difficulté.');
+  set(list,'carre','II',"Est en capacité d'identifier les contraintes d'un problème structuré et d'en résoudre partiellement les relations.");
+  set(list,'organisation','II',"Est en capacité d'effectuer une tâche de gestion de stock multicritère, mais produit des erreurs.");
+  set(list,'planning','II',"Est en capacité de déterminer l’ordre d’exécution de tâches les unes par rapport aux autres mais produit des erreurs.");
+  set(list,'texte','III','Ne sait pas utiliser un logiciel de traitement de texte.');
+  set(list,'mail','II','A besoin d’aide pour envoyer un message et/ou des oublis de consignes sont révélés.');
+  set(list,'expression','III',"La structure des phrases et l’orthographe grammaticale n’est pas correcte.");
+  set(list,'math-enonce','II','A compris et exécuté partiellement une consigne unique.');
+  set(list,'math-problemes','III','La personne a recouru à des stratégies inappropriées ou sans liens avec les exigences de la situation.');
+  const out=make({civilite:'Mme',nom:'COMMENTAIRES'},list);
+  assert(out.ok,out.validation.errors.join(' | '));
+  assert(/exemple|gabarit/i.test(out.text),'besoin de modèle/gabarit perdu');
+  assert(/ciseaux/i.test(out.text),'utilisation des ciseaux perdue');
+  assert(!/cutter/i.test(out.text),'ancienne référence au cutter réintroduite');
+  assert(/consignes supplémentaires|indications complémentaires/i.test(out.text),'besoin de consignes assemblage perdu');
+  assert(/peu présentes|très limité/i.test(out.text),'finitions faibles perdues');
+  assert(/pièces sont reconnues|identification des pièces/i.test(out.text),'distinction briques reconnues/assemblage perdue');
+  assert(/partielle|partiellement/i.test(out.text),'raisonnement partiel perdu');
+  assert(/multicritère|plusieurs critères/i.test(out.text),'organisation multicritère perdue');
+  assert(/ordre d’exécution|enchaînement/i.test(out.text),'planning avec erreurs perdu');
+  assert(/traitement de texte/i.test(out.text),'commentaire traitement de texte perdu');
+  assert(/messagerie|message/i.test(out.text),'commentaire messagerie perdu');
+  assert(/orthographe|structuration/i.test(out.text),'commentaire expression perdu');
+  assert(/consigne.*part/i.test(out.text),'commentaire math consigne perdu');
+  assert(/stratégies|méthode/i.test(out.text),'commentaire problèmes maths perdu');
+})();
+
 (function durantReferenceCase(){
   const list=rows('I');
   set(list,'fabrication-plan','I',"La personne n'a pas besoin d'aide pour commencer l'exercice.");
@@ -310,6 +346,7 @@ function words(text){return String(text||'').trim().split(/\s+/).filter(Boolean)
     const out=make({civilite:i%2?'M.':'Mme',nom:'STRESS'+i},list);
     assert(out.ok,'stress '+i+': '+out.validation.errors.join(' | '));
     assert(!/potentiel|diagnostic|profil psychologique|projet professionnel adapté|fonctionnement cognitif/i.test(out.text),'inférence interdite au stress '+i);
+    assert(!/cutter/i.test(out.text),'ancienne référence cutter au stress '+i);
     const wc=words(out.text);
     assert(wc<380,'synthèse anormalement longue au stress '+i+' : '+wc+' mots');
     assert((out.text.match(/\bnécessite(?:nt)?\b/gi)||[]).length<=5,'tournure « nécessite » trop répétée au stress '+i);
