@@ -14,7 +14,9 @@ function createCandidateStore(options = {}) {
 
   const sebRoot = path.join(documentsPath, 'SEB EvalPro');
   const candidatesRoot = path.join(sebRoot, 'Candidats');
+  const systemRoot = path.join(sebRoot, 'System');
   const activePointerPath = path.join(userDataPath, 'active-candidate.json');
+  const activePointerBackupPath = path.join(systemRoot, 'active-candidate.json');
   let atomicWriteCounter = 0;
 
   function ensureDirectory(directory) {
@@ -24,8 +26,9 @@ function createCandidateStore(options = {}) {
 
   function ensureRoots() {
     ensureDirectory(candidatesRoot);
+    ensureDirectory(systemRoot);
     ensureDirectory(userDataPath);
-    return { sebRoot, candidatesRoot };
+    return { sebRoot, candidatesRoot, systemRoot };
   }
 
   function atomicWriteJson(target, value) {
@@ -152,11 +155,36 @@ function createCandidateStore(options = {}) {
     };
   }
 
-  function readActivePointer() {
-    const pointer = readJson(activePointerPath);
-    if (!pointer || !pointer.candidateDir || !pointer.candidateId) return null;
-    if (!fs.existsSync(pointer.candidateDir)) return null;
+  function writeActivePointer(pointer) {
+    writeActivePointer(pointer);
+    atomicWriteJson(activePointerBackupPath, pointer);
     return pointer;
+  }
+
+  function removeActivePointer() {
+    removeActivePointer();
+    removeFile(activePointerBackupPath);
+  }
+
+  function validPointer(pointer) {
+    return !!pointer && !!pointer.candidateDir && !!pointer.candidateId && fs.existsSync(pointer.candidateDir);
+  }
+
+  function readActivePointer() {
+    const primary = readJson(activePointerPath);
+    if (validPointer(primary)) {
+      // Répare la copie de récupération si nécessaire.
+      const backup = readJson(activePointerBackupPath);
+      if (!validPointer(backup) || String(backup.candidateId) !== String(primary.candidateId)) {
+        try { atomicWriteJson(activePointerBackupPath, primary); } catch (_) {}
+      }
+      return primary;
+    }
+
+    const backup = readJson(activePointerBackupPath);
+    if (!validPointer(backup)) return null;
+    try { atomicWriteJson(activePointerPath, backup); } catch (_) {}
+    return backup;
   }
 
   function manifestPath(candidateDir) {
@@ -207,7 +235,7 @@ function createCandidateStore(options = {}) {
       const folderName = path.basename(target);
       writeManifest(target, { ...manifest, folderName, privacyFolderMigratedAt:now().toISOString() });
       if (pointer && String(pointer.candidateId || '') === String(manifest.candidateId)) {
-        atomicWriteJson(activePointerPath, { ...pointer, folderName, candidateDir:target });
+        writeActivePointer({ ...pointer, folderName, candidateDir:target });
       }
     }
     return { renamed };
@@ -252,7 +280,7 @@ function createCandidateStore(options = {}) {
       identityKey:identity.identityKey,
       createdAt:String(manifest.createdAt || now().toISOString())
     };
-    atomicWriteJson(activePointerPath, pointer);
+    writeActivePointer(pointer);
     return pointer;
   }
 
@@ -316,7 +344,7 @@ function createCandidateStore(options = {}) {
       identityKey: identity.identityKey,
       createdAt
     };
-    atomicWriteJson(activePointerPath, pointer);
+    writeActivePointer(pointer);
     return pointer;
   }
 
@@ -463,7 +491,9 @@ function createCandidateStore(options = {}) {
     paths: {
       sebRoot,
       candidatesRoot,
-      activePointerPath
+      activePointerPath,
+      activePointerBackupPath,
+      systemRoot
     }
   };
 }
