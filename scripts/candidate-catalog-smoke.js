@@ -9,13 +9,13 @@ const root = fs.mkdtempSync(path.join(os.tmpdir(), 'seb-evalpro-candidate-catalo
 const documentsPath = path.join(root, 'Documents');
 const userDataPath = path.join(root, 'UserData');
 const sebRoot = path.join(documentsPath, 'SEB EvalPro');
-const legacyDir = path.join(sebRoot, 'Admin', 'Ancien groupe', 'DUPONT_Jean_ancien');
+const legacyDir = path.join(sebRoot, 'Admin', 'Ancien groupe', 'XX_YY_ancien');
 const replayRoot = path.join(sebRoot, 'parcours');
 const bilanRoot = path.join(sebRoot, 'Bilans', 'Historique');
 
 const candidate = {
-  nom:'DUPONT',
-  prenom:'Jean',
+  nom:'XX',
+  prenom:'YY',
   lieu:'Lorient',
   groupe:'7',
   date:'2026-09-18'
@@ -33,7 +33,7 @@ try {
 
   writeJson(path.join(legacyDir, 'manifest.json'), {
     schemaVersion:1,
-    candidateId:'candidate-dupont',
+    candidateId:'candidate-xx',
     folderName:path.basename(legacyDir),
     status:'SESSION_FERMEE',
     updatedAt:'2026-09-18T18:00:00.000Z',
@@ -41,7 +41,7 @@ try {
   });
   writeJson(path.join(legacyDir, 'donnees', 'evaluation-state.json'), { version:1 });
 
-  const replayName = 'DUPONT_JEAN_2026-09-18_BUILD-24_TEST';
+  const replayName = 'XX_JEAN_2026-09-18_BUILD-24_TEST';
   const replayDir = path.join(replayRoot, replayName);
   writeJson(path.join(replayDir, 'manifest.json'), {
     schemaVersion:2,
@@ -51,11 +51,11 @@ try {
   fs.mkdirSync(path.join(replayDir, 'slides'), { recursive:true });
   fs.writeFileSync(path.join(replayDir, 'slides', '001.png'), 'fake', 'utf8');
 
-  const legacyWordName = 'Evaluation_DUPONT_Jean_2026-09-18.doc';
+  const legacyWordName = 'Evaluation_XX_YY_2026-09-18.doc';
   fs.mkdirSync(path.join(sebRoot, 'Bilans'), { recursive:true });
   fs.writeFileSync(path.join(sebRoot, 'Bilans', legacyWordName), '<html><table><tr><td>ancien Word</td></tr></table></html>', 'utf8');
 
-  const bilanName = 'DUPONT_JEAN_2026-09-18_BUILD-24_BILAN_R00_TEST.json';
+  const bilanName = 'XX_JEAN_2026-09-18_BUILD-24_BILAN_R00_TEST.json';
   writeJson(path.join(bilanRoot, bilanName), {
     schemaVersion:1,
     type:'SEB_EVALPRO_BILAN_ARCHIVE',
@@ -113,11 +113,11 @@ try {
 
   const first = list();
   assert.strictEqual(first.length, 1, 'Le candidat historique doit être migré une seule fois.');
-  assert.strictEqual(first[0].candidateId, 'candidate-dupont');
+  assert.strictEqual(first[0].candidateId, 'candidate-xx');
   assert.strictEqual(first[0].replayCount, 1, 'Le parcours historique doit être rattaché au dossier candidat.');
   assert.strictEqual(first[0].bilanCount, 1, 'Le bilan historique doit être rattaché au dossier candidat.');
 
-  const newDir = path.join(sebRoot, 'Candidats', 'DUPONT_Jean_Lorient_7');
+  const newDir = path.join(sebRoot, 'Candidats', 'XX_YY_Lorient_7');
   assert(fs.existsSync(newDir), 'La copie autonome du candidat doit exister.');
   assert(fs.existsSync(legacyDir), 'Le dossier historique Admin doit rester intact.');
   assert(fs.existsSync(path.join(newDir, 'replay', replayName)), 'Le replay doit être migré dans le dossier candidat.');
@@ -125,13 +125,13 @@ try {
   assert(fs.existsSync(path.join(newDir, 'bilan', 'exports', legacyWordName)), 'Un ancien Word associable sans ambiguïté doit être copié dans le dossier candidat.');
   assert(fs.existsSync(path.join(sebRoot, 'Bilans', legacyWordName)), 'L’ancien Word global doit rester intact pendant la migration de sécurité.');
 
-  const duplicateDir = path.join(sebRoot, 'Candidats', 'DUPONT_Jean_Lorient_7_2');
+  const duplicateDir = path.join(sebRoot, 'Candidats', 'XX_YY_Lorient_7_2');
   for (const rel of ['donnees','resultats','replay',path.join('bilan','historique'),path.join('bilan','exports')]) {
     fs.mkdirSync(path.join(duplicateDir, rel), { recursive:true });
   }
   writeJson(path.join(duplicateDir, 'manifest.json'), {
     schemaVersion:1,
-    candidateId:'candidate-dupont-duplicate',
+    candidateId:'candidate-xx-duplicate',
     folderName:path.basename(duplicateDir),
     status:'EN_COURS',
     createdAt:'2026-09-19T08:00:00.000Z',
@@ -162,7 +162,7 @@ try {
   assert.strictEqual(fs.existsSync(duplicateDir), false, 'Le doublon ne doit plus rester dans Candidats.');
   const duplicateArchiveRoot = path.join(sebRoot, 'Corbeille', 'Doublons');
   assert(fs.existsSync(duplicateArchiveRoot), 'Le doublon doit être archivé sans destruction.');
-  assert(fs.readdirSync(duplicateArchiveRoot).some((name) => name.startsWith('DUPONT_Jean_Lorient_7_2__')), 'Le dossier doublon complet doit être conservé dans Corbeille\\Doublons.');
+  assert(fs.readdirSync(duplicateArchiveRoot).some((name) => name.startsWith('XX_YY_Lorient_7_2__')), 'Le dossier doublon complet doit être conservé dans Corbeille\\Doublons.');
   const mergedDuplicateResponses = JSON.parse(fs.readFileSync(path.join(newDir, 'resultats', 'reponses.json'), 'utf8'));
   assert.strictEqual(mergedDuplicateResponses.duplicate_only, 'OK', 'Les réponses présentes uniquement dans le doublon doivent être récupérées.');
   const mergedState = JSON.parse(fs.readFileSync(path.join(newDir, 'donnees', 'evaluation-state.json'), 'utf8'));
@@ -174,17 +174,17 @@ try {
   writeJson(path.join(newDir, 'resultats', 'scores.json'), { page2_q1:1, page2_q2:1 });
   const stateBeforeResults = fs.readFileSync(path.join(newDir, 'donnees', 'evaluation-state.json'), 'utf8');
 
-  const preparedResults = beginResults(null, 'candidate-dupont');
+  const preparedResults = beginResults(null, 'candidate-xx');
   assert(preparedResults && preparedResults.ok, 'Les résultats du candidat doivent pouvoir être ouverts indépendamment d’une session active.');
   const resultsEvent = { returnValue:null };
   loadResultsWorkspaceSync(resultsEvent);
   assert(resultsEvent.returnValue && resultsEvent.returnValue.ok && resultsEvent.returnValue.readOnly === true, 'Le workspace Résultats doit être disponible en lecture seule.');
-  assert.strictEqual(resultsEvent.returnValue.candidateId, 'candidate-dupont', 'Les résultats doivent appartenir au candidat sélectionné.');
+  assert.strictEqual(resultsEvent.returnValue.candidateId, 'candidate-xx', 'Les résultats doivent appartenir au candidat sélectionné.');
   const resultsCandidate = JSON.parse(resultsEvent.returnValue.state.sessionStorage.candidat_data);
   const resultsResponses = JSON.parse(resultsEvent.returnValue.state.sessionStorage.reponses_data);
   const resultsScores = JSON.parse(resultsEvent.returnValue.state.sessionStorage.scores_data);
-  assert.strictEqual(resultsCandidate.nom, 'DUPONT');
-  assert.strictEqual(resultsCandidate['prénom'], 'Jean');
+  assert.strictEqual(resultsCandidate.nom, 'XX');
+  assert.strictEqual(resultsCandidate['prénom'], 'YY');
   assert.strictEqual(resultsResponses.page2_q1, '1020');
   assert.strictEqual(resultsScores.page2_q1, 1);
   assert.strictEqual(endResults(), true, 'La fermeture du workspace Résultats doit réussir.');
@@ -193,22 +193,22 @@ try {
   assert(resultsAfterEnd.returnValue && resultsAfterEnd.returnValue.ok === false, 'Le workspace Résultats fermé ne doit plus exposer de candidat.');
   assert.strictEqual(fs.readFileSync(path.join(newDir, 'donnees', 'evaluation-state.json'), 'utf8'), stateBeforeResults, 'Ouvrir les résultats ne doit jamais modifier l’état du candidat.');
 
-  const d = detail(null, 'candidate-dupont');
+  const d = detail(null, 'candidate-xx');
   assert(d && d.ok);
   assert.strictEqual(d.bilans.length, 1);
   assert.strictEqual(d.bilans[0].integrityOk, false, 'Un bilan corrompu doit être signalé.');
 
-  const prepared = beginBilan(null, 'candidate-dupont');
+  const prepared = beginBilan(null, 'candidate-xx');
   assert(prepared && prepared.ok, 'Le candidat doit pouvoir ouvrir un espace de bilan même sans dépendre d’une session active.');
 
   const loadEvent = { returnValue:null };
   loadWorkspaceSync(loadEvent);
   assert(loadEvent.returnValue && loadEvent.returnValue.ok, 'Les données du candidat sélectionné doivent être chargées pour le bilan.');
-  assert.strictEqual(loadEvent.returnValue.candidateId, 'candidate-dupont');
+  assert.strictEqual(loadEvent.returnValue.candidateId, 'candidate-xx');
   const loadedCandidate = JSON.parse(loadEvent.returnValue.state.sessionStorage.candidat_data);
-  assert.strictEqual(loadedCandidate.nom, 'DUPONT');
-  assert.strictEqual(loadedCandidate.prenom || loadedCandidate['prénom'], 'Jean');
-  assert.strictEqual(loadEvent.returnValue.state.sessionStorage.seb_evalpro_admin_candidate_id, 'candidate-dupont');
+  assert.strictEqual(loadedCandidate.nom, 'XX');
+  assert.strictEqual(loadedCandidate.prenom || loadedCandidate['prénom'], 'YY');
+  assert.strictEqual(loadEvent.returnValue.state.sessionStorage.seb_evalpro_admin_candidate_id, 'candidate-xx');
 
   const originalDocument = {
     title:'Bilan institutionnel',
@@ -216,15 +216,15 @@ try {
     rows:[{ kind:'item', key:'test', moduleText:'Test', level:'I', preset:'', comment:'Original', detail:'', options:[] }]
   };
   const firstBilan = saveCurrentBilan(null, {
-    candidateId:'candidate-dupont',
-    candidate:{ nom:'DUPONT', prenom:'Jean', date:'2026-09-18' },
+    candidateId:'candidate-xx',
+    candidate:{ nom:'XX', prenom:'YY', date:'2026-09-18' },
     originalBuild:'79',
-    sessionToken:'candidate-dupont-smoke',
+    sessionToken:'candidate-xx-smoke',
     document:originalDocument
   });
   assert(firstBilan && firstBilan.ok && firstBilan.revision === 0, 'Le bilan original doit être archivé directement dans le dossier candidat sélectionné.');
   const firstArchive = JSON.parse(fs.readFileSync(path.join(newDir, 'bilan', 'historique', firstBilan.filename), 'utf8'));
-  assert.strictEqual(firstArchive.candidateId, 'candidate-dupont', 'L’archive doit mémoriser le dossier candidat exact.');
+  assert.strictEqual(firstArchive.candidateId, 'candidate-xx', 'L’archive doit mémoriser le dossier candidat exact.');
 
   const revisionDocument = {
     ...originalDocument,
@@ -234,21 +234,21 @@ try {
   assert(revision && revision.ok && revision.revision === 1, 'La première révision doit être enregistrée dans le même dossier candidat.');
   assert(fs.existsSync(path.join(newDir, 'bilan', 'historique', revision.filename)), 'Le fichier de révision doit exister dans le dossier candidat.');
 
-  const wordBase = 'Evaluation_DUPONT_JEAN_2026-09-18.doc';
+  const wordBase = 'Evaluation_XX_JEAN_2026-09-18.doc';
   fs.writeFileSync(path.join(newDir, 'bilan', 'exports', wordBase), 'word courant', 'utf8');
-  fs.writeFileSync(path.join(newDir, 'bilan', 'exports', 'Evaluation_DUPONT_JEAN_2026-09-18_2.doc'), 'doublon', 'utf8');
-  fs.writeFileSync(path.join(newDir, 'bilan', 'exports', 'Evaluation_DUPONT_JEAN_2026-09-18_R01.doc'), 'ancienne révision Word', 'utf8');
-  const afterBilan = detail(null, 'candidate-dupont');
+  fs.writeFileSync(path.join(newDir, 'bilan', 'exports', 'Evaluation_XX_JEAN_2026-09-18_2.doc'), 'doublon', 'utf8');
+  fs.writeFileSync(path.join(newDir, 'bilan', 'exports', 'Evaluation_XX_JEAN_2026-09-18_R01.doc'), 'ancienne révision Word', 'utf8');
+  const afterBilan = detail(null, 'candidate-xx');
   assert(afterBilan && afterBilan.ok);
   assert.strictEqual(afterBilan.bilans.filter((b) => b.integrityOk).length, 2, 'Le catalogue doit voir le bilan original et sa révision.');
   assert.strictEqual(afterBilan.candidate.revisionCount, 1, 'Le catalogue doit annoncer une révision.');
   assert.deepStrictEqual(
-    afterBilan.exports.filter((name) => /^Evaluation_DUPONT_JEAN_2026-09-18/i.test(name)).map((name) => name.toLowerCase()),
+    afterBilan.exports.filter((name) => /^Evaluation_XX_JEAN_2026-09-18/i.test(name)).map((name) => name.toLowerCase()),
     [wordBase.toLowerCase()],
     'Un seul Word courant doit rester visible, sans dépendre de la casse du nom de fichier Windows.'
   );
-  assert.strictEqual(fs.existsSync(path.join(newDir, 'bilan', 'exports', 'Evaluation_DUPONT_JEAN_2026-09-18_2.doc')), false, 'Le doublon Word _2 doit être nettoyé.');
-  assert.strictEqual(fs.existsSync(path.join(newDir, 'bilan', 'exports', 'Evaluation_DUPONT_JEAN_2026-09-18_R01.doc')), false, 'L’ancien Word de révision doit être nettoyé.');
+  assert.strictEqual(fs.existsSync(path.join(newDir, 'bilan', 'exports', 'Evaluation_XX_JEAN_2026-09-18_2.doc')), false, 'Le doublon Word _2 doit être nettoyé.');
+  assert.strictEqual(fs.existsSync(path.join(newDir, 'bilan', 'exports', 'Evaluation_XX_JEAN_2026-09-18_R01.doc')), false, 'L’ancien Word de révision doit être nettoyé.');
 
   const modifiedState = {
     ...loadEvent.returnValue.state,
@@ -271,7 +271,7 @@ try {
   loadWorkspaceSync(afterEnd);
   assert(afterEnd.returnValue && afterEnd.returnValue.ok === false, 'L’espace bilan fermé ne doit plus exposer de candidat sélectionné.');
 
-  const corrupt = loadBilan(null, 'candidate-dupont', bilanName);
+  const corrupt = loadBilan(null, 'candidate-xx', bilanName);
   assert(corrupt && corrupt.ok === false && corrupt.corruption === true, 'Un bilan corrompu doit être refusé avec avertissement.');
   assert(/ATTENTION/i.test(corrupt.error) && /corruption/i.test(corrupt.error));
 
@@ -294,7 +294,7 @@ try {
     localStorage:{}
   });
 
-  const deleted = deleteCandidate(null, 'candidate-dupont');
+  const deleted = deleteCandidate(null, 'candidate-xx');
   assert(deleted && deleted.ok, 'La suppression administrateur du candidat doit réussir.');
   assert.strictEqual(fs.existsSync(newDir), false, 'Le dossier candidat complet doit être supprimé.');
   assert.strictEqual(fs.existsSync(legacyDir), false, 'La copie historique Admin du même candidat doit être supprimée.');
