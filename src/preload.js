@@ -341,14 +341,60 @@ function createCandidateFinishDialog() {
 }
 
 
+function createExportDestinationModeDialog() {
+  return new Promise((resolve) => {
+    const backdrop = document.createElement('div');
+    backdrop.id = 'seb-evalpro-export-destination-dialog';
+    backdrop.innerHTML = `
+      <div class="seb-transfer-card" role="dialog" aria-modal="true" aria-label="Destination de l’export">
+        <div class="seb-transfer-title">Où exporter les candidats ?</div>
+        <div class="seb-transfer-text">
+          Vous pouvez ajouter les fichiers à un dossier déjà présent sur la clé USB,
+          ou créer un nouveau dossier pour cette série d’exports.
+        </div>
+        <div class="seb-transfer-actions export-choice">
+          <button type="button" id="seb-export-existing">Choisir un dossier existant</button>
+          <button type="button" id="seb-export-create">Créer un nouveau dossier</button>
+          <button type="button" id="seb-export-cancel">Annuler</button>
+        </div>
+      </div>`;
+
+    const style = document.createElement('style');
+    style.textContent = `
+      #seb-evalpro-export-destination-dialog{position:fixed;inset:0;z-index:2147483647;background:rgba(0,0,0,.42);display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif}
+      #seb-evalpro-export-destination-dialog .seb-transfer-card{width:520px;max-width:calc(100vw - 40px);background:#fff;border:1px solid #aaa;border-radius:8px;padding:20px;box-shadow:0 10px 35px rgba(0,0,0,.3);box-sizing:border-box}
+      #seb-evalpro-export-destination-dialog .seb-transfer-title{font-size:20px;font-weight:700;color:#0070c0;margin-bottom:10px}
+      #seb-evalpro-export-destination-dialog .seb-transfer-text{font-size:14px;line-height:1.45;color:#222;margin-bottom:16px}
+      #seb-evalpro-export-destination-dialog .seb-transfer-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px}
+      #seb-evalpro-export-destination-dialog button{font-family:Arial,sans-serif;font-size:14px;padding:9px 14px;border:2px solid #0070c0;border-radius:6px;background:#fff;color:#0070c0;font-weight:700;cursor:pointer}
+      #seb-evalpro-export-destination-dialog #seb-export-create{background:#0070c0;color:#fff}
+    `;
+    backdrop.appendChild(style);
+    document.body.appendChild(backdrop);
+
+    const finish = (value) => {
+      backdrop.remove();
+      resolve(value);
+    };
+    backdrop.querySelector('#seb-export-existing').addEventListener('click', () => finish('existing'));
+    backdrop.querySelector('#seb-export-create').addEventListener('click', () => finish('create'));
+    backdrop.querySelector('#seb-export-cancel').addEventListener('click', () => finish(null));
+    backdrop.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') finish(null);
+    });
+    backdrop.querySelector('#seb-export-existing').focus();
+  });
+}
+
+
 function createTransferNameDialog() {
   return new Promise((resolve) => {
     const backdrop = document.createElement('div');
     backdrop.id = 'seb-evalpro-transfer-dialog';
     backdrop.innerHTML = `
       <div class="seb-transfer-card" role="dialog" aria-modal="true" aria-label="Nom du regroupement">
-        <div class="seb-transfer-title">Importer les dossiers candidats</div>
-        <div class="seb-transfer-text">Choisissez le nom du dossier qui regroupera les stagiaires sur le PC Admin.</div>
+        <div class="seb-transfer-title">Créer un dossier d’export</div>
+        <div class="seb-transfer-text">Saisissez le nom du nouveau dossier à créer sur la clé USB.</div>
         <label class="seb-transfer-label" for="seb-transfer-name">Nom du dossier</label>
         <input id="seb-transfer-name" class="seb-transfer-input" type="text" autocomplete="off" placeholder="Ex. Lorient, Groupe A, Session septembre" />
         <div id="seb-transfer-error" class="seb-transfer-error" aria-live="polite"></div>
@@ -762,7 +808,20 @@ function injectAdminBar() {
     try {
       const password = await createTransferPasswordDialog('export');
       if (!password) return;
-      const result = await ipcRenderer.invoke('admin:export-candidates', password);
+
+      const destinationMode = await createExportDestinationModeDialog();
+      if (!destinationMode) return;
+
+      let newFolderName = '';
+      if (destinationMode === 'create') {
+        newFolderName = await createTransferNameDialog();
+        if (!newFolderName) return;
+      }
+
+      const result = await ipcRenderer.invoke('admin:export-candidates', password, {
+        mode:destinationMode,
+        folderName:newFolderName
+      });
       if (!result || result.cancelled) return;
       if (!result.ok) {
         await showTransferMessage('Export impossible', result.error || 'Une erreur est survenue pendant l’export.', true);
