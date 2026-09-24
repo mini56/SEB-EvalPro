@@ -164,6 +164,24 @@ try {
 
   // Premier export : 5 terminés/anciens, le candidat 6 actif doit rester sur le PC.
   const exportWhileActive = sourceTransfer.exportAll(usbRoot, password);
+  if (exportWhileActive.total !== 5) {
+    const required = [
+      'manifest.json',
+      path.join('donnees', 'candidat.json'),
+      path.join('donnees', 'evaluation-state.json'),
+      path.join('donnees', 'progression.json'),
+      path.join('resultats', 'reponses.json'),
+      path.join('resultats', 'scores.json')
+    ];
+    const debugRecords = sourceTransfer.listCandidateRecords(sourceTransfer.paths.candidatesRoot, false).map((record) => ({
+      id:record.candidateId,
+      folder:record.folderName,
+      status:String(record.manifest && record.manifest.status || ''),
+      nom:record.candidate && record.candidate.nom,
+      missing:required.filter((rel) => !fs.existsSync(path.join(record.candidateDir, rel)))
+    }));
+    console.log('FULL_CYCLE_DEBUG_RECORDS=' + JSON.stringify(debugRecords));
+  }
   assert.strictEqual(exportWhileActive.total, 5, 'Avec un parcours actif, seuls les 5 dossiers terminés doivent être exportés.');
   assert.strictEqual(exportWhileActive.added, 5);
   assert.strictEqual(fs.readdirSync(usbRoot).filter((name) => name.endsWith('.seb')).length, 5);
