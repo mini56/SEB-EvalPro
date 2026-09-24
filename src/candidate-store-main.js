@@ -156,13 +156,13 @@ function createCandidateStore(options = {}) {
   }
 
   function writeActivePointer(pointer) {
-    writeActivePointer(pointer);
+    atomicWriteJson(activePointerPath, pointer);
     atomicWriteJson(activePointerBackupPath, pointer);
     return pointer;
   }
 
   function removeActivePointer() {
-    removeActivePointer();
+    removeFile(activePointerPath);
     removeFile(activePointerBackupPath);
   }
 
