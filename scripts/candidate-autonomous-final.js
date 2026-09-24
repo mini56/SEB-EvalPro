@@ -318,16 +318,15 @@ function parseJs(text, label) {
   ]) if (!catalogMain.includes(token)) fail('catalogue backend incomplet: ' + token, 7);
 
   for (const token of [
-    'removeLegacyCandidateCopies',
-    'removeCandidateRuntimeState',
-    "candidate-catalog:delete"
-  ]) if (!catalogMain.includes(token)) fail('effacement candidat Admin incomplet: ' + token, 7);
-  for (const token of [
+    "candidate-catalog:delete",
+    "La suppression d’un dossier candidat est désactivée"
+  ]) if (!catalogMain.includes(token)) fail('protection anti-suppression candidat incomplète: ' + token, 7);
+  for (const forbidden of [
     'confirmCandidateDeletion',
     'seb-cc-detail-delete',
     'Supprimer définitivement',
     "ipcRenderer.invoke('candidate-catalog:delete'"
-  ]) if (!catalogPreload.includes(token)) fail('interface effacement candidat incomplète: ' + token, 7);
+  ]) if (catalogPreload.includes(forbidden)) fail('suppression candidat encore exposée dans l’interface: ' + forbidden, 7);
   if (catalogPreload.includes('function statusLabel') || catalogPreload.includes('Session fermée') || catalogPreload.includes('>En cours<')) {
     fail('statut technique candidat encore affiché dans le catalogue', 7);
   }
