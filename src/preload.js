@@ -960,6 +960,32 @@ function showReadOnlyCandidateResults() {
   }
 }
 
+async function completeCandidateFromFinalPage() {
+  if (candidateJourneyCompleted || candidateCompletionInFlight || adminUnlocked || adminCandidateWorkspace || adminCandidateResultsWorkspace) return;
+  if (isAdminCandidatesPage() || isAdminBilanPage()) return;
+  const finalPage = document.getElementById('pageFinale');
+  if (!finalPage) return;
+  const style = window.getComputedStyle(finalPage);
+  const visible = finalPage.classList.contains('visible')
+    || (style.display !== 'none' && style.visibility !== 'hidden' && Number(style.opacity || '1') !== 0);
+  if (!visible) return;
+
+  candidateCompletionInFlight = true;
+  try {
+    const saved = saveNow(true);
+    if (saved && saved.ok === false) return;
+    const result = await ipcRenderer.invoke('candidate:complete-active', 'candidate-final-page');
+    if (result && result.ok) {
+      candidateJourneyCompleted = true;
+      clearTimeout(saveTimer);
+      if (periodicSaveTimer) clearInterval(periodicSaveTimer);
+    }
+  } catch (_) {
+  } finally {
+    candidateCompletionInFlight = false;
+  }
+}
+
 window.addEventListener('DOMContentLoaded', async () => {
   adminUnlocked = await ipcRenderer.invoke('admin:status');
   injectAdminBar();
@@ -970,6 +996,13 @@ window.addEventListener('DOMContentLoaded', async () => {
     document.addEventListener('change', scheduleSave, true);
     document.addEventListener('click', scheduleSave, true);
     periodicSaveTimer = setInterval(() => saveNow(false), SAVE_CHECKPOINT_MS);
+
+    const finalPage = document.getElementById('pageFinale');
+    if (finalPage && !isAdminCandidatesPage() && !isAdminBilanPage()) {
+      const observer = new MutationObserver(() => { completeCandidateFromFinalPage(); });
+      observer.observe(finalPage, { attributes:true, attributeFilter:['class','style'] });
+      setTimeout(() => { completeCandidateFromFinalPage(); }, 0);
+    }
   }
 });
 
