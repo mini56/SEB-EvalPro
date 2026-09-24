@@ -407,7 +407,7 @@ function parseJs(text, label) {
     'isAdminNavigationPage(page)',
     'initializeCandidateSecurity',
     'safeStorage',
-    'candidate-local-key.sebkey'
+    'createCandidateLocalProtection'
   ]) if (!main.includes(token)) fail('confinement/navigation Admin incomplet: ' + token, 7);
 
   for (const token of [
