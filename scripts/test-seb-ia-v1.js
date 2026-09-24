@@ -162,6 +162,122 @@ function words(text){return String(text||'').trim().split(/\s+/).filter(Boolean)
   console.log('SEB-IA DURANT: '+words(out.text)+' mots.\n'+out.text);
 })();
 
+
+(function realisticProfileBattery(){
+  const profiles=[];
+
+  {
+    const list=rows('I');
+    set(list,'fabrication-tracage','II','Les traits sont droits mais pas toujours aux dimensions indiquées.');
+    set(list,'fabrication-finition','II','Les finitions demandent encore davantage de précision.');
+    set(list,'texte','II','A besoin d’aide pour certaines fonctions du traitement de texte.');
+    set(list,'expression','II','Structure des phrases correcte. Idées présentées de manière ordonnée. - 68 % de réponses correctes.');
+    set(list,'math-enonce','I','Comprend et exécute une consigne unique. - 92 % de réponses correctes.');
+    set(list,'math-problemes','I','Résout les problèmes proposés. - 88 % de réponses correctes.');
+    profiles.push({
+      name:'appuis-majoritaires',
+      out:make({civilite:'Mme',nom:'APPUI',prenom:'TEST'},list),
+      must:[/fabrication/i,/traitement de texte/i,/68 %/,/92 %/,/88 %/]
+    });
+  }
+
+  {
+    const list=rows('III');
+    set(list,'briques-identification','II','A besoin de consignes supplémentaires pour commencer.');
+    set(list,'tri-temps','I','Moyenne 10 : 48');
+    set(list,'tri-erreurs','I','Fiabilité satisfaisante.');
+    set(list,'mail','II','Le message est envoyé mais la pièce jointe reste à sécuriser.');
+    set(list,'expression','III','Orthographe pas toujours correcte. - 31 % de réponses correctes.');
+    set(list,'math-enonce','II','Comprend les consignes simples avec quelques repères. - 54 % de réponses correctes.');
+    set(list,'math-problemes','III','Les problèmes restent difficiles. - 22 % de réponses correctes.');
+    profiles.push({
+      name:'difficultes-majoritaires',
+      out:make({civilite:'M.',nom:'DIFFICULTES',prenom:'TEST'},list),
+      must:[/difficult|accompagnement|fragile|complexe/i,/31 %/,/54 %/,/22 %/]
+    });
+  }
+
+  {
+    const list=rows('NE');
+    set(list,'fabrication-plan','I',"La personne n'a pas besoin d'aide pour commencer l'exercice.");
+    set(list,'fabrication-decoupe','II','Les découpes manquent encore de régularité.');
+    set(list,'briques-identification','I','Le schéma est compris.');
+    set(list,'tri-temps','II','Moyenne 13 : 05');
+    set(list,'tri-erreurs','II','Quelques erreurs sont relevées.');
+    set(list,'expression','II','Production écrite partiellement maîtrisée. - 57 % de réponses correctes.');
+    profiles.push({
+      name:'nombreux-non-evalues',
+      out:make({civilite:'Mme',nom:'NE',prenom:'TEST'},list),
+      must:[/pas pu être évalu|hors interprétation/i,/57 %/]
+    });
+  }
+
+  {
+    const list=rows('I');
+    set(list,'planning','NE','Non évalué.');
+    set(list,'carre','NE','Non évalué.');
+    set(list,'texte','NE','Non évalué.');
+    const out=engine.generate({
+      candidate:{civilite:'M.',nom:'ABANDONS',prenom:'TEST'},
+      rows:list,
+      abandons:[
+        {key:'planning.html',exercice:'Planification — Le restaurant',raisons:['Je ne comprends pas la consigne'],commentaire:''},
+        {key:'carre-magique.html',exercice:'Carré magique',raisons:['L’exercice est trop difficile'],commentaire:'La personne souhaite arrêter.'},
+        {key:'nwtexte.html',exercice:'Traitement de texte',raisons:[],commentaire:'Arrêt demandé pendant l’exercice.'}
+      ]
+    });
+    profiles.push({
+      name:'abandons-multiples',
+      out,
+      must:[/Planification — Le restaurant/i,/Carré magique/i,/Traitement de texte/i,/Je ne comprends pas la consigne/i,/L’exercice est trop difficile/i]
+    });
+  }
+
+  {
+    const list=rows('II');
+    set(list,'fabrication-plan','I',"La personne n'a pas besoin d'aide pour commencer l'exercice.");
+    set(list,'fabrication-decoupe','III','Les découpes ne sont pas droites ou restent incomplètes.');
+    set(list,'briques-identification','I','Lecture du schéma sans aide.');
+    set(list,'briques-manipulation','III','Plusieurs erreurs dans la manipulation et l’assemblage.');
+    set(list,'carre','III',"Difficultés à identifier les contraintes d'un problème structuré et à établir les relations.");
+    set(list,'organisation','I','Classe les éléments selon les critères attendus.');
+    set(list,'planning','III',"N’est pas en capacité de déterminer l’ordre d’exécution des tâches.");
+    set(list,'tri-temps','I','Moyenne 11 : 18');
+    set(list,'tri-erreurs','III','Fiabilité insuffisante.');
+    set(list,'texte','I','Réalise le document demandé sans aide.');
+    set(list,'mail','III','L’objet et la pièce jointe ne sont pas correctement renseignés.');
+    profiles.push({
+      name:'tres-contraste',
+      out:make({civilite:'Mme',nom:'CONTRASTE',prenom:'TEST'},list),
+      must:[/contraintes/i,/ordre|enchaînement|ordonner/i,/outils numériques|traitement de texte|messagerie/i]
+    });
+  }
+
+  {
+    const list=rows('II');
+    set(list,'expression','II','Les idées sont présentées de manière ordonnée. - 59 % de réponses correctes.');
+    set(list,'math-enonce','I','Comprend et exécute les consignes. - 100 % de réponses correctes.');
+    set(list,'math-problemes','III','La résolution de problèmes reste difficile. - 34 % de réponses correctes.');
+    set(list,'tri-temps','II','Moyenne 13 : 42');
+    set(list,'tri-erreurs','II','Entre 1.1 et 2 % d’erreur. - 7 erreurs.');
+    profiles.push({
+      name:'fortement-chiffre',
+      out:make({civilite:'M.',nom:'CHIFFRE',prenom:'TEST'},list),
+      must:[/59 %/,/100 %/,/34 %/,/13 min 42 s/]
+    });
+  }
+
+  for(const p of profiles){
+    assert(p.out.ok,p.name+': '+p.out.validation.errors.join(' | '));
+    const wc=words(p.out.text);
+    assert(wc>=120,p.name+': synthèse trop courte ('+wc+' mots)');
+    assert(wc<380,p.name+': synthèse trop longue ('+wc+' mots)');
+    for(const re of p.must)assert(re.test(p.out.text),p.name+': information attendue absente: '+re);
+    assert(!/potentiel|diagnostic|profil psychologique|fonctionnement cognitif|orientation professionnelle/i.test(p.out.text),p.name+': inférence interdite');
+    console.log('\nSEB-IA PROFIL REALISTE ['+p.name+'] — '+wc+' mots\n'+p.out.text+'\n');
+  }
+})();
+
 (function stress(){
   const levels=['I','II','III','NE'];
   const seen=new Set();
