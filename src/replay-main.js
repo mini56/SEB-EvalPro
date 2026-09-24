@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { findCandidateDir, listCandidateDirs, selectCandidate } = require('./candidate-folder-utils');
+const { readJsonFile, encodeJson } = require('./candidate-data-crypto');
 
 module.exports = function registerCandidateReplay({ app, ipcMain, getAdminUnlocked, buildNumber }) {
   const BUILD = String(buildNumber || 'DEV');
@@ -192,7 +193,7 @@ module.exports = function registerCandidateReplay({ app, ipcMain, getAdminUnlock
   }
 
   function readManifest(folderPath) {
-    return JSON.parse(fs.readFileSync(path.join(folderPath, 'manifest.json'), 'utf8'));
+    return readJsonFile(path.join(folderPath, 'manifest.json'));
   }
 
   function verifyArchiveDirectory(folderPath, manifest) {
@@ -305,7 +306,7 @@ module.exports = function registerCandidateReplay({ app, ipcMain, getAdminUnlock
 
       const snapshotSha256 = sha256Json(snapshot);
       const datePart = safePart(candidate.date || new Date().toISOString().slice(0, 10), 'DATE');
-      const base = [safePart(candidate.nom, 'NOM'), safePart(candidate.prenom, 'PRENOM'), datePart, `BUILD-${safePart(BUILD, 'DEV')}`, snapshotSha256.slice(0, 12)].join('_');
+      const base = ['REPLAY', safePart(path.basename(candidateDir), 'CAND'), datePart, `BUILD-${safePart(BUILD, 'DEV')}`, snapshotSha256.slice(0, 12)].join('_');
       const folderName = base;
       const targetFolder = path.join(candidateReplayRoot, folderName);
       const manifestPath = path.join(targetFolder, 'manifest.json');
@@ -359,7 +360,7 @@ module.exports = function registerCandidateReplay({ app, ipcMain, getAdminUnlock
         slides
       };
       manifest.integritySha256 = computeArchiveIntegrity(manifest);
-      fs.writeFileSync(path.join(tempFolder, 'manifest.json'), JSON.stringify(manifest, null, 2), 'utf8');
+      fs.writeFileSync(path.join(tempFolder, 'manifest.json'), encodeJson(manifest), 'utf8');
       fs.renameSync(tempFolder, targetFolder);
       // SEB_CANDIDATE_AUTONOMOUS_REPLAY: le dossier candidat est la source unique du replay.
 
@@ -385,7 +386,7 @@ module.exports = function registerCandidateReplay({ app, ipcMain, getAdminUnlock
     try {
       const stat = fs.statSync(fullPath);
       if (stat.isFile() && name.toLowerCase().endsWith('.json')) {
-        const archive = JSON.parse(fs.readFileSync(fullPath, 'utf8'));
+        const archive = readJsonFile(fullPath);
         if (!verifyLegacyArchive(archive)) {
           return { ok:false, corruption:true, error:'ATTENTION : le replay est modifié ou corrompu. Il n’a pas été ouvert.' };
         }
@@ -490,7 +491,7 @@ module.exports = function registerCandidateReplay({ app, ipcMain, getAdminUnlock
         } else if (entry.isFile() && entry.name.toLowerCase().endsWith('.json')) {
           const stat = fs.statSync(fullPath);
           try {
-            const archive = JSON.parse(fs.readFileSync(fullPath, 'utf8'));
+            const archive = readJsonFile(fullPath);
             results.push({
               filename: entry.name,
               candidate: archive.candidate || {},
@@ -521,7 +522,7 @@ module.exports = function registerCandidateReplay({ app, ipcMain, getAdminUnlock
       if (!fs.existsSync(fullPath)) return { ok: false, error: 'Archive introuvable.' };
       const stat = fs.statSync(fullPath);
       if (stat.isFile() && name.toLowerCase().endsWith('.json')) {
-        const archive = JSON.parse(fs.readFileSync(fullPath, 'utf8'));
+        const archive = readJsonFile(fullPath);
         if (!verifyLegacyArchive(archive)) return { ok: false, error: 'Archive historique modifiée ou corrompue.' };
         return {
           ok: true,
