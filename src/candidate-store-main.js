@@ -462,7 +462,7 @@ function createCandidateStore(options = {}) {
       closedAt: manifest.closedAt || completedAt
     });
 
-    removeFile(activePointerPath);
+    removeActivePointer();
 
     return {
       candidateId: active.candidateId,
