@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, screen, dialog, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, dialog, Menu, safeStorage } = require('electron');
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
@@ -6,6 +6,7 @@ const crypto = require('crypto');
 const { getEditionCapabilities } = require('./edition');
 const { createCandidateStore } = require('./candidate-store-main');
 const { createCandidateTransfer } = require('./candidate-transfer-main');
+const { configureLocalKey, readJsonFile, encodeJson, migrateJsonFile, migrateJsonTree } = require('./candidate-data-crypto');
 
 const ADMIN_PASSWORD_SHA256 = 'c800892ba3f11b33d36eedf7d3c4297f2b6c02e2c347dda8954b4c577f6666b5';
 const STATE_VERSION = 1;
@@ -62,6 +63,54 @@ function startCandidateKeyGuard() {
 
 function stateFilePath() {
   return path.join(app.getPath('userData'), 'evaluation-state.json');
+}
+
+function candidateLocalKeyPath() {
+  return path.join(app.getPath('userData'), 'candidate-local-key.sebkey');
+}
+
+function initializeCandidateSecurity() {
+  if (!safeStorage || !safeStorage.isEncryptionAvailable()) {
+    throw new Error('La protection Windows des données candidat n’est pas disponible sur ce poste.');
+  }
+
+  const keyFile = candidateLocalKeyPath();
+  fs.mkdirSync(path.dirname(keyFile), { recursive:true });
+  let localKey = null;
+
+  if (fs.existsSync(keyFile)) {
+    try {
+      const wrapper = JSON.parse(fs.readFileSync(keyFile, 'utf8'));
+      const protectedBytes = Buffer.from(String(wrapper.protectedKey || ''), 'base64');
+      const keyBase64 = safeStorage.decryptString(protectedBytes);
+      localKey = Buffer.from(keyBase64, 'base64');
+    } catch (error) {
+      throw new Error('La clé locale des données candidat est illisible sur ce PC.');
+    }
+  } else {
+    localKey = crypto.randomBytes(32);
+    const protectedBytes = safeStorage.encryptString(localKey.toString('base64'));
+    const wrapper = {
+      schemaVersion:1,
+      protection:'Windows safeStorage/DPAPI',
+      protectedKey:protectedBytes.toString('base64'),
+      createdAt:new Date().toISOString()
+    };
+    const temp = keyFile + '.tmp';
+    fs.writeFileSync(temp, JSON.stringify(wrapper, null, 2), 'utf8');
+    fs.renameSync(temp, keyFile);
+  }
+
+  if (!Buffer.isBuffer(localKey) || localKey.length !== 32) {
+    throw new Error('Clé locale des données candidat invalide.');
+  }
+  configureLocalKey(localKey);
+
+  const store = getCandidateStore();
+  const folders = store.migrateCandidateFolderNames();
+  const migrated = migrateJsonTree(store.paths.candidatesRoot);
+  migrateJsonFile(stateFilePath());
+  console.log('SEB EvalPro confidentialité candidat: clé locale Windows active, dossiers codés=' + folders.renamed + ', JSON chiffrés=' + migrated.files + '.');
 }
 
 function sebDocumentsRoot() {
@@ -156,9 +205,8 @@ function defaultState() {
 
 function readState() {
   try {
-    const raw = fs.readFileSync(stateFilePath(), 'utf8');
-    const parsed = JSON.parse(raw);
-    return { ...defaultState(), ...parsed };
+    const parsed = readJsonFile(stateFilePath());
+    return parsed && typeof parsed === 'object' ? { ...defaultState(), ...parsed } : defaultState();
   } catch (_) {
     return defaultState();
   }
@@ -197,7 +245,7 @@ function writeState(nextState) {
     version: STATE_VERSION,
     updatedAt: new Date().toISOString()
   };
-  atomicReplaceState(target, JSON.stringify(safeState, null, 2));
+  atomicReplaceState(target, encodeJson(safeState));
 
   try {
     getCandidateStore().saveSnapshot(safeState);
@@ -487,6 +535,7 @@ function createWindow() {
 }
 
 function startApplication() {
+  initializeCandidateSecurity();
   ensureSebDocumentsFolders();
   createSplashWindow();
   setTimeout(() => {
@@ -576,7 +625,7 @@ ipcMain.handle('candidate:active', () => {
   return getCandidateStore().getActiveCandidate();
 });
 
-ipcMain.handle('admin:export-candidates', async () => {
+ipcMain.handle('admin:export-candidates', async (_event, password) => {
   if (!mainWindow || !adminSessionUnlocked) return { ok: false, error: 'Accès administrateur requis.' };
   try {
     const selection = await dialog.showOpenDialog(mainWindow, {
@@ -587,14 +636,14 @@ ipcMain.handle('admin:export-candidates', async () => {
     if (selection.canceled || !selection.filePaths || !selection.filePaths[0]) {
       return { ok: false, cancelled: true };
     }
-    const result = getCandidateTransfer().exportAll(selection.filePaths[0]);
+    const result = getCandidateTransfer().exportAll(selection.filePaths[0], password);
     return { ok: true, ...result };
   } catch (error) {
     return { ok: false, error: error && error.message ? error.message : String(error) };
   }
 });
 
-ipcMain.handle('admin:import-candidates', async () => {
+ipcMain.handle('admin:import-candidates', async (_event, password) => {
   if (!editionCapabilities.canImport) return { ok:false, error:'Import réservé à la version Administrateur.' };
   if (!mainWindow || !adminSessionUnlocked) return { ok: false, error: 'Accès administrateur requis.' };
   try {
@@ -606,7 +655,7 @@ ipcMain.handle('admin:import-candidates', async () => {
     if (selection.canceled || !selection.filePaths || !selection.filePaths[0]) {
       return { ok: false, cancelled: true };
     }
-    const result = getCandidateTransfer().importAll(selection.filePaths[0]);
+    const result = getCandidateTransfer().importAll(selection.filePaths[0], password);
     return { ok: true, ...result };
   } catch (error) {
     return { ok: false, error: error && error.message ? error.message : String(error) };
