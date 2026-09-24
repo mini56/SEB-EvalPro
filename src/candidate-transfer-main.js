@@ -1,11 +1,14 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const zlib = require('zlib');
+const { encodeJson } = require('./candidate-data-crypto');
 const {
   readJson,
   ensureDir,
   normalize,
   standardFolderName,
+  codedFolderName,
   uniqueFolderPath,
   listCandidateDirs,
   selectCandidate,
@@ -38,7 +41,7 @@ function createCandidateTransfer(options = {}) {
   function writeJson(target, value) {
     ensureDir(path.dirname(target));
     const temp = target + '.tmp';
-    fs.writeFileSync(temp, JSON.stringify(value, null, 2), 'utf8');
+    fs.writeFileSync(temp, encodeJson(value), 'utf8');
     fs.renameSync(temp, target);
   }
 
@@ -168,7 +171,7 @@ function createCandidateTransfer(options = {}) {
     for (const legacy of listCandidateDirs(legacyAdminRoot, true)) {
       if (!basicRecordValid(legacy)) continue;
       if (current.some((r) => sameCandidate(r, legacy))) continue;
-      const base = standardFolderName(legacy.candidate);
+      const base = codedFolderName(legacy.candidateId, legacy.manifest && legacy.manifest.shortId);
       const target = fs.existsSync(path.join(candidatesRoot, base)) ? uniqueFolderPath(candidatesRoot, base) : path.join(candidatesRoot, base);
       copyVerifiedAtomic(legacy.candidateDir, target);
       completeLegacySkeleton(target, legacy);
@@ -244,65 +247,276 @@ function createCandidateTransfer(options = {}) {
   }
 
   function chooseTargetName(record, destinationRoot) {
-    const base = standardFolderName(record.candidate);
+    const base = codedFolderName(record && record.candidateId, record && record.manifest && record.manifest.shortId);
     return fs.existsSync(path.join(destinationRoot, base)) ? uniqueFolderPath(destinationRoot, base) : path.join(destinationRoot, base);
   }
 
-  function exportAll(selectedUsbPath) {
+  function transferPassword(password) {
+    const value = String(password || '');
+    if (value.length < 8) throw new Error('Le mot de passe de transfert doit contenir au moins 8 caractères.');
+    return value;
+  }
+
+  function transferKey(password, salt) {
+    return crypto.scryptSync(transferPassword(password), salt, 32, { N:32768, r:8, p:1, maxmem:64 * 1024 * 1024 });
+  }
+
+  function encryptTransferPayload(payload, password) {
+    const salt = crypto.randomBytes(16);
+    const iv = crypto.randomBytes(12);
+    const key = transferKey(password, salt);
+    const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+    cipher.setAAD(Buffer.from('SEB-EvalPro/usb-transfer/v1', 'utf8'));
+    const zipped = zlib.gzipSync(Buffer.from(JSON.stringify(payload), 'utf8'), { level:9 });
+    const encrypted = Buffer.concat([cipher.update(zipped), cipher.final()]);
+    const tag = cipher.getAuthTag();
+    key.fill(0);
+    return JSON.stringify({
+      format:'SEB-EVALPRO-USB-1',
+      kdf:'scrypt-N32768-r8-p1',
+      cipher:'aes-256-gcm',
+      salt:salt.toString('base64'),
+      iv:iv.toString('base64'),
+      tag:tag.toString('base64'),
+      data:encrypted.toString('base64')
+    });
+  }
+
+  function decryptTransferPayload(text, password) {
+    let envelope;
+    try { envelope = JSON.parse(String(text || '')); }
+    catch (_) { throw new Error('Fichier de transfert SEB EvalPro invalide.'); }
+    if (!envelope || envelope.format !== 'SEB-EVALPRO-USB-1') throw new Error('Format de transfert SEB EvalPro non reconnu.');
+    try {
+      const salt = Buffer.from(String(envelope.salt || ''), 'base64');
+      const iv = Buffer.from(String(envelope.iv || ''), 'base64');
+      const tag = Buffer.from(String(envelope.tag || ''), 'base64');
+      const encrypted = Buffer.from(String(envelope.data || ''), 'base64');
+      const key = transferKey(password, salt);
+      const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+      decipher.setAAD(Buffer.from('SEB-EvalPro/usb-transfer/v1', 'utf8'));
+      decipher.setAuthTag(tag);
+      const zipped = Buffer.concat([decipher.update(encrypted), decipher.final()]);
+      key.fill(0);
+      const payload = JSON.parse(zlib.gunzipSync(zipped).toString('utf8'));
+      if (!payload || payload.type !== 'SEB_EVALPRO_CANDIDATE_TRANSFER' || payload.schemaVersion !== 1 || !payload.candidateId) {
+        throw new Error('Contenu de transfert invalide.');
+      }
+      return payload;
+    } catch (error) {
+      if (String(error && error.message || '').includes('Contenu de transfert invalide')) throw error;
+      throw new Error('Mot de passe incorrect ou fichier de transfert endommagé. Aucun fichier n’a été importé.');
+    }
+  }
+
+  function safeTransferRelative(rel) {
+    const value = String(rel || '').replace(/\\/g, '/');
+    if (!value || value.startsWith('/') || /^[A-Za-z]:/.test(value)) throw new Error('Chemin de transfert invalide.');
+    const normalized = path.posix.normalize(value);
+    if (normalized === '..' || normalized.startsWith('../') || normalized.includes('/../')) throw new Error('Chemin de transfert invalide.');
+    return normalized;
+  }
+
+  function packCandidate(record) {
+    const entries = [];
+    const walk = (dir) => {
+      const list = fs.readdirSync(dir, { withFileTypes:true }).sort((a,b) => a.name.localeCompare(b.name));
+      for (const entry of list) {
+        const full = path.join(dir, entry.name);
+        const rel = safeTransferRelative(path.relative(record.candidateDir, full));
+        if (entry.isDirectory()) {
+          entries.push({ type:'dir', rel });
+          walk(full);
+          continue;
+        }
+        if (!entry.isFile()) continue;
+        if (entry.name.endsWith('.tmp') || entry.name.includes('.seb-copy-')) continue;
+        if (entry.name.toLowerCase().endsWith('.json')) {
+          const value = readJson(full);
+          if (value == null) throw new Error('Fichier candidat JSON illisible : ' + rel);
+          entries.push({ type:'json', rel, data:Buffer.from(JSON.stringify(value), 'utf8').toString('base64') });
+        } else {
+          entries.push({ type:'file', rel, data:fs.readFileSync(full).toString('base64') });
+        }
+      }
+    };
+    walk(record.candidateDir);
+    return {
+      schemaVersion:1,
+      type:'SEB_EVALPRO_CANDIDATE_TRANSFER',
+      candidateId:String(record.candidateId || ''),
+      shortId:String(record.manifest && record.manifest.shortId || ''),
+      status:String(record.manifest && record.manifest.status || ''),
+      exportedAt:now().toISOString(),
+      entries
+    };
+  }
+
+  function portableFileName(record) {
+    const token = String(record && record.candidateId || '').replace(/[^A-Za-z0-9]+/g, '').toUpperCase().slice(0, 12) || crypto.randomBytes(6).toString('hex').toUpperCase();
+    return 'CAND-' + token + '.seb';
+  }
+
+  function writePortableAtomic(target, text) {
+    const temp = target + '.seb-copy-' + process.pid + '-' + Date.now() + '.tmp';
+    fs.writeFileSync(temp, text, 'utf8');
+    fs.renameSync(temp, target);
+  }
+
+  function exportAll(selectedUsbPath, password) {
     const destinationRoot = path.resolve(String(selectedUsbPath || ''));
     if (!destinationRoot) throw new Error('Clé USB non sélectionnée.');
+    transferPassword(password);
     prepareCandidates();
     ensureDir(destinationRoot);
     if (path.resolve(candidatesRoot) === destinationRoot) throw new Error('La destination d’export ne peut pas être le dossier local des candidats.');
 
-    const sourceRecords = listCandidateDirs(candidatesRoot, false).filter(candidateShapeValid);
-    const existing = listCandidateDirs(destinationRoot, false);
+    const sourceRecords = listCandidateDirs(candidatesRoot, false)
+      .filter(candidateShapeValid)
+      .filter((record) => String(record.manifest && record.manifest.status || '') === 'SESSION_FERMEE');
     let added = 0, skipped = 0, verifiedFiles = 0;
     const copied = [];
+
     for (const source of sourceRecords) {
-      if (existing.some((r) => sameCandidate(r, source))) {
+      const filename = portableFileName(source);
+      const target = path.join(destinationRoot, filename);
+      if (fs.existsSync(target)) {
         skipped += 1;
         continue;
       }
-      const target = chooseTargetName(source, destinationRoot);
-      const checked = copyVerifiedAtomic(source.candidateDir, target);
-      verifiedFiles += checked.files;
-      const imported = listCandidateDirs(destinationRoot, false).find((r) => sameCandidate(r, source));
-      if (imported) existing.push(imported);
+      const payload = packCandidate(source);
+      const encrypted = encryptTransferPayload(payload, password);
+      writePortableAtomic(target, encrypted);
+      const verified = decryptTransferPayload(fs.readFileSync(target, 'utf8'), password);
+      if (String(verified.candidateId) !== String(source.candidateId)) {
+        try { fs.rmSync(target, { force:true }); } catch (_) {}
+        throw new Error('Vérification de l’export chiffré échouée.');
+      }
       added += 1;
-      copied.push({ candidateId:source.candidateId, folderName:path.basename(target), candidateDir:target });
+      verifiedFiles += payload.entries.filter((entry) => entry.type !== 'dir').length;
+      copied.push({ candidateId:source.candidateId, filename, transferFile:target });
     }
-    return { total:sourceRecords.length, added, updated:0, skipped, verifiedFiles, copied, destinationRoot, exportedAt:now().toISOString(), verified:true };
+
+    return {
+      total:sourceRecords.length,
+      added,
+      updated:0,
+      skipped,
+      verifiedFiles,
+      copied,
+      destinationRoot,
+      exportedAt:now().toISOString(),
+      verified:true,
+      passwordProtected:true,
+      format:'SEB-EVALPRO-USB-1'
+    };
   }
 
-  function importAll(selectedUsbPath) {
+  function unpackCandidatePayload(payload, targetDir) {
+    const temp = targetDir + '.seb-import-' + process.pid + '-' + Date.now();
+    if (fs.existsSync(temp)) fs.rmSync(temp, { recursive:true, force:true });
+    ensureDir(temp);
+    try {
+      for (const item of payload.entries || []) {
+        const rel = safeTransferRelative(item && item.rel);
+        const target = path.join(temp, ...rel.split('/'));
+        if (item.type === 'dir') {
+          ensureDir(target);
+          continue;
+        }
+        ensureDir(path.dirname(target));
+        const data = Buffer.from(String(item && item.data || ''), 'base64');
+        if (item.type === 'json') {
+          let value;
+          try { value = JSON.parse(data.toString('utf8')); }
+          catch (_) { throw new Error('JSON de transfert invalide : ' + rel); }
+          writeJson(target, value);
+        } else if (item.type === 'file') {
+          fs.writeFileSync(target, data);
+        } else {
+          throw new Error('Type de fichier de transfert invalide.');
+        }
+      }
+      ensureCandidateShape(temp);
+      const manifest = readJson(path.join(temp, 'manifest.json'));
+      if (!manifest || String(manifest.candidateId || '') !== String(payload.candidateId || '')) {
+        throw new Error('Identité technique du candidat incohérente dans le transfert.');
+      }
+      writeJson(path.join(temp, 'manifest.json'), {
+        ...manifest,
+        folderName:path.basename(targetDir),
+        importedAt:now().toISOString(),
+        importedFromEncryptedTransfer:true
+      });
+      fs.renameSync(temp, targetDir);
+    } catch (error) {
+      try { if (fs.existsSync(temp)) fs.rmSync(temp, { recursive:true, force:true }); } catch (_) {}
+      throw error;
+    }
+  }
+
+  function importAll(selectedUsbPath, password) {
     const sourceRoot = path.resolve(String(selectedUsbPath || ''));
     if (!sourceRoot || !fs.existsSync(sourceRoot)) throw new Error('Clé USB non sélectionnée ou inaccessible.');
+    transferPassword(password);
+
+    const transferFiles = fs.readdirSync(sourceRoot, { withFileTypes:true })
+      .filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith('.seb'))
+      .map((entry) => path.join(sourceRoot, entry.name))
+      .sort((a,b) => path.basename(a).localeCompare(path.basename(b)));
+
+    if (!transferFiles.length) {
+      return { total:0, added:0, updated:0, skipped:0, verifiedFiles:0, copied:[], sourceRoot, destinationRoot:candidatesRoot, verified:true, passwordProtected:true };
+    }
+
+    // Phase 1 : tout déchiffrer et tout valider avant la moindre écriture locale.
+    const packages = transferFiles.map((file) => ({
+      file,
+      payload:decryptTransferPayload(fs.readFileSync(file, 'utf8'), password)
+    }));
+
     ensureDir(candidatesRoot);
     prepareCandidates();
-
-    const sourceRecords = listCandidateDirs(sourceRoot, false).filter(candidateShapeValid);
     const destinationRecords = listCandidateDirs(candidatesRoot, false);
     let added = 0, skipped = 0, verifiedFiles = 0;
     const copied = [];
 
-    for (const source of sourceRecords) {
-      if (destinationRecords.some((r) => sameCandidate(r, source))) {
+    for (const pack of packages) {
+      const payload = pack.payload;
+      if (destinationRecords.some((record) => String(record.candidateId) === String(payload.candidateId))) {
         skipped += 1;
         continue;
       }
-      const target = chooseTargetName(source, candidatesRoot);
-      const checked = copyVerifiedAtomic(source.candidateDir, target);
-      verifiedFiles += checked.files;
-      const manifest = readJson(path.join(target, 'manifest.json')) || {};
-      writeJson(path.join(target, 'manifest.json'), { ...manifest, folderName:path.basename(target), importedAt:now().toISOString() });
-      const imported = listCandidateDirs(candidatesRoot, false).find((r) => sameCandidate(r, source));
-      if (imported) destinationRecords.push(imported);
+      const base = codedFolderName(payload.candidateId, payload.shortId);
+      const target = fs.existsSync(path.join(candidatesRoot, base))
+        ? uniqueFolderPath(candidatesRoot, base)
+        : path.join(candidatesRoot, base);
+      unpackCandidatePayload(payload, target);
+      const imported = listCandidateDirs(candidatesRoot, false).find((record) => String(record.candidateId) === String(payload.candidateId));
+      if (!imported || !candidateShapeValid(imported)) {
+        try { fs.rmSync(target, { recursive:true, force:true }); } catch (_) {}
+        throw new Error('Vérification locale après import échouée.');
+      }
+      destinationRecords.push(imported);
       added += 1;
-      copied.push({ candidateId:source.candidateId, folderName:path.basename(target), candidateDir:target });
+      verifiedFiles += (payload.entries || []).filter((entry) => entry.type !== 'dir').length;
+      copied.push({ candidateId:payload.candidateId, folderName:path.basename(target), candidateDir:target });
     }
 
-    return { total:sourceRecords.length, added, updated:0, skipped, verifiedFiles, copied, sourceRoot, destinationRoot:candidatesRoot, importedAt:now().toISOString(), verified:true };
+    return {
+      total:packages.length,
+      added,
+      updated:0,
+      skipped,
+      verifiedFiles,
+      copied,
+      sourceRoot,
+      destinationRoot:candidatesRoot,
+      importedAt:now().toISOString(),
+      verified:true,
+      passwordProtected:true,
+      format:'SEB-EVALPRO-USB-1'
+    };
   }
 
   return {
