@@ -118,7 +118,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          npm run dist:win
+          npx electron-builder --win --publish never
           if ($LASTEXITCODE -ne 0) { throw 'Construction Windows échouée.' }
           $setup = 'dist\SEB-eval-PRO-0.3.2-Windows-Setup.exe'
           if (-not (Test-Path $setup)) { throw "Setup 0.3.2 absent : $setup" }
