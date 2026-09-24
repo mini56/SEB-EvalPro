@@ -356,28 +356,28 @@ function createTransferPasswordDialog(mode) {
   return new Promise((resolve) => {
     const backdrop = document.createElement('div');
     backdrop.id = 'seb-evalpro-transfer-password-dialog';
-    backdrop.innerHTML = \`
-      <div class="seb-transfer-password-card" role="dialog" aria-modal="true" aria-label="\${isExport ? 'Mot de passe export USB' : 'Mot de passe import USB'}">
-        <div class="seb-transfer-password-title">\${isExport ? 'Export USB sécurisé' : 'Import USB sécurisé'}</div>
-        <div class="seb-transfer-password-text">\${isExport
+    backdrop.innerHTML = `
+      <div class="seb-transfer-password-card" role="dialog" aria-modal="true" aria-label="${isExport ? 'Mot de passe export USB' : 'Mot de passe import USB'}">
+        <div class="seb-transfer-password-title">${isExport ? 'Export USB sécurisé' : 'Import USB sécurisé'}</div>
+        <div class="seb-transfer-password-text">${isExport
           ? 'Choisissez le mot de passe qui protégera les fichiers transférés. Il sera demandé sur l’autre PC.'
           : 'Saisissez le mot de passe utilisé lors de l’export de cette clé USB.'}</div>
         <label for="seb-transfer-password">Mot de passe de transfert</label>
         <input id="seb-transfer-password" type="password" autocomplete="off" />
-        \${isExport ? \`
+        ${isExport ? `
           <label for="seb-transfer-password-confirm">Confirmer le mot de passe</label>
           <input id="seb-transfer-password-confirm" type="password" autocomplete="off" />
-        \` : ''}
+        ` : ''}
         <button type="button" id="seb-transfer-password-show" class="show-password">Afficher le mot de passe</button>
         <div id="seb-transfer-password-error" class="seb-transfer-password-error" aria-live="polite"></div>
         <div class="seb-transfer-password-actions">
           <button type="button" id="seb-transfer-password-cancel">Annuler</button>
-          <button type="button" id="seb-transfer-password-ok" class="primary">\${isExport ? 'Continuer l’export' : 'Continuer l’import'}</button>
+          <button type="button" id="seb-transfer-password-ok" class="primary">${isExport ? 'Continuer l’export' : 'Continuer l’import'}</button>
         </div>
-      </div>\`;
+      </div>`;
 
     const style = document.createElement('style');
-    style.textContent = \`
+    style.textContent = `
       #seb-evalpro-transfer-password-dialog{position:fixed;inset:0;z-index:2147483647;background:rgba(0,0,0,.42);display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif}
       #seb-evalpro-transfer-password-dialog .seb-transfer-password-card{width:470px;max-width:calc(100vw - 40px);background:#fff;border:1px solid #aaa;border-radius:8px;padding:20px;box-shadow:0 10px 35px rgba(0,0,0,.3);box-sizing:border-box}
       #seb-evalpro-transfer-password-dialog .seb-transfer-password-title{font-size:20px;font-weight:700;color:#0070c0;margin-bottom:8px}
@@ -389,7 +389,7 @@ function createTransferPasswordDialog(mode) {
       #seb-evalpro-transfer-password-dialog button.primary{background:#0070c0;color:#fff}
       #seb-evalpro-transfer-password-dialog .seb-transfer-password-error{min-height:20px;color:#c00000;font-size:13px;margin-top:7px}
       #seb-evalpro-transfer-password-dialog .seb-transfer-password-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:8px}
-    \`;
+    `;
     backdrop.appendChild(style);
     document.body.appendChild(backdrop);
 
