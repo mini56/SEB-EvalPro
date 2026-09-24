@@ -135,7 +135,9 @@ function words(text){return String(text||'').trim().split(/\s+/).filter(Boolean)
   assert(!/excellent|parfait|exceptionnel|remarquable/i.test(out.text),'intensification non justifiée');
   assert(!/\bà le\b|\bde le\b/i.test(out.text),'contraction française incorrecte');
   assert(!/0 min 03 s|6 erreurs/i.test(out.text),'métriques de tri recopiées sans utilité');
-  assert(words(out.text)<250,'cas DURANT trop long: '+words(out.text)+' mots');
+  assert(words(out.text)>=250,'cas DURANT devenu trop court: '+words(out.text)+' mots');
+  assert(words(out.text)<320,'cas DURANT trop long: '+words(out.text)+' mots');
+  assert(/Dans l’ensemble|Au terme du parcours|Les acquis|Les résultats/i.test(out.text),'conclusion descriptive absente');
   console.log('SEB-IA DURANT: '+words(out.text)+' mots.\n'+out.text);
 })();
 
