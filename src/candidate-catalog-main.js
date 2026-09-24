@@ -3,11 +3,13 @@ const path = require('path');
 const crypto = require('crypto');
 const { shell } = require('electron');
 const { getEditionCapabilities } = require('./edition');
+const { encodeJson } = require('./candidate-data-crypto');
 const {
   readJson,
   ensureDir,
   normalize,
   standardFolderName,
+  codedFolderName,
   uniqueFolderPath,
   listCandidateDirs,
   selectCandidate,
@@ -33,7 +35,7 @@ module.exports = function registerCandidateCatalog({ app, ipcMain, getAdminUnloc
   function writeJson(target, value) {
     ensureDir(path.dirname(target));
     const temp = target + '.tmp';
-    fs.writeFileSync(temp, JSON.stringify(value, null, 2), 'utf8');
+    fs.writeFileSync(temp, encodeJson(value), 'utf8');
     fs.renameSync(temp, target);
   }
 
@@ -145,7 +147,7 @@ module.exports = function registerCandidateCatalog({ app, ipcMain, getAdminUnloc
       const current = records.find((record) => String(record.candidateId) === String(active.candidateId));
       if (current) return current;
     }
-    const canonical = standardFolderName(records[0] && records[0].candidate);
+    const canonical = codedFolderName(records[0] && records[0].candidateId, records[0] && records[0].manifest && records[0].manifest.shortId);
     const exact = records.find((record) => record.folderName === canonical);
     if (exact) return exact;
     return records.slice().sort((a,b) =>
@@ -225,7 +227,7 @@ module.exports = function registerCandidateCatalog({ app, ipcMain, getAdminUnloc
         }
 
         ensureDir(duplicateArchiveRoot);
-        const archiveBase = duplicate.folderName + '__' + suffix;
+        const archiveBase = codedFolderName(duplicate.candidateId, duplicate.manifest && duplicate.manifest.shortId) + '__DUP-' + suffix;
         const archiveTarget = uniqueFolderPath(duplicateArchiveRoot, archiveBase);
         fs.renameSync(duplicate.candidateDir, archiveTarget);
         consolidatedFrom.push({
@@ -282,7 +284,7 @@ module.exports = function registerCandidateCatalog({ app, ipcMain, getAdminUnloc
     for (const legacy of listCandidateDirs(legacyAdminRoot, true)) {
       if (current.some((r) => String(r.candidateId) === String(legacy.candidateId))) continue;
       if (selectCandidate(current, legacy.candidate)) continue;
-      const base = standardFolderName(legacy.candidate);
+      const base = codedFolderName(legacy.candidateId, legacy.manifest && legacy.manifest.shortId);
       const target = fs.existsSync(path.join(candidatesRoot, base))
         ? uniqueFolderPath(candidatesRoot, base)
         : path.join(candidatesRoot, base);
