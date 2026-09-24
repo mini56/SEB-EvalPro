@@ -27,7 +27,7 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
-          if ($version -ne '0.3.4') { throw "Version attendue 0.3.4, trouvée : $version" }
+          if ($version -ne '0.3.5') { throw "Version attendue 0.3.5, trouvée : $version" }
           Write-Host "SEB_VERSION: $version"
 
       - name: Validate SEB-IA
@@ -117,23 +117,23 @@ jobs:
             [System.IO.File]::WriteAllText($path, $text, $utf8Bom)
           }
 
-      - name: Build Windows Setup 0.3.4
+      - name: Build Windows Setup 0.3.5
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           npx electron-builder --win --publish never
           if ($LASTEXITCODE -ne 0) { throw 'Construction Windows échouée.' }
-          $setup = 'dist\SEB-eval-PRO-0.3.4-Windows-Setup.exe'
-          if (-not (Test-Path $setup)) { throw "Setup 0.3.4 absent : $setup" }
+          $setup = 'dist\SEB-eval-PRO-0.3.5-Windows-Setup.exe'
+          if (-not (Test-Path $setup)) { throw "Setup 0.3.5 absent : $setup" }
           if (Test-Path 'dist\win-unpacked\resources\ai') {
             throw 'Un ancien Pack IA externe est encore embarqué.'
           }
           if (-not (Test-Path 'dist\win-unpacked\resources\candidate-keyguard.exe')) {
             throw 'candidate-keyguard.exe absent du programme empaqueté.'
           }
-          Write-Host "SETUP_034: $((Resolve-Path $setup).Path)"
+          Write-Host "SETUP_035: $((Resolve-Path $setup).Path)"
 
-      - name: Build standalone Windows uninstaller 0.3.4
+      - name: Build standalone Windows uninstaller 0.3.5
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -145,18 +145,18 @@ jobs:
           }
           if (-not $makensis) { throw 'makensis.exe introuvable.' }
           $makensisPath = if ($makensis.Source) { $makensis.Source } else { $makensis.FullName }
-          & $makensisPath '/DAPP_VERSION=0.3.4' 'build\standalone-uninstaller.nsi'
+          & $makensisPath '/DAPP_VERSION=0.3.5' 'build\standalone-uninstaller.nsi'
           if ($LASTEXITCODE -ne 0) { throw "Compilation désinstallateur échouée : $LASTEXITCODE" }
-          $uninstaller = 'dist\SEB-eval-PRO-0.3.4-Windows-Desinstallation.exe'
+          $uninstaller = 'dist\SEB-eval-PRO-0.3.5-Windows-Desinstallation.exe'
           if (-not (Test-Path $uninstaller)) { throw "Désinstallateur absent : $uninstaller" }
-          Write-Host 'STANDALONE_UNINSTALLER_034: OK'
+          Write-Host 'STANDALONE_UNINSTALLER_035: OK'
 
       - name: Verify Setup identity and hashes
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $setup = (Resolve-Path 'dist\SEB-eval-PRO-0.3.4-Windows-Setup.exe').Path
-          $uninstaller = (Resolve-Path 'dist\SEB-eval-PRO-0.3.4-Windows-Desinstallation.exe').Path
+          $setup = (Resolve-Path 'dist\SEB-eval-PRO-0.3.5-Windows-Setup.exe').Path
+          $uninstaller = (Resolve-Path 'dist\SEB-eval-PRO-0.3.5-Windows-Desinstallation.exe').Path
 
           $installer = Get-Content 'build\installer.nsh' -Raw
           foreach ($required in @('Version Candidat','Version Administrateur','SEB-IA est intégrée','edition-candidate.flag','edition-admin.flag')) {
@@ -177,14 +177,14 @@ jobs:
           $ErrorActionPreference = 'Stop'
           Add-Type -AssemblyName System.Drawing
 
-          $setup = (Resolve-Path 'dist\SEB-eval-PRO-0.3.4-Windows-Setup.exe').Path
-          $uninstaller = (Resolve-Path 'dist\SEB-eval-PRO-0.3.4-Windows-Desinstallation.exe').Path
-          $installDir = 'C:\SEBEvalPro-034-CI'
+          $setup = (Resolve-Path 'dist\SEB-eval-PRO-0.3.5-Windows-Setup.exe').Path
+          $uninstaller = (Resolve-Path 'dist\SEB-eval-PRO-0.3.5-Windows-Desinstallation.exe').Path
+          $installDir = 'C:\SEBEvalPro-035-CI'
           Remove-Item -Recurse -Force $installDir -ErrorAction SilentlyContinue
           Remove-Item 'HKCU:\Software\SEB EvalPro' -Recurse -Force -ErrorAction SilentlyContinue
 
           $documents = [Environment]::GetFolderPath('MyDocuments')
-          $preservedFile = Join-Path $documents 'SEB EvalPro\Bilans\ci-preserve-034.txt'
+          $preservedFile = Join-Path $documents 'SEB EvalPro\Bilans\ci-preserve-035.txt'
           New-Item -ItemType Directory -Force -Path (Split-Path -Parent $preservedFile) | Out-Null
           Set-Content -LiteralPath $preservedFile -Value 'must survive uninstall' -Encoding ascii
 
@@ -205,7 +205,7 @@ jobs:
           }
 
           $productVersion = (Get-Item $exe).VersionInfo.ProductVersion
-          if (-not $productVersion -or -not $productVersion.StartsWith('0.3.4')) {
+          if (-not $productVersion -or -not $productVersion.StartsWith('0.3.5')) {
             throw "Version de l'exécutable incorrecte : $productVersion"
           }
           Write-Host "INSTALLED_VERSION=$productVersion"
@@ -266,26 +266,26 @@ jobs:
           Write-Host 'REAL_INSTALL_UNINSTALL: OK'
           Write-Host 'DOCUMENTS_BILANS_PRESERVED: OK'
 
-      - name: Upload Windows 0.3.4 artifact
+      - name: Upload Windows 0.3.5 artifact
         uses: actions/upload-artifact@v4
         with:
-          name: SEB-EvalPro-0.3.4-Windows-Setup
-          path: dist/SEB-eval-PRO-0.3.4-Windows-Setup.exe
+          name: SEB-EvalPro-0.3.5-Windows-Setup
+          path: dist/SEB-eval-PRO-0.3.5-Windows-Setup.exe
           if-no-files-found: error
           retention-days: 14
 
-      - name: Publish 0.3.4 test release
+      - name: Publish 0.3.5 test release
         continue-on-error: true
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $tag = "seb-evalpro-seb-ia-034-build-${{ github.run_number }}"
-          $setup = 'dist\SEB-eval-PRO-0.3.4-Windows-Setup.exe'
-          $uninstaller = 'dist\SEB-eval-PRO-0.3.4-Windows-Desinstallation.exe'
-          $title = "SEB EvalPro 0.3.4 - SEB-IA - Build #${{ github.run_number }}"
-          $notes = "Setup complet SEB-éval-PRO 0.3.4 avec identité Sauvegarde 56, icône officielle, raccourcis Bureau/Menu Démarrer, garde clavier Candidat, SEB-IA intégrée et désinstallateur autonome. Installation/désinstallation réelle et conservation des bilans/Documents validées automatiquement."
+          $tag = "seb-evalpro-seb-ia-035-build-${{ github.run_number }}"
+          $setup = 'dist\SEB-eval-PRO-0.3.5-Windows-Setup.exe'
+          $uninstaller = 'dist\SEB-eval-PRO-0.3.5-Windows-Desinstallation.exe'
+          $title = "SEB EvalPro 0.3.5 - SEB-IA - Build #${{ github.run_number }}"
+          $notes = "Setup complet SEB-éval-PRO 0.3.5 avec identité Sauvegarde 56, icône officielle, raccourcis Bureau/Menu Démarrer, garde clavier Candidat, SEB-IA intégrée et désinstallateur autonome. Installation/désinstallation réelle et conservation des bilans/Documents validées automatiquement."
           gh release create $tag $setup $uninstaller --target "${{ github.sha }}" --title $title --notes $notes --prerelease --repo "${{ github.repository }}"
-          if ($LASTEXITCODE -ne 0) { throw 'Publication Release test 0.3.4 échouée.' }
+          if ($LASTEXITCODE -ne 0) { throw 'Publication Release test 0.3.5 échouée.' }
           Write-Host "RELEASE_TAG=$tag"
