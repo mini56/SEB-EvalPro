@@ -31,6 +31,9 @@ jobs:
       - name: Test SEB-IA engine
         run: npm run test:seb-ia
 
+      - name: Test candidate data security
+        run: npm run test:security
+
       - name: Generate web application
         run: npm run prepare:web
 
