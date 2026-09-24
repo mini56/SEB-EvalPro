@@ -130,7 +130,8 @@ function getCandidateStore() {
 function getCandidateTransfer() {
   if (!candidateTransfer) {
     candidateTransfer = createCandidateTransfer({
-      documentsPath: app.getPath('documents')
+      documentsPath: app.getPath('documents'),
+      userDataPath: app.getPath('userData')
     });
   }
   return candidateTransfer;
@@ -625,6 +626,25 @@ ipcMain.handle('candidate:active', () => {
   return getCandidateStore().getActiveCandidate();
 });
 
+ipcMain.handle('candidate:complete-active', (_event, mode) => {
+  const completionMode = String(mode || '');
+  if (!['admin-manual', 'candidate-final-page'].includes(completionMode)) {
+    return { ok:false, error:'Mode de fin de parcours invalide.' };
+  }
+  if (completionMode === 'admin-manual' && !adminSessionUnlocked) {
+    return { ok:false, error:'Accès administrateur requis.' };
+  }
+  try {
+    const currentState = readState();
+    const completed = getCandidateStore().completeActiveCandidate(currentState, completionMode);
+    if (!completed) return { ok:false, error:'Aucun parcours candidat actif sur ce PC.' };
+    writeState(defaultState());
+    return { ok:true, ...completed };
+  } catch (error) {
+    return { ok:false, error:error && error.message ? error.message : String(error) };
+  }
+});
+
 ipcMain.handle('admin:export-candidates', async (_event, password) => {
   if (!mainWindow || !adminSessionUnlocked) return { ok: false, error: 'Accès administrateur requis.' };
   try {
@@ -726,11 +746,7 @@ require('./session-close')({
   ipcMain,
   getMainWindow: () => mainWindow,
   getAdminUnlocked: () => adminSessionUnlocked,
-  setAdminUnlocked: (value) => { adminSessionUnlocked = !!value; },
-  readState,
-  writeState,
-  defaultState,
-  finalizeCandidateSession: (state) => getCandidateStore().closeActiveCandidate(state)
+  setAdminUnlocked: (value) => { adminSessionUnlocked = !!value; }
 });
 
 app.whenReady().then(startApplication);
