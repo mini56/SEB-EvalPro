@@ -2,9 +2,6 @@ name: TEST Windows SEB-IA Full Setup
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - tmp-seb-ia-v1
 
 permissions:
   contents: write
