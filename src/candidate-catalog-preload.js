@@ -171,7 +171,6 @@ async function openCandidateDetail(candidateId, onChanged) {
       <div class="seb-cc-detail-actions">
         <button type="button" id="seb-cc-detail-bilan" class="primary">Faire le bilan</button>
         <button type="button" id="seb-cc-detail-close">Fermer</button>
-        <button type="button" id="seb-cc-detail-delete" class="danger">Supprimer</button>
       </div>
     </div>`;
   document.body.appendChild(overlay);
@@ -280,17 +279,7 @@ async function openCandidateDetail(candidateId, onChanged) {
     await beginCandidateBilan(candidateId, overlay);
   });
   overlay.querySelector('#seb-cc-detail-close').addEventListener('click', () => overlay.remove());
-  overlay.querySelector('#seb-cc-detail-delete').addEventListener('click', async () => {
-    const confirmed = await confirmCandidateDeletion(item);
-    if (!confirmed) return;
-    const deleted = await ipcRenderer.invoke('candidate-catalog:delete', candidateId);
-    if (!deleted || !deleted.ok) {
-      alert((deleted && deleted.error) || 'Suppression du candidat impossible.');
-      return;
-    }
-    overlay.remove();
-    if (typeof onChanged === 'function') await onChanged();
-  });
+
 }
 
 async function beginCandidateResults(candidateId, detailOverlay = null) {
