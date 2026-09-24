@@ -222,7 +222,7 @@ jobs:
             if (-not (Test-Path $backup)) { throw "Sauvegarde pré-mise-à-jour absente : $backup" }
           }
           if ((Get-Content (Join-Path $systemRecovery 'candidate-local-key.sebkey') -Raw).Trim() -ne 'CI-OLD-KEY-036') {
-            throw 'La clé locale ancienne n’a pas été sauvegardée avant installation.'
+            throw "La clé locale ancienne n'a pas été sauvegardée avant installation."
           }
           Write-Host 'PREUPDATE_KEY_STATE_POINTER_BACKUP: OK'
 
@@ -230,13 +230,13 @@ jobs:
           if (-not (Test-Path $exe)) {
             $exe = Get-ChildItem $installDir -Filter '*.exe' | Where-Object { $_.Name -notmatch '^Uninstall' } | Select-Object -First 1 -ExpandProperty FullName
           }
-          if (-not $exe -or -not (Test-Path $exe)) { throw 'Exécutable SEB-éval-PRO installé introuvable.' }
+          if (-not $exe -or -not (Test-Path $exe)) { throw "Exécutable SEB-éval-PRO installé introuvable." }
 
           if (-not (Test-Path (Join-Path $installDir 'resources\candidate-keyguard.exe'))) {
-            throw 'Garde clavier Candidat absent après installation.'
+            throw "Garde clavier Candidat absent après installation."
           }
           if (-not (Test-Path (Join-Path $installDir 'edition-candidate.flag'))) {
-            throw 'Installation silencieuse par défaut non marquée Candidat.'
+            throw "Installation silencieuse par défaut non marquée Candidat."
           }
 
           $productVersion = (Get-Item $exe).VersionInfo.ProductVersion
@@ -247,7 +247,7 @@ jobs:
 
           $icon = [System.Drawing.Icon]::ExtractAssociatedIcon($exe)
           if (-not $icon -or $icon.Width -lt 16 -or $icon.Height -lt 16) {
-            throw 'Icône Windows associée à SEB-éval-PRO invalide.'
+            throw "Icône Windows associée à SEB-éval-PRO invalide."
           }
           $icon.Dispose()
           Write-Host 'INSTALLED_PROGRAM_ICON: OK'
@@ -257,14 +257,14 @@ jobs:
             (Join-Path ([Environment]::GetFolderPath('CommonDesktopDirectory')) 'SEB-éval-PRO.lnk')
           ) | Select-Object -Unique
           $desktopLink = $desktopCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
-          if (-not $desktopLink) { throw 'Raccourci Bureau SEB-éval-PRO absent.' }
+          if (-not $desktopLink) { throw "Raccourci Bureau SEB-éval-PRO absent." }
 
           $startCandidates = @(
             (Join-Path ([Environment]::GetFolderPath('Programs')) 'SEB-éval-PRO.lnk'),
             (Join-Path ([Environment]::GetFolderPath('CommonPrograms')) 'SEB-éval-PRO.lnk')
           ) | Select-Object -Unique
           $startLink = $startCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
-          if (-not $startLink) { throw 'Raccourci Menu Démarrer SEB-éval-PRO absent.' }
+          if (-not $startLink) { throw "Raccourci Menu Démarrer SEB-éval-PRO absent." }
 
           $ws = New-Object -ComObject WScript.Shell
           foreach ($link in @($desktopLink,$startLink)) {
@@ -294,13 +294,13 @@ jobs:
             }
           }
           if (-not (Test-Path $preservedFile)) {
-            throw 'Documents\SEB EvalPro\Bilans a été supprimé à tort.'
+            throw "Documents\SEB EvalPro\Bilans a été supprimé à tort."
           }
           if (-not (Test-Path $preservedCandidateFile)) {
-            throw 'Documents\SEB EvalPro\Candidats a été supprimé à tort.'
+            throw "Documents\SEB EvalPro\Candidats a été supprimé à tort."
           }
           if (-not (Test-Path (Join-Path $systemRecovery 'candidate-local-key.sebkey'))) {
-            throw 'La sauvegarde de la clé locale dans Documents a été supprimée à tort.'
+            throw "La sauvegarde de la clé locale dans Documents a été supprimée à tort."
           }
           foreach ($link in @($desktopCandidates + $startCandidates)) {
             if (Test-Path $link) { throw "Raccourci encore présent après désinstallation : $link" }
