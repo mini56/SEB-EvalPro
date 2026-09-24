@@ -1,6 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { encodeJson, readJsonFile } = require('./candidate-data-crypto');
+const { codedFolderName } = require('./candidate-folder-utils');
 
 function createCandidateStore(options = {}) {
   const documentsPath = options.documentsPath;
@@ -30,7 +32,7 @@ function createCandidateStore(options = {}) {
     ensureDirectory(path.dirname(target));
     atomicWriteCounter += 1;
     const temp = `${target}.${process.pid}.${atomicWriteCounter}.tmp`;
-    fs.writeFileSync(temp, JSON.stringify(value, null, 2), 'utf8');
+    fs.writeFileSync(temp, encodeJson(value), 'utf8');
     let lastError = null;
     for (let attempt = 0; attempt < 5; attempt += 1) {
       try {
@@ -48,11 +50,7 @@ function createCandidateStore(options = {}) {
   }
 
   function readJson(target) {
-    try {
-      return JSON.parse(fs.readFileSync(target, 'utf8'));
-    } catch (_) {
-      return null;
-    }
+    return readJsonFile(target);
   }
 
   function removeFile(target) {
@@ -173,13 +171,46 @@ function createCandidateStore(options = {}) {
     atomicWriteJson(manifestPath(candidateDir), manifest);
   }
 
-  function buildFolderName(identity) {
-    return [
-      sanitizeSegment(identity.nom).toUpperCase(),
-      sanitizeSegment(identity.prenom),
-      sanitizeSegment(identity.lieu),
-      sanitizeSegment(identity.groupe)
-    ].join('_');
+  function buildFolderName(candidateId, shortId = '') {
+    return codedFolderName(candidateId, shortId);
+  }
+
+  function migrateCandidateFolderNames() {
+    ensureRoots();
+    const pointer = readActivePointer();
+    let renamed = 0;
+    let entries = [];
+    try { entries = fs.readdirSync(candidatesRoot, { withFileTypes:true }); } catch (_) { entries = []; }
+
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      const oldDir = path.join(candidatesRoot, entry.name);
+      const manifest = readManifest(oldDir);
+      if (!manifest || !manifest.candidateId) continue;
+      const desiredBase = buildFolderName(manifest.candidateId, manifest.shortId);
+      if (entry.name === desiredBase || entry.name.startsWith(desiredBase + '_')) continue;
+
+      let target = path.join(candidatesRoot, desiredBase);
+      let index = 2;
+      while (fs.existsSync(target)) {
+        const existing = readManifest(target);
+        if (existing && String(existing.candidateId || '') === String(manifest.candidateId)) break;
+        target = path.join(candidatesRoot, desiredBase + '_' + index);
+        index += 1;
+      }
+
+      if (path.resolve(oldDir) !== path.resolve(target)) {
+        fs.renameSync(oldDir, target);
+        renamed += 1;
+      }
+
+      const folderName = path.basename(target);
+      writeManifest(target, { ...manifest, folderName, privacyFolderMigratedAt:now().toISOString() });
+      if (pointer && String(pointer.candidateId || '') === String(manifest.candidateId)) {
+        atomicWriteJson(activePointerPath, { ...pointer, folderName, candidateDir:target });
+      }
+    }
+    return { renamed };
   }
 
   function existingCandidateForIdentity(identity) {
@@ -198,10 +229,9 @@ function createCandidateStore(options = {}) {
       records.push({ candidateDir, folderName:entry.name, manifest });
     }
     if (!records.length) return null;
-    const canonical = buildFolderName(identity);
     records.sort((a,b) => {
-      const ac = a.folderName === canonical ? 0 : 1;
-      const bc = b.folderName === canonical ? 0 : 1;
+      const ac = /^CAND-/i.test(a.folderName) ? 0 : 1;
+      const bc = /^CAND-/i.test(b.folderName) ? 0 : 1;
       if (ac !== bc) return ac - bc;
       return String(a.manifest.createdAt || '').localeCompare(String(b.manifest.createdAt || ''));
     });
@@ -230,7 +260,7 @@ function createCandidateStore(options = {}) {
 
     const candidateId = crypto.randomUUID();
     const shortId = candidateId.replace(/-/g, '').slice(0, 6).toUpperCase();
-    const baseFolderName = buildFolderName(identity);
+    const baseFolderName = buildFolderName(candidateId, shortId);
     let folderName = baseFolderName;
     let candidateDir = path.join(candidatesRoot, folderName);
     let index = 2;
@@ -290,6 +320,7 @@ function createCandidateStore(options = {}) {
   }
 
   function ensureActiveCandidate(state) {
+    migrateCandidateFolderNames();
     const identity = candidateIdentityFromState(state);
     if (!identity) return null;
 
@@ -418,6 +449,7 @@ function createCandidateStore(options = {}) {
     getActiveExportDir,
     closeActiveCandidate,
     candidateIdentityFromState,
+    migrateCandidateFolderNames,
     paths: {
       sebRoot,
       candidatesRoot,
