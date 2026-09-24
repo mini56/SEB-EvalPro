@@ -1,3 +1,4 @@
+// CI_TRIGGER_USB_ROOT
 const assert = require('assert');
 const fs = require('fs');
 const os = require('os');
