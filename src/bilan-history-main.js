@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { findCandidateDir, listCandidateDirs, copyFileIfMissing, ensureDir } = require('./candidate-folder-utils');
+const { readJsonFile, encodeJson } = require('./candidate-data-crypto');
 
 module.exports = function registerBilanHistory({ app, ipcMain, getAdminUnlocked, buildNumber }) {
   const CURRENT_BUILD = String(buildNumber || 'DEV');
@@ -113,13 +114,14 @@ module.exports = function registerBilanHistory({ app, ipcMain, getAdminUnlocked,
     const legacy = path.join(legacyHistoryDir, safe);
     if (!safe.toLowerCase().endsWith('.json') || !fs.existsSync(legacy)) return null;
     let archive = null;
-    try { archive = JSON.parse(fs.readFileSync(legacy, 'utf8')); } catch (_) { return null; }
+    try { archive = readJsonFile(legacy); } catch (_) { return null; }
     if (!verify(archive)) return { full:legacy, filename:safe, archive, legacy:true, integrityOk:false };
     const candidateDir = findCandidateDir(documentsPath, normalizeCandidate(archive.candidate));
     if (!candidateDir) return { full:legacy, filename:safe, archive, legacy:true, integrityOk:true };
     const target = path.join(candidateDir, 'bilan', 'historique', safe);
     ensureDir(path.dirname(target));
     copyFileIfMissing(legacy, target);
+    fs.writeFileSync(target, encodeJson(archive), 'utf8');
     return { full:target, filename:safe, archive, legacy:false, integrityOk:true };
   }
 
@@ -134,7 +136,7 @@ module.exports = function registerBilanHistory({ app, ipcMain, getAdminUnlocked,
       full = migrated && migrated.full ? migrated.full : '';
     }
     if (!full || !fs.existsSync(full)) throw new Error('Archive de bilan introuvable.');
-    const archive = JSON.parse(fs.readFileSync(full, 'utf8'));
+    const archive = readJsonFile(full);
     if (!verify(archive)) throw new Error('ATTENTION : archive de bilan modifiée ou corrompue. Ouverture refusée.');
     return { archive, filename:safe, full };
   }
@@ -146,7 +148,7 @@ module.exports = function registerBilanHistory({ app, ipcMain, getAdminUnlocked,
 
     for (const location of candidateLocations()) {
       try {
-        const archive = JSON.parse(fs.readFileSync(location.full, 'utf8'));
+        const archive = readJsonFile(location.full);
         items.push({ filename:location.filename, archive, integrityOk:verify(archive), full:location.full });
       } catch (_) {
         items.push({ filename:location.filename, archive:null, integrityOk:false, full:location.full });
@@ -160,7 +162,7 @@ module.exports = function registerBilanHistory({ app, ipcMain, getAdminUnlocked,
       const migrated = migrateLegacyArchive(entry.name);
       if (!migrated) continue;
       try {
-        const archive = migrated.archive || JSON.parse(fs.readFileSync(migrated.full, 'utf8'));
+        const archive = migrated.archive || readJsonFile(migrated.full);
         items.push({ filename:entry.name, archive, integrityOk:verify(archive), full:migrated.full });
       } catch (_) {
         items.push({ filename:entry.name, archive:null, integrityOk:false, full:migrated.full });
@@ -215,7 +217,7 @@ module.exports = function registerBilanHistory({ app, ipcMain, getAdminUnlocked,
     const filename = `${base}_BILAN_R${String(revision).padStart(2, '0')}_${stamp}_${body.documentSha256.slice(0, 10)}.json`;
     const target = path.join(targetHistory, filename);
     const temp = target + '.tmp';
-    fs.writeFileSync(temp, JSON.stringify(body, null, 2), 'utf8');
+    fs.writeFileSync(temp, encodeJson(body), 'utf8');
     fs.renameSync(temp, target);
     // SEB_CANDIDATE_AUTONOMOUS_BILAN : aucune écriture opérationnelle dans l'ancien historique global.
     return { filename, archive:body };
