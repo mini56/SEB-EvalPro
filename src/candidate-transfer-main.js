@@ -19,6 +19,7 @@ const {
 
 function createCandidateTransfer(options = {}) {
   const documentsPath = options.documentsPath;
+  const userDataPath = options.userDataPath || null;
   const now = typeof options.now === 'function' ? options.now : () => new Date();
   if (!documentsPath) throw new Error('documentsPath requis');
 
@@ -240,10 +241,60 @@ function createCandidateTransfer(options = {}) {
     }
   }
 
+  function activeCandidateId() {
+    if (!userDataPath) return '';
+    const pointer = readJson(path.join(userDataPath, 'active-candidate.json'));
+    return String(pointer && pointer.candidateId || '');
+  }
+
+  function normalizeCandidateLifecycle() {
+    const activeId = activeCandidateId();
+    let normalized = 0;
+    for (const record of listCandidateDirs(candidatesRoot, false)) {
+      completeLegacySkeleton(record.candidateDir, record);
+      const manifestPath = path.join(record.candidateDir, 'manifest.json');
+      const manifest = readJson(manifestPath) || {};
+      const recordId = String(record.candidateId || '');
+      const status = String(manifest.status || '');
+
+      if (activeId && recordId === activeId) {
+        if (status !== 'EN_COURS') {
+          writeJson(manifestPath, {
+            ...manifest,
+            status:'EN_COURS',
+            updatedAt:now().toISOString(),
+            completedAt:null,
+            completionReason:null
+          });
+          normalized += 1;
+        }
+        continue;
+      }
+
+      if (userDataPath && status !== 'TERMINE') {
+        const completedAt = String(manifest.completedAt || manifest.closedAt || manifest.updatedAt || now().toISOString());
+        writeJson(manifestPath, {
+          ...manifest,
+          status:'TERMINE',
+          updatedAt:String(manifest.updatedAt || completedAt),
+          completedAt,
+          completionReason:String(manifest.completionReason || 'legacy-no-active-pointer')
+        });
+        normalized += 1;
+      }
+    }
+    return normalized;
+  }
+
   function prepareCandidates() {
     const migrated = migrateLegacyAdmin();
     syncGlobalArtifactsIntoCandidates();
-    return migrated;
+    const normalized = normalizeCandidateLifecycle();
+    return { migrated, normalized };
+  }
+
+  function isCompletedStatus(status) {
+    return ['TERMINE', 'SESSION_FERMEE'].includes(String(status || ''));
   }
 
   function chooseTargetName(record, destinationRoot) {
@@ -368,12 +419,13 @@ function createCandidateTransfer(options = {}) {
     if (!destinationRoot) throw new Error('Clé USB non sélectionnée.');
     transferPassword(password);
     prepareCandidates();
-    ensureDir(destinationRoot);
+    if (!fs.existsSync(destinationRoot)) ensureDir(destinationRoot);
+    else if (!fs.statSync(destinationRoot).isDirectory()) throw new Error('La destination d’export doit être un dossier ou la racine de la clé USB.');
     if (path.resolve(candidatesRoot) === destinationRoot) throw new Error('La destination d’export ne peut pas être le dossier local des candidats.');
 
     const sourceRecords = listCandidateDirs(candidatesRoot, false)
       .filter(candidateShapeValid)
-      .filter((record) => String(record.manifest && record.manifest.status || '') === 'SESSION_FERMEE');
+      .filter((record) => isCompletedStatus(record.manifest && record.manifest.status));
     let added = 0, skipped = 0, verifiedFiles = 0;
     const copied = [];
 
