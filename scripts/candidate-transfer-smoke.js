@@ -4,6 +4,7 @@ const os = require('os');
 const path = require('path');
 const crypto = require('crypto');
 const { createCandidateTransfer } = require('../src/candidate-transfer-main');
+const { configureLocalKey, migrateJsonTree, LOCAL_PREFIX } = require('../src/candidate-data-crypto');
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'seb-evalpro-secure-transfer-'));
 const pc1Documents = path.join(root, 'PC1', 'Documents');
@@ -68,6 +69,8 @@ try {
     nom:'VV', 'prénom':'UU', lieu:'Auray', groupe:'2', date:'2026-09-18'
   }, 'EN_COURS');
 
+  configureLocalKey(Buffer.alloc(32, 11));
+  migrateJsonTree(pc1.paths.candidatesRoot);
   fs.mkdirSync(usbRoot, { recursive:true });
   const firstExport = pc1.exportAll(usbRoot, password);
   assert.strictEqual(firstExport.total, 2, 'Seules les sessions fermées doivent être exportées.');
@@ -89,6 +92,8 @@ try {
   assert.strictEqual(secondExport.added, 0);
   assert.strictEqual(secondExport.skipped, 2);
 
+  // Le PC Admin utilise volontairement une autre clé locale.
+  configureLocalKey(Buffer.alloc(32, 22));
   const admin = createCandidateTransfer({ documentsPath:adminDocuments, now:() => new Date(fixedNow) });
   assert.throws(
     () => admin.importAll(usbRoot, 'Mauvais-2026!'),
@@ -107,6 +112,8 @@ try {
   assert.strictEqual(imported.passwordProtected, true);
   const records = admin.listCandidateRecords(imported.destinationRoot, false);
   assert.strictEqual(records.length, 2);
+  const importedManifestRaw = fs.readFileSync(path.join(records[0].candidateDir, 'manifest.json'), 'utf8');
+  assert(importedManifestRaw.startsWith(LOCAL_PREFIX), 'Les données importées doivent être rechiffrées avec la clé locale du PC Admin.');
   assert(records.every((record) => /^CAND-/i.test(record.folderName)), 'Les dossiers importés doivent rester codés.');
 
   const importedAgain = admin.importAll(usbRoot, password);
