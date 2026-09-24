@@ -351,6 +351,96 @@ function createTransferNameDialog() {
   });
 }
 
+function createTransferPasswordDialog(mode) {
+  const isExport = mode === 'export';
+  return new Promise((resolve) => {
+    const backdrop = document.createElement('div');
+    backdrop.id = 'seb-evalpro-transfer-password-dialog';
+    backdrop.innerHTML = \`
+      <div class="seb-transfer-password-card" role="dialog" aria-modal="true" aria-label="\${isExport ? 'Mot de passe export USB' : 'Mot de passe import USB'}">
+        <div class="seb-transfer-password-title">\${isExport ? 'Export USB sécurisé' : 'Import USB sécurisé'}</div>
+        <div class="seb-transfer-password-text">\${isExport
+          ? 'Choisissez le mot de passe qui protégera les fichiers transférés. Il sera demandé sur l’autre PC.'
+          : 'Saisissez le mot de passe utilisé lors de l’export de cette clé USB.'}</div>
+        <label for="seb-transfer-password">Mot de passe de transfert</label>
+        <input id="seb-transfer-password" type="password" autocomplete="off" />
+        \${isExport ? \`
+          <label for="seb-transfer-password-confirm">Confirmer le mot de passe</label>
+          <input id="seb-transfer-password-confirm" type="password" autocomplete="off" />
+        \` : ''}
+        <button type="button" id="seb-transfer-password-show" class="show-password">Afficher le mot de passe</button>
+        <div id="seb-transfer-password-error" class="seb-transfer-password-error" aria-live="polite"></div>
+        <div class="seb-transfer-password-actions">
+          <button type="button" id="seb-transfer-password-cancel">Annuler</button>
+          <button type="button" id="seb-transfer-password-ok" class="primary">\${isExport ? 'Continuer l’export' : 'Continuer l’import'}</button>
+        </div>
+      </div>\`;
+
+    const style = document.createElement('style');
+    style.textContent = \`
+      #seb-evalpro-transfer-password-dialog{position:fixed;inset:0;z-index:2147483647;background:rgba(0,0,0,.42);display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif}
+      #seb-evalpro-transfer-password-dialog .seb-transfer-password-card{width:470px;max-width:calc(100vw - 40px);background:#fff;border:1px solid #aaa;border-radius:8px;padding:20px;box-shadow:0 10px 35px rgba(0,0,0,.3);box-sizing:border-box}
+      #seb-evalpro-transfer-password-dialog .seb-transfer-password-title{font-size:20px;font-weight:700;color:#0070c0;margin-bottom:8px}
+      #seb-evalpro-transfer-password-dialog .seb-transfer-password-text{font-size:14px;line-height:1.45;color:#333;margin-bottom:14px}
+      #seb-evalpro-transfer-password-dialog label{display:block;font-size:14px;font-weight:700;color:#222;margin:10px 0 5px}
+      #seb-evalpro-transfer-password-dialog input{width:100%;font-size:18px;padding:8px 10px;border:1px solid #999;border-radius:4px;box-sizing:border-box}
+      #seb-evalpro-transfer-password-dialog button{font-family:Arial,sans-serif;font-size:14px;padding:8px 14px;border:2px solid #0070c0;border-radius:6px;background:#fff;color:#0070c0;font-weight:700;cursor:pointer}
+      #seb-evalpro-transfer-password-dialog button.show-password{margin-top:10px;padding:5px 10px;font-size:13px}
+      #seb-evalpro-transfer-password-dialog button.primary{background:#0070c0;color:#fff}
+      #seb-evalpro-transfer-password-dialog .seb-transfer-password-error{min-height:20px;color:#c00000;font-size:13px;margin-top:7px}
+      #seb-evalpro-transfer-password-dialog .seb-transfer-password-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:8px}
+    \`;
+    backdrop.appendChild(style);
+    document.body.appendChild(backdrop);
+
+    const password = backdrop.querySelector('#seb-transfer-password');
+    const confirmation = backdrop.querySelector('#seb-transfer-password-confirm');
+    const error = backdrop.querySelector('#seb-transfer-password-error');
+    const show = backdrop.querySelector('#seb-transfer-password-show');
+    let visible = false;
+
+    const finish = (value) => {
+      password.value = '';
+      if (confirmation) confirmation.value = '';
+      backdrop.remove();
+      resolve(value);
+    };
+
+    show.addEventListener('click', () => {
+      visible = !visible;
+      password.type = visible ? 'text' : 'password';
+      if (confirmation) confirmation.type = visible ? 'text' : 'password';
+      show.textContent = visible ? 'Masquer le mot de passe' : 'Afficher le mot de passe';
+      password.focus();
+    });
+
+    const accept = () => {
+      const value = String(password.value || '');
+      if (value.length < 8) {
+        error.textContent = 'Le mot de passe doit contenir au moins 8 caractères.';
+        password.focus();
+        return;
+      }
+      if (confirmation && value !== String(confirmation.value || '')) {
+        error.textContent = 'Les deux mots de passe ne sont pas identiques.';
+        confirmation.focus();
+        return;
+      }
+      finish(value);
+    };
+
+    backdrop.querySelector('#seb-transfer-password-cancel').addEventListener('click', () => finish(null));
+    backdrop.querySelector('#seb-transfer-password-ok').addEventListener('click', accept);
+    for (const input of [password, confirmation].filter(Boolean)) {
+      input.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') accept();
+        if (event.key === 'Escape') finish(null);
+      });
+    }
+    password.focus();
+  });
+}
+
 function showTransferMessage(title, message, isError = false) {
   return new Promise((resolve) => {
     const backdrop = document.createElement('div');
@@ -613,7 +703,9 @@ function injectAdminBar() {
     exportCandidatesButton.disabled = true;
     importCandidatesButton.disabled = true;
     try {
-      const result = await ipcRenderer.invoke('admin:export-candidates');
+      const password = await createTransferPasswordDialog('export');
+      if (!password) return;
+      const result = await ipcRenderer.invoke('admin:export-candidates', password);
       if (!result || result.cancelled) return;
       if (!result.ok) {
         await showTransferMessage('Export impossible', result.error || 'Une erreur est survenue pendant l’export.', true);
@@ -625,7 +717,7 @@ function injectAdminBar() {
       }
       await showTransferMessage(
         'Export terminé',
-        `Copie des fichiers terminée.\nVous pouvez retirer la clé USB en toute sécurité.\n\n${result.added} dossier(s) copié(s), ${result.skipped || 0} déjà présent(s) et ignoré(s).\n${result.verifiedFiles || 0} fichier(s) vérifié(s).\n\nClé : ${result.destinationRoot}`
+        `Copie des fichiers terminée.\nVous pouvez retirer la clé USB en toute sécurité.\n\n${result.added} fichier(s) candidat chiffré(s) créé(s), ${result.skipped || 0} déjà présent(s) et ignoré(s).\n${result.verifiedFiles || 0} fichier(s) vérifié(s).\n\nClé : ${result.destinationRoot}`
       );
     } catch (error) {
       await showTransferMessage('Export impossible', String(error && error.message ? error.message : error), true);
@@ -641,14 +733,16 @@ function injectAdminBar() {
     exportCandidatesButton.disabled = true;
     importCandidatesButton.disabled = true;
     try {
-      const result = await ipcRenderer.invoke('admin:import-candidates');
+      const password = await createTransferPasswordDialog('import');
+      if (!password) return;
+      const result = await ipcRenderer.invoke('admin:import-candidates', password);
       if (!result || result.cancelled) return;
       if (!result.ok) {
         await showTransferMessage('Import impossible', result.error || 'Une erreur est survenue pendant l’import.', true);
         return;
       }
       if (!result.total) {
-        await showTransferMessage('Import candidats', 'Aucun dossier candidat valide n’a été trouvé sur la clé sélectionnée.');
+        await showTransferMessage('Import candidats', 'Aucun fichier candidat chiffré (.seb) n’a été trouvé sur la clé sélectionnée.');
         return;
       }
       await showTransferMessage(
