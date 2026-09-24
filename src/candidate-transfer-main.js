@@ -86,12 +86,14 @@ function createCandidateTransfer(options = {}) {
 
   function identityKey(candidate) {
     const c = candidate || {};
-    return [c.nom, c.prenom || c['prénom'], c.lieu || c.ville, c.groupe].map(normalize).join('|');
+    return [c.nom, c.prenom || c['prénom'], c.lieu || c.ville, c.groupe, c.date || c.dateTest].map(normalize).join('|');
   }
 
   function sameCandidate(a, b) {
     if (!a || !b) return false;
-    if (a.candidateId && b.candidateId && String(a.candidateId) === String(b.candidateId)) return true;
+    if (a.candidateId && b.candidateId) {
+      return String(a.candidateId) === String(b.candidateId);
+    }
     const ka = identityKey(a.candidate);
     const kb = identityKey(b.candidate);
     return !!ka && ka === kb && ka.split('|').every(Boolean);
@@ -248,37 +250,23 @@ function createCandidateTransfer(options = {}) {
   }
 
   function normalizeCandidateLifecycle() {
-    const activeId = activeCandidateId();
     let normalized = 0;
     for (const record of listCandidateDirs(candidatesRoot, false)) {
-      completeLegacySkeleton(record.candidateDir, record);
       const manifestPath = path.join(record.candidateDir, 'manifest.json');
       const manifest = readJson(manifestPath) || {};
-      const recordId = String(record.candidateId || '');
       const status = String(manifest.status || '');
 
-      if (activeId && recordId === activeId) {
-        if (status !== 'EN_COURS') {
-          writeJson(manifestPath, {
-            ...manifest,
-            status:'EN_COURS',
-            updatedAt:now().toISOString(),
-            completedAt:null,
-            completionReason:null
-          });
-          normalized += 1;
-        }
-        continue;
-      }
-
-      if (userDataPath && status !== 'TERMINE') {
+      // Compatibilité historique explicite uniquement. Un EN_COURS reste EN_COURS
+      // même si son pointeur actif est absent : l'absence de pointeur ne prouve
+      // jamais que le parcours est terminé.
+      if (status === 'SESSION_FERMEE') {
         const completedAt = String(manifest.completedAt || manifest.closedAt || manifest.updatedAt || now().toISOString());
         writeJson(manifestPath, {
           ...manifest,
           status:'TERMINE',
           updatedAt:String(manifest.updatedAt || completedAt),
           completedAt,
-          completionReason:String(manifest.completionReason || 'legacy-no-active-pointer')
+          completionReason:String(manifest.completionReason || 'legacy-session-fermee')
         });
         normalized += 1;
       }
@@ -450,6 +438,81 @@ function createCandidateTransfer(options = {}) {
     fs.renameSync(temp, target);
   }
 
+  function assertLocalCandidateFoldersReadable() {
+    ensureDir(candidatesRoot);
+    const recordsByDir = new Map(listCandidateDirs(candidatesRoot, false).map((r) => [path.resolve(r.candidateDir), r]));
+    const entries = fs.readdirSync(candidatesRoot, { withFileTypes:true });
+    for (const entry of entries) {
+      if (!entry.isDirectory() || entry.name.startsWith('.')) continue;
+      const dir = path.join(candidatesRoot, entry.name);
+      const manifestFile = path.join(dir, 'manifest.json');
+      if (!fs.existsSync(manifestFile)) {
+        throw new Error('Dossier candidat local sans manifest : ' + entry.name + '. Aucun transfert n’a été effectué.');
+      }
+      const manifest = readJson(manifestFile);
+      if (!manifest || !manifest.candidateId) {
+        throw new Error('Dossier candidat local illisible : ' + entry.name + '. Aucun transfert n’a été effectué.');
+      }
+      const status = String(manifest.status || '');
+      if (!['EN_COURS','TERMINE','SESSION_FERMEE'].includes(status)) {
+        throw new Error('Statut candidat local non reconnu : ' + entry.name + '. Aucun transfert n’a été effectué.');
+      }
+      const record = recordsByDir.get(path.resolve(dir));
+      if (!record) {
+        throw new Error('Dossier candidat local incohérent : ' + entry.name + '. Aucun transfert n’a été effectué.');
+      }
+      if (isCompletedStatus(status)) {
+        if (!candidateShapeValid(record)) {
+          throw new Error('Dossier candidat terminé incomplet : ' + entry.name + '. Aucun export n’a été effectué.');
+        }
+        for (const rel of requiredFiles) {
+          if (readJson(path.join(dir, rel)) == null) {
+            throw new Error('Fichier candidat illisible : ' + entry.name + '\\' + rel + '. Aucun export n’a été effectué.');
+          }
+        }
+      }
+    }
+    return Array.from(recordsByDir.values());
+  }
+
+  function validateTransferPayloadForImport(payload) {
+    if (!payload || !payload.candidateId || !Array.isArray(payload.entries)) {
+      throw new Error('Contenu de transfert candidat incomplet.');
+    }
+    if (!isCompletedStatus(payload.status)) {
+      throw new Error('Un fichier de transfert contient un parcours non terminé. Aucun fichier n’a été importé.');
+    }
+
+    const files = new Map();
+    for (const item of payload.entries) {
+      const rel = safeTransferRelative(item && item.rel);
+      if (item.type === 'dir') continue;
+      if (!['json','file'].includes(item.type)) throw new Error('Type de fichier de transfert invalide.');
+      if (files.has(rel)) throw new Error('Fichier dupliqué dans le transfert : ' + rel);
+      files.set(rel, item);
+      if (item.type === 'json') {
+        try { JSON.parse(Buffer.from(String(item.data || ''), 'base64').toString('utf8')); }
+        catch (_) { throw new Error('JSON de transfert invalide : ' + rel); }
+      }
+    }
+
+    for (const rel of requiredFiles) {
+      const normalized = safeTransferRelative(rel);
+      if (!files.has(normalized)) {
+        throw new Error('Fichier obligatoire absent du transfert : ' + normalized + '. Aucun fichier n’a été importé.');
+      }
+    }
+
+    const manifestItem = files.get('manifest.json');
+    let manifest;
+    try { manifest = JSON.parse(Buffer.from(String(manifestItem.data || ''), 'base64').toString('utf8')); }
+    catch (_) { throw new Error('Manifest de transfert invalide.'); }
+    if (!manifest || String(manifest.candidateId || '') !== String(payload.candidateId)) {
+      throw new Error('Identité technique incohérente dans le transfert.');
+    }
+    return true;
+  }
+
   function exportAll(selectedUsbPath, password) {
     const destinationRoot = path.resolve(String(selectedUsbPath || ''));
     if (!destinationRoot) throw new Error('Clé USB non sélectionnée.');
@@ -459,8 +522,10 @@ function createCandidateTransfer(options = {}) {
     else if (!fs.statSync(destinationRoot).isDirectory()) throw new Error('La destination d’export doit être un dossier ou la racine de la clé USB.');
     if (path.resolve(candidatesRoot) === destinationRoot) throw new Error('La destination d’export ne peut pas être le dossier local des candidats.');
 
-    const sourceRecords = listCandidateDirs(candidatesRoot, false)
-      .filter(candidateShapeValid)
+    const allRecords = assertLocalCandidateFoldersReadable();
+    const activeId = activeCandidateId();
+    const sourceRecords = allRecords
+      .filter((record) => String(record.candidateId || '') !== activeId)
       .filter((record) => isCompletedStatus(record.manifest && record.manifest.status));
     let added = 0, skipped = 0, verifiedFiles = 0;
     const copied = [];
@@ -535,6 +600,7 @@ function createCandidateTransfer(options = {}) {
       }
       writeJson(path.join(temp, 'manifest.json'), {
         ...manifest,
+        status:'TERMINE',
         folderName:path.basename(targetDir),
         importedAt:now().toISOString(),
         importedFromEncryptedTransfer:true
@@ -565,13 +631,17 @@ function createCandidateTransfer(options = {}) {
       file,
       payload:decryptTransferPayload(fs.readFileSync(file, 'utf8'), password)
     }));
+    packages.forEach((pack) => validateTransferPayloadForImport(pack.payload));
 
     ensureDir(candidatesRoot);
     prepareCandidates();
+    assertLocalCandidateFoldersReadable();
     const destinationRecords = listCandidateDirs(candidatesRoot, false);
     let added = 0, skipped = 0, verifiedFiles = 0;
     const copied = [];
+    const createdTargets = [];
 
+    try {
     for (const pack of packages) {
       const payload = pack.payload;
       if (destinationRecords.some((record) => String(record.candidateId) === String(payload.candidateId))) {
@@ -592,6 +662,13 @@ function createCandidateTransfer(options = {}) {
       added += 1;
       verifiedFiles += (payload.entries || []).filter((entry) => entry.type !== 'dir').length;
       copied.push({ candidateId:payload.candidateId, folderName:path.basename(target), candidateDir:target });
+      createdTargets.push(target);
+    }
+    } catch (error) {
+      for (const target of createdTargets.reverse()) {
+        try { if (fs.existsSync(target)) fs.rmSync(target, { recursive:true, force:true }); } catch (_) {}
+      }
+      throw new Error((error && error.message ? error.message : String(error)) + ' Aucun nouvel import de cette opération n’a été conservé.');
     }
 
     return {
