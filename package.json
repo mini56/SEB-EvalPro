@@ -10,7 +10,8 @@
     "start": "npm run prepare:web && electron .",
     "dist:win": "npm run prepare:web && electron-builder --win --publish never",
     "dist:linux": "npm run prepare:web && electron-builder --linux AppImage --publish never",
-    "test:seb-ia": "node scripts/test-seb-ia-v1.js"
+    "test:seb-ia": "node scripts/test-seb-ia-v1.js && node scripts/audit-repository-names.js",
+    "audit:names": "node scripts/audit-repository-names.js"
   },
   "dependencies": {
     "quill": "2.0.3"
