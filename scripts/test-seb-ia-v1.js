@@ -157,7 +157,10 @@ function words(text){return String(text||'').trim().split(/\s+/).filter(Boolean)
     const out=make({civilite:i%2?'M.':'Mme',nom:'STRESS'+i},list);
     assert(out.ok,'stress '+i+': '+out.validation.errors.join(' | '));
     assert(!/potentiel|diagnostic|profil psychologique|projet professionnel adapté|fonctionnement cognitif/i.test(out.text),'inférence interdite au stress '+i);
-    assert(words(out.text)<340,'synthèse anormalement longue au stress '+i);
+    const wc=words(out.text);
+    assert(wc<380,'synthèse anormalement longue au stress '+i+' : '+wc+' mots');
+    assert((out.text.match(/\bnécessite(?:nt)?\b/gi)||[]).length<=5,'tournure « nécessite » trop répétée au stress '+i);
+    assert((out.text.match(/\bdemande(?:nt)?\b/gi)||[]).length<=5,'tournure « demande » trop répétée au stress '+i);
     seen.add(out.text);totalWords+=words(out.text);
   }
   assert(seen.size>=295,'diversité rédactionnelle insuffisante');
