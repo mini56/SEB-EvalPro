@@ -36,7 +36,7 @@ try {
 
   const first = store.saveSnapshot(state);
   assert(first, 'Le dossier candidat doit être créé.');
-  assert.strictEqual(first.folderName, 'XX_YY_Lorient_7');
+  assert(/^CAND-[A-F0-9]{12}(?:_\d+)?$/.test(first.folderName), 'Le dossier candidat doit utiliser uniquement un identifiant technique CAND-.');
   assert(fs.existsSync(path.join(first.candidateDir, 'manifest.json')));
   assert(fs.existsSync(path.join(first.candidateDir, 'donnees', 'candidat.json')));
   assert(fs.existsSync(path.join(first.candidateDir, 'donnees', 'evaluation-state.json')));
