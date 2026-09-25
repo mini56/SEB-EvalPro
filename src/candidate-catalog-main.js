@@ -19,10 +19,10 @@ const {
   copyDirectoryAtomically
 } = require('./candidate-folder-utils');
 
-module.exports = function registerCandidateCatalog({ app, ipcMain, getAdminUnlocked, getActiveCandidate }) {
+module.exports = function registerCandidateCatalog({ app, ipcMain, getAdminUnlocked, getActiveCandidate, dataRoot = null }) {
   const editionCapabilities = getEditionCapabilities();
   const documentsPath = app.getPath('documents');
-  const root = path.join(documentsPath, 'SEB EvalPro');
+  const root = dataRoot || path.join(documentsPath, 'SEB EvalPro');
   const candidatesRoot = path.join(root, 'Candidats');
   const legacyAdminRoot = path.join(root, 'Admin');
   const globalReplayRoot = path.join(root, 'parcours');
