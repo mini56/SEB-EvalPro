@@ -49,7 +49,10 @@ function insertBefore(text, marker, addition, label) {
       'import shell Electron'
     );
 
-    if (!out.includes("const candidateExportDir = getCandidateStore().getActiveExportDir();")) {
+    if (
+      !out.includes("const candidateExportDir = getCandidateStore().getActiveExportDir();") &&
+      !out.includes("const visibleDirectory = bilanDocumentsDir();")
+    ) {
       out = replaceOnce(
         out,
         "    const filename = path.basename(item.getFilename() || 'Evaluation.doc');\n    if (!/\\.docx?$/i.test(filename)) return;\n    try {\n      ensureSebDocumentsFolders();\n      item.setSavePath(uniqueOutputPath(bilanDocumentsDir(), filename));\n    } catch (_) {}",
