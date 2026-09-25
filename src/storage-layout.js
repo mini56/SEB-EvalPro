@@ -142,6 +142,29 @@ function migrateLegacyDocumentsStorage({ documentsPath, userDataPath }) {
   ensureDir(internalRoot);
   ensureDir(legacyRoot);
 
+  // Récupération éventuelle créée par l'installeur 0.3.8 avant mise à jour.
+  // Elle reste hors de Documents et sert uniquement à restaurer les anciennes
+  // clé/état/pointeur si l'ancien désinstalleur a nettoyé AppData.
+  const localAppData = String(process.env.LOCALAPPDATA || '').trim();
+  if (localAppData) {
+    const upgradeRecovery = path.join(localAppData, 'SEB EvalPro Recovery');
+    if (fs.existsSync(upgradeRecovery)) {
+      const systemRoot = ensureDir(path.join(internalRoot, 'System'));
+      for (const name of ['candidate-local-key.sebkey', 'evaluation-state.json', 'active-candidate.json']) {
+        const source = path.join(upgradeRecovery, name);
+        const target = path.join(systemRoot, name);
+        if (!fs.existsSync(source)) continue;
+        try {
+          const merged = copyFilePreserving(source, target, conflictRoot, path.join('UpgradeRecovery', name));
+          result.copied += merged.copied;
+          result.conflicts += merged.conflict;
+        } catch (error) {
+          result.errors.push(error && error.message ? error.message : String(error));
+        }
+      }
+    }
+  }
+
   // Phase 1 : copier et vérifier TOUT avant de supprimer quoi que ce soit
   // dans Documents. Une erreur laisse l'ancien stockage entièrement présent.
   try {
