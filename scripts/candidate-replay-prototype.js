@@ -73,7 +73,7 @@ function write(file, text) {
   const bilanPreload = read('src/bilan-history-preload.js').text;
   const candidateCatalogPreload = read('src/candidate-catalog-preload.js').text;
   const requiredMain = [
-    "path.join(app.getPath('documents'), 'SEB EvalPro', 'parcours')",
+    "path.join(storageRoot, 'parcours')",
     "ipcMain.handle('replay:capture-page'",
     "ipcMain.handle('replay:archive-final'",
     "ipcMain.handle('admin:list-parcours'",
