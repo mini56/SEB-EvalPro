@@ -7,14 +7,15 @@ const LOCAL_PREFIX = 'SEBLOCAL1:';
 function createCandidateLocalProtection(options = {}) {
   const documentsPath = options.documentsPath;
   const userDataPath = options.userDataPath;
+  const dataRoot = options.dataRoot || (documentsPath ? path.join(documentsPath, 'SEB EvalPro') : null);
   const safeStorage = options.safeStorage;
   const cryptoModule = options.cryptoModule || crypto;
 
-  if (!documentsPath) throw new Error('documentsPath requis');
+  if (!dataRoot) throw new Error('dataRoot requis');
   if (!userDataPath) throw new Error('userDataPath requis');
   if (!safeStorage) throw new Error('safeStorage requis');
 
-  const sebRoot = path.join(documentsPath, 'SEB EvalPro');
+  const sebRoot = dataRoot;
   const candidatesRoot = path.join(sebRoot, 'Candidats');
   const systemRoot = path.join(sebRoot, 'System');
   const primaryKeyPath = path.join(userDataPath, 'candidate-local-key.sebkey');
