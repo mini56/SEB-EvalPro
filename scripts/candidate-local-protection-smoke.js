@@ -19,69 +19,83 @@ function fakeSafeStorage() {
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'seb-evalpro-local-protection-'));
 const documentsPath = path.join(root, 'Documents');
 const userDataPath = path.join(root, 'AppData');
+const dataRoot = path.join(userDataPath, 'storage');
 
 try {
   const first = createCandidateLocalProtection({
     documentsPath,
     userDataPath,
+    dataRoot,
     safeStorage:fakeSafeStorage()
   });
 
   const key1 = first.initializeKey();
   assert(Buffer.isBuffer(key1) && key1.length === 32);
   assert(fs.existsSync(first.paths.primaryKeyPath), 'La clé AppData doit être créée.');
-  assert(fs.existsSync(first.paths.backupKeyPath), 'La copie durable de la clé doit être créée dans Documents.');
+  assert(fs.existsSync(first.paths.backupKeyPath), 'La copie de récupération doit être interne, hors Documents.');
+  assert(!first.paths.backupKeyPath.startsWith(path.join(documentsPath, 'SEB EvalPro')), 'La clé ne doit plus être sauvegardée dans Documents.');
 
   fs.mkdirSync(userDataPath, { recursive:true });
   fs.writeFileSync(first.paths.primaryStatePath, 'SEBLOCAL1:ETAT-CHIFFRE-TEST', 'utf8');
   assert.strictEqual(first.backupState(), true);
-  assert(fs.existsSync(first.paths.backupStatePath), 'L’état de reprise doit être sauvegardé dans Documents.');
+  assert(fs.existsSync(first.paths.backupStatePath), 'L’état de reprise doit être sauvegardé dans le stockage interne.');
 
   const originalKey = Buffer.from(key1);
   key1.fill(0);
 
-  // Simulation de l'ancien désinstalleur 0.3.5 : AppData disparaît.
   fs.rmSync(first.paths.primaryKeyPath, { force:true });
   fs.rmSync(first.paths.primaryStatePath, { force:true });
 
   const second = createCandidateLocalProtection({
     documentsPath,
     userDataPath,
+    dataRoot,
     safeStorage:fakeSafeStorage()
   });
   const key2 = second.initializeKey();
-  assert.deepStrictEqual(key2, originalKey, 'La même clé doit être restaurée depuis Documents.');
-  assert(fs.existsSync(second.paths.primaryKeyPath), 'La clé AppData doit être restaurée.');
+  assert.deepStrictEqual(key2, originalKey, 'La même clé doit être restaurée depuis la copie interne.');
+  assert(fs.existsSync(second.paths.primaryKeyPath), 'La clé principale doit être restaurée.');
   assert.strictEqual(second.restoreStateFromBackupIfNeeded(), true, 'L’état de reprise doit être restauré.');
-  assert.strictEqual(fs.readFileSync(second.paths.primaryStatePath, 'utf8'), 'SEBLOCAL1:ETAT-CHIFFRE-TEST');
   key2.fill(0);
 
-  // Aucune nouvelle clé ne doit être créée si des données chiffrées existent
-  // mais que toutes les copies de la clé ont disparu.
+  // Reproduit le cas réel 0.3.7 : sauvegarde de clé présente mais illisible.
   fs.rmSync(second.paths.primaryKeyPath, { force:true });
-  fs.rmSync(second.paths.backupKeyPath, { force:true });
   fs.rmSync(second.paths.primaryStatePath, { force:true });
   fs.rmSync(second.paths.backupStatePath, { force:true });
 
-  const candidateDir = path.join(documentsPath, 'SEB EvalPro', 'Candidats', 'CAND-TEST');
+  const candidateDir = path.join(dataRoot, 'Candidats', 'CAND-TEST');
   fs.mkdirSync(candidateDir, { recursive:true });
-  fs.writeFileSync(path.join(candidateDir, 'manifest.json'), 'SEBLOCAL1:DONNEE-CHIFFREE-SANS-CLE', 'utf8');
+  const orphanEncrypted = 'SEBLOCAL1:DONNEE-CHIFFREE-SANS-CLE';
+  fs.writeFileSync(path.join(candidateDir, 'manifest.json'), orphanEncrypted, 'utf8');
+  fs.writeFileSync(second.paths.backupKeyPath, 'SAUVEGARDE-CLE-ILLISIBLE', 'utf8');
 
   const third = createCandidateLocalProtection({
     documentsPath,
     userDataPath,
+    dataRoot,
     safeStorage:fakeSafeStorage()
   });
-  assert.throws(
-    () => third.initializeKey(),
-    /aucune nouvelle clé|données chiffrées existent/i,
-    'Une clé perdue ne doit jamais être remplacée silencieusement.'
+  const key3 = third.initializeKey();
+  assert(Buffer.isBuffer(key3) && key3.length === 32, 'Une nouvelle clé doit permettre au programme de continuer.');
+  assert(fs.existsSync(third.paths.primaryKeyPath), 'La nouvelle clé principale doit être créée.');
+  assert(fs.existsSync(third.paths.backupKeyPath), 'La nouvelle copie interne doit être créée.');
+  assert.strictEqual(
+    fs.readFileSync(path.join(candidateDir, 'manifest.json'), 'utf8'),
+    orphanEncrypted,
+    'La donnée chiffrée ancienne doit rester strictement intacte.'
   );
-  assert.strictEqual(fs.existsSync(third.paths.primaryKeyPath), false, 'Aucune nouvelle clé ne doit être générée en présence de données chiffrées orphelines.');
+  const recoveryDir = path.join(dataRoot, 'System', 'Recovery');
+  assert(fs.existsSync(recoveryDir), 'La clé illisible doit être conservée en récupération.');
+  assert(
+    fs.readdirSync(recoveryDir).some((name) => name.startsWith('backup-key-unreadable-')),
+    'La sauvegarde de clé illisible doit être archivée et non supprimée.'
+  );
+  key3.fill(0);
 
-  console.log('CANDIDATE_KEY_BACKUP_RESTORE=OK');
-  console.log('CANDIDATE_STATE_BACKUP_RESTORE=OK');
-  console.log('CANDIDATE_MISSING_KEY_FAIL_CLOSED=OK');
+  console.log('CANDIDATE_KEY_INTERNAL_BACKUP_RESTORE=OK');
+  console.log('CANDIDATE_STATE_INTERNAL_BACKUP_RESTORE=OK');
+  console.log('UNREADABLE_BACKUP_KEY_DOES_NOT_BLOCK_APP=OK');
+  console.log('ORPHAN_ENCRYPTED_CANDIDATE_PRESERVED=OK');
   console.log('Candidate Local Protection Test: OK');
 } finally {
   fs.rmSync(root, { recursive:true, force:true });
