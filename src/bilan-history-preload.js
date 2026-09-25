@@ -202,7 +202,7 @@ async function openChooser() {
   if (existing) existing.remove();
   const overlay = document.createElement('div');
   overlay.id = 'seb-bilan-history-chooser';
-  overlay.innerHTML = `<div class="seb-bh-card"><div class="seb-bh-head"><div class="seb-bh-title">Ouvrir un ancien bilan</div><div class="seb-bh-badge">ARCHIVE ÉDITABLE</div></div><div class="seb-bh-body"><div class="seb-bh-path">Documents\\SEB EvalPro\\Bilans\\Historique</div><div id="seb-bh-list">Chargement…</div></div><div class="seb-bh-actions"><button type="button" id="seb-bh-close">Fermer</button></div></div>`;
+  overlay.innerHTML = `<div class="seb-bh-card"><div class="seb-bh-head"><div class="seb-bh-title">Ouvrir un ancien bilan</div><div class="seb-bh-badge">ARCHIVE ÉDITABLE</div></div><div class="seb-bh-body"><div class="seb-bh-path">Stockage interne SEB EvalPro</div><div id="seb-bh-list">Chargement…</div></div><div class="seb-bh-actions"><button type="button" id="seb-bh-close">Fermer</button></div></div>`;
   document.body.appendChild(overlay);
   overlay.querySelector('#seb-bh-close').addEventListener('click', () => overlay.remove());
   overlay.addEventListener('keydown', (event) => { if (event.key === 'Escape') overlay.remove(); });
