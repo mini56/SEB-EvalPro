@@ -108,6 +108,7 @@ function createCandidateLocalProtection(options = {}) {
 
     let key = null;
     let primaryError = null;
+    let backupError = null;
 
     if (fs.existsSync(primaryKeyPath)) {
       try {
@@ -121,26 +122,58 @@ function createCandidateLocalProtection(options = {}) {
       try {
         key = loadProtectedKey(backupKeyPath);
         copyAtomic(backupKeyPath, primaryKeyPath);
-      } catch (backupError) {
-        if (primaryError) {
-          throw new Error('Les deux copies de la clé locale candidat sont illisibles sur ce PC.');
-        }
-        throw new Error('La sauvegarde de la clé locale candidat est illisible sur ce PC.');
+      } catch (error) {
+        backupError = error;
       }
     }
 
     if (!key) {
-      if (fs.existsSync(primaryKeyPath) || encryptedCandidateDataExists()) {
-        throw new Error(
-          'Clé locale candidat absente ou illisible alors que des données chiffrées existent. ' +
-          'SEB EvalPro n’a créé aucune nouvelle clé afin de ne pas rendre les dossiers candidats irrécupérables.'
-        );
+      // 0.3.8 : une ancienne clé illisible ne doit plus bloquer tout SEB EvalPro.
+      // Les fichiers illisibles sont conservés sous un autre nom pour permettre
+      // une récupération ultérieure ; aucune donnée candidat chiffrée n'est effacée.
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const recoveryRoot = ensureDir(path.join(systemRoot, 'Recovery'));
+      const preserveUnreadable = (target, label) => {
+        if (!target || !fs.existsSync(target)) return false;
+        try {
+          const preserved = path.join(recoveryRoot, label + '-unreadable-' + stamp + '.sebkey');
+          fs.copyFileSync(target, preserved);
+          return true;
+        } catch (_) {
+          return false;
+        }
+      };
+
+      if (primaryError) preserveUnreadable(primaryKeyPath, 'primary-key');
+      if (backupError) preserveUnreadable(backupKeyPath, 'backup-key');
+
+      const hadEncryptedData = encryptedCandidateDataExists();
+      if (hadEncryptedData) {
+        // Conserver aussi les anciens états de reprise chiffrés avant d'initialiser
+        // une nouvelle clé. Ils ne seront jamais écrasés silencieusement.
+        for (const [statePath, label] of [
+          [primaryStatePath, 'evaluation-state-primary'],
+          [backupStatePath, 'evaluation-state-backup']
+        ]) {
+          if (!fileStartsEncrypted(statePath)) continue;
+          try {
+            fs.copyFileSync(statePath, path.join(recoveryRoot, label + '-lost-key-' + stamp + '.json'));
+          } catch (_) {}
+        }
       }
+
       key = cryptoModule.randomBytes(32);
       writeProtectedKey(primaryKeyPath, key);
       copyAtomic(primaryKeyPath, backupKeyPath);
+
+      if (primaryError || backupError || hadEncryptedData) {
+        console.warn(
+          'SEB EvalPro 0.3.8 : ancienne clé locale inutilisable. ' +
+          'Les anciennes données chiffrées restent intactes ; une nouvelle clé locale a été créée.'
+        );
+      }
     } else {
-      // La copie Documents est la sauvegarde de récupération durable du même poste Windows.
+      // Copie de récupération interne au profil de l'application.
       copyAtomic(primaryKeyPath, backupKeyPath);
     }
 
