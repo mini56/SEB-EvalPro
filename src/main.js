@@ -6,7 +6,7 @@ const crypto = require('crypto');
 const { getEditionCapabilities } = require('./edition');
 const { createCandidateStore } = require('./candidate-store-main');
 const { createCandidateTransfer } = require('./candidate-transfer-main');
-const { LOCAL_PREFIX, configureLocalKey, readJsonFile, encodeJson, migrateJsonFile, migrateJsonTree } = require('./candidate-data-crypto');
+const { configureLocalKey, readJsonFile, encodeJson, migrateJsonFile, migrateJsonTree } = require('./candidate-data-crypto');
 const { createCandidateLocalProtection } = require('./candidate-local-protection');
 
 const ADMIN_PASSWORD_SHA256 = 'c800892ba3f11b33d36eedf7d3c4297f2b6c02e2c347dda8954b4c577f6666b5';
@@ -78,26 +78,6 @@ function getCandidateProtection() {
   return candidateProtection;
 }
 
-function assertEncryptedCandidateAccess() {
-  const root = path.join(app.getPath('documents'), 'SEB EvalPro', 'Candidats');
-  if (!fs.existsSync(root)) return true;
-  for (const entry of fs.readdirSync(root, { withFileTypes:true })) {
-    if (!entry.isDirectory() || entry.name.startsWith('.')) continue;
-    const manifestPath = path.join(root, entry.name, 'manifest.json');
-    if (!fs.existsSync(manifestPath)) continue;
-    let raw = '';
-    try { raw = fs.readFileSync(manifestPath, 'utf8'); } catch (_) { continue; }
-    if (!raw.startsWith(LOCAL_PREFIX)) continue;
-    if (!readJsonFile(manifestPath)) {
-      throw new Error(
-        'La clé locale présente sur ce PC ne permet pas de lire un dossier candidat chiffré. ' +
-        'SEB EvalPro bloque la migration afin de ne modifier aucune donnée.'
-      );
-    }
-  }
-  return true;
-}
-
 function initializeCandidateSecurity() {
   const protection = getCandidateProtection();
   const localKey = protection.initializeKey();
@@ -108,8 +88,10 @@ function initializeCandidateSecurity() {
   configureLocalKey(localKey);
   localKey.fill(0);
   protection.restoreStateFromBackupIfNeeded();
-  assertEncryptedCandidateAccess();
 
+  // Un dossier candidat individuel illisible ne doit jamais bloquer tout SEB EvalPro.
+  // Les migrations parcourent les fichiers un par un et ignorent ceux qui ne peuvent
+  // pas être décodés. Ils resteront intacts pour diagnostic/récupération ultérieure.
   const store = getCandidateStore();
   const folders = store.migrateCandidateFolderNames();
   const migrated = migrateJsonTree(store.paths.candidatesRoot);
@@ -546,10 +528,75 @@ function createWindow() {
   });
 }
 
+function showStartupSecurityError(error) {
+  const message = String(error && error.message ? error.message : error || 'Erreur de sécurité inconnue.');
+  console.error('SEB EvalPro démarrage sécurisé impossible:', message);
+
+  if (splashWindow && !splashWindow.isDestroyed()) {
+    try { splashWindow.close(); } catch (_) {}
+  }
+
+  mainWindow = new BrowserWindow({
+    width: 860,
+    height: 520,
+    show: true,
+    center: true,
+    resizable: true,
+    backgroundColor: '#ffffff',
+    title: 'SEB EvalPro - Démarrage impossible',
+    autoHideMenuBar: true,
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      devTools: false
+    }
+  });
+  mainWindow.setMenuBarVisibility(false);
+
+  const safeMessage = message
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+
+  const html = `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>SEB EvalPro</title>
+  <style>
+    body{font-family:Arial,sans-serif;margin:0;background:#f5f7fa;color:#222}
+    .card{max-width:760px;margin:60px auto;background:#fff;border:1px solid #ccd6e0;border-radius:10px;padding:28px 32px;box-shadow:0 8px 28px rgba(0,0,0,.12)}
+    h1{margin:0 0 18px;color:#c00000;font-size:25px}
+    p{line-height:1.55}
+    .msg{margin:18px 0;padding:14px;background:#fff5f5;border-left:4px solid #c00000;white-space:pre-wrap}
+    .note{color:#555;font-size:14px}
+  </style></head><body><div class="card">
+    <h1>SEB EvalPro ne peut pas accéder aux données sécurisées</h1>
+    <p>Le programme a bien démarré, mais la protection générale des données candidat n'a pas pu être initialisée.</p>
+    <div class="msg">${safeMessage}</div>
+    <p><strong>Aucun dossier candidat n'a été supprimé ni remplacé.</strong></p>
+    <p class="note">Fermez cette fenêtre puis faites vérifier la clé locale ou sa copie de récupération. Un dossier candidat individuel endommagé ne doit pas provoquer cet écran : seuls les problèmes concernant la clé générale du poste peuvent bloquer l'accès sécurisé aux données.</p>
+  </div></body></html>`;
+
+  mainWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+  });
+}
+
 function startApplication() {
-  initializeCandidateSecurity();
-  ensureSebDocumentsFolders();
+  // Toujours créer une interface visible avant les contrôles de sécurité.
+  // Une erreur de clé ne doit jamais laisser un simple processus invisible.
   createSplashWindow();
+  setSplashProgress(16, 'Vérification de la protection des données…');
+
+  try {
+    initializeCandidateSecurity();
+    ensureSebDocumentsFolders();
+  } catch (error) {
+    showStartupSecurityError(error);
+    return;
+  }
+
   setTimeout(() => {
     setSplashProgress(20, 'Préparation du programme…');
     createWindow();
