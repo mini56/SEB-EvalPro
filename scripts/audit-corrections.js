@@ -96,6 +96,26 @@ function patchMailResume() {
   if (/@(Sauvegarde56\.org)/.test(html)) {
     throw new Error('SEB EvalPro audit: nvmail affiche encore Sauvegarde56.org avec un S majuscule');
   }
+  for (const forbidden of [
+    "destinataire.toLowerCase() === 'conseil.perso@sauvegarde56.org'",
+    "copie.toLowerCase() === 'stage-pro@sauvegarde56.org'",
+    "to.toLowerCase() === 'conseil.perso@sauvegarde56.org'",
+    "cc.toLowerCase() === 'stage-pro@sauvegarde56.org'"
+  ]) {
+    if (html.includes(forbidden)) {
+      throw new Error('SEB EvalPro audit: la notation nvmail ne doit pas ignorer les majuscules dans les adresses mail');
+    }
+  }
+  for (const required of [
+    "destinataire === 'conseil.perso@sauvegarde56.org'",
+    "copie === 'stage-pro@sauvegarde56.org'",
+    "String(to || '').trim() === 'conseil.perso@sauvegarde56.org'",
+    "String(cc || '').trim() === 'stage-pro@sauvegarde56.org'"
+  ]) {
+    if (!html.includes(required)) {
+      throw new Error('SEB EvalPro audit: notation stricte des adresses nvmail absente : ' + required);
+    }
+  }
 
   const destructive = /document\.addEventListener\('DOMContentLoaded', function\(\) \{\s*\/\/ NETTOYAGE des données page 8[\s\S]*?document\.getElementById\('fichierSelectionne'\)\.textContent = 'Aucun fichier sélectionné';\s*\}\);/;
   const out = mustReplace(
