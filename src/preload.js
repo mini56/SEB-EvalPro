@@ -341,6 +341,64 @@ function createCandidateFinishDialog() {
 }
 
 
+function createExportCandidateFinishDialog(activeCandidate) {
+  return new Promise((resolve) => {
+    const rawName = String(activeCandidate && activeCandidate.displayName || 'ce candidat').trim() || 'ce candidat';
+    const safeName = rawName.replace(/[&<>"']/g, (char) => ({
+      '&':'&amp;',
+      '<':'&lt;',
+      '>':'&gt;',
+      '"':'&quot;',
+      "'":'&#39;'
+    })[char]);
+
+    const backdrop = document.createElement('div');
+    backdrop.id = 'seb-evalpro-export-finish-candidate-dialog';
+    backdrop.innerHTML = `
+      <div class="seb-session-close-card" role="dialog" aria-modal="true" aria-label="Terminer le parcours avant export">
+        <div class="seb-session-close-title">Parcours candidat encore en cours</div>
+        <div class="seb-session-close-text">
+          Le parcours de <strong>${safeName}</strong> est encore en cours.<br><br>
+          Voulez-vous mettre fin au parcours de <strong>${safeName}</strong> avant l’export ?
+        </div>
+        <div class="seb-session-close-warning">
+          Cette action est définitive : le parcours ne pourra plus être repris.
+        </div>
+        <div class="seb-session-close-actions">
+          <button type="button" id="seb-export-finish-cancel">Annuler l’export</button>
+          <button type="button" id="seb-export-finish-ok" class="danger">Terminer le parcours et exporter</button>
+        </div>
+      </div>`;
+
+    const style = document.createElement('style');
+    style.textContent = `
+      #seb-evalpro-export-finish-candidate-dialog{position:fixed;inset:0;z-index:2147483647;background:rgba(0,0,0,.42);display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif}
+      #seb-evalpro-export-finish-candidate-dialog .seb-session-close-card{width:500px;max-width:calc(100vw - 40px);background:#fff;border:1px solid #aaa;border-radius:8px;padding:20px;box-shadow:0 10px 35px rgba(0,0,0,.3);box-sizing:border-box}
+      #seb-evalpro-export-finish-candidate-dialog .seb-session-close-title{font-size:20px;font-weight:700;color:#c00000;margin-bottom:12px}
+      #seb-evalpro-export-finish-candidate-dialog .seb-session-close-text{font-size:14px;line-height:1.45;color:#222}
+      #seb-evalpro-export-finish-candidate-dialog .seb-session-close-warning{font-size:13px;font-weight:700;color:#c00000;margin-top:10px}
+      #seb-evalpro-export-finish-candidate-dialog .seb-session-close-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
+      #seb-evalpro-export-finish-candidate-dialog button{font-family:Arial,sans-serif;font-size:14px;padding:8px 14px;border:1px solid #999;border-radius:4px;background:#f2f2f2;cursor:pointer}
+      #seb-evalpro-export-finish-candidate-dialog button.danger{background:#c00000;color:#fff;border-color:#c00000}
+    `;
+    backdrop.appendChild(style);
+    document.body.appendChild(backdrop);
+
+    const finish = (value) => {
+      backdrop.remove();
+      resolve(value);
+    };
+    backdrop.querySelector('#seb-export-finish-cancel').addEventListener('click', () => finish(false));
+    backdrop.querySelector('#seb-export-finish-ok').addEventListener('click', () => finish(true));
+    backdrop.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') finish(false);
+      if (event.key === 'Enter') finish(true);
+    });
+    backdrop.querySelector('#seb-export-finish-cancel').focus();
+  });
+}
+
+
 function createExportDestinationModeDialog() {
   return new Promise((resolve) => {
     const backdrop = document.createElement('div');
@@ -802,10 +860,45 @@ function injectAdminBar() {
 
   exportCandidatesButton.addEventListener('click', async () => {
     showBar();
+    // SEB_ADMIN_EXPORT_REQUIRES_CLOSED_CANDIDATE
+    const candidateFolderOpen = !!document.getElementById('seb-candidate-detail')
+      || !!adminCandidateWorkspace
+      || !!adminCandidateResultsWorkspace
+      || !!document.getElementById('seb-bilan-history-editor')
+      || !!document.getElementById('seb-replay-viewer');
+    if (candidateFolderOpen) {
+      await showTransferMessage('Export impossible', 'Fermez le dossier candidat avant de lancer l’export.', true);
+      scheduleHideBar();
+      return;
+    }
+
     saveNow(true);
     exportCandidatesButton.disabled = true;
     importCandidatesButton.disabled = true;
     try {
+      // SEB_ADMIN_EXPORT_FINALIZES_ACTIVE_CANDIDATE
+      const activeCandidate = await ipcRenderer.invoke('candidate:active').catch(() => null);
+      if (activeCandidate && String(activeCandidate.status || '') === 'EN_COURS') {
+        const confirmed = await createExportCandidateFinishDialog(activeCandidate);
+        if (!confirmed) return;
+
+        const completed = await ipcRenderer.invoke('candidate:complete-active', 'admin-export').catch((error) => ({
+          ok:false,
+          error:String(error && error.message ? error.message : error)
+        }));
+        if (!completed || !completed.ok) {
+          await showTransferMessage(
+            'Fin de parcours impossible',
+            completed && completed.error ? completed.error : 'Le parcours n’a pas pu être terminé avant l’export.',
+            true
+          );
+          return;
+        }
+
+        finishCandidateButton.hidden = true;
+        await refreshCandidateBadge();
+      }
+
       const password = await createTransferPasswordDialog('export');
       if (!password) return;
 

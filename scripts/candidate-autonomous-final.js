@@ -83,9 +83,9 @@ function parseJs(text, label) {
   out = out.replace(/\s*const groupName = await createTransferNameDialog\(\);[\s\S]*?if \(!groupName\) \{[\s\S]*?return;\s*\}\s*/m, '\n');
   out = out.replace("ipcRenderer.invoke('admin:import-candidates', groupName)", "ipcRenderer.invoke('admin:import-candidates')");
   // SEB_BUILD94_ADMIN_HOME_EXPORT
-  const exportGuardMarker = '// SEB_ADMIN_EXPORT_REQUIRES_CLOSED_CANDIDATE';
+  const exportGuardMarker = '// SEB_ADMIN_EXPORT_FINALIZES_ACTIVE_CANDIDATE';
   if (!out.includes(exportGuardMarker)) {
-    const exportAnchor = "  exportCandidatesButton.addEventListener('click', async () => {\n    showBar();\n    saveNow(true);";
+    const exportAnchor = "  exportCandidatesButton.addEventListener('click', async () => {\n    showBar();\n    saveNow(true);\n    exportCandidatesButton.disabled = true;\n    importCandidatesButton.disabled = true;\n    try {\n      const password = await createTransferPasswordDialog('export');";
     if (!out.includes(exportAnchor)) fail('ancre export dossiers candidats absente', 3);
     const exportReplacement = [
       "  exportCandidatesButton.addEventListener('click', async () => {",
@@ -101,7 +101,29 @@ function parseJs(text, label) {
       "      scheduleHideBar();",
       "      return;",
       "    }",
-      "    saveNow(true);"
+      "",
+      "    saveNow(true);",
+      "    exportCandidatesButton.disabled = true;",
+      "    importCandidatesButton.disabled = true;",
+      "    try {",
+      "      // SEB_ADMIN_EXPORT_FINALIZES_ACTIVE_CANDIDATE",
+      "      const activeCandidate = await ipcRenderer.invoke('candidate:active').catch(() => null);",
+      "      if (activeCandidate && String(activeCandidate.status || '') === 'EN_COURS') {",
+      "        const confirmed = await createExportCandidateFinishDialog(activeCandidate);",
+      "        if (!confirmed) return;",
+      "        const completed = await ipcRenderer.invoke('candidate:complete-active', 'admin-export').catch((error) => ({",
+      "          ok:false,",
+      "          error:String(error && error.message ? error.message : error)",
+      "        }));",
+      "        if (!completed || !completed.ok) {",
+      "          await showTransferMessage('Fin de parcours impossible', completed && completed.error ? completed.error : 'Le parcours n’a pas pu être terminé avant l’export.', true);",
+      "          return;",
+      "        }",
+      "        finishCandidateButton.hidden = true;",
+      "        await refreshCandidateBadge();",
+      "      }",
+      "",
+      "      const password = await createTransferPasswordDialog('export');"
     ].join('\n');
     out = out.replace(exportAnchor, exportReplacement);
   }
@@ -414,6 +436,10 @@ function parseJs(text, label) {
     'candidateCatalog.install({ beforeNavigate: () => saveNow(true) });',
     'SEB_ADMIN_EXPORT_REQUIRES_CLOSED_CANDIDATE',
     'Fermez le dossier candidat avant de lancer l’export.',
+    'SEB_ADMIN_EXPORT_FINALIZES_ACTIVE_CANDIDATE',
+    'createExportCandidateFinishDialog',
+    'Terminer le parcours et exporter',
+    "candidate:complete-active', 'admin-export'",
     'SEB_ADMIN_HOME_PRIVACY_BUTTON_IN_BAR',
     'createTransferPasswordDialog',
     'Afficher le mot de passe'
