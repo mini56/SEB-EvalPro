@@ -20,10 +20,11 @@ const {
 function createCandidateTransfer(options = {}) {
   const documentsPath = options.documentsPath;
   const userDataPath = options.userDataPath || null;
+  const dataRoot = options.dataRoot || (documentsPath ? path.join(documentsPath, 'SEB EvalPro') : null);
   const now = typeof options.now === 'function' ? options.now : () => new Date();
-  if (!documentsPath) throw new Error('documentsPath requis');
+  if (!dataRoot) throw new Error('dataRoot requis');
 
-  const sebRoot = path.join(documentsPath, 'SEB EvalPro');
+  const sebRoot = dataRoot;
   const candidatesRoot = path.join(sebRoot, 'Candidats');
   const legacyAdminRoot = path.join(sebRoot, 'Admin');
   const globalReplayRoot = path.join(sebRoot, 'parcours');
