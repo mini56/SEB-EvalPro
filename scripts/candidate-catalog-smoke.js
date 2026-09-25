@@ -86,13 +86,15 @@ try {
     app,
     ipcMain,
     getAdminUnlocked:() => true,
-    getActiveCandidate:() => null
+    getActiveCandidate:() => null,
+    dataRoot:sebRoot
   });
   registerBilanHistory({
     app,
     ipcMain,
     getAdminUnlocked:() => true,
-    buildNumber:'79'
+    buildNumber:'79',
+    dataRoot:sebRoot
   });
 
   const list = handlers.get('candidate-catalog:list');
