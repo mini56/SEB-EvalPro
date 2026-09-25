@@ -8,6 +8,7 @@ const { createCandidateStore } = require('./candidate-store-main');
 const { createCandidateTransfer } = require('./candidate-transfer-main');
 const { configureLocalKey, readJsonFile, encodeJson, migrateJsonFile, migrateJsonTree } = require('./candidate-data-crypto');
 const { createCandidateLocalProtection } = require('./candidate-local-protection');
+const { internalStorageRoot, documentsWordRoot, migrateLegacyDocumentsStorage } = require('./storage-layout');
 
 const ADMIN_PASSWORD_SHA256 = 'c800892ba3f11b33d36eedf7d3c4297f2b6c02e2c347dda8954b4c577f6666b5';
 const STATE_VERSION = 1;
@@ -67,11 +68,20 @@ function stateFilePath() {
   return path.join(app.getPath('userData'), 'evaluation-state.json');
 }
 
+function sebInternalRoot() {
+  return internalStorageRoot(app.getPath('userData'));
+}
+
+function sebDocumentsRoot() {
+  return documentsWordRoot(app.getPath('documents'));
+}
+
 function getCandidateProtection() {
   if (!candidateProtection) {
     candidateProtection = createCandidateLocalProtection({
       documentsPath: app.getPath('documents'),
       userDataPath: app.getPath('userData'),
+      dataRoot: sebInternalRoot(),
       safeStorage
     });
   }
@@ -100,15 +110,12 @@ function initializeCandidateSecurity() {
   console.log('SEB EvalPro confidentialité candidat: clé locale Windows protégée et sauvegardée, dossiers codés=' + folders.renamed + ', JSON chiffrés=' + migrated.files + '.');
 }
 
-function sebDocumentsRoot() {
-  return path.join(app.getPath('documents'), 'SEB EvalPro');
-}
-
 function getCandidateStore() {
   if (!candidateStore) {
     candidateStore = createCandidateStore({
       documentsPath: app.getPath('documents'),
-      userDataPath: app.getPath('userData')
+      userDataPath: app.getPath('userData'),
+      dataRoot: sebInternalRoot()
     });
   }
   return candidateStore;
@@ -118,18 +125,19 @@ function getCandidateTransfer() {
   if (!candidateTransfer) {
     candidateTransfer = createCandidateTransfer({
       documentsPath: app.getPath('documents'),
-      userDataPath: app.getPath('userData')
+      userDataPath: app.getPath('userData'),
+      dataRoot: sebInternalRoot()
     });
   }
   return candidateTransfer;
 }
 
 function bilanDocumentsDir() {
-  return path.join(sebDocumentsRoot(), 'Bilans');
+  return sebDocumentsRoot();
 }
 
 function ensureSebDocumentsFolders() {
-  fs.mkdirSync(bilanDocumentsDir(), { recursive: true });
+  fs.mkdirSync(sebDocumentsRoot(), { recursive: true });
   getCandidateStore().ensureRoots();
 }
 
@@ -164,18 +172,25 @@ function installDownloadRouting() {
     if (!/\.docx?$/i.test(filename)) return;
     try {
       ensureSebDocumentsFolders();
-      const candidateExportDir = getCandidateStore().getActiveExportDir();
-      const targetDirectory = adminExportCandidateDir || candidateExportDir || bilanDocumentsDir();
-      const isCurrentCandidateWord = !!adminExportCandidateDir && /^Evaluation_.+\.docx?$/i.test(filename);
-      if (isCurrentCandidateWord) {
-        const target = path.join(targetDirectory, filename);
-        item.setSavePath(target);
-        item.once('done', (_downloadEvent, state) => {
-          if (state === 'completed') cleanupNumberedCandidateWordCopies(targetDirectory, filename);
-        });
-      } else {
-        item.setSavePath(uniqueOutputPath(targetDirectory, filename));
-      }
+      const candidateExportDir = adminExportCandidateDir || getCandidateStore().getActiveExportDir();
+      const visibleDirectory = bilanDocumentsDir();
+      const visibleTarget = /^Evaluation_.+\.docx?$/i.test(filename)
+        ? path.join(visibleDirectory, filename)
+        : uniqueOutputPath(visibleDirectory, filename);
+      item.setSavePath(visibleTarget);
+      item.once('done', (_downloadEvent, state) => {
+        if (state !== 'completed') return;
+        cleanupNumberedCandidateWordCopies(visibleDirectory, filename);
+        if (!candidateExportDir) return;
+        try {
+          fs.mkdirSync(candidateExportDir, { recursive:true });
+          const archiveTarget = path.join(candidateExportDir, path.basename(visibleTarget));
+          fs.copyFileSync(visibleTarget, archiveTarget);
+          cleanupNumberedCandidateWordCopies(candidateExportDir, path.basename(archiveTarget));
+        } catch (error) {
+          console.error('Archivage interne du Word impossible:', error && error.message ? error.message : String(error));
+        }
+      });
     } catch (_) {}
   });
 }
@@ -587,9 +602,23 @@ function startApplication() {
   // Toujours créer une interface visible avant les contrôles de sécurité.
   // Une erreur de clé ne doit jamais laisser un simple processus invisible.
   createSplashWindow();
-  setSplashProgress(16, 'Vérification de la protection des données…');
+  setSplashProgress(10, 'Migration du stockage local…');
 
   try {
+    const migration = migrateLegacyDocumentsStorage({
+      documentsPath: app.getPath('documents'),
+      userDataPath: app.getPath('userData')
+    });
+    if (!migration.completed) {
+      console.warn('SEB EvalPro 0.3.8 : migration Documents incomplète, anciennes données conservées.', migration);
+    } else {
+      console.log(
+        'SEB EvalPro 0.3.8 : stockage interne migré ; dossiers Documents retirés=' +
+        migration.removedDirectories + ', fichiers Word visibles conservés=' + migration.wordExports + '.'
+      );
+    }
+
+    setSplashProgress(16, 'Vérification de la protection des données…');
     initializeCandidateSecurity();
     ensureSebDocumentsFolders();
   } catch (error) {
@@ -667,7 +696,7 @@ ipcMain.handle('admin:lock', () => {
 
 ipcMain.handle('candidate:set-admin-export-context', (_event, candidateId) => {
   if (!adminSessionUnlocked) return false;
-  const root = path.join(sebDocumentsRoot(), 'Candidats');
+  const root = path.join(sebInternalRoot(), 'Candidats');
   const record = getCandidateTransfer().listCandidateRecords(root, false)
     .find((item) => String(item.candidateId) === String(candidateId || ''));
   if (!record) {
