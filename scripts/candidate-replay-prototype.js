@@ -110,7 +110,7 @@ function write(file, text) {
   const requiredBilanPreload = [
     'Ouvrir un ancien bilan',
     'Enregistrer une nouvelle révision',
-    'Documents\\\\SEB EvalPro\\\\Bilans\\\\Historique',
+    'Stockage interne SEB EvalPro',
     "bilan-history:save-current",
     "bilan-history:save-revision",
     'le bilan d\'origine n\'est jamais écrasé'
