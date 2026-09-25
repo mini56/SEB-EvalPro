@@ -82,6 +82,21 @@ function patchAdminBilan() {
 
 function patchMailResume() {
   const { file, html } = read('nvmail.html');
+
+  // Les adresses visibles dans les consignes doivent être strictement identiques
+  // aux adresses attendues par la correction, y compris la casse affichée.
+  for (const expected of [
+    'conseil.perso@sauvegarde56.org',
+    'stage-pro@sauvegarde56.org'
+  ]) {
+    if (!html.includes('>' + expected + '<')) {
+      throw new Error('SEB EvalPro audit: adresse visible nvmail incorrecte ou absente : ' + expected);
+    }
+  }
+  if (/@(Sauvegarde56\.org)/.test(html)) {
+    throw new Error('SEB EvalPro audit: nvmail affiche encore Sauvegarde56.org avec un S majuscule');
+  }
+
   const destructive = /document\.addEventListener\('DOMContentLoaded', function\(\) \{\s*\/\/ NETTOYAGE des données page 8[\s\S]*?document\.getElementById\('fichierSelectionne'\)\.textContent = 'Aucun fichier sélectionné';\s*\}\);/;
   const out = mustReplace(
     html,
