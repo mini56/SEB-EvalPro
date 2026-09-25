@@ -1,15 +1,25 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const { findCandidateDir, listCandidateDirs, selectCandidate } = require('./candidate-folder-utils');
+const { listCandidateDirs, selectCandidate } = require('./candidate-folder-utils');
 const { readJsonFile, encodeJson } = require('./candidate-data-crypto');
 
-module.exports = function registerCandidateReplay({ app, ipcMain, getAdminUnlocked, buildNumber }) {
+module.exports = function registerCandidateReplay({ app, ipcMain, getAdminUnlocked, buildNumber, dataRoot = null }) {
   const BUILD = String(buildNumber || 'DEV');
   const TYPE = 'SEB_EVALPRO_PARCOURS_ARCHIVE';
   const SCHEMA_VERSION = 2;
   const captureQueues = new Map();
   let replayAtomicCounter = 0;
+  const storageRoot = dataRoot || path.join(app.getPath('userData'), 'storage');
+  const candidatesRoot = path.join(storageRoot, 'Candidats');
+  const legacyAdminRoot = path.join(storageRoot, 'Admin');
+
+  function findCandidateDirInternal(candidate) {
+    const current = selectCandidate(listCandidateDirs(candidatesRoot, false), candidate);
+    if (current) return current.candidateDir;
+    const legacy = selectCandidate(listCandidateDirs(legacyAdminRoot, true), candidate);
+    return legacy ? legacy.candidateDir : null;
+  }
   const ARCHIVE_MARKER_KEYS = new Set([
     'seb_evalpro_replay_archive',
     'seb_evalpro_replay_archive_file',
@@ -17,7 +27,7 @@ module.exports = function registerCandidateReplay({ app, ipcMain, getAdminUnlock
   ]);
 
   function parcoursDir() {
-    return path.join(app.getPath('documents'), 'SEB EvalPro', 'parcours');
+    return path.join(storageRoot, 'parcours');
   }
 
   function pendingRoot() {
@@ -292,7 +302,7 @@ module.exports = function registerCandidateReplay({ app, ipcMain, getAdminUnlock
         return { ok: false, error: 'Candidat non identifié : archive non créée.' };
       }
 
-      const candidateDir = findCandidateDir(app.getPath('documents'), candidate);
+      const candidateDir = findCandidateDirInternal(candidate);
       if (!candidateDir) {
         return { ok: false, error: 'Dossier candidat introuvable : replay non créé.' };
       }
@@ -372,8 +382,7 @@ module.exports = function registerCandidateReplay({ app, ipcMain, getAdminUnlock
   });
 
   function candidateRecordById(candidateId) {
-    const root = path.join(app.getPath('documents'), 'SEB EvalPro', 'Candidats');
-    return listCandidateDirs(root, false).find((record) => String(record.candidateId) === String(candidateId || '')) || null;
+    return listCandidateDirs(candidatesRoot, false).find((record) => String(record.candidateId) === String(candidateId || '')) || null;
   }
 
   function loadCandidateArchive(candidateId, requestedName) {
