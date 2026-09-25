@@ -44,7 +44,8 @@ function parseJs(text, label) {
   app,
   ipcMain,
   getAdminUnlocked: () => adminSessionUnlocked,
-  getActiveCandidate: () => getCandidateStore().getActiveCandidate()
+  getActiveCandidate: () => getCandidateStore().getActiveCandidate(),
+  dataRoot: sebInternalRoot()
 });
 
 ` + marker);
