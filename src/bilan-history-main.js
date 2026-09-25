@@ -1,16 +1,24 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const { findCandidateDir, listCandidateDirs, copyFileIfMissing, ensureDir } = require('./candidate-folder-utils');
+const { listCandidateDirs, selectCandidate, copyFileIfMissing, ensureDir } = require('./candidate-folder-utils');
 const { readJsonFile, encodeJson } = require('./candidate-data-crypto');
 
-module.exports = function registerBilanHistory({ app, ipcMain, getAdminUnlocked, buildNumber }) {
+module.exports = function registerBilanHistory({ app, ipcMain, getAdminUnlocked, buildNumber, dataRoot = null }) {
   const CURRENT_BUILD = String(buildNumber || 'DEV');
   const TYPE = 'SEB_EVALPRO_BILAN_ARCHIVE';
   const documentsPath = app.getPath('documents');
-  const root = path.join(documentsPath, 'SEB EvalPro');
+  const root = dataRoot || path.join(app.getPath('userData'), 'storage');
   const candidatesRoot = path.join(root, 'Candidats');
+  const legacyAdminRoot = path.join(root, 'Admin');
   const legacyHistoryDir = path.join(root, 'Bilans', 'Historique');
+
+  function findCandidateDirInternal(candidate) {
+    const current = selectCandidate(listCandidateDirs(candidatesRoot, false), candidate);
+    if (current) return current.candidateDir;
+    const legacy = selectCandidate(listCandidateDirs(legacyAdminRoot, true), candidate);
+    return legacy ? legacy.candidateDir : null;
+  }
 
   function safePart(value, fallback = 'INCONNU') {
     let text = String(value || '').trim();
@@ -83,7 +91,7 @@ module.exports = function registerBilanHistory({ app, ipcMain, getAdminUnlocked,
   function candidateHistoryDir(candidate, candidateId = '') {
     const id = String(candidateId || '').trim();
     const selected = id ? listCandidateDirs(candidatesRoot, false).find((record) => String(record.candidateId || '') === id) : null;
-    const candidateDir = selected ? selected.candidateDir : findCandidateDir(documentsPath, candidate);
+    const candidateDir = selected ? selected.candidateDir : findCandidateDirInternal(candidate);
     if (!candidateDir) throw new Error('Dossier candidat introuvable : bilan non enregistré.');
     const dir = path.join(candidateDir, 'bilan', 'historique');
     ensureDir(dir);
@@ -116,7 +124,7 @@ module.exports = function registerBilanHistory({ app, ipcMain, getAdminUnlocked,
     let archive = null;
     try { archive = readJsonFile(legacy); } catch (_) { return null; }
     if (!verify(archive)) return { full:legacy, filename:safe, archive, legacy:true, integrityOk:false };
-    const candidateDir = findCandidateDir(documentsPath, normalizeCandidate(archive.candidate));
+    const candidateDir = findCandidateDirInternal(normalizeCandidate(archive.candidate));
     if (!candidateDir) return { full:legacy, filename:safe, archive, legacy:true, integrityOk:true };
     const target = path.join(candidateDir, 'bilan', 'historique', safe);
     ensureDir(path.dirname(target));
