@@ -398,7 +398,8 @@ function parseJs(text, label) {
     'devTools: false',
     'SEB_CANDIDATE_CLOSE_GUARD',
     'candidate:set-admin-export-context',
-    'isCurrentCandidateWord',
+    'const visibleDirectory = bilanDocumentsDir();',
+    'Archivage interne du Word impossible',
     'cleanupNumberedCandidateWordCopies',
     'admin:open-candidate-results',
     'adminCandidateResultsMode',
@@ -542,4 +543,4 @@ function parseJs(text, label) {
   ]) parseJs(source, label);
 }
 
-console.log('SEB EvalPro candidats autonomes final: dossier candidat source unique, USB vérifié sans écrasement, replay exact, bilans/Word candidats, corruption contrôlée et runtime hors ligne — OK.');
+console.log('SEB EvalPro candidats autonomes final: stockage candidat interne source unique, Word visible dans Documents, USB vérifié sans écrasement, replay exact, corruption contrôlée et runtime hors ligne — OK.');
