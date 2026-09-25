@@ -106,9 +106,9 @@ for (const required of [
 fs.writeFileSync(preloadPath, preload, 'utf8');
 console.log('SEB EvalPro Build #138: Word historique corrigé — NE/I/II/III uniquement en en-tête; cases de résultat vides et seulement colorées; archives JSON #134+ inchangées.');
 
-// Build #139 : l'export Word historique est écrit directement par le processus
-// principal dans Documents\\SEB EvalPro\\Bilans. Aucun téléchargement navigateur
-// n'est utilisé : le fichier doit exister sur disque avant d'afficher le succès.
+// Build #139 / 0.3.8 : l'export Word historique est écrit directement
+// à la racine de Documents\\SEB EvalPro, seul emplacement visible autorisé.
+// Une copie est également conservée dans l'archive interne du candidat.
 {
   const mainPath = path.join(__dirname, '..', 'src', 'bilan-history-main.js');
   let main = fs.readFileSync(mainPath, 'utf8').replace(/\r\n/g, '\n');
@@ -121,7 +121,16 @@ console.log('SEB EvalPro Build #138: Word historique corrigé — NE/I/II/III un
     }
     const directWriter = `
   function historicalWordDir() {
-    return path.join(app.getPath('documents'), 'SEB EvalPro', 'Bilans');
+    return path.join(app.getPath('documents'), 'SEB EvalPro');
+  }
+
+  function historicalWordArchiveDir(candidate) {
+    const normalized = normalizeCandidate(candidate);
+    const record = selectCandidate(listCandidateDirs(candidatesRoot, false), normalized);
+    if (!record) return null;
+    const directory = path.join(record.candidateDir, 'bilan', 'exports');
+    ensureDir(directory);
+    return directory;
   }
 
   function uniqueHistoricalWordPath(filename) {
@@ -131,7 +140,7 @@ console.log('SEB EvalPro Build #138: Word historique corrigé — NE/I/II/III un
     let target = path.join(directory, filename);
     let index = 2;
     while (fs.existsSync(target)) {
-      target = path.join(directory, \`${'${parsed.name}'}_${'${index}'}${'${parsed.ext}'}\`);
+      target = path.join(directory, \`${parsed.name}_${index}${parsed.ext}\`);
       index += 1;
     }
     return target;
@@ -147,13 +156,20 @@ console.log('SEB EvalPro Build #138: Word historique corrigé — NE/I/II/III un
       if (!filename || !filename.toLowerCase().endsWith('.doc')) throw new Error('Nom du document Word invalide.');
       const html = String((payload && payload.html) || '');
       if (html.length < 100 || !html.includes('<table')) throw new Error('Contenu Word vide ou invalide.');
+      const candidate = normalizeCandidate(payload && payload.candidate);
       const target = uniqueHistoricalWordPath(filename);
-      const temp = \`${'${target}'}.tmp\`;
+      const temp = \`${target}.tmp\`;
       fs.writeFileSync(temp, '\\uFEFF' + html, 'utf8');
       fs.renameSync(temp, target);
       if (!fs.existsSync(target)) throw new Error('Le document Word n’a pas été créé sur le disque.');
       const size = fs.statSync(target).size;
       if (size < 100) throw new Error('Le document Word créé est vide.');
+
+      const archiveDir = historicalWordArchiveDir(candidate);
+      if (archiveDir) {
+        fs.copyFileSync(target, path.join(archiveDir, path.basename(target)));
+      }
+
       event.returnValue = { ok: true, filename: path.basename(target), path: target, size };
     } catch (error) {
       event.returnValue = { ok: false, error: error && error.message ? error.message : String(error) };
@@ -191,7 +207,7 @@ console.log('SEB EvalPro Build #138: Word historique corrigé — NE/I/II/III un
   const revisionNumber = Number.isFinite(Number(revision)) ? Number(revision) : 0;
   const revisionSuffix = \`_R${'${String(revisionNumber).padStart(2, \'0\')}' }\`;
   const wordFilename = \`Bilan_${'${safe(candidate.nom || \'NOM\')}'}_${'${safe(candidate.prenom || \'PRENOM\')}'}_${'${safe(candidate.date || \'\')}'}${'${revisionSuffix}'}.doc\`;
-  const result = ipcRenderer.sendSync('bilan-history:write-word-sync', { filename: wordFilename, html });
+  const result = ipcRenderer.sendSync('bilan-history:write-word-sync', { filename: wordFilename, html, candidate });
   if (!result || !result.ok) throw new Error((result && result.error) || 'Écriture du document Word impossible.');
   return result.path || result.filename || wordFilename;
 }`;
@@ -203,7 +219,9 @@ console.log('SEB EvalPro Build #138: Word historique corrigé — NE/I/II/III un
   const checkPreload = fs.readFileSync(preloadPath, 'utf8');
   for (const token of [
     "ipcMain.on('bilan-history:write-word-sync'",
-    "path.join(app.getPath('documents'), 'SEB EvalPro', 'Bilans')",
+    "path.join(app.getPath('documents'), 'SEB EvalPro')",
+    "historicalWordArchiveDir(candidate)",
+    "fs.copyFileSync(target, path.join(archiveDir, path.basename(target)))",
     "fs.writeFileSync(temp, '\\uFEFF' + html, 'utf8')",
     "ipcRenderer.sendSync('bilan-history:write-word-sync'",
     "return result.path || result.filename || wordFilename;",
@@ -216,4 +234,4 @@ console.log('SEB EvalPro Build #138: Word historique corrigé — NE/I/II/III un
   }
 }
 
-console.log('SEB EvalPro Build #139: les Word historiques modifiés sont écrits directement et vérifiés dans Documents\\SEB EvalPro\\Bilans; cases de niveau colorées mais vides; JSON #134+ inchangés.');
+console.log('SEB EvalPro Build #139: Word historiques visibles dans Documents\\SEB EvalPro et archivés dans le stockage interne candidat; JSON #134+ inchangés.');
