@@ -364,7 +364,7 @@ function evaluerFormulaire(event) {
   // ============================================
   // CRITÈRE 1 : Destinataire (À:)
   // ============================================
-  if (destinataire.toLowerCase() === 'conseil.perso@sauvegarde56.org') {
+  if (destinataire === 'conseil.perso@sauvegarde56.org') {
     score++;
     details.push('✅ Destinataire correct (1 pt)');
   } else {
@@ -374,7 +374,7 @@ function evaluerFormulaire(event) {
   // ============================================
   // CRITÈRE 2 : Copie (Cc:)
   // ============================================
-  if (copie.toLowerCase() === 'stage-pro@sauvegarde56.org') {
+  if (copie === 'stage-pro@sauvegarde56.org') {
     score++;
     details.push('✅ Copie (Cc) correcte (1 pt)');
   } else {
@@ -483,8 +483,8 @@ function saveEmailAnswers(to, cc, subject, message, file) {
   const nomCandidat = getNomCandidat();
   
   // Calcul des scores individuels
-  const score_to = (to.toLowerCase() === 'conseil.perso@sauvegarde56.org') ? 1 : 0;
-  const score_cc = (cc.toLowerCase() === 'stage-pro@sauvegarde56.org') ? 1 : 0;
+  const score_to = (String(to || '').trim() === 'conseil.perso@sauvegarde56.org') ? 1 : 0;
+  const score_cc = (String(cc || '').trim() === 'stage-pro@sauvegarde56.org') ? 1 : 0;
   
   // Validation de l'objet : doit contenir "Mail-SEB" (majuscules) ET le prénom avec majuscule
   let score_subject = 0;
