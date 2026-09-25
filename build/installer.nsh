@@ -78,54 +78,55 @@ seb_install_complete:
 !macroend
 
 !macro preInit
-  # Avant toute mise à jour, sauver les fichiers durables de l'ancienne version
-  # dans Documents. Ceci protège notamment la transition depuis 0.3.5, dont
-  # l'ancien désinstalleur nettoyait encore AppData.
+  # 0.3.8 : ne plus utiliser Documents pour les sauvegardes techniques.
+  # Avant une mise à jour, les fichiers de récupération des anciennes versions
+  # sont placés temporairement dans LocalAppData, hors des anciens dossiers
+  # susceptibles d'être nettoyés par leur désinstalleur.
   SetShellVarContext current
   CreateDirectory "$DOCUMENTS\SEB EvalPro"
-  CreateDirectory "$DOCUMENTS\SEB EvalPro\System"
+  CreateDirectory "$LOCALAPPDATA\SEB EvalPro Recovery"
 
-  IfFileExists "$DOCUMENTS\SEB EvalPro\System\candidate-local-key.sebkey" seb_key_backup_done 0
+  IfFileExists "$LOCALAPPDATA\SEB EvalPro Recovery\candidate-local-key.sebkey" seb_key_recovery_done 0
   IfFileExists "$APPDATA\SEB-éval-PRO\candidate-local-key.sebkey" 0 +3
-    CopyFiles /SILENT "$APPDATA\SEB-éval-PRO\candidate-local-key.sebkey" "$DOCUMENTS\SEB EvalPro\System\candidate-local-key.sebkey"
-    Goto seb_key_backup_done
+    CopyFiles /SILENT "$APPDATA\SEB-éval-PRO\candidate-local-key.sebkey" "$LOCALAPPDATA\SEB EvalPro Recovery\candidate-local-key.sebkey"
+    Goto seb_key_recovery_done
   IfFileExists "$APPDATA\SEB EvalPro\candidate-local-key.sebkey" 0 +3
-    CopyFiles /SILENT "$APPDATA\SEB EvalPro\candidate-local-key.sebkey" "$DOCUMENTS\SEB EvalPro\System\candidate-local-key.sebkey"
-    Goto seb_key_backup_done
+    CopyFiles /SILENT "$APPDATA\SEB EvalPro\candidate-local-key.sebkey" "$LOCALAPPDATA\SEB EvalPro Recovery\candidate-local-key.sebkey"
+    Goto seb_key_recovery_done
   IfFileExists "$APPDATA\seb-evalpro\candidate-local-key.sebkey" 0 +3
-    CopyFiles /SILENT "$APPDATA\seb-evalpro\candidate-local-key.sebkey" "$DOCUMENTS\SEB EvalPro\System\candidate-local-key.sebkey"
-    Goto seb_key_backup_done
-  IfFileExists "$APPDATA\SEB-eval-PRO\candidate-local-key.sebkey" 0 seb_key_backup_done
-    CopyFiles /SILENT "$APPDATA\SEB-eval-PRO\candidate-local-key.sebkey" "$DOCUMENTS\SEB EvalPro\System\candidate-local-key.sebkey"
-seb_key_backup_done:
+    CopyFiles /SILENT "$APPDATA\seb-evalpro\candidate-local-key.sebkey" "$LOCALAPPDATA\SEB EvalPro Recovery\candidate-local-key.sebkey"
+    Goto seb_key_recovery_done
+  IfFileExists "$APPDATA\SEB-eval-PRO\candidate-local-key.sebkey" 0 seb_key_recovery_done
+    CopyFiles /SILENT "$APPDATA\SEB-eval-PRO\candidate-local-key.sebkey" "$LOCALAPPDATA\SEB EvalPro Recovery\candidate-local-key.sebkey"
+seb_key_recovery_done:
 
-  IfFileExists "$DOCUMENTS\SEB EvalPro\System\evaluation-state.json" seb_state_backup_done 0
+  IfFileExists "$LOCALAPPDATA\SEB EvalPro Recovery\evaluation-state.json" seb_state_recovery_done 0
   IfFileExists "$APPDATA\SEB-éval-PRO\evaluation-state.json" 0 +3
-    CopyFiles /SILENT "$APPDATA\SEB-éval-PRO\evaluation-state.json" "$DOCUMENTS\SEB EvalPro\System\evaluation-state.json"
-    Goto seb_state_backup_done
+    CopyFiles /SILENT "$APPDATA\SEB-éval-PRO\evaluation-state.json" "$LOCALAPPDATA\SEB EvalPro Recovery\evaluation-state.json"
+    Goto seb_state_recovery_done
   IfFileExists "$APPDATA\SEB EvalPro\evaluation-state.json" 0 +3
-    CopyFiles /SILENT "$APPDATA\SEB EvalPro\evaluation-state.json" "$DOCUMENTS\SEB EvalPro\System\evaluation-state.json"
-    Goto seb_state_backup_done
+    CopyFiles /SILENT "$APPDATA\SEB EvalPro\evaluation-state.json" "$LOCALAPPDATA\SEB EvalPro Recovery\evaluation-state.json"
+    Goto seb_state_recovery_done
   IfFileExists "$APPDATA\seb-evalpro\evaluation-state.json" 0 +3
-    CopyFiles /SILENT "$APPDATA\seb-evalpro\evaluation-state.json" "$DOCUMENTS\SEB EvalPro\System\evaluation-state.json"
-    Goto seb_state_backup_done
-  IfFileExists "$APPDATA\SEB-eval-PRO\evaluation-state.json" 0 seb_state_backup_done
-    CopyFiles /SILENT "$APPDATA\SEB-eval-PRO\evaluation-state.json" "$DOCUMENTS\SEB EvalPro\System\evaluation-state.json"
-seb_state_backup_done:
+    CopyFiles /SILENT "$APPDATA\seb-evalpro\evaluation-state.json" "$LOCALAPPDATA\SEB EvalPro Recovery\evaluation-state.json"
+    Goto seb_state_recovery_done
+  IfFileExists "$APPDATA\SEB-eval-PRO\evaluation-state.json" 0 seb_state_recovery_done
+    CopyFiles /SILENT "$APPDATA\SEB-eval-PRO\evaluation-state.json" "$LOCALAPPDATA\SEB EvalPro Recovery\evaluation-state.json"
+seb_state_recovery_done:
 
-  IfFileExists "$DOCUMENTS\SEB EvalPro\System\active-candidate.json" seb_pointer_backup_done 0
+  IfFileExists "$LOCALAPPDATA\SEB EvalPro Recovery\active-candidate.json" seb_pointer_recovery_done 0
   IfFileExists "$APPDATA\SEB-éval-PRO\active-candidate.json" 0 +3
-    CopyFiles /SILENT "$APPDATA\SEB-éval-PRO\active-candidate.json" "$DOCUMENTS\SEB EvalPro\System\active-candidate.json"
-    Goto seb_pointer_backup_done
+    CopyFiles /SILENT "$APPDATA\SEB-éval-PRO\active-candidate.json" "$LOCALAPPDATA\SEB EvalPro Recovery\active-candidate.json"
+    Goto seb_pointer_recovery_done
   IfFileExists "$APPDATA\SEB EvalPro\active-candidate.json" 0 +3
-    CopyFiles /SILENT "$APPDATA\SEB EvalPro\active-candidate.json" "$DOCUMENTS\SEB EvalPro\System\active-candidate.json"
-    Goto seb_pointer_backup_done
+    CopyFiles /SILENT "$APPDATA\SEB EvalPro\active-candidate.json" "$LOCALAPPDATA\SEB EvalPro Recovery\active-candidate.json"
+    Goto seb_pointer_recovery_done
   IfFileExists "$APPDATA\seb-evalpro\active-candidate.json" 0 +3
-    CopyFiles /SILENT "$APPDATA\seb-evalpro\active-candidate.json" "$DOCUMENTS\SEB EvalPro\System\active-candidate.json"
-    Goto seb_pointer_backup_done
-  IfFileExists "$APPDATA\SEB-eval-PRO\active-candidate.json" 0 seb_pointer_backup_done
-    CopyFiles /SILENT "$APPDATA\SEB-eval-PRO\active-candidate.json" "$DOCUMENTS\SEB EvalPro\System\active-candidate.json"
-seb_pointer_backup_done:
+    CopyFiles /SILENT "$APPDATA\seb-evalpro\active-candidate.json" "$LOCALAPPDATA\SEB EvalPro Recovery\active-candidate.json"
+    Goto seb_pointer_recovery_done
+  IfFileExists "$APPDATA\SEB-eval-PRO\active-candidate.json" 0 seb_pointer_recovery_done
+    CopyFiles /SILENT "$APPDATA\SEB-eval-PRO\active-candidate.json" "$LOCALAPPDATA\SEB EvalPro Recovery\active-candidate.json"
+seb_pointer_recovery_done:
 
   StrCpy $SebEdition "candidate"
   ReadRegStr $0 HKCU "Software\SEB EvalPro" "Edition"
