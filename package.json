@@ -1,6 +1,6 @@
 {
   "name": "seb-evalpro",
-  "version": "0.3.6",
+  "version": "0.3.7",
   "description": "SEB EvalPro - versions Candidat et Administrateur avec SEB-IA intégrée",
   "main": "src/main.js",
   "author": "Sauvegarde 56",
