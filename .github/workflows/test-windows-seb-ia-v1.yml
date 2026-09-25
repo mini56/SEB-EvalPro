@@ -27,7 +27,7 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
-          if ($version -ne '0.3.7') { throw "Version attendue 0.3.7, trouvée : $version" }
+          if ($version -ne '0.3.8') { throw "Version attendue 0.3.8, trouvée : $version" }
           Write-Host "SEB_VERSION: $version"
 
       - name: Validate SEB-IA
@@ -131,23 +131,23 @@ jobs:
             [System.IO.File]::WriteAllText($path, $text, $utf8Bom)
           }
 
-      - name: Build Windows Setup 0.3.7
+      - name: Build Windows Setup 0.3.8
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           npx electron-builder --win --publish never
           if ($LASTEXITCODE -ne 0) { throw 'Construction Windows échouée.' }
-          $setup = 'dist\SEB-eval-PRO-0.3.7-Windows-Setup.exe'
-          if (-not (Test-Path $setup)) { throw "Setup 0.3.7 absent : $setup" }
+          $setup = 'dist\SEB-eval-PRO-0.3.8-Windows-Setup.exe'
+          if (-not (Test-Path $setup)) { throw "Setup 0.3.8 absent : $setup" }
           if (Test-Path 'dist\win-unpacked\resources\ai') {
             throw 'Un ancien Pack IA externe est encore embarqué.'
           }
           if (-not (Test-Path 'dist\win-unpacked\resources\candidate-keyguard.exe')) {
             throw 'candidate-keyguard.exe absent du programme empaqueté.'
           }
-          Write-Host "SETUP_037: $((Resolve-Path $setup).Path)"
+          Write-Host "SETUP_038: $((Resolve-Path $setup).Path)"
 
-      - name: Build standalone Windows uninstaller 0.3.7
+      - name: Build standalone Windows uninstaller 0.3.8
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -159,18 +159,18 @@ jobs:
           }
           if (-not $makensis) { throw 'makensis.exe introuvable.' }
           $makensisPath = if ($makensis.Source) { $makensis.Source } else { $makensis.FullName }
-          & $makensisPath '/DAPP_VERSION=0.3.7' 'build\standalone-uninstaller.nsi'
+          & $makensisPath '/DAPP_VERSION=0.3.8' 'build\standalone-uninstaller.nsi'
           if ($LASTEXITCODE -ne 0) { throw "Compilation désinstallateur échouée : $LASTEXITCODE" }
-          $uninstaller = 'dist\SEB-eval-PRO-0.3.7-Windows-Desinstallation.exe'
+          $uninstaller = 'dist\SEB-eval-PRO-0.3.8-Windows-Desinstallation.exe'
           if (-not (Test-Path $uninstaller)) { throw "Désinstallateur absent : $uninstaller" }
-          Write-Host 'STANDALONE_UNINSTALLER_037: OK'
+          Write-Host 'STANDALONE_UNINSTALLER_038: OK'
 
       - name: Verify Setup identity and hashes
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $setup = (Resolve-Path 'dist\SEB-eval-PRO-0.3.7-Windows-Setup.exe').Path
-          $uninstaller = (Resolve-Path 'dist\SEB-eval-PRO-0.3.7-Windows-Desinstallation.exe').Path
+          $setup = (Resolve-Path 'dist\SEB-eval-PRO-0.3.8-Windows-Setup.exe').Path
+          $uninstaller = (Resolve-Path 'dist\SEB-eval-PRO-0.3.8-Windows-Desinstallation.exe').Path
 
           $installer = Get-Content 'build\installer.nsh' -Raw
           foreach ($required in @('Version Candidat','Version Administrateur','SEB-IA est intégrée','edition-candidate.flag','edition-admin.flag')) {
@@ -191,40 +191,40 @@ jobs:
           $ErrorActionPreference = 'Stop'
           Add-Type -AssemblyName System.Drawing
 
-          $setup = (Resolve-Path 'dist\SEB-eval-PRO-0.3.7-Windows-Setup.exe').Path
-          $uninstaller = (Resolve-Path 'dist\SEB-eval-PRO-0.3.7-Windows-Desinstallation.exe').Path
-          $installDir = 'C:\SEBEvalPro-037-CI'
+          $setup = (Resolve-Path 'dist\SEB-eval-PRO-0.3.8-Windows-Setup.exe').Path
+          $uninstaller = (Resolve-Path 'dist\SEB-eval-PRO-0.3.8-Windows-Desinstallation.exe').Path
+          $installDir = 'C:\SEBEvalPro-038-CI'
+          $documents = [Environment]::GetFolderPath('MyDocuments')
+          $sebDocuments = Join-Path $documents 'SEB EvalPro'
+          $upgradeRecovery = Join-Path $env:LOCALAPPDATA 'SEB EvalPro Recovery'
+          $legacyAppData = Join-Path $env:APPDATA 'SEB-éval-PRO'
+
           Remove-Item -Recurse -Force $installDir -ErrorAction SilentlyContinue
           Remove-Item 'HKCU:\Software\SEB EvalPro' -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item -Recurse -Force $sebDocuments -ErrorAction SilentlyContinue
+          Remove-Item -Recurse -Force $upgradeRecovery -ErrorAction SilentlyContinue
+          Remove-Item -Recurse -Force $legacyAppData -ErrorAction SilentlyContinue
 
-          $documents = [Environment]::GetFolderPath('MyDocuments')
-          $preservedFile = Join-Path $documents 'SEB EvalPro\Bilans\ci-preserve-037.txt'
-          $preservedCandidateFile = Join-Path $documents 'SEB EvalPro\Candidats\CAND-CI-037\manifest.json'
-          $systemRecovery = Join-Path $documents 'SEB EvalPro\System'
-          New-Item -ItemType Directory -Force -Path (Split-Path -Parent $preservedFile) | Out-Null
-          New-Item -ItemType Directory -Force -Path (Split-Path -Parent $preservedCandidateFile) | Out-Null
-          Remove-Item -Recurse -Force $systemRecovery -ErrorAction SilentlyContinue
-          Set-Content -LiteralPath $preservedFile -Value 'must survive uninstall' -Encoding ascii
-          Set-Content -LiteralPath $preservedCandidateFile -Value 'candidate folder must survive uninstall' -Encoding ascii
-
-          # Simuler les fichiers durables d'une ancienne 0.3.5 avant mise à jour.
-          $legacyAppData = Join-Path $env:APPDATA 'SEB-éval-PRO'
+          # Simuler les fichiers durables d'une ancienne version avant mise à jour.
           New-Item -ItemType Directory -Force -Path $legacyAppData | Out-Null
-          Set-Content -LiteralPath (Join-Path $legacyAppData 'candidate-local-key.sebkey') -Value 'CI-OLD-KEY-037' -Encoding ascii
-          Set-Content -LiteralPath (Join-Path $legacyAppData 'evaluation-state.json') -Value 'CI-OLD-STATE-037' -Encoding ascii
-          Set-Content -LiteralPath (Join-Path $legacyAppData 'active-candidate.json') -Value 'CI-OLD-POINTER-037' -Encoding ascii
+          Set-Content -LiteralPath (Join-Path $legacyAppData 'candidate-local-key.sebkey') -Value 'CI-OLD-KEY-038' -Encoding ascii
+          Set-Content -LiteralPath (Join-Path $legacyAppData 'evaluation-state.json') -Value 'CI-OLD-STATE-038' -Encoding ascii
+          Set-Content -LiteralPath (Join-Path $legacyAppData 'active-candidate.json') -Value 'CI-OLD-POINTER-038' -Encoding ascii
 
           $p = Start-Process -FilePath $setup -ArgumentList @('/S',"/D=$installDir") -Wait -PassThru
           if ($p.ExitCode -ne 0) { throw "Installation silencieuse échouée : $($p.ExitCode)" }
 
           foreach ($name in @('candidate-local-key.sebkey','evaluation-state.json','active-candidate.json')) {
-            $backup = Join-Path $systemRecovery $name
-            if (-not (Test-Path $backup)) { throw "Sauvegarde pré-mise-à-jour absente : $backup" }
+            $backup = Join-Path $upgradeRecovery $name
+            if (-not (Test-Path $backup)) { throw "Récupération pré-mise-à-jour absente : $backup" }
           }
-          if ((Get-Content (Join-Path $systemRecovery 'candidate-local-key.sebkey') -Raw).Trim() -ne 'CI-OLD-KEY-037') {
-            throw "La clé locale ancienne n'a pas été sauvegardée avant installation."
+          if ((Get-Content (Join-Path $upgradeRecovery 'candidate-local-key.sebkey') -Raw).Trim() -ne 'CI-OLD-KEY-038') {
+            throw "La clé locale ancienne n'a pas été préservée hors de Documents."
           }
-          Write-Host 'PREUPDATE_KEY_STATE_POINTER_BACKUP: OK'
+          if (Test-Path (Join-Path $sebDocuments 'System')) {
+            throw "L'installeur 0.3.8 ne doit plus créer Documents\SEB EvalPro\System."
+          }
+          Write-Host 'PREUPDATE_RECOVERY_OUTSIDE_DOCUMENTS: OK'
 
           $exe = Join-Path $installDir 'SEB-éval-PRO.exe'
           if (-not (Test-Path $exe)) {
@@ -240,7 +240,7 @@ jobs:
           }
 
           $productVersion = (Get-Item $exe).VersionInfo.ProductVersion
-          if (-not $productVersion -or -not $productVersion.StartsWith('0.3.7')) {
+          if (-not $productVersion -or -not $productVersion.StartsWith('0.3.8')) {
             throw "Version de l'exécutable incorrecte : $productVersion"
           }
           Write-Host "INSTALLED_VERSION=$productVersion"
@@ -276,11 +276,11 @@ jobs:
 
           $recoveryProbePaths = @(
             (Join-Path $env:APPDATA 'SEB-éval-PRO'),
-            (Join-Path $env:LOCALAPPDATA 'SEB-éval-PRO')
+            (Join-Path $env:LOCALAPPDATA 'SEB EvalPro Recovery')
           )
-          foreach ($path in $recoveryProbePaths) {
-            New-Item -ItemType Directory -Force -Path $path | Out-Null
-            Set-Content -LiteralPath (Join-Path $path 'ci-recovery-probe.txt') -Value 'must survive uninstall' -Encoding ascii
+          foreach ($probePath in $recoveryProbePaths) {
+            New-Item -ItemType Directory -Force -Path $probePath | Out-Null
+            Set-Content -LiteralPath (Join-Path $probePath 'ci-recovery-probe.txt') -Value 'must survive uninstall' -Encoding ascii
           }
 
           $u = Start-Process -FilePath $uninstaller -ArgumentList '/S' -Wait -PassThru
@@ -288,48 +288,60 @@ jobs:
           Start-Sleep -Seconds 2
 
           if (Test-Path $installDir) { throw "Dossier d'installation encore présent : $installDir" }
-          foreach ($path in $recoveryProbePaths) {
-            if (-not (Test-Path (Join-Path $path 'ci-recovery-probe.txt'))) {
-              throw "Données de récupération supprimées à tort : $path"
+          foreach ($probePath in $recoveryProbePaths) {
+            if (-not (Test-Path (Join-Path $probePath 'ci-recovery-probe.txt'))) {
+              throw "Données de récupération supprimées à tort : $probePath"
             }
-          }
-          if (-not (Test-Path $preservedFile)) {
-            throw "Documents\SEB EvalPro\Bilans a été supprimé à tort."
-          }
-          if (-not (Test-Path $preservedCandidateFile)) {
-            throw "Documents\SEB EvalPro\Candidats a été supprimé à tort."
-          }
-          if (-not (Test-Path (Join-Path $systemRecovery 'candidate-local-key.sebkey'))) {
-            throw "La sauvegarde de la clé locale dans Documents a été supprimée à tort."
           }
           foreach ($link in @($desktopCandidates + $startCandidates)) {
             if (Test-Path $link) { throw "Raccourci encore présent après désinstallation : $link" }
           }
 
           Write-Host 'REAL_INSTALL_UNINSTALL: OK'
-          Write-Host 'DOCUMENTS_BILANS_PRESERVED: OK'
-          Write-Host 'DOCUMENTS_CANDIDATES_PRESERVED: OK'
-          Write-Host 'CANDIDATE_RECOVERY_APPDATA_PRESERVED: OK'
-          Write-Host 'CANDIDATE_KEY_BACKUP_PRESERVED: OK'
+          Write-Host 'TECHNICAL_RECOVERY_OUTSIDE_DOCUMENTS: OK'
 
-      - name: Test installed application really opens and isolates one corrupt candidate
+      - name: Test installed app migrates Documents and isolates corrupt data
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $setup = (Resolve-Path 'dist\SEB-eval-PRO-0.3.7-Windows-Setup.exe').Path
-          $uninstaller = (Resolve-Path 'dist\SEB-eval-PRO-0.3.7-Windows-Desinstallation.exe').Path
+          $setup = (Resolve-Path 'dist\SEB-eval-PRO-0.3.8-Windows-Setup.exe').Path
+          $uninstaller = (Resolve-Path 'dist\SEB-eval-PRO-0.3.8-Windows-Desinstallation.exe').Path
           $documents = [Environment]::GetFolderPath('MyDocuments')
           $sebDocuments = Join-Path $documents 'SEB EvalPro'
-          $legacyAppData = Join-Path $env:APPDATA 'SEB-éval-PRO'
-          $installDir = 'C:\SEBEvalPro-037-Startup-CI'
+          $upgradeRecovery = Join-Path $env:LOCALAPPDATA 'SEB EvalPro Recovery'
+          $installDir = 'C:\SEBEvalPro-038-Startup-CI'
 
-          # Retirer uniquement les données artificielles créées par le test précédent,
-          # afin de démarrer ici sur un profil propre.
-          Remove-Item -Recurse -Force $legacyAppData -ErrorAction SilentlyContinue
-          Remove-Item -Recurse -Force (Join-Path $sebDocuments 'System') -ErrorAction SilentlyContinue
-          Remove-Item -Recurse -Force (Join-Path $sebDocuments 'Candidats\CAND-CI-037') -ErrorAction SilentlyContinue
-          Remove-Item -Force (Join-Path $sebDocuments 'Bilans\ci-preserve-037.txt') -ErrorAction SilentlyContinue
+          $userDataCandidates = @(
+            (Join-Path $env:APPDATA 'SEB-éval-PRO'),
+            (Join-Path $env:APPDATA 'seb-evalpro'),
+            (Join-Path $env:APPDATA 'SEB EvalPro'),
+            (Join-Path $env:APPDATA 'SEB-eval-PRO')
+          ) | Select-Object -Unique
+
+          foreach ($candidate in $userDataCandidates) {
+            Remove-Item -Recurse -Force $candidate -ErrorAction SilentlyContinue
+          }
+          Remove-Item -Recurse -Force $upgradeRecovery -ErrorAction SilentlyContinue
+          Remove-Item -Recurse -Force $sebDocuments -ErrorAction SilentlyContinue
           Remove-Item -Recurse -Force $installDir -ErrorAction SilentlyContinue
+
+          # Ancien stockage Documents volontairement encombré comme sur un vrai poste.
+          $legacyCandidate = Join-Path $sebDocuments 'Candidats\CAND-LEGACY-CI'
+          $legacySystem = Join-Path $sebDocuments 'System'
+          $legacyBilan = Join-Path $sebDocuments 'Bilans'
+          $legacyParcours = Join-Path $sebDocuments 'parcours'
+          $legacyAdmin = Join-Path $sebDocuments 'Admin'
+          $legacyCorbeille = Join-Path $sebDocuments 'Corbeille'
+          foreach ($dir in @($legacyCandidate,$legacySystem,$legacyBilan,$legacyParcours,$legacyAdmin,$legacyCorbeille)) {
+            New-Item -ItemType Directory -Force -Path $dir | Out-Null
+          }
+          Set-Content -LiteralPath (Join-Path $legacyCandidate 'manifest.json') -Value 'SEBLOCAL1:OLD-ENCRYPTED-CANDIDATE-CI' -Encoding ascii
+          Set-Content -LiteralPath (Join-Path $legacySystem 'candidate-local-key.sebkey') -Value 'OLD-UNREADABLE-KEY-CI' -Encoding ascii
+          Set-Content -LiteralPath (Join-Path $legacyParcours 'old.json') -Value '{"old":true}' -Encoding ascii
+          Set-Content -LiteralPath (Join-Path $legacyAdmin 'old.json') -Value '{"old":true}' -Encoding ascii
+          Set-Content -LiteralPath (Join-Path $legacyCorbeille 'old.json') -Value '{"old":true}' -Encoding ascii
+          Set-Content -LiteralPath (Join-Path $legacyBilan 'Evaluation_CI.docx') -Value 'WORD-CI' -Encoding ascii
+          Set-Content -LiteralPath (Join-Path $sebDocuments 'ancienne-trace.tmp') -Value 'legacy-root-file' -Encoding ascii
 
           $install = Start-Process -FilePath $setup -ArgumentList @('/S',"/D=$installDir") -Wait -PassThru
           if ($install.ExitCode -ne 0) { throw "Installation de test démarrage échouée : $($install.ExitCode)" }
@@ -343,7 +355,7 @@ jobs:
           function Assert-SebWindow([string]$label) {
             $process = Start-Process -FilePath $exe -PassThru
             try {
-              Start-Sleep -Seconds 5
+              Start-Sleep -Seconds 6
               $process.Refresh()
               if ($process.HasExited) { throw "$label : SEB EvalPro s'est arrêté avant d'afficher sa fenêtre." }
               if ($process.MainWindowHandle -eq 0) { throw "$label : processus présent mais aucune fenêtre SEB EvalPro visible." }
@@ -357,47 +369,81 @@ jobs:
               if ($process -and -not $process.HasExited) {
                 & taskkill.exe /PID $process.Id /T /F | Out-Null
               }
-              Start-Sleep -Milliseconds 800
+              Start-Sleep -Milliseconds 900
             }
           }
 
-          Assert-SebWindow 'REAL_APP_FIRST_START'
+          Assert-SebWindow 'REAL_APP_038_FIRST_START'
 
-          # Créer volontairement UN seul dossier candidat illisible.
-          # Il doit être isolé et ne jamais bloquer les autres candidats ni le programme.
-          $corruptDir = Join-Path $sebDocuments 'Candidats\CAND-CORRUPT-CI'
+          # Documents\SEB EvalPro : seulement des Word, aucun sous-dossier.
+          if (-not (Test-Path $sebDocuments)) { throw 'Documents\SEB EvalPro doit exister pour les exports Word.' }
+          $visible = @(Get-ChildItem -LiteralPath $sebDocuments -Force)
+          $bad = @($visible | Where-Object { $_.PSIsContainer -or $_.Extension -notin @('.doc','.docx') })
+          if ($bad.Count -gt 0) {
+            throw "Contenu technique encore présent dans Documents : $($bad.FullName -join ', ')"
+          }
+          if (-not (Test-Path (Join-Path $sebDocuments 'Evaluation_CI.docx'))) {
+            throw 'Le Word historique n’a pas été conservé dans Documents\SEB EvalPro.'
+          }
+          Write-Host 'DOCUMENTS_SEB_EVALPRO_WORD_ONLY: OK'
+
+          $storageCandidates = @(
+            (Join-Path $env:APPDATA 'SEB-éval-PRO\storage'),
+            (Join-Path $env:APPDATA 'seb-evalpro\storage'),
+            (Join-Path $env:APPDATA 'SEB EvalPro\storage'),
+            (Join-Path $env:APPDATA 'SEB-eval-PRO\storage')
+          ) | Select-Object -Unique
+          $storage = $storageCandidates | Where-Object { Test-Path (Join-Path $_ 'Candidats\CAND-LEGACY-CI\manifest.json') } | Select-Object -First 1
+          if (-not $storage) { throw 'Stockage interne 0.3.8 introuvable après migration.' }
+
+          foreach ($dir in @('Candidats','System','parcours','Admin','Corbeille','Bilans')) {
+            if (-not (Test-Path (Join-Path $storage $dir))) { throw "Dossier interne migré absent : $dir" }
+          }
+          $legacyManifest = Join-Path $storage 'Candidats\CAND-LEGACY-CI\manifest.json'
+          if ((Get-Content $legacyManifest -Raw).Trim() -ne 'SEBLOCAL1:OLD-ENCRYPTED-CANDIDATE-CI') {
+            throw 'Le candidat chiffré historique a été modifié pendant la migration.'
+          }
+          $recoveryDir = Join-Path $storage 'System\Recovery'
+          if (-not (Test-Path $recoveryDir)) { throw 'La clé ancienne illisible n’a pas été mise en récupération.' }
+          if (-not (Get-ChildItem $recoveryDir -Filter 'backup-key-unreadable-*.sebkey' -ErrorAction SilentlyContinue)) {
+            throw 'La sauvegarde de clé illisible n’a pas été conservée.'
+          }
+          Write-Host 'UNREADABLE_LEGACY_KEY_DOES_NOT_BLOCK_APP: OK'
+          Write-Host 'LEGACY_ENCRYPTED_CANDIDATE_PRESERVED: OK'
+
+          # Un seul dossier candidat corrompu dans le stockage interne ne doit jamais bloquer l'application.
+          $corruptDir = Join-Path $storage 'Candidats\CAND-CORRUPT-CI'
           New-Item -ItemType Directory -Force -Path $corruptDir | Out-Null
-          Set-Content -LiteralPath (Join-Path $corruptDir 'manifest.json') -Value 'SEBLOCAL1:CORRUPT-CANDIDATE-ONLY' -Encoding utf8
-
+          Set-Content -LiteralPath (Join-Path $corruptDir 'manifest.json') -Value 'SEBLOCAL1:CORRUPT-CANDIDATE-ONLY' -Encoding ascii
           Assert-SebWindow 'CORRUPT_CANDIDATE_ISOLATED'
           Write-Host 'ONE_CORRUPT_CANDIDATE_DOES_NOT_BLOCK_APP: OK'
 
-          Remove-Item -Recurse -Force $corruptDir -ErrorAction SilentlyContinue
           $uninstall = Start-Process -FilePath $uninstaller -ArgumentList '/S' -Wait -PassThru
           if ($uninstall.ExitCode -ne 0) { throw "Désinstallation après test démarrage échouée : $($uninstall.ExitCode)" }
-          Remove-Item -Recurse -Force (Join-Path $sebDocuments 'System') -ErrorAction SilentlyContinue
-          Remove-Item -Recurse -Force $legacyAppData -ErrorAction SilentlyContinue
+          if (-not (Test-Path $storage)) { throw 'Le stockage interne candidat a été supprimé par la désinstallation.' }
+          if (-not (Test-Path (Join-Path $sebDocuments 'Evaluation_CI.docx'))) { throw 'Le Word exporté a été supprimé par la désinstallation.' }
+          Write-Host 'INTERNAL_DATA_PRESERVED_AFTER_UNINSTALL: OK'
 
-      - name: Upload Windows 0.3.7 artifact
+      - name: Upload Windows 0.3.8 artifact
         uses: actions/upload-artifact@v4
         with:
-          name: SEB-EvalPro-0.3.7-Windows-Setup
-          path: dist/SEB-eval-PRO-0.3.7-Windows-Setup.exe
+          name: SEB-EvalPro-0.3.8-Windows-Setup
+          path: dist/SEB-eval-PRO-0.3.8-Windows-Setup.exe
           if-no-files-found: error
           retention-days: 14
 
-      - name: Publish 0.3.7 test release
+      - name: Publish 0.3.8 test release
         continue-on-error: true
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $tag = "seb-evalpro-seb-ia-037-build-${{ github.run_number }}"
-          $setup = 'dist\SEB-eval-PRO-0.3.7-Windows-Setup.exe'
-          $uninstaller = 'dist\SEB-eval-PRO-0.3.7-Windows-Desinstallation.exe'
-          $title = "SEB EvalPro 0.3.7 - SEB-IA - Build #${{ github.run_number }}"
-          $notes = "Setup complet SEB-éval-PRO 0.3.7 avec identité Sauvegarde 56, icône officielle, raccourcis Bureau/Menu Démarrer, garde clavier Candidat, SEB-IA intégrée et désinstallateur autonome. Installation/désinstallation réelle, conservation des dossiers candidats et récupération clé/reprise validées automatiquement."
+          $tag = "seb-evalpro-seb-ia-038-build-${{ github.run_number }}"
+          $setup = 'dist\SEB-eval-PRO-0.3.8-Windows-Setup.exe'
+          $uninstaller = 'dist\SEB-eval-PRO-0.3.8-Windows-Desinstallation.exe'
+          $title = "SEB EvalPro 0.3.8 - SEB-IA - Build #${{ github.run_number }}"
+          $notes = "Setup complet SEB-éval-PRO 0.3.8 avec stockage candidat interne, Documents réservé aux exports Word, migration sécurisée des anciens dossiers, isolation d'une clé ou d'un candidat illisible, SEB-IA intégrée et désinstallateur autonome."
           gh release create $tag $setup $uninstaller --target "${{ github.sha }}" --title $title --notes $notes --prerelease --repo "${{ github.repository }}"
-          if ($LASTEXITCODE -ne 0) { throw 'Publication Release test 0.3.7 échouée.' }
+          if ($LASTEXITCODE -ne 0) { throw 'Publication Release test 0.3.8 échouée.' }
           Write-Host "RELEASE_TAG=$tag"
