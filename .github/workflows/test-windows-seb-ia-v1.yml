@@ -383,7 +383,7 @@ jobs:
             throw "Contenu technique encore présent dans Documents : $($bad.FullName -join ', ')"
           }
           if (-not (Test-Path (Join-Path $sebDocuments 'Evaluation_CI.docx'))) {
-            throw 'Le Word historique n’a pas été conservé dans Documents\SEB EvalPro.'
+            throw "Le Word historique n'a pas été conservé dans Documents\SEB EvalPro."
           }
           Write-Host 'DOCUMENTS_SEB_EVALPRO_WORD_ONLY: OK'
 
@@ -404,9 +404,9 @@ jobs:
             throw 'Le candidat chiffré historique a été modifié pendant la migration.'
           }
           $recoveryDir = Join-Path $storage 'System\Recovery'
-          if (-not (Test-Path $recoveryDir)) { throw 'La clé ancienne illisible n’a pas été mise en récupération.' }
+          if (-not (Test-Path $recoveryDir)) { throw "La clé ancienne illisible n'a pas été mise en récupération." }
           if (-not (Get-ChildItem $recoveryDir -Filter 'backup-key-unreadable-*.sebkey' -ErrorAction SilentlyContinue)) {
-            throw 'La sauvegarde de clé illisible n’a pas été conservée.'
+            throw "La sauvegarde de clé illisible n'a pas été conservée."
           }
           Write-Host 'UNREADABLE_LEGACY_KEY_DOES_NOT_BLOCK_APP: OK'
           Write-Host 'LEGACY_ENCRYPTED_CANDIDATE_PRESERVED: OK'
