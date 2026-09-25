@@ -163,45 +163,31 @@ function parseJs(text, label) {
 }
 
 // -----------------------------------------------------------------------------
-// WORD : conserver le modèle institutionnel historique, mais écrire le Word
-// courant dans le dossier exact du candidat, jamais dans le vieux Bilans global.
+// WORD 0.3.8 : le document visible est uniquement dans Documents\\SEB EvalPro.
+// L'archive interne du candidat conserve sa propre copie.
 // -----------------------------------------------------------------------------
 {
   const { file, text } = read('src/bilan-history-main.js');
   let out = text;
 
-  if (out.includes("function historicalWordDir() {\n    return path.join(app.getPath('documents'), 'SEB EvalPro', 'Bilans');\n  }")) {
-    out = out.replace(
-      "function historicalWordDir() {\n    return path.join(app.getPath('documents'), 'SEB EvalPro', 'Bilans');\n  }",
-      `function historicalWordDir(candidate) {
-    const candidateDir = findCandidateDir(app.getPath('documents'), normalizeCandidate(candidate));
-    if (!candidateDir) throw new Error('Dossier candidat introuvable pour le document Word.');
-    const directory = path.join(candidateDir, 'bilan', 'exports');
-    fs.mkdirSync(directory, { recursive: true });
-    return directory;
-  }`
-    );
-  }
-
+  // Compatibilité si un ancien script a encore injecté le dossier Bilans visible.
   out = out.replace(
-    'function historicalWordPath(filename) {\n    const directory = historicalWordDir();',
-    'function historicalWordPath(filename, candidate) {\n    const directory = historicalWordDir(candidate);'
-  );
-  out = out.replace(
-    'function cleanupLegacyHistoricalWords(filename) {\n    const directory = historicalWordDir();',
-    'function cleanupLegacyHistoricalWords(filename, candidate) {\n    const directory = historicalWordDir(candidate);'
-  );
-  out = out.replace(
-    'cleanupLegacyHistoricalWords(filename);\n      const target = historicalWordPath(filename);',
-    'const candidate = normalizeCandidate(payload && payload.candidate);\n      cleanupLegacyHistoricalWords(filename, candidate);\n      const target = historicalWordPath(filename, candidate);'
+    "function historicalWordDir() {\n    return path.join(app.getPath('documents'), 'SEB EvalPro', 'Bilans');\n  }",
+    "function historicalWordDir() {\n    return path.join(app.getPath('documents'), 'SEB EvalPro');\n  }"
   );
 
-  if (out.includes("return path.join(app.getPath('documents'), 'SEB EvalPro', 'Bilans');")) {
-    fail('writer Word global encore actif après correctif final', 5);
+  if (out.includes("bilan-history:write-word-sync")) {
+    if (!out.includes("return path.join(app.getPath('documents'), 'SEB EvalPro');")) {
+      fail('writer Word visible 0.3.8 absent de Documents\\SEB EvalPro', 5);
+    }
+    if (!out.includes('historicalWordArchiveDir(candidate)')) {
+      fail('archive Word interne du candidat absente', 5);
+    }
+    if (!out.includes("path.join(record.candidateDir, 'bilan', 'exports')")) {
+      fail('archive Word non rattachée au dossier candidat interne', 5);
+    }
   }
-  if (out.includes("bilan-history:write-word-sync") && !out.includes("historicalWordDir(candidate)")) {
-    fail('writer Word présent mais non rattaché au candidat', 5);
-  }
+
   parseJs(out, 'src/bilan-history-main.js');
   write(file, out);
 }
