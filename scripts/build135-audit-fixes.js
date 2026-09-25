@@ -184,9 +184,9 @@ function checkHtmlScripts(html, label) {
   const { file, text } = read('src/main.js');
   const out = text;
   for (const required of [
-    "const candidateExportDir = getCandidateStore().getActiveExportDir();",
-    "const targetDirectory = adminExportCandidateDir || candidateExportDir || bilanDocumentsDir();",
-    "const isCurrentCandidateWord = !!adminExportCandidateDir && /^Evaluation_.+\\.docx?$/i.test(filename);"
+    "const candidateExportDir = adminExportCandidateDir || getCandidateStore().getActiveExportDir();",
+    "const visibleDirectory = bilanDocumentsDir();",
+    "fs.copyFileSync(visibleTarget, archiveTarget);"
   ]) {
     if (!out.includes(required)) fail('routage Word bilan candidat absent : ' + required, 13);
   }
