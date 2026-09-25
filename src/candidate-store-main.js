@@ -7,12 +7,13 @@ const { codedFolderName } = require('./candidate-folder-utils');
 function createCandidateStore(options = {}) {
   const documentsPath = options.documentsPath;
   const userDataPath = options.userDataPath;
+  const dataRoot = options.dataRoot || (documentsPath ? path.join(documentsPath, 'SEB EvalPro') : null);
   const now = typeof options.now === 'function' ? options.now : () => new Date();
 
-  if (!documentsPath) throw new Error('documentsPath requis');
+  if (!dataRoot) throw new Error('dataRoot requis');
   if (!userDataPath) throw new Error('userDataPath requis');
 
-  const sebRoot = path.join(documentsPath, 'SEB EvalPro');
+  const sebRoot = dataRoot;
   const candidatesRoot = path.join(sebRoot, 'Candidats');
   const systemRoot = path.join(sebRoot, 'System');
   const activePointerPath = path.join(userDataPath, 'active-candidate.json');
