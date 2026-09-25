@@ -351,7 +351,7 @@ jobs:
               if ($title -match 'Démarrage impossible') {
                 throw "$label : l'écran de blocage sécurité a été affiché à la place du programme."
               }
-              Write-Host "$label: WINDOW_OK title='$title' handle=$($process.MainWindowHandle)"
+              Write-Host "${label}: WINDOW_OK title='$title' handle=$($process.MainWindowHandle)"
             }
             finally {
               if ($process -and -not $process.HasExited) {
