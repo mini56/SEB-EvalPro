@@ -140,7 +140,7 @@ console.log('SEB EvalPro Build #138: Word historique corrigé — NE/I/II/III un
     let target = path.join(directory, filename);
     let index = 2;
     while (fs.existsSync(target)) {
-      target = path.join(directory, \`${parsed.name}_${index}${parsed.ext}\`);
+      target = path.join(directory, \`${'${parsed.name}'}_${'${index}'}${'${parsed.ext}'}\`);
       index += 1;
     }
     return target;
@@ -158,7 +158,7 @@ console.log('SEB EvalPro Build #138: Word historique corrigé — NE/I/II/III un
       if (html.length < 100 || !html.includes('<table')) throw new Error('Contenu Word vide ou invalide.');
       const candidate = normalizeCandidate(payload && payload.candidate);
       const target = uniqueHistoricalWordPath(filename);
-      const temp = \`${target}.tmp\`;
+      const temp = \`${'${target}'}.tmp\`;
       fs.writeFileSync(temp, '\\uFEFF' + html, 'utf8');
       fs.renameSync(temp, target);
       if (!fs.existsSync(target)) throw new Error('Le document Word n’a pas été créé sur le disque.');
