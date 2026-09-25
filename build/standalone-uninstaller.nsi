@@ -27,7 +27,7 @@ VIAddVersionKey /LANG=1036 "LegalCopyright" "Sauvegarde 56"
 
 Function .onInit
   IfSilent silent_mode
-  MessageBox MB_ICONQUESTION|MB_YESNO "Cette opération va désinstaller SEB-éval-PRO et supprimer les anciens raccourcis.$\r$\n$\r$\nLes dossiers candidats, la clé locale de déchiffrement, la reprise d'un parcours et les documents dans Documents seront conservés.$\r$\n$\r$\nContinuer ?" IDYES confirmed
+  MessageBox MB_ICONQUESTION|MB_YESNO "Cette opération va désinstaller SEB-éval-PRO et supprimer les anciens raccourcis.$\r$\n$\r$\nLe stockage interne des candidats, la clé locale, la reprise d'un parcours et les exports Word dans Documents seront conservés.$\r$\n$\r$\nContinuer ?" IDYES confirmed
   Abort
 confirmed:
   Return
@@ -268,6 +268,6 @@ cleanup_failed:
 
 cleanup_ok:
   SetErrorLevel 0
-  DetailPrint "SEB-éval-PRO a été désinstallé. Les dossiers candidats, données de reprise et documents ont été conservés."
+  DetailPrint "SEB-éval-PRO a été désinstallé. Le stockage interne candidat, les données de reprise et les exports Word ont été conservés."
 cleanup_done:
 SectionEnd
