@@ -129,60 +129,83 @@ function migrateLegacyDocumentsStorage({ documentsPath, userDataPath }) {
   const internalRoot = internalStorageRoot(userDataPath);
   const conflictRoot = path.join(internalRoot, 'MigrationConflicts');
   const legacyMiscRoot = path.join(internalRoot, 'LegacyDocuments');
-  const result = { copied:0, conflicts:0, wordExports:0, removedDirectories:0, removedFiles:0, remaining:[] };
+  const result = {
+    copied:0,
+    conflicts:0,
+    wordExports:0,
+    removedDirectories:0,
+    removedFiles:0,
+    remaining:[],
+    errors:[]
+  };
 
   ensureDir(internalRoot);
   ensureDir(legacyRoot);
 
-  for (const word of collectWordExports(legacyRoot)) {
-    if (preserveWordAtRoot(word, legacyRoot)) result.wordExports += 1;
-  }
+  // Phase 1 : copier et vérifier TOUT avant de supprimer quoi que ce soit
+  // dans Documents. Une erreur laisse l'ancien stockage entièrement présent.
+  try {
+    for (const word of collectWordExports(legacyRoot)) {
+      if (preserveWordAtRoot(word, legacyRoot)) result.wordExports += 1;
+    }
 
-  const entries = fs.readdirSync(legacyRoot, { withFileTypes:true });
-  for (const entry of entries) {
-    const source = path.join(legacyRoot, entry.name);
+    const entries = fs.readdirSync(legacyRoot, { withFileTypes:true });
+    for (const entry of entries) {
+      const source = path.join(legacyRoot, entry.name);
 
-    if (entry.isDirectory()) {
-      const normalized = entry.name.toLocaleLowerCase('fr-FR');
-      const target = TECHNICAL_DIRS.has(normalized)
-        ? path.join(internalRoot, entry.name)
-        : path.join(legacyMiscRoot, entry.name);
-      ensureDir(target);
-      const merged = mergeTree(source, target, conflictRoot, entry.name);
-      result.copied += merged.copied;
-      result.conflicts += merged.conflicts;
-
-      try {
-        fs.rmSync(source, { recursive:true, force:true });
-        result.removedDirectories += 1;
-      } catch (_) {
-        result.remaining.push(source);
+      if (entry.isDirectory()) {
+        const normalized = entry.name.toLocaleLowerCase('fr-FR');
+        const target = TECHNICAL_DIRS.has(normalized)
+          ? path.join(internalRoot, entry.name)
+          : path.join(legacyMiscRoot, entry.name);
+        ensureDir(target);
+        const merged = mergeTree(source, target, conflictRoot, entry.name);
+        result.copied += merged.copied;
+        result.conflicts += merged.conflicts;
+        continue;
       }
-      continue;
+
+      if (!entry.isFile() || /\.docx?$/i.test(entry.name)) continue;
+      const target = path.join(legacyMiscRoot, '_root', entry.name);
+      const merged = copyFilePreserving(source, target, conflictRoot, path.join('_root', entry.name));
+      result.copied += merged.copied;
+      result.conflicts += merged.conflict;
     }
+  } catch (error) {
+    result.errors.push(error && error.message ? error.message : String(error));
+    return { ...result, legacyRoot, internalRoot, completed:false };
+  }
 
-    if (!entry.isFile() || /\.docx?$/i.test(entry.name)) continue;
-
-    const target = path.join(legacyMiscRoot, '_root', entry.name);
-    const merged = copyFilePreserving(source, target, conflictRoot, path.join('_root', entry.name));
-    result.copied += merged.copied;
-    result.conflicts += merged.conflict;
+  // Phase 2 : seulement après vérification complète, retirer de Documents
+  // tout ce qui n'est pas un export Word.
+  for (const entry of fs.readdirSync(legacyRoot, { withFileTypes:true })) {
+    const target = path.join(legacyRoot, entry.name);
     try {
-      fs.rmSync(source, { force:true });
-      result.removedFiles += 1;
-    } catch (_) {
-      result.remaining.push(source);
+      if (entry.isDirectory()) {
+        fs.rmSync(target, { recursive:true, force:true });
+        result.removedDirectories += 1;
+      } else if (entry.isFile() && !/\.docx?$/i.test(entry.name)) {
+        fs.rmSync(target, { force:true });
+        result.removedFiles += 1;
+      }
+    } catch (error) {
+      result.errors.push(error && error.message ? error.message : String(error));
+      result.remaining.push(target);
     }
   }
 
-  // Contrôle final : Documents\\SEB EvalPro ne doit contenir que des fichiers Word.
   for (const entry of fs.readdirSync(legacyRoot, { withFileTypes:true })) {
     if (entry.isDirectory() || (entry.isFile() && !/\.docx?$/i.test(entry.name))) {
       result.remaining.push(path.join(legacyRoot, entry.name));
     }
   }
 
-  return { ...result, legacyRoot, internalRoot };
+  return {
+    ...result,
+    legacyRoot,
+    internalRoot,
+    completed:result.remaining.length === 0 && result.errors.length === 0
+  };
 }
 
 module.exports = {
