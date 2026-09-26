@@ -37,8 +37,6 @@ jobs:
       - name: Generate web application
         run: npm run prepare:web
 
-      - name: Probe Dictée architecture
-        run: node scripts/dictee-architecture-probe.js
 
       - name: Functional nwtexte smoke
         run: xvfb-run -a npm run test:nwtexte-functional
@@ -72,6 +70,9 @@ jobs:
 
       - name: Functional Genre-Nombre smoke
         run: xvfb-run -a npm run test:genrenombres-functional
+
+      - name: Functional Dictée smoke
+        run: xvfb-run -a npm run test:dictee-functional
 
       - name: Verify integrated SEB-IA output
         shell: bash
