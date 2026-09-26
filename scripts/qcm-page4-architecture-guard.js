@@ -96,13 +96,14 @@ if (!checkpoint.includes("page.id === 'page4' && window.sebQcmPage4")) {
   fail('ancien checkpoint possède encore la reprise Page 4');
 }
 
-for (const token of [
-  "const rep4 = reponses['page4'] || \"0/0\";",
-  "const sc4 = scores['page4'] || 0;",
-  "scoreMathsProblemes += scoreFractions;",
-  'totalMathsProblemes = 27'
-]) {
-  if (!qcm.includes(token)) fail('contrat Résultats/Maths Page 4 absent: ' + token);
+const resultChecks = [
+  [/const\s+rep4\s*=\s*reponses\[['"]page4['"]\]\s*\|\|\s*['"]0\/0['"]\s*;/, 'résultat fractions'],
+  [/const\s+sc4\s*=\s*scores\[['"]page4['"]\]\s*\|\|\s*0\s*;/, 'score fractions'],
+  [/scoreMathsProblemes\s*\+=\s*scoreFractions\s*;/, 'intégration maths problèmes'],
+  [/totalMathsProblemes\s*=\s*27\s*;/, 'dénominateur maths problèmes']
+];
+for (const [pattern, label] of resultChecks) {
+  if (!pattern.test(qcm)) fail('contrat Résultats/Maths Page 4 absent: ' + label);
 }
 
 if (!qcm.includes('sessionStorage.clear();')) fail('reset nouvelle évaluation ne nettoie plus l’état Page 4');
