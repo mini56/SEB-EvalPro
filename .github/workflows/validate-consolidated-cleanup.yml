@@ -101,6 +101,6 @@ jobs:
         shell: bash
         run: |
           test -f src/seb-ia-engine.js
-          grep -q "seb-ia-v1-integration" app/web/admin-bilan.html
+          grep -q "seb-ia-v1-integration" app/web/admin-bilan.html app/web/js/admin-bilan-runtime.js app/web/js/admin-bilan-runtime-tail.js
           grep -q "SEB_HISTORY_SEB_IA_V1" src/bilan-history-preload.js
           echo "SEB-IA V1 integration checks passed."
