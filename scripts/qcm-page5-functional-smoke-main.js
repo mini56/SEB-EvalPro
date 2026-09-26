@@ -214,9 +214,13 @@ app.whenReady().then(async () => {
     for(let i=0;i<140;i+=1){
       try{
         const state=await win.webContents.executeJavaScript(`
-          ({search:location.search,visible:Boolean(document.getElementById('page5_1')?.classList.contains('visible'))})
+          ({
+            search:location.search,
+            visible:Boolean(document.getElementById('page5_1')?.classList.contains('visible')),
+            controller:Boolean(window.sebQcmPage5_1)
+          })
         `,true);
-        if(state.search.includes('page=5_1')&&state.visible){onPage51=true;break;}
+        if(state.search.includes('page=5_1')&&state.visible&&state.controller){onPage51=true;break;}
       }catch(_){}
       await sleep(50);
     }
@@ -227,7 +231,10 @@ app.whenReady().then(async () => {
         document.getElementById('reponse5_1_1').value='2';
         document.getElementById('reponse5_1_2').value='3';
         document.getElementById('reponse5_1_3').value='5';
-        saveTableAnswers('5_1');
+        document.getElementById('reponse5_1_1').dispatchEvent(new Event('input',{bubbles:true}));
+        document.getElementById('reponse5_1_2').dispatchEvent(new Event('input',{bubbles:true}));
+        document.getElementById('reponse5_1_3').dispatchEvent(new Event('input',{bubbles:true}));
+        window.sebQcmPage5_1.save();
         const r=JSON.parse(sessionStorage.getItem('reponses_data')||'{}');
         const s=JSON.parse(sessionStorage.getItem('scores_data')||'{}');
         return {
@@ -245,7 +252,7 @@ app.whenReady().then(async () => {
     }
     if (JSON.stringify(page51Preserves.p51) !== JSON.stringify(['2','3','5']) ||
         JSON.stringify(page51Preserves.p51s) !== JSON.stringify([1,1,1])) {
-      throw new Error('Page 5_1 historique perturbée par la modularisation Page 5.');
+      throw new Error('Page 5_1 modulaire perturbée ou incorrecte.');
     }
 
     console.log('QCM_PAGE5_FUNCTIONAL_SMOKE: OK');
