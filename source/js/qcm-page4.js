@@ -71,54 +71,80 @@
     });
   }
 
-  function nonOverlappingPosition(placed, metrics, margin) {
-    let x = 0;
-    let y = 0;
-    let overlap = true;
-    let attempts = 0;
+  function shuffle(values) {
+    const copy = values.slice();
+    for (let i = copy.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const tmp = copy[i];
+      copy[i] = copy[j];
+      copy[j] = tmp;
+    }
+    return copy;
+  }
 
-    while (overlap && attempts < 400) {
-      x = Math.random() * metrics.maxX;
-      y = Math.random() * metrics.maxY;
-      attempts += 1;
-      overlap = placed.some((pos) =>
-        Math.abs(pos.x - x) < metrics.size + margin &&
-        Math.abs(pos.y - y) < metrics.size + margin
-      );
+  function cloudSlots(wrapper, itemCount, margin) {
+    prepareCloud(wrapper);
+
+    let metrics = cloudMetrics(wrapper);
+    const step = metrics.size + margin;
+    const columns = Math.max(1, Math.floor((metrics.width + margin) / step));
+    const rows = Math.max(1, Math.ceil(itemCount / columns));
+    const requiredHeight = (rows * metrics.size) + (Math.max(0, rows - 1) * margin);
+
+    if (metrics.height < requiredHeight) {
+      wrapper.style.height = requiredHeight + 'px';
+      metrics = cloudMetrics(wrapper);
     }
 
-    if (overlap) {
-      const step = metrics.size + margin;
-      outer:
-      for (let gy = 0; gy <= metrics.maxY; gy += step) {
-        for (let gx = 0; gx <= metrics.maxX; gx += step) {
-          const blocked = placed.some((pos) =>
-            Math.abs(pos.x - gx) < metrics.size + margin &&
-            Math.abs(pos.y - gy) < metrics.size + margin
-          );
-          if (!blocked) {
-            x = gx;
-            y = gy;
-            overlap = false;
-            break outer;
-          }
-        }
+    const slots = [];
+    for (let y = 0; y <= metrics.maxY + 0.001; y += step) {
+      for (let x = 0; x <= metrics.maxX + 0.001; x += step) {
+        slots.push({ x, y });
       }
     }
 
-    return { x, y };
+    // La hauteur a été ajustée pour garantir assez de cases. Ce garde protège
+    // néanmoins contre un futur changement CSS incohérent.
+    if (slots.length < itemCount) {
+      const fallback = [];
+      for (let index = 0; index < itemCount; index += 1) {
+        fallback.push({
+          x:(index % columns) * step,
+          y:Math.floor(index / columns) * step
+        });
+      }
+      return fallback;
+    }
+
+    return shuffle(slots).slice(0, itemCount);
+  }
+
+  function cloudHasOverlap(wrapper, margin) {
+    if (!isCloud(wrapper)) return false;
+    const metrics = cloudMetrics(wrapper);
+    const items = Array.from(wrapper.querySelectorAll('.item'));
+    for (let i = 0; i < items.length; i += 1) {
+      const ax = parseFloat(items[i].style.left) || 0;
+      const ay = parseFloat(items[i].style.top) || 0;
+      for (let j = i + 1; j < items.length; j += 1) {
+        const bx = parseFloat(items[j].style.left) || 0;
+        const by = parseFloat(items[j].style.top) || 0;
+        if (
+          Math.abs(ax - bx) < metrics.size + margin &&
+          Math.abs(ay - by) < metrics.size + margin
+        ) return true;
+      }
+    }
+    return false;
   }
 
   function randomizeCloud(wrapper) {
     if (!isCloud(wrapper)) return [];
-    prepareCloud(wrapper);
-    const metrics = cloudMetrics(wrapper);
-    const margin = 6;
-    const placed = [];
+    const items = Array.from(wrapper.querySelectorAll('.item'));
+    const placed = cloudSlots(wrapper, items.length, 6);
 
-    Array.from(wrapper.querySelectorAll('.item')).forEach((item) => {
-      const pos = nonOverlappingPosition(placed, metrics, margin);
-      placed.push(pos);
+    items.forEach((item, index) => {
+      const pos = placed[index];
       item.style.left = pos.x + 'px';
       item.style.top = pos.y + 'px';
     });
@@ -233,7 +259,9 @@
     if (canonical && canonical.selections) {
       applySelections(canonical.selections);
       const hasPositions = applyCloudPositions(canonical.positions);
-      if (!hasPositions) wrappers().filter(isCloud).forEach(randomizeCloud);
+      wrappers().filter(isCloud).forEach((wrapper) => {
+        if (!hasPositions || cloudHasOverlap(wrapper, 6)) randomizeCloud(wrapper);
+      });
       persistState(false);
       return { source:'canonical', restored:true };
     }
