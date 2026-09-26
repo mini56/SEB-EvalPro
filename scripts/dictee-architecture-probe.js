@@ -76,6 +76,8 @@ function compact(value) {
   return String(value || '').replace(/\r\n/g, '\n');
 }
 
+const stableStyleMatch = html.match(/<style\b[^>]*\bid=["']seb-dictee-stable-style["'][^>]*>([\s\S]*?)<\/style>/i);
+if (stableStyleMatch) console.log('DICTEE_STABLE_STYLE=' + JSON.stringify(compact(stableStyleMatch[1])));
 if (core) console.log('DICTEE_CORE_SCRIPT=' + JSON.stringify(compact(core.code)));
 if (stable) console.log('DICTEE_STABLE_RUNTIME=' + JSON.stringify(compact(stable.code)));
 if (fixedUi) console.log('DICTEE_FIXED_UI_RUNTIME=' + JSON.stringify(compact(fixedUi.code)));
