@@ -79,7 +79,7 @@ app.whenReady().then(async () => {
     `, true);
 
     if (initial.inputs !== 20 || initial.total !== 20) throw new Error('Genre/Nombre doit contenir exactement 20 réponses.');
-    if (initial.route !== 'tri_de_cheville.html') throw new Error('Route Genre/Nombre -> Tri incorrecte.');
+    if (initial.route !== 'dictee.html') throw new Error('Route Genre/Nombre -> Dictée incorrecte.');
     if (!initial.checkVisible || initial.nextVisible) throw new Error('État initial des boutons Genre/Nombre incorrect.');
 
     const empty = await win.webContents.executeJavaScript('window.sebGenreNombre.verify()', true);
@@ -209,7 +209,7 @@ app.whenReady().then(async () => {
     if (lockedReload.errors !== '18' || !lockedReload.allDisabled || !lockedReload.nextVisible) {
       throw new Error('État validé Genre/Nombre perdu après rechargement.');
     }
-    if (lockedReload.green !== 2 || lockedReload.red !== 18 || lockedReload.route !== 'tri_de_cheville.html') {
+    if (lockedReload.green !== 2 || lockedReload.red !== 18 || lockedReload.route !== 'dictee.html') {
       throw new Error('Correction/navigation Genre/Nombre perdue après rechargement.');
     }
 
@@ -251,7 +251,7 @@ app.whenReady().then(async () => {
     console.log('GENRENOMBRES_NORMALIZATION=SPACES_APOSTROPHE_OK_ACCENT_STRICT');
     console.log('GENRENOMBRES_PARTIAL=2/20_ERRORS_18');
     console.log('GENRENOMBRES_PERFECT=20/20_ERRORS_0');
-    console.log('GENRENOMBRES_ROUTE=tri_de_cheville.html');
+    console.log('GENRENOMBRES_ROUTE=dictee.html');
     win.destroy();
     app.exit(0);
   } catch (error) {
