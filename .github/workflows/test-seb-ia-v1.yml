@@ -40,6 +40,9 @@ jobs:
       - name: Functional nwtexte smoke
         run: xvfb-run -a npm run test:nwtexte-functional
 
+      - name: Functional nvmail smoke
+        run: xvfb-run -a npm run test:nvmail-functional
+
       - name: Verify integrated SEB-IA output
         shell: bash
         run: |

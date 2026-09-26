@@ -22,6 +22,7 @@ function replaceRequired(state, search, replacement, label) {
 // au nom réel des images du dossier imageqcm.
 {
   const state = readTarget('nvmail.html');
+  const controller = readTarget('js/nvmail-page.js');
   replaceRequired(
     state,
     'imageqcm/scenario.PNG',
@@ -40,7 +41,7 @@ function replaceRequired(state, search, replacement, label) {
     "messageNormalise.includes(prenomNom) || messageNormalise.includes(nomPrenom)",
     'const score_signature = signatureCandidatValide(message, prenomCandidat, nomCandidat) ? 1 : 0'
   ]) {
-    if (!state.html.includes(required)) {
+    if (!controller.html.includes(required)) {
       console.error('SEB EvalPro UI: contrôle signature candidat absent: ' + required);
       process.exit(4);
     }

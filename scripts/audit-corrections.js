@@ -81,10 +81,9 @@ function patchAdminBilan() {
 }
 
 function patchMailResume() {
-  const { file, html } = read('nvmail.html');
+  const { html } = read('nvmail.html');
+  const { html: controller } = read('js/nvmail-page.js');
 
-  // Les adresses visibles dans les consignes doivent être strictement identiques
-  // aux adresses attendues par la correction, y compris la casse affichée.
   for (const expected of [
     'conseil.perso@sauvegarde56.org',
     'stage-pro@sauvegarde56.org'
@@ -96,35 +95,34 @@ function patchMailResume() {
   if (/@(Sauvegarde56\.org)/.test(html)) {
     throw new Error('SEB EvalPro audit: nvmail affiche encore Sauvegarde56.org avec un S majuscule');
   }
+
   for (const forbidden of [
-    "destinataire.toLowerCase() === 'conseil.perso@sauvegarde56.org'",
-    "copie.toLowerCase() === 'stage-pro@sauvegarde56.org'",
-    "to.toLowerCase() === 'conseil.perso@sauvegarde56.org'",
-    "cc.toLowerCase() === 'stage-pro@sauvegarde56.org'"
+    "toLowerCase() === 'conseil.perso@sauvegarde56.org'",
+    "toLowerCase() === 'stage-pro@sauvegarde56.org'",
+    "sessionStorage.removeItem('page8_data')"
   ]) {
-    if (html.includes(forbidden)) {
-      throw new Error('SEB EvalPro audit: la notation nvmail ne doit pas ignorer les majuscules dans les adresses mail');
-    }
-  }
-  for (const required of [
-    "destinataire === 'conseil.perso@sauvegarde56.org'",
-    "copie === 'stage-pro@sauvegarde56.org'",
-    "String(to || '').trim() === 'conseil.perso@sauvegarde56.org'",
-    "String(cc || '').trim() === 'stage-pro@sauvegarde56.org'"
-  ]) {
-    if (!html.includes(required)) {
-      throw new Error('SEB EvalPro audit: notation stricte des adresses nvmail absente : ' + required);
+    if (controller.includes(forbidden)) {
+      throw new Error('SEB EvalPro audit: logique nvmail interdite : ' + forbidden);
     }
   }
 
-  const destructive = /document\.addEventListener\('DOMContentLoaded', function\(\) \{\s*\/\/ NETTOYAGE des données page 8[\s\S]*?document\.getElementById\('fichierSelectionne'\)\.textContent = 'Aucun fichier sélectionné';\s*\}\);/;
-  const out = mustReplace(
-    html,
-    destructive,
-    "// Les champs et page8_data sont conservés pour permettre une reprise exacte après fermeture de l'application.",
-    'suppression nettoyage destructif messagerie'
-  );
-  write(file, out);
+  for (const required of [
+    "String(to || '').trim() === 'conseil.perso@sauvegarde56.org'",
+    "String(cc || '').trim() === 'stage-pro@sauvegarde56.org'",
+    'function signatureCandidatValide',
+    'function objetMailCandidatValide',
+    'function telephoneMailValide',
+    "sessionStorage.setItem(STORAGE_KEY, JSON.stringify(data))",
+    "window.sebParcours.goNext('nvmail')"
+  ]) {
+    if (!controller.includes(required)) {
+      throw new Error('SEB EvalPro audit: contrat nvmail absent : ' + required);
+    }
+  }
+
+  if (!html.includes('js/nvmail-page.js') || /function\s+evaluerFormulaire\s*\(/.test(html)) {
+    throw new Error('SEB EvalPro audit: logique nvmail non externalisée');
+  }
 }
 
 function patchGenreNombreResume() {

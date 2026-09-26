@@ -171,59 +171,27 @@ for (const spec of [
 }
 
 // -----------------------------------------------------------------------------
-// 5. Messagerie : objet exactement de la forme Prénom + Mail-SEB, comparaison
-//    tolérante à la casse/accents/espaces ; téléphone = 10 chiffres commençant
-//    par 0, avec séparateurs usuels optionnels.
+// 5. Messagerie : la source fonctionnelle est désormais js/nvmail-page.js.
+//    Le build vérifie la logique validée mais ne la réécrit plus.
 // -----------------------------------------------------------------------------
 {
-  const { file, text } = read('app/web/nvmail.html');
-  let out = text;
-  if (!out.includes('function objetMailCandidatValide')) {
-    const marker = 'function evaluerFormulaire(event) {';
-    const pos = out.indexOf(marker);
-    if (pos < 0) fail('Messagerie: evaluerFormulaire introuvable', 8);
-    const helpers = [
-      'function objetMailCandidatValide(subject, prenomCandidat) {',
-      '  const objet = normaliserIdentiteMail(subject);',
-      '  const prenom = normaliserIdentiteMail(prenomCandidat);',
-      '  if (!objet || !prenom) return false;',
-      "  return objet === (prenom + ' mail seb').trim();",
-      '}',
-      '',
-      'function telephoneMailValide(message) {',
-      "  const texte = String(message || '');",
-      "  return /(^|[^\\d])0\\d(?:[\\s.,\\/-]?\\d{2}){4}(?!\\d)/.test(texte);",
-      '}',
-      '',
-      ''
-    ].join('\n');
-    out = out.slice(0, pos) + helpers + out.slice(pos);
+  const { text } = read('app/web/js/nvmail-page.js');
+  for (const required of [
+    'function objetMailCandidatValide',
+    "return objet === (prenom + ' mail seb').trim();",
+    'function telephoneMailValide',
+    'function signatureCandidatValide',
+    "String(to || '').trim() === 'conseil.perso@sauvegarde56.org'",
+    "String(cc || '').trim() === 'stage-pro@sauvegarde56.org'",
+    'const score_subject = objetMailCandidatValide(subject, prenomCandidat) ? 1 : 0;',
+    'const score_signature = signatureCandidatValide(message, prenomCandidat, nomCandidat) ? 1 : 0;',
+    'const score_telephone = telephoneMailValide(message) ? 1 : 0;',
+    "sessionStorage.setItem(STORAGE_KEY, JSON.stringify(data));"
+  ]) {
+    if (!text.includes(required)) fail('Messagerie: contrat externalisé absent: ' + required, 8);
   }
-
-  const subjectEvalRegex = /  \/\/ CRITÈRE 3 : Objet \(format : Prénom Mail-SEB\)[\s\S]*?  if \(objetOK\) \{/;
-  if (!subjectEvalRegex.test(out)) fail('Messagerie: bloc objet formulaire introuvable', 8);
-  out = out.replace(subjectEvalRegex,
-    "  // CRITÈRE 3 : Objet (format : Prénom Mail-SEB)\n  const objetOK = objetMailCandidatValide(objet, prenomCandidat);\n\n  if (objetOK) {");
-
-  const phoneEvalRegex = /  \/\/ ============================================\n  \/\/ CRITÈRE 6 : Numéro de téléphone \(10 chiffres\)\n  \/\/ ============================================[\s\S]*?  if \(hasTelephone\) \{/;
-  if (!phoneEvalRegex.test(out)) fail('Messagerie: bloc téléphone formulaire introuvable', 8);
-  out = out.replace(phoneEvalRegex,
-    "  // ============================================\n  // CRITÈRE 6 : Numéro de téléphone (10 chiffres commençant par 0)\n  // ============================================\n  const hasTelephone = telephoneMailValide(message);\n\n  if (hasTelephone) {");
-
-  const subjectSaveRegex = /  \/\/ Validation de l'objet :[\s\S]*?  const score_file =/;
-  if (!subjectSaveRegex.test(out)) fail('Messagerie: bloc objet sauvegarde introuvable', 8);
-  out = out.replace(subjectSaveRegex,
-    "  // Validation de l'objet : Prénom Mail-SEB, casse et accents tolérés.\n  const score_subject = objetMailCandidatValide(subject, prenomCandidat) ? 1 : 0;\n\n  const score_file =");
-
-  const phoneSaveRegex = /  \/\/ Validation du numéro de téléphone \(10 chiffres avec différents séparateurs\)[\s\S]*?  \/\/ CALCUL DU SCORE TOTAL/;
-  if (!phoneSaveRegex.test(out)) fail('Messagerie: bloc téléphone sauvegarde introuvable', 8);
-  out = out.replace(phoneSaveRegex,
-    "  // Validation du numéro de téléphone : 10 chiffres commençant par 0.\n  const score_telephone = telephoneMailValide(message) ? 1 : 0;\n\n  // CALCUL DU SCORE TOTAL");
-
-  if ((out.match(/objetMailCandidatValide\(/g) || []).length < 3) fail('Messagerie: objet non centralisé', 8);
-  if ((out.match(/telephoneMailValide\(/g) || []).length < 3) fail('Messagerie: téléphone non centralisé', 8);
-  if (/const regexPoints = \/\\d\{2\}/.test(out)) fail('Messagerie: ancien contrôle téléphone encore présent', 8);
-  write(file, out);
+  if (/const regexPoints = \/\\d\{2\}/.test(text)) fail('Messagerie: ancien contrôle téléphone réintroduit', 8);
+  if (/sessionStorage\.removeItem\(['"]page8_data['"]\)/.test(text)) fail('Messagerie: effacement de reprise réintroduit', 8);
 }
 
 // -----------------------------------------------------------------------------
