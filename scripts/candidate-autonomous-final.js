@@ -533,6 +533,17 @@ function parseJs(text, label) {
   if (!main.includes('SEB_TEMP_WINDOWS_RECOVERY') || !main.includes('TEMP_ALLOW_WINDOWS_RECOVERY = true')) {
     fail('sortie Windows temporaire de récupération absente', 7);
   }
+  for (const token of [
+    'SEB_WINDOWS_RETURN_KIOSK_GUARD',
+    'forceCandidateWindowLockAfterWindowsReturn',
+    'installCandidateWindowsReturnGuard',
+    "['resume', 'unlock-screen', 'user-did-become-active']",
+    'win.setKiosk(false)',
+    'win.setKiosk(true)',
+    'mainWindow.setSkipTaskbar(true)'
+  ]) {
+    if (!main.includes(token)) fail('réaffirmation kiosk après reprise Windows absente: ' + token, 7);
+  }
   if (nativeKeyguard.includes('if (vk == VK_LWIN || vk == VK_RWIN) return 1;') || !nativeKeyguard.includes('winHeld')) {
     fail('touche Windows temporaire encore bloquée', 7);
   }

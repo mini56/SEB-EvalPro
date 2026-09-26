@@ -2,6 +2,9 @@ name: TEST Windows SEB-IA Full Setup
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - tmp-seb-ia-v1
 
 permissions:
   contents: write
@@ -27,7 +30,7 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
-          if ($version -ne '0.3.8') { throw "Version attendue 0.3.8, trouvée : $version" }
+          if ($version -ne '0.3.9') { throw "Version attendue 0.3.9, trouvée : $version" }
           Write-Host "SEB_VERSION: $version"
 
       - name: Validate SEB-IA
@@ -131,14 +134,14 @@ jobs:
             [System.IO.File]::WriteAllText($path, $text, $utf8Bom)
           }
 
-      - name: Build Windows Setup 0.3.8
+      - name: Build Windows Setup 0.3.9
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           npx electron-builder --win --publish never
           if ($LASTEXITCODE -ne 0) { throw 'Construction Windows échouée.' }
-          $setup = 'dist\SEB-eval-PRO-0.3.8-Windows-Setup.exe'
-          if (-not (Test-Path $setup)) { throw "Setup 0.3.8 absent : $setup" }
+          $setup = 'dist\SEB-eval-PRO-0.3.9-Windows-Setup.exe'
+          if (-not (Test-Path $setup)) { throw "Setup 0.3.9 absent : $setup" }
           if (Test-Path 'dist\win-unpacked\resources\ai') {
             throw 'Un ancien Pack IA externe est encore embarqué.'
           }
@@ -147,7 +150,7 @@ jobs:
           }
           Write-Host "SETUP_038: $((Resolve-Path $setup).Path)"
 
-      - name: Build standalone Windows uninstaller 0.3.8
+      - name: Build standalone Windows uninstaller 0.3.9
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -159,9 +162,9 @@ jobs:
           }
           if (-not $makensis) { throw 'makensis.exe introuvable.' }
           $makensisPath = if ($makensis.Source) { $makensis.Source } else { $makensis.FullName }
-          & $makensisPath '/DAPP_VERSION=0.3.8' 'build\standalone-uninstaller.nsi'
+          & $makensisPath '/DAPP_VERSION=0.3.9' 'build\standalone-uninstaller.nsi'
           if ($LASTEXITCODE -ne 0) { throw "Compilation désinstallateur échouée : $LASTEXITCODE" }
-          $uninstaller = 'dist\SEB-eval-PRO-0.3.8-Windows-Desinstallation.exe'
+          $uninstaller = 'dist\SEB-eval-PRO-0.3.9-Windows-Desinstallation.exe'
           if (-not (Test-Path $uninstaller)) { throw "Désinstallateur absent : $uninstaller" }
           Write-Host 'STANDALONE_UNINSTALLER_038: OK'
 
@@ -169,8 +172,8 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $setup = (Resolve-Path 'dist\SEB-eval-PRO-0.3.8-Windows-Setup.exe').Path
-          $uninstaller = (Resolve-Path 'dist\SEB-eval-PRO-0.3.8-Windows-Desinstallation.exe').Path
+          $setup = (Resolve-Path 'dist\SEB-eval-PRO-0.3.9-Windows-Setup.exe').Path
+          $uninstaller = (Resolve-Path 'dist\SEB-eval-PRO-0.3.9-Windows-Desinstallation.exe').Path
 
           $installer = Get-Content 'build\installer.nsh' -Raw
           foreach ($required in @('Version Candidat','Version Administrateur','SEB-IA est intégrée','edition-candidate.flag','edition-admin.flag')) {
@@ -191,8 +194,8 @@ jobs:
           $ErrorActionPreference = 'Stop'
           Add-Type -AssemblyName System.Drawing
 
-          $setup = (Resolve-Path 'dist\SEB-eval-PRO-0.3.8-Windows-Setup.exe').Path
-          $uninstaller = (Resolve-Path 'dist\SEB-eval-PRO-0.3.8-Windows-Desinstallation.exe').Path
+          $setup = (Resolve-Path 'dist\SEB-eval-PRO-0.3.9-Windows-Setup.exe').Path
+          $uninstaller = (Resolve-Path 'dist\SEB-eval-PRO-0.3.9-Windows-Desinstallation.exe').Path
           $installDir = 'C:\SEBEvalPro-038-CI'
           $documents = [Environment]::GetFolderPath('MyDocuments')
           $sebDocuments = Join-Path $documents 'SEB EvalPro'
@@ -222,7 +225,7 @@ jobs:
             throw "La clé locale ancienne n'a pas été préservée hors de Documents."
           }
           if (Test-Path (Join-Path $sebDocuments 'System')) {
-            throw "L'installeur 0.3.8 ne doit plus créer Documents\SEB EvalPro\System."
+            throw "L'installeur 0.3.9 ne doit plus créer Documents\SEB EvalPro\System."
           }
           Write-Host 'PREUPDATE_RECOVERY_OUTSIDE_DOCUMENTS: OK'
 
@@ -240,7 +243,7 @@ jobs:
           }
 
           $productVersion = (Get-Item $exe).VersionInfo.ProductVersion
-          if (-not $productVersion -or -not $productVersion.StartsWith('0.3.8')) {
+          if (-not $productVersion -or -not $productVersion.StartsWith('0.3.9')) {
             throw "Version de l'exécutable incorrecte : $productVersion"
           }
           Write-Host "INSTALLED_VERSION=$productVersion"
@@ -304,8 +307,8 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $setup = (Resolve-Path 'dist\SEB-eval-PRO-0.3.8-Windows-Setup.exe').Path
-          $uninstaller = (Resolve-Path 'dist\SEB-eval-PRO-0.3.8-Windows-Desinstallation.exe').Path
+          $setup = (Resolve-Path 'dist\SEB-eval-PRO-0.3.9-Windows-Setup.exe').Path
+          $uninstaller = (Resolve-Path 'dist\SEB-eval-PRO-0.3.9-Windows-Desinstallation.exe').Path
           $documents = [Environment]::GetFolderPath('MyDocuments')
           $sebDocuments = Join-Path $documents 'SEB EvalPro'
           $upgradeRecovery = Join-Path $env:LOCALAPPDATA 'SEB EvalPro Recovery'
@@ -394,7 +397,7 @@ jobs:
             (Join-Path $env:APPDATA 'SEB-eval-PRO\storage')
           ) | Select-Object -Unique
           $storage = $storageCandidates | Where-Object { Test-Path (Join-Path $_ 'Candidats\CAND-LEGACY-CI\manifest.json') } | Select-Object -First 1
-          if (-not $storage) { throw 'Stockage interne 0.3.8 introuvable après migration.' }
+          if (-not $storage) { throw 'Stockage interne 0.3.9 introuvable après migration.' }
 
           foreach ($dir in @('Candidats','System','parcours','Admin','Corbeille','Bilans')) {
             if (-not (Test-Path (Join-Path $storage $dir))) { throw "Dossier interne migré absent : $dir" }
@@ -424,15 +427,15 @@ jobs:
           if (-not (Test-Path (Join-Path $sebDocuments 'Evaluation_CI.docx'))) { throw 'Le Word exporté a été supprimé par la désinstallation.' }
           Write-Host 'INTERNAL_DATA_PRESERVED_AFTER_UNINSTALL: OK'
 
-      - name: Upload Windows 0.3.8 artifact
+      - name: Upload Windows 0.3.9 artifact
         uses: actions/upload-artifact@v4
         with:
-          name: SEB-EvalPro-0.3.8-Windows-Setup
-          path: dist/SEB-eval-PRO-0.3.8-Windows-Setup.exe
+          name: SEB-EvalPro-0.3.9-Windows-Setup
+          path: dist/SEB-eval-PRO-0.3.9-Windows-Setup.exe
           if-no-files-found: error
           retention-days: 14
 
-      - name: Publish 0.3.8 test release
+      - name: Publish 0.3.9 test release
         continue-on-error: true
         shell: pwsh
         env:
@@ -440,10 +443,10 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $tag = "seb-evalpro-seb-ia-038-build-${{ github.run_number }}"
-          $setup = 'dist\SEB-eval-PRO-0.3.8-Windows-Setup.exe'
-          $uninstaller = 'dist\SEB-eval-PRO-0.3.8-Windows-Desinstallation.exe'
-          $title = "SEB EvalPro 0.3.8 - SEB-IA - Build #${{ github.run_number }}"
-          $notes = "Setup complet SEB-éval-PRO 0.3.8 avec stockage candidat interne, Documents réservé aux exports Word, migration sécurisée des anciens dossiers, isolation d'une clé ou d'un candidat illisible, SEB-IA intégrée et désinstallateur autonome."
+          $setup = 'dist\SEB-eval-PRO-0.3.9-Windows-Setup.exe'
+          $uninstaller = 'dist\SEB-eval-PRO-0.3.9-Windows-Desinstallation.exe'
+          $title = "SEB EvalPro 0.3.9 - SEB-IA - Build #${{ github.run_number }}"
+          $notes = "Setup complet SEB-éval-PRO 0.3.9 avec stockage candidat interne, Documents réservé aux exports Word, migration sécurisée des anciens dossiers, isolation d'une clé ou d'un candidat illisible, SEB-IA intégrée et désinstallateur autonome."
           gh release create $tag $setup $uninstaller --target "${{ github.sha }}" --title $title --notes $notes --prerelease --repo "${{ github.repository }}"
-          if ($LASTEXITCODE -ne 0) { throw 'Publication Release test 0.3.8 échouée.' }
+          if ($LASTEXITCODE -ne 0) { throw 'Publication Release test 0.3.9 échouée.' }
           Write-Host "RELEASE_TAG=$tag"

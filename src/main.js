@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, screen, dialog, Menu, safeStorage } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, dialog, Menu, safeStorage, powerMonitor } = require('electron');
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
@@ -30,6 +30,7 @@ let adminCandidateResultsMode = false;
 let lastCandidateSaveError = '';
 let allowApplicationExit = false;
 let candidateKeyGuardProcess = null;
+let candidateWindowsReturnGuardInstalled = false;
 // SEB_TEMP_WINDOWS_RECOVERY : temporaire pendant la phase de stabilisation.
 const TEMP_ALLOW_WINDOWS_RECOVERY = true;
 let stateWriteCounter = 0;
@@ -336,6 +337,72 @@ function enforceCandidateWindowLock(focusWindow = false) {
 function reinforceCandidateWindowLock() {
   for (const delay of [0, 120, 350, 800]) {
     setTimeout(() => enforceCandidateWindowLock(delay === 0 || delay === 350), delay);
+  }
+}
+
+// SEB_WINDOWS_RETURN_KIOSK_GUARD
+// Après une veille ou un verrouillage Windows, le Shell peut remettre la barre
+// des tâches au premier plan alors qu'Electron pense encore être en mode kiosk.
+// On force donc une vraie réaffirmation du mode candidat à chaque retour Windows.
+function forceCandidateWindowLockAfterWindowsReturn(reason = 'windows-return') {
+  if (adminSessionUnlocked || allowApplicationExit || !mainWindow || mainWindow.isDestroyed()) return;
+
+  const win = mainWindow;
+  startCandidateKeyGuard();
+
+  try {
+    if (win.isMinimized()) win.restore();
+    if (!win.isVisible()) win.show();
+
+    win.setSkipTaskbar(true);
+    win.setMenuBarVisibility(false);
+    win.setAlwaysOnTop(true);
+
+    // Windows peut conserver un état plein écran logique tout en réaffichant
+    // la barre des tâches. Le basculement kiosk force Windows à recalculer le
+    // z-order et les contraintes plein écran, même si isKiosk() vaut déjà true.
+    if (process.platform === 'win32') {
+      win.setKiosk(false);
+      win.setFullScreen(false);
+      win.setKiosk(true);
+      win.setFullScreen(true);
+    } else {
+      if (!win.isKiosk()) win.setKiosk(true);
+      if (!win.isFullScreen()) win.setFullScreen(true);
+    }
+
+    win.setSkipTaskbar(true);
+    win.setAlwaysOnTop(true);
+    win.show();
+    if (typeof win.moveTop === 'function') win.moveTop();
+    win.focus();
+  } catch (error) {
+    console.warn('SEB EvalPro : réaffirmation kiosk après retour Windows impossible (' + reason + ').', error);
+  }
+
+  // Plusieurs passes couvrent le délai de réinitialisation de l'Explorer Windows
+  // après écran verrouillé / veille, sans supprimer la touche Windows temporaire.
+  for (const delay of [80, 250, 600, 1200, 2200]) {
+    setTimeout(() => {
+      if (adminSessionUnlocked || allowApplicationExit || !mainWindow || mainWindow.isDestroyed()) return;
+      enforceCandidateWindowLock(true);
+      try {
+        mainWindow.setSkipTaskbar(true);
+        mainWindow.setAlwaysOnTop(true);
+        if (typeof mainWindow.moveTop === 'function') mainWindow.moveTop();
+      } catch (_) {}
+    }, delay);
+  }
+}
+
+function installCandidateWindowsReturnGuard() {
+  if (candidateWindowsReturnGuardInstalled) return;
+  candidateWindowsReturnGuardInstalled = true;
+
+  for (const eventName of ['resume', 'unlock-screen', 'user-did-become-active']) {
+    powerMonitor.on(eventName, () => {
+      if (!adminSessionUnlocked) forceCandidateWindowLockAfterWindowsReturn(eventName);
+    });
   }
 }
 
@@ -872,7 +939,10 @@ require('./session-close')({
   setAdminUnlocked: (value) => { adminSessionUnlocked = !!value; }
 });
 
-app.whenReady().then(startApplication);
+app.whenReady().then(() => {
+  installCandidateWindowsReturnGuard();
+  startApplication();
+});
 
 app.on('before-quit', () => {
   allowApplicationExit = true;
