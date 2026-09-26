@@ -95,27 +95,34 @@ function write(file, text) { fs.writeFileSync(file, text, 'utf8'); }
 // être ramenée vers un ancien état intermédiaire.
 {
   let qcm = read(qcmPath);
-  if (qcm.includes('const scoreMax = 7;')) {
-    qcm = qcm.replace('const scoreMax = 7;', 'const scoreMax = 8;');
+  const runtimePath = path.join(root, 'app', 'web', 'js', 'qcm-runtime.js');
+  const externalRuntime = qcm.includes('js/qcm-runtime.js') && fs.existsSync(runtimePath);
+  let logic = externalRuntime ? read(runtimePath) : qcm;
+
+  if (logic.includes('const scoreMax = 7;')) {
+    logic = logic.replace('const scoreMax = 7;', 'const scoreMax = 8;');
   }
-  if (!qcm.includes('const scoreMax = 8;')) fail('résultat Traitement /8 absent');
+  if (!logic.includes('const scoreMax = 8;')) fail('résultat Traitement /8 absent');
 
   // Retirer l'ancien libellé transitoire s'il subsiste afin d'éviter deux lignes
   // d'enregistrement dans la page Résultats.
-  qcm = qcm.replace(/^.*analyse\.score\.enregistrement.*Enregistrement via le menu Fichier.*\n?/m, '');
-  qcm = qcm.replace(/^.*analyse\.score\.enregistrement.*Enregistrement conforme.*\n?/m, '');
+  logic = logic.replace(/^.*analyse\.score\.enregistrement.*Enregistrement via le menu Fichier.*\n?/m, '');
+  logic = logic.replace(/^.*analyse\.score\.enregistrement.*Enregistrement conforme.*\n?/m, '');
 
   const sizeNeedle = "Taille 12px (détecté:";
-  const sizePos = qcm.indexOf(sizeNeedle);
+  const sizePos = logic.indexOf(sizeNeedle);
   if (sizePos < 0) fail('ligne Taille 12 du résultat introuvable');
-  const lineEnd = qcm.indexOf('\n', sizePos);
+  const lineEnd = logic.indexOf('\n', sizePos);
   if (lineEnd < 0) fail('fin ligne Taille 12 introuvable');
-  const saveLine = "    html += '<span class=\"' + (analyse.score.enregistrement ? 'correct' : 'incorrect') + '\">' + (analyse.score.enregistrement ? '✓' : '✗') + ' Enregistrement conforme</span>';\n";
-  qcm = qcm.slice(0, lineEnd + 1) + saveLine + qcm.slice(lineEnd + 1);
+  const saveLine = "    html += '<span class=\"" + (analyse.score.enregistrement ? 'correct' : 'incorrect') + "\">' + (analyse.score.enregistrement ? '✓' : '✗') + ' Enregistrement conforme</span>';\n";
+  logic = logic.slice(0, lineEnd + 1) + saveLine + logic.slice(lineEnd + 1);
 
-  if (qcm.includes("Score obtenu : ' + score + ' / 10")) fail('ancien calcul Traitement /10 encore présent');
-  if (!qcm.includes('const scoreMax = 8;')) fail('résultat Traitement /8 absent');
-  if ((qcm.match(/Enregistrement conforme/g) || []).length !== 1) fail('critère Enregistrement dupliqué ou absent');
+  if (logic.includes("Score obtenu : ' + score + ' / 10")) fail('ancien calcul Traitement /10 encore présent');
+  if (!logic.includes('const scoreMax = 8;')) fail('résultat Traitement /8 absent');
+  if ((logic.match(/Enregistrement conforme/g) || []).length !== 1) fail('critère Enregistrement dupliqué ou absent');
+
+  if (externalRuntime) write(runtimePath, logic);
+  else qcm = logic;
   write(qcmPath, qcm);
 }
 
