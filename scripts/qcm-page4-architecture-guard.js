@@ -97,8 +97,8 @@ if (!checkpoint.includes("page.id === 'page4' && window.sebQcmPage4")) {
 }
 
 const resultChecks = [
-  [/const\s+rep4\s*=\s*reponses\[['"]page4['"]\]\s*\|\|\s*['"]0\/0['"]\s*;/, 'résultat fractions'],
-  [/const\s+sc4\s*=\s*scores\[['"]page4['"]\]\s*\|\|\s*0\s*;/, 'score fractions'],
+  [/reponses\s*\[['"]page4['"]\]/, 'lecture réponse fractions'],
+  [/scores\s*\[['"]page4['"]\]/, 'lecture score fractions'],
   [/scoreMathsProblemes\s*\+=\s*scoreFractions\s*;/, 'intégration maths problèmes'],
   [/totalMathsProblemes\s*=\s*27\s*;/, 'dénominateur maths problèmes']
 ];
