@@ -217,6 +217,7 @@ function patchQcmResume() {
     if (page.id === 'pageTexteTrous' && window.sebQcmTexteTrous) return;
     if (page.id === 'page4' && window.sebQcmPage4) return;
     if (page.id === 'page5' && window.sebQcmPage5) return;
+    if (page.id === 'page5_1' && window.sebQcmPage5_1) return;
     const controls = Array.from(page.querySelectorAll('input, textarea, select'));
     const values = controls.map((el, index) => ({
       index,
@@ -238,6 +239,7 @@ function patchQcmResume() {
     if (page && page.id === 'pageTexteTrous' && window.sebQcmTexteTrous) return;
     if (page && page.id === 'page4' && window.sebQcmPage4) return;
     if (page && page.id === 'page5' && window.sebQcmPage5) return;
+    if (page && page.id === 'page5_1' && window.sebQcmPage5_1) return;
     const draft = readDrafts()[page.id];
     if (!draft) return;
     const controls = Array.from(page.querySelectorAll('input, textarea, select'));
