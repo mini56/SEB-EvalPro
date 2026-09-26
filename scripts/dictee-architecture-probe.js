@@ -60,6 +60,27 @@ for (const token of [
   if (snippet) console.log('DICTEE_SNIPPET[' + token + ']=' + JSON.stringify(snippet));
 }
 
+
+const scriptBlocks = Array.from(html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)).map((match, index) => {
+  const attrs = match[1] || '';
+  const idMatch = attrs.match(/\bid=["']([^"']+)["']/i);
+  const srcMatch = attrs.match(/\bsrc=["']([^"']+)["']/i);
+  return { index, id:idMatch ? idMatch[1] : '', src:srcMatch ? srcMatch[1] : '', code:match[2] || '' };
+});
+const core = scriptBlocks.find((item) => !item.id && !item.src && item.code.includes("const STORAGE_KEY = 'dictee_data'"));
+const stable = scriptBlocks.find((item) => item.id === 'seb-dictee-stable-runtime');
+const fixedUi = scriptBlocks.find((item) => item.id === 'seb-dictee-fixed-audio-ui-112');
+const rightActions = scriptBlocks.find((item) => item.id === 'seb-dictee-right-actions-final');
+
+function compact(value) {
+  return String(value || '').replace(/\r\n/g, '\n');
+}
+
+if (core) console.log('DICTEE_CORE_SCRIPT=' + JSON.stringify(compact(core.code)));
+if (stable) console.log('DICTEE_STABLE_RUNTIME=' + JSON.stringify(compact(stable.code)));
+if (fixedUi) console.log('DICTEE_FIXED_UI_RUNTIME=' + JSON.stringify(compact(fixedUi.code)));
+if (rightActions) console.log('DICTEE_RIGHT_ACTIONS_RUNTIME=' + JSON.stringify(compact(rightActions.code)));
+
 if (!summary.hasDicteeData) fail('clé dictee_data absente');
 if (!summary.hasWav || summary.hasOgg) fail('audio Julie final incorrect');
 if (!summary.hasTotalWords) fail('barème 80 mots absent');
