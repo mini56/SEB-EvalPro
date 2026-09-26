@@ -67,6 +67,9 @@ jobs:
       - name: Functional Planning smoke
         run: xvfb-run -a npm run test:planning-functional
 
+      - name: Functional Genre-Nombre smoke
+        run: xvfb-run -a npm run test:genrenombres-functional
+
       - name: Verify integrated SEB-IA output
         shell: bash
         run: |
