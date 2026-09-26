@@ -77,6 +77,15 @@ const genreCompatPath = path.join(webRoot, 'genrenombres.html');
 const genreCompatMarker = 'seb-dictee-legacy-route-compat';
 let genreCompatInjected = false;
 
+// Compatibilité temporaire du vieux patch Dictée avec le QCM externalisé.
+// Le patch historique sait modifier qcmv1.0.html ; on lui expose donc une copie
+// temporaire de js/qcm-runtime.js dans un <script>, puis on recopie ses
+// modifications dans le vrai runtime et on retire immédiatement cette copie.
+const qcmCompatPath = path.join(webRoot, 'qcmv1.0.html');
+const qcmRuntimePath = path.join(webRoot, 'js', 'qcm-runtime.js');
+const qcmCompatMarker = 'seb-dictee-qcm-runtime-compat';
+let qcmCompatInjected = false;
+
 if (fs.existsSync(genreCompatPath)) {
   let genreCompatHtml = fs.readFileSync(genreCompatPath, 'utf8');
   if (genreCompatHtml.includes('js/genrenombres-page.js') && !genreCompatHtml.includes(genreCompatMarker)) {
@@ -86,6 +95,19 @@ if (fs.existsSync(genreCompatPath)) {
       : genreCompatHtml + compatScript;
     fs.writeFileSync(genreCompatPath, genreCompatHtml, 'utf8');
     genreCompatInjected = true;
+  }
+}
+
+if (fs.existsSync(qcmCompatPath) && fs.existsSync(qcmRuntimePath)) {
+  let qcmCompatHtml = fs.readFileSync(qcmCompatPath, 'utf8');
+  if (qcmCompatHtml.includes('js/qcm-runtime.js') && !qcmCompatHtml.includes(qcmCompatMarker)) {
+    const runtimeText = fs.readFileSync(qcmRuntimePath, 'utf8').replace(/\r\n/g, '\n');
+    const compatScript = '\n<script id="' + qcmCompatMarker + '">\n' + runtimeText + '\n</script>\n';
+    qcmCompatHtml = /<\/body>/i.test(qcmCompatHtml)
+      ? qcmCompatHtml.replace(/<\/body>/i, compatScript + '</body>')
+      : qcmCompatHtml + compatScript;
+    fs.writeFileSync(qcmCompatPath, qcmCompatHtml, 'utf8');
+    qcmCompatInjected = true;
   }
 }
 
@@ -101,6 +123,19 @@ try {
       '\n'
     );
     fs.writeFileSync(genreCompatPath, genreCompatHtml, 'utf8');
+  }
+
+  if (qcmCompatInjected && fs.existsSync(qcmCompatPath)) {
+    let qcmCompatHtml = fs.readFileSync(qcmCompatPath, 'utf8').replace(/\r\n/g, '\n');
+    const compatRegex = new RegExp(
+      '<script\\s+id=["\\']' + qcmCompatMarker + '["\\'][^>]*>\\n?([\\s\\S]*?)\\n?<\\/script>',
+      'i'
+    );
+    const match = qcmCompatHtml.match(compatRegex);
+    if (!match) fail('runtime QCM temporaire introuvable après patch Dictée');
+    fs.writeFileSync(qcmRuntimePath, match[1], 'utf8');
+    qcmCompatHtml = qcmCompatHtml.replace(compatRegex, '');
+    fs.writeFileSync(qcmCompatPath, qcmCompatHtml, 'utf8');
   }
 }
 
