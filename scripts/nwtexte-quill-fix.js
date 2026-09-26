@@ -69,8 +69,9 @@ if (engine.includes('document.execCommand') || engine.includes('window.enregistr
 if (!page.includes("window.sebParcours.goNext('nwtexte')") || /nvmail\.html/i.test(page)) {
   fail('navigation nwtexte encore couplée directement à nvmail', 8);
 }
-if (!parcours.includes("{ id:'nwtexte', file:'nwtexte.html' }") ||
-    !parcours.includes("{ id:'nvmail', file:'nvmail.html' }")) {
+const nwtexteRoutePos = parcours.indexOf("id:'nwtexte'");
+const nvmailRoutePos = parcours.indexOf("id:'nvmail'");
+if (nwtexteRoutePos < 0 || nvmailRoutePos <= nwtexteRoutePos) {
   fail('registre de parcours nwtexte -> nvmail incomplet', 9);
 }
 
