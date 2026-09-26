@@ -253,167 +253,25 @@ function patchTriLiveChrono() {
 }
 
 function installGenericResume() {
+  // nwtexte est volontairement exclu : Quill possède son propre moteur
+  // transactionnel de sauvegarde/restauration. Deux moteurs concurrents
+  // provoquaient des restaurations de DOM incohérentes.
   const pages = [
     'autoeval1.html', 'autoeval2.html', 'brique.html', 'carre.html', 'genrenombres.html',
-    'nvmail.html', 'nwtexte.html', 'paronymes.html', 'planning.html', 'stock.html', 'tri_de_cheville.html'
+    'nvmail.html', 'paronymes.html', 'planning.html', 'stock.html', 'tri_de_cheville.html'
   ];
-
-  const runtime = `
-<script id="seb-evalpro-page-draft-resume">
-(function(){
-  const page = decodeURIComponent((location.pathname.split('/').pop() || '').toLowerCase());
-  const KEY = 'seb_evalpro_page_draft_' + page;
-  let restoring = false;
-  let timer = null;
-
-  function controls(){ return Array.from(document.querySelectorAll('input,textarea,select')); }
-  function editables(){ return Array.from(document.querySelectorAll('[contenteditable="true"]')); }
-
-  function stockPositions(){
-    if (page !== 'stock.html') return null;
-    return Array.from(document.querySelectorAll('.pot')).map((pot) => {
-      const id = pot.dataset.potId || '';
-      const parent = pot.parentElement;
-      if (!parent) return { id, type: 'source' };
-      if (parent.classList.contains('case')) {
-        const level = parent.closest('[data-etagere][data-niveau]');
-        return {
-          id,
-          type: 'case',
-          etagere: level?.dataset.etagere || '',
-          niveau: level?.dataset.niveau || '',
-          caseNum: parent.dataset.case || ''
-        };
-      }
-      if (parent.id === 'zone-tri') return { id, type: 'tri' };
-      return { id, type: 'source' };
-    });
-  }
-
-  function saveDraft(){
-    if (restoring) return;
-    try {
-      const state = {
-        controls: controls().map((el, index) => ({
-          index,
-          id: el.id || '',
-          type: (el.type || el.tagName || '').toLowerCase(),
-          value: (el.type === 'password' || el.type === 'file') ? '' : el.value,
-          checked: !!el.checked,
-          disabled: !!el.disabled
-        })),
-        editables: editables().map((el, index) => ({ index, id: el.id || '', html: el.innerHTML })),
-        selectedCells: Array.from(document.querySelectorAll('td')).map((td, index) => td.classList.contains('selected') ? index : -1).filter((x) => x >= 0),
-        ui: {},
-        stock: stockPositions(),
-        stockValidated: page === 'stock.html' && sessionStorage.getItem('stockCorrect') !== null
-      };
-      ['consigne','autoEvalPart','btnValider','btnSuivant','validBtn','autoEvalBtn','startBtn','stopBtn','resetBtn','resMS','resErr','indicator','fichierSelectionne','resultatScore','autoEvalResult'].forEach((id) => {
-        const el = document.getElementById(id);
-        if (!el) return;
-        state.ui[id] = {
-          text: (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement) ? null : el.textContent,
-          className: el.className || '',
-          style: el.getAttribute('style') || '',
-          disabled: 'disabled' in el ? !!el.disabled : null
-        };
-      });
-      sessionStorage.setItem(KEY, JSON.stringify(state));
-      if (window.sebEvalPro?.save) window.sebEvalPro.save();
-    } catch (_) {}
-  }
-
-  function restoreStock(items){
-    if (page !== 'stock.html' || !Array.isArray(items)) return;
-    setTimeout(() => {
-      document.querySelectorAll('.case').forEach((c) => c.classList.remove('occupied'));
-      items.forEach((saved) => {
-        const pot = document.querySelector('.pot[data-pot-id="' + saved.id + '"]');
-        if (!pot) return;
-        let target = null;
-        if (saved.type === 'case') {
-          target = document.querySelector('[data-etagere="' + saved.etagere + '"][data-niveau="' + saved.niveau + '"] .case[data-case="' + saved.caseNum + '"]');
-        } else if (saved.type === 'tri') {
-          target = document.getElementById('zone-tri');
-        } else {
-          target = document.getElementById('pots-source');
-        }
-        if (target) {
-          target.appendChild(pot);
-          if (target.classList?.contains('case')) target.classList.add('occupied');
-        }
-      });
-    }, 180);
-  }
-
-  function restoreDraft(){
-    let state = null;
-    try { state = JSON.parse(sessionStorage.getItem(KEY) || 'null'); } catch (_) {}
-    if (!state) return;
-    restoring = true;
-    try {
-      const list = controls();
-      (state.controls || []).forEach((saved) => {
-        let el = saved.id ? document.getElementById(saved.id) : null;
-        if (!el) el = list[saved.index];
-        if (!el || el.type === 'password' || el.type === 'file') return;
-        if (el.type === 'checkbox' || el.type === 'radio') el.checked = !!saved.checked;
-        else if (saved.value !== undefined) el.value = saved.value;
-        if (saved.disabled !== undefined) el.disabled = !!saved.disabled;
-      });
-      const eds = editables();
-      (state.editables || []).forEach((saved) => {
-        let el = saved.id ? document.getElementById(saved.id) : null;
-        if (!el) el = eds[saved.index];
-        if (el && typeof saved.html === 'string') el.innerHTML = saved.html;
-      });
-      const tds = Array.from(document.querySelectorAll('td'));
-      (state.selectedCells || []).forEach((index) => { if (tds[index]) tds[index].classList.add('selected'); });
-      Object.entries(state.ui || {}).forEach(([id, saved]) => {
-        const el = document.getElementById(id);
-        if (!el) return;
-        if (typeof saved.className === 'string') el.className = saved.className;
-        if (typeof saved.style === 'string') {
-          if (saved.style) el.setAttribute('style', saved.style); else el.removeAttribute('style');
-        }
-        if (saved.text !== null && saved.text !== undefined && !(el instanceof HTMLInputElement) && !(el instanceof HTMLTextAreaElement) && !(el instanceof HTMLSelectElement)) el.textContent = saved.text;
-        if (saved.disabled !== null && saved.disabled !== undefined && 'disabled' in el) el.disabled = !!saved.disabled;
-      });
-      restoreStock(state.stock);
-      if (page === 'stock.html' && state.stockValidated) {
-        const btn = document.querySelector('.verify-btn');
-        if (btn) {
-          btn.innerHTML = '➡️ Suivant';
-          btn.onclick = () => { window.location.href = 'planning.html'; };
-        }
-      }
-    } finally {
-      restoring = false;
-    }
-  }
-
-  function schedule(){
-    clearTimeout(timer);
-    timer = setTimeout(saveDraft, 80);
-  }
-
-  document.addEventListener('DOMContentLoaded', function(){
-    restoreDraft();
-    document.addEventListener('input', schedule, true);
-    document.addEventListener('change', schedule, true);
-    document.addEventListener('click', schedule, true);
-    document.addEventListener('drop', () => setTimeout(schedule, 30), true);
-    document.addEventListener('dragend', () => setTimeout(schedule, 30), true);
-    setInterval(saveDraft, 1000);
-  });
-})();
-</script>`;
+  const runtimeRef = '<script src="js/seb-page-draft-resume.js" id="seb-evalpro-page-draft-resume"></script>';
 
   pages.forEach((name) => {
     const { file, html } = read(name);
     if (html.includes('seb-evalpro-page-draft-resume')) return;
-    write(file, injectBeforeBodyEnd(html, runtime));
+    write(file, injectBeforeBodyEnd(html, runtimeRef));
   });
+
+  const nwtexte = read('nwtexte.html').html;
+  if (nwtexte.includes('seb-evalpro-page-draft-resume')) {
+    throw new Error('SEB EvalPro audit: reprise générique interdite dans nwtexte');
+  }
 }
 
 patchQcm();
