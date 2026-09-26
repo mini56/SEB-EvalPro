@@ -815,12 +815,12 @@ pre {
 <button onclick="window.openCalculator()">Ouvrir la calculatrice</button>
 
     <div class="tablecenter" style="margin-top:10px;">
-      <button onclick="saveTableAnswers('2_1'); nextPage(3);"class="passez">Passez</button>	
-      <button onclick="saveTableAnswers('2_1'); nextPage(3);"class="suivant">Suivant</button>
+      <button id="page2_1Pass" type="button" class="passez">Passez</button>	
+      <button id="page2_1Next" type="button" class="suivant">Suivant</button>
 
     </div>
   </div>
-  <!-- FIN PAGE 2_1 -->
+  <script src="js/qcm-page2-1.js"></script>\n  <!-- FIN PAGE 2_1 -->
 
   <!-- PAGE 3 -->
   <div id="page3" class="page">
@@ -1423,7 +1423,6 @@ let reponses = {};
 let scores   = {};
 
 /* === Bonnes réponses / ensembles === */
-const bonnesReponsesPage2_1 = { 6:'10', 7:'75', 8:'12', 9:'24', 10:'165' };
 const bonnesReponsesPage3   = {
   1:"9h15", 2:'8h50', 3:'9h05', 4:'9h20', 5:'8h45', 6:'5h15',
   7:'9h45', 8:'9h15', 9:'9h30', 10:'9h55', 11:'9h25', 12:'2h35',
@@ -1538,8 +1537,7 @@ const bonnesReponsesPage6   = { 1:'2300', 2:'7500', 3: '2.5', 4:'8400', 5:'3200'
 document.addEventListener('DOMContentLoaded', function() {
   // Liste des IDs des inputs qui doivent accepter SEULEMENT des chiffres
   const numericInputIds = [
-    'reponse2_1_6', 'reponse2_1_7', 'reponse2_1_8', 'reponse2_1_9', 'reponse2_1_10',
-	'reponse6_1', 'reponse6_2', 'reponse6_3', 'reponse6_4', 'reponse6_5',
+    'reponse6_1', 'reponse6_2', 'reponse6_3', 'reponse6_4', 'reponse6_5',
 	'reponse6_6', 'reponse6_7', 'reponse6_8', 'reponse6_9', 'reponse6_10'
 	
 	
@@ -1784,16 +1782,7 @@ function saveTableAnswers(pageNum)  {
   // --- Cas standard pour les autres pages ---
   let bonnes, start = 0, end = -1;
   
-  if (pageNum === '2_1') {
-
-    bonnes = bonnesReponsesPage2_1; start = 6;  end = 10;
-    // ✅ AJOUT: Sauvegarde des unités pour page 2_1
-    for (let i = start; i <= end; i++) {
-      const uniteVal = (document.getElementById(`unite2_1_${i}`)?.value.trim()) || '';
-      reponses[`page2_1_unite${i}`] = uniteVal;
-      scores[`page2_1_unite${i}`] = 0; // commentaire non noté
-    }
-  } else if (pageNum == 3) {
+  if (pageNum == 3) {
     bonnes = bonnesReponsesPage3;   start = 1;  end = 14;
   } else if (pageNum == 5) {
     bonnes = bonnesReponsesPage5;   start = 1;  end = 8;
@@ -1831,9 +1820,9 @@ function saveTableAnswers(pageNum)  {
     return;
   }
 
-  // Pour pages 2_1, 3, 5
+  // Pour pages 3 et 5
   for (let i = start; i <= end; i++) {
-    const inputId = (pageNum === '2_1') ? `reponse2_1_${i}` : `reponse${pageNum}_${i}`;
+    const inputId = `reponse${pageNum}_${i}`;
     const inputEl = document.getElementById(inputId);
     const val = inputEl ? (inputEl.value.trim() || '') : '';
     reponses[`page${pageNum}_q${i}`] = val;
