@@ -19,7 +19,7 @@
     'brique.html': 'stock.html',
     'stock.html': 'planning.html',
     'planning.html': 'genrenombres.html',
-    'genrenombres.html': 'tri_de_cheville.html',
+    'genrenombres.html': 'dictee.html',
     'dictee.html': 'tri_de_cheville.html',
     'tri_de_cheville.html': 'nwtexte.html',
     'nwtexte.html': 'nvmail.html',
