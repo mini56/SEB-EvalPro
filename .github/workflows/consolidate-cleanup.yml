@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   consolidate:
-    if: \${{ !contains(github.event.head_commit.message, '[consolidated]') }}
+    if: ${{ !contains(github.event.head_commit.message, '[consolidated]') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -36,7 +36,7 @@ jobs:
 
       - name: Consolidate validated generated output into sources
         env:
-          GREEN_REF_DIR: \${{ github.workspace }}/_green
+          GREEN_REF_DIR: ${{ github.workspace }}/_green
         run: python scripts/consolidate-green-reference.py
 
       - name: Verify clean preparation and JavaScript syntax
