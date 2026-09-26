@@ -37,6 +37,9 @@ jobs:
       - name: Generate web application
         run: npm run prepare:web
 
+      - name: Probe Dictée architecture
+        run: node scripts/dictee-architecture-probe.js
+
       - name: Functional nwtexte smoke
         run: xvfb-run -a npm run test:nwtexte-functional
 
