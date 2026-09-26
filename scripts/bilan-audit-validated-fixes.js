@@ -114,7 +114,7 @@ function write(file, text) { fs.writeFileSync(file, text, 'utf8'); }
   if (sizePos < 0) fail('ligne Taille 12 du résultat introuvable');
   const lineEnd = logic.indexOf('\n', sizePos);
   if (lineEnd < 0) fail('fin ligne Taille 12 introuvable');
-  const saveLine = "    html += '<span class=\"" + (analyse.score.enregistrement ? 'correct' : 'incorrect') + "\">' + (analyse.score.enregistrement ? '✓' : '✗') + ' Enregistrement conforme</span>';\n";
+  const saveLine = "    html += '<span class=\\\"' + (analyse.score.enregistrement ? 'correct' : 'incorrect') + '\\\">' + (analyse.score.enregistrement ? '✓' : '✗') + ' Enregistrement conforme</span>';\\n";
   logic = logic.slice(0, lineEnd + 1) + saveLine + logic.slice(lineEnd + 1);
 
   if (logic.includes("Score obtenu : ' + score + ' / 10")) fail('ancien calcul Traitement /10 encore présent');
