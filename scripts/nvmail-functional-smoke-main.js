@@ -28,8 +28,8 @@ async function runScenario(win) {
       const assert=(value,message)=>{if(!value)throw new Error(message);};
       sessionStorage.clear();
       sessionStorage.setItem('candidat_data', JSON.stringify({
-        nom:'DUPONT',
-        prénom:'Élodie',
+        nom:'XX',
+        prénom:'YY',
         lieu:'Lorient',
         groupe:'7',
         date:'2026-09-26'
@@ -41,8 +41,8 @@ async function runScenario(win) {
       const message=document.getElementById('message');
       to.value='conseil.perso@sauvegarde56.org';
       cc.value='stage-pro@sauvegarde56.org';
-      subject.value='Élodie Mail-SEB';
-      message.value='Bonjour, voici mon rapport. Cordialement, ÉLODIE DUPONT 01.02.34.56.78';
+      subject.value='YY Mail-SEB';
+      message.value='Bonjour, voici mon rapport. Cordialement, YY XX 01.02.34.56.78';
 
       document.getElementById('nvmail-file-picker').click();
       assert(document.getElementById('modalFichier').style.display==='block','Fenêtre de pièce jointe non ouverte.');
@@ -61,7 +61,7 @@ async function runScenario(win) {
       const wrongCase=window.sebNvmail.saveEmailAnswers(
         'Conseil.perso@sauvegarde56.org',
         'stage-pro@sauvegarde56.org',
-        'Élodie Mail-SEB',
+        'YY Mail-SEB',
         message.value,
         'Rapport_stage.docx'
       );
@@ -70,7 +70,7 @@ async function runScenario(win) {
       const wrongSubject=window.sebNvmail.saveEmailAnswers(
         'conseil.perso@sauvegarde56.org',
         'stage-pro@sauvegarde56.org',
-        'Mail-SEB Élodie',
+        'Mail-SEB YY',
         message.value,
         'Rapport_stage.docx'
       );
@@ -79,7 +79,7 @@ async function runScenario(win) {
       const finalData=window.sebNvmail.saveEmailAnswers(
         'conseil.perso@sauvegarde56.org',
         'stage-pro@sauvegarde56.org',
-        'élodie mail-seb',
+        'yy mail-seb',
         message.value,
         'Rapport_stage.docx'
       );
@@ -106,9 +106,9 @@ async function verifyReload(win) {
       };
       if(!data||data.score_total!==6)throw new Error('page8_data perdu après rechargement.');
       if(fields.to!=='conseil.perso@sauvegarde56.org'||fields.cc!=='stage-pro@sauvegarde56.org')throw new Error('Adresses non restaurées.');
-      if(fields.subject!=='élodie mail-seb')throw new Error('Objet non restauré.');
+      if(fields.subject!=='yy mail-seb')throw new Error('Objet non restauré.');
       if(fields.file!=='Rapport_stage.docx')throw new Error('Pièce jointe non restaurée.');
-      if(!fields.message.includes('ÉLODIE DUPONT'))throw new Error('Message non restauré.');
+      if(!fields.message.includes('YY XX'))throw new Error('Message non restauré.');
       return {score:data.score_total,route:window.sebParcours.nextFile('nvmail')};
     })()
   `, true);
