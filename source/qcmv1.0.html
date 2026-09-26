@@ -1012,11 +1012,13 @@ pre {
 	  <p> <input class="step"  type="text" maxlength="1" style="width:30px;" id="reponse5_8">   Vérifier que tout le matériel est intact et fonctionnel.</p>
 	  </table>
 	  <div class="tablecenter">
-	    <button onclick="saveTableAnswers(5); nextPage('5_1');"class="passez">Passez</button>
-		<button onclick="saveTableAnswers(5); nextPage('5_1');"class="suivant">Suivant</button>
+	    <button id="page5Pass" type="button" class="passez">Passez</button>
+		<button id="page5Next" type="button" class="suivant">Suivant</button>
 	  </div>
   </div>
   
+<script src="js/qcm-page5.js"></script>
+
 <!--- Page 5--->
   <div id="page5_1" class="page">
 <br>
@@ -1428,7 +1430,6 @@ let scores   = {};
 
 /* === Bonnes réponses / ensembles === */
 
-const bonnesReponsesPage5   = { 1:'2', 2:'5', 3:'3', 4:'1', 5:'4', 6:'7', 7:'8', 8:'6' };
 const bonnesReponsesPage5_1 = { autorisees: ['2','3','5'] };
 const bonnesReponsesPage6   = { 1:'2300', 2:'7500', 3: '2.5', 4:'8400', 5:'3200' , 6:'450', 7:'750', 8:'5,6', 9:'1250', 10:'4' };
 
@@ -1626,9 +1627,7 @@ function saveTableAnswers(pageNum)  {
   // --- Cas standard pour les autres pages ---
   let bonnes, start = 0, end = -1;
   
-  if (pageNum == 5) {
-    bonnes = bonnesReponsesPage5;   start = 1;  end = 8;
-  } else if (pageNum == 6) {
+  if (pageNum == 6) {
     bonnes = bonnesReponsesPage6; start = 1; end = 10;
     // --- Enregistrer les 10 réponses notées ---
     for (let i = start; i <= end; i++) {
@@ -1662,7 +1661,7 @@ function saveTableAnswers(pageNum)  {
     return;
   }
 
-  // Pour page 5
+  // Ancien traitement standard conservé temporairement pour compatibilité.
   for (let i = start; i <= end; i++) {
     const inputId = `reponse${pageNum}_${i}`;
     const inputEl = document.getElementById(inputId);
