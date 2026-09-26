@@ -16,6 +16,9 @@ let html = fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n');
 const modularPage5 = html.includes('js/qcm-page5.js');
 const modularPage5_1 = html.includes('js/qcm-page5-1.js');
 const modularPage6 = html.includes('js/qcm-page6.js');
+const runtimeFile = path.join(root, 'app', 'web', 'js', 'qcm-runtime.js');
+const externalRuntime = html.includes('js/qcm-runtime.js') && fs.existsSync(runtimeFile);
+let logic = externalRuntime ? fs.readFileSync(runtimeFile, 'utf8').replace(/\r\n/g, '\n') : html;
 let moduleText = '';
 let module51Text = '';
 
@@ -111,25 +114,25 @@ if (!modularPage5 && !html.includes('SEB_PAGE5_ORGANISATION_SNAPSHOT')) {
 // Résultats stagiaire : récupération dédiée Page 5, puis état canonique,
 // puis ancien brouillon si nécessaire.
 const resultRecoveryAnchor = `  // ===============================\n  // Page 8 : récupération des données d'e-mail\n  // ===============================`;
-if (!html.includes('SEB_PAGE5_RESULTS_RECOVERY')) {
-  if (!html.includes(resultRecoveryAnchor)) fail('point récupération résultats introuvable', 8);
+if (!logic.includes('SEB_PAGE5_RESULTS_RECOVERY')) {
+  if (!logic.includes(resultRecoveryAnchor)) fail('point récupération résultats introuvable', 8);
 
   const recovery = modularPage5
     ? `  // SEB_PAGE5_RESULTS_RECOVERY\n  try {\n    let organisation = JSON.parse(sessionStorage.getItem('page5_organisation_data') || 'null');\n\n    if (!organisation || typeof organisation !== 'object') {\n      const state = JSON.parse(sessionStorage.getItem('seb_evalpro_qcm_page5_state') || 'null');\n      if (state && state.values) {\n        organisation = {};\n        for (let i = 1; i <= 8; i++) {\n          const value = String(state.values[i] == null ? '' : state.values[i]).trim();\n          organisation[i] = {\n            reponse:value,\n            score:(window.sebQcmPage5 && value === String(window.sebQcmPage5.answers[i])) ? 1 : 0\n          };\n        }\n      }\n    }\n\n    if (!organisation || typeof organisation !== 'object') {\n      const drafts = JSON.parse(sessionStorage.getItem('seb_evalpro_qcm_drafts') || '{}') || {};\n      const draft = drafts.page5;\n      if (draft && Array.isArray(draft.values)) {\n        organisation = {};\n        for (let i = 1; i <= 8; i++) {\n          const wanted = 'reponse5_' + i;\n          const saved = draft.values.find(v => v && v.id === wanted);\n          if (!saved) continue;\n          const value = String(saved.value == null ? '' : saved.value).trim();\n          organisation[i] = {\n            reponse:value,\n            score:(window.sebQcmPage5 && value === String(window.sebQcmPage5.answers[i])) ? 1 : 0\n          };\n        }\n      }\n    }\n\n    if (organisation && typeof organisation === 'object') {\n      for (let i = 1; i <= 8; i++) {\n        const item = organisation[i] || organisation[String(i)];\n        if (!item) continue;\n        const key = 'page5_q' + i;\n        if (!Object.prototype.hasOwnProperty.call(reponses, key) || String(reponses[key] || '').trim() === '') {\n          reponses[key] = String(item.reponse == null ? '' : item.reponse);\n          scores[key] = Number(item.score || 0);\n        }\n      }\n    }\n  } catch (e) {\n    console.warn('Récupération Page 5 impossible:', e);\n  }\n\n`
     : `  // SEB_PAGE5_RESULTS_RECOVERY\n  try {\n    let organisation = JSON.parse(sessionStorage.getItem('page5_organisation_data') || 'null');\n    if (!organisation || typeof organisation !== 'object') {\n      const drafts = JSON.parse(sessionStorage.getItem('seb_evalpro_qcm_drafts') || '{}') || {};\n      const draft = drafts.page5;\n      if (draft && Array.isArray(draft.values)) {\n        organisation = {};\n        for (let i = 1; i <= 8; i++) {\n          const wanted = 'reponse5_' + i;\n          const saved = draft.values.find(v => v && v.id === wanted);\n          if (!saved) continue;\n          const value = String(saved.value == null ? '' : saved.value).trim();\n          organisation[i] = {\n            reponse:value,\n            score:(value === String(bonnesReponsesPage5[i])) ? 1 : 0\n          };\n        }\n      }\n    }\n    if (organisation && typeof organisation === 'object') {\n      for (let i = 1; i <= 8; i++) {\n        const item = organisation[i] || organisation[String(i)];\n        if (!item) continue;\n        const key = 'page5_q' + i;\n        if (!Object.prototype.hasOwnProperty.call(reponses, key) || String(reponses[key] || '').trim() === '') {\n          reponses[key] = String(item.reponse == null ? '' : item.reponse);\n          scores[key] = Number(item.score || 0);\n        }\n      }\n    }\n  } catch (e) {\n    console.warn('Récupération Page 5 impossible:', e);\n  }\n\n`;
 
-  html = html.replace(resultRecoveryAnchor, recovery + resultRecoveryAnchor);
+  logic = logic.replace(resultRecoveryAnchor, recovery + resultRecoveryAnchor);
 }
 
 const checks = [
-  [(modularPage5 && modularPage5_1 && modularPage6) || html.includes('SEB_PAGE5_RESULTS_PERSISTENCE'), 'fusion persistante pages historiques'],
+  [(modularPage5 && modularPage5_1 && modularPage6) || logic.includes('SEB_PAGE5_RESULTS_PERSISTENCE'), 'fusion persistante pages historiques'],
   [modularPage5_1 ? module51Text.includes("sessionStorage.setItem(RESPONSE_STORAGE, JSON.stringify(storedResponses));") : html.includes('SEB_PAGE51_IMMEDIATE_PERSIST'), 'persistance immédiate Page 5.1'],
-  [html.includes('SEB_PAGE5_RESULTS_RECOVERY'), 'récupération Résultats stagiaire'],
-  [html.includes('afficherLigne("Page 5 — Organisation", "page5", 1, 8);'), 'affichage Page 5 Résultats']
+  [logic.includes('SEB_PAGE5_RESULTS_RECOVERY'), 'récupération Résultats stagiaire'],
+  [logic.includes('afficherLigne("Page 5 — Organisation", "page5", 1, 8);'), 'affichage Page 5 Résultats']
 ];
 if (modularPage5) {
   checks.push([moduleText.includes("sessionStorage.setItem(SNAPSHOT_KEY, JSON.stringify(snapshot));"), 'snapshot Page 5 modulaire']);
-  checks.push([html.includes('seb_evalpro_qcm_page5_state'), 'fallback état canonique Page 5']);
+  checks.push([logic.includes('seb_evalpro_qcm_page5_state'), 'fallback état canonique Page 5']);
 } else {
   checks.push([html.includes(expectedMap), 'barème officiel Page 5']);
   checks.push([html.includes("sessionStorage.setItem('page5_organisation_data'"), 'snapshot Page 5']);
@@ -138,5 +141,7 @@ if (modularPage5) {
 const failed = checks.filter(([ok]) => !ok).map(([, label]) => label);
 if (failed.length) fail('contrôles finaux échoués : ' + failed.join(', '), 9);
 
+if (externalRuntime) fs.writeFileSync(runtimeFile, logic, 'utf8');
+else html = logic;
 fs.writeFileSync(file, html, 'utf8');
 console.log('SEB EvalPro TEST: Page 5 Organisation conservée et récupérée correctement dans Résultats stagiaire.');
