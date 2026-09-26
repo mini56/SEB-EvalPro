@@ -26,24 +26,7 @@ if (tri.includes('imageqcm/chariot.PNG')) {
 }
 fs.writeFileSync(triPath, tri, 'utf8');
 
-const shellPatch = `
-<script id="seb-evalpro-visual-branding">
-(function(){
-  const APP_NAME = ${JSON.stringify(APP_NAME)};
-  function applyBranding(){
-    if (document.title !== APP_NAME) document.title = APP_NAME;
-    document.querySelectorAll('.seb-evalpro-name').forEach((el) => {
-      if (el.textContent !== APP_NAME) el.textContent = APP_NAME;
-    });
-    const alertTitle = document.getElementById('seb-evalpro-alert-title');
-    if (alertTitle && alertTitle.textContent !== APP_NAME) alertTitle.textContent = APP_NAME;
-  }
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', applyBranding);
-  else applyBranding();
-  const observer = new MutationObserver(applyBranding);
-  observer.observe(document.documentElement, { childList: true, subtree: true });
-})();
-</script>`;
+const shellRef = '<script src="js/seb-visual-branding.js" id="seb-evalpro-visual-branding"></script>';
 
 function injectBeforeBodyEnd(html, block) {
   const index = html.toLowerCase().lastIndexOf('</body>');
@@ -57,7 +40,7 @@ for (const entry of fs.readdirSync(webDir, { withFileTypes: true })) {
   const target = path.join(webDir, entry.name);
   let html = fs.readFileSync(target, 'utf8');
   if (html.includes('seb-evalpro-visual-branding')) continue;
-  html = injectBeforeBodyEnd(html, shellPatch);
+  html = injectBeforeBodyEnd(html, shellRef);
   fs.writeFileSync(target, html, 'utf8');
   patched += 1;
 }
