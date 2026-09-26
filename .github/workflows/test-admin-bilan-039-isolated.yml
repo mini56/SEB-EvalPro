@@ -1,7 +1,9 @@
 name: TEST Admin Bilan 0.3.9 Isolated
 
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - tmp-windows-setup-039-final-audit
 
 permissions:
   contents: read

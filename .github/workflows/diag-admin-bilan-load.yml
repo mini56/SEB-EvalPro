@@ -1,9 +1,7 @@
 name: DIAG Admin Bilan Load 0.3.9
 
 on:
-  push:
-    branches:
-      - tmp-windows-setup-039-final-audit
+  workflow_dispatch:
 
 permissions:
   contents: read
