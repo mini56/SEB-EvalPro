@@ -31,12 +31,27 @@ function patchQcm() {
   const { file, html } = read('qcmv1.0.html');
   let out = html;
 
-  out = mustReplace(
-    out,
-    "(bonnes[i] && val.replace(',', '.') === bonnes[i].toString())",
-    "(bonnes[i] && val.replace(',', '.') === bonnes[i].toString().replace(',', '.'))",
-    'conversion page 6 avec virgule ou point'
-  );
+  if (out.includes('js/qcm-page6.js')) {
+    const { html: page6 } = read('js/qcm-page6.js');
+    for (const token of [
+      'function normalizeNumeric(value)',
+      ".replace(',', '.')",
+      'function sameNumeric(left, right)',
+      "3:'2.5'",
+      "8:'5.6'"
+    ]) {
+      if (!page6.includes(token)) {
+        throw new Error('SEB EvalPro audit: contrat numérique Page 6 modulaire absent : ' + token);
+      }
+    }
+  } else {
+    out = mustReplace(
+      out,
+      "(bonnes[i] && val.replace(',', '.') === bonnes[i].toString())",
+      "(bonnes[i] && val.replace(',', '.') === bonnes[i].toString().replace(',', '.'))",
+      'conversion page 6 avec virgule ou point'
+    );
+  }
 
   out = mustReplace(
     out,
