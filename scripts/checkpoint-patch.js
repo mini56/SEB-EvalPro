@@ -88,6 +88,24 @@ function patchTri() {
 
 function patchBrique() {
   const { file, html } = readPage('brique.html');
+
+  if (html.includes('js/brique-page.js')) {
+    const modulePath = path.join(webDir, 'js', 'brique-page.js');
+    if (!fs.existsSync(modulePath)) throw new Error('SEB EvalPro: module brique-page.js introuvable.');
+    const moduleText = fs.readFileSync(modulePath, 'utf8');
+    for (const token of [
+      "const CHECKPOINT_KEY = 'seb_evalpro_brique_checkpoint';",
+      'const PERIOD_SECONDS = 1;',
+      'function persistCheckpoint(force)',
+      'function restoreCheckpoint()',
+      'persistCheckpoint(false);',
+      'persistCheckpoint(true);'
+    ]) {
+      if (!moduleText.includes(token)) throw new Error('SEB EvalPro: contrat checkpoint Brique modulaire absent: ' + token);
+    }
+    return;
+  }
+
   if (html.includes('seb-evalpro-brique-checkpoint')) return;
 
   const patch = `
