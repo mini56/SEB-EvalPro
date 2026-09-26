@@ -208,16 +208,11 @@
       transition: all .2s;
     }
     #calc { background: var(--accent); color: #fff; box-shadow: 0 4px 10px rgba(37,99,235,.25); }
+    #calc:disabled { opacity: .55; cursor: not-allowed; }
     #calc:hover { background: var(--accent-light); }
-    #reset {
-      background: transparent;
-      color: var(--accent);
-      border: 1px solid var(--accent-light);
-    }
-    #reset:hover { background: var(--accent-light); color: #fff; }
 
     .results-container {
-      display: flex;
+      display: none;
       align-items: stretch;
       justify-content: space-between;
       gap: 16px;
@@ -282,12 +277,6 @@
     #startBtn:hover { background: #15803d; }
     #stopBtn { background: var(--orange); color: white; }
     #stopBtn:hover { background: #ea580c; }
-    #resetBtn {
-      background: transparent;
-      color: var(--accent);
-      border: 1px solid var(--accent-light);
-    }
-    #resetBtn:hover { background: var(--accent-light); color: white; }
 
     /* Footer collé en bas de la colonne droite */
     .footer {
@@ -385,9 +374,12 @@ Chacun des employés doit trier de trois à cinq boîtes de chevilles, selon le 
           <h1> <img src="imageqcm/avatar_transparant.png" alt="avatar" width="45" height="45" style="margin-right:8px;"> Consignes:</h1>
           <p><strong>Lisez les indications avant de commencer l’exercice:</strong></p>
           <ul>
-            <li>Remplissez vos temps en minutes, secondes et erreurs dans le tableau de droite pour chaque tri.</li>
-            <li>Appuyez sur <strong>Calculer </strong>pour afficher votre moyenne.</li>
-            <li>Vous pourrez ensuite remplir votre autoévaluation personnelle.</li>
+            <li>Pour chaque boîte de chevilles, cliquez sur <strong>Démarrer le chronomètre</strong> au moment où vous commencez le tri.</li>
+            <li>Lorsque le tri est terminé, cliquez sur <strong>Arrêter le chronomètre</strong>. Le temps est automatiquement reporté dans les cases Minutes et Secondes.</li>
+            <li>Le curseur se place ensuite dans la case <strong>Erreurs</strong> du tri correspondant. Saisissez le nombre d’erreurs, même s’il est égal à <strong>0</strong>.</li>
+            <li>Après la saisie des erreurs, le chronomètre revient à <strong>00:00</strong> et le tri suivant peut commencer.</li>
+            <li>Effectuez entre <strong>3 et 5 tris</strong> selon le temps disponible pour le plateau.</li>
+            <li>À partir de 3 tris complets, cliquez sur <strong>Voir les résultats</strong> pour afficher votre moyenne, le nombre total d’erreurs et compléter votre autoévaluation personnelle.</li>
           </ul>
         
  <div><p><img src="imageqcm/chariot.PNG" alt="img_chariot" width="480" height="370" style=" margin: auto; display: block;"></div></div>
@@ -437,7 +429,7 @@ Chacun des employés doit trier de trois à cinq boîtes de chevilles, selon le 
           <p style="margin-top:10px;">Laissez un commentaire pour préciser votre ressenti :</p>
           <textarea id="autoComment" rows="8" placeholder="Écrivez ici votre remarque libre..."></textarea>
 		  <div class="footer">
-          <button type="button" onclick="saveAutoEval(); saveTriResultsToQCM(); passerEtapeSuivante()">Valider mon autoévaluation</button>
+          <button type="button" id="seb-tri-auto-validate">Valider mon autoévaluation</button>
         </div>
         </form>
         </div> <!-- fin autoEvalPart -->
@@ -453,25 +445,23 @@ Chacun des employés doit trier de trois à cinq boîtes de chevilles, selon le 
             <span id="chrono-min">00</span>:<span id="chrono-sec">00</span>
           </div>
           <div class="chrono-buttons">
-            <button id="startBtn" type="button" onclick="startChrono()">Démarrer</button>
-            <button id="stopBtn" type="button" onclick="stopChrono()">Stop</button>
-            <button id="resetBtn" type="button" onclick="resetChrono()">Remise à zéro</button>
+            <button id="startBtn" type="button">Démarrer le chronomètre</button>
+            <button id="stopBtn" type="button" disabled>Arrêter le chronomètre</button>
           </div>
         </div>
         <div class="content">
           <div class="row" style="font-weight:600; color:var(--muted)">
             <span>Tri n°</span><span>Minutes</span><span>Secondes</span><span>Erreurs</span>
           </div>
-          <div class="row"><span>1</span><input id="m1" type="number"><input id="s1" type="number"><input id="e1" type="number"></div>
-          <div class="row"><span>2</span><input id="m2" type="number"><input id="s2" type="number"><input id="e2" type="number"></div>
-          <div class="row"><span>3</span><input id="m3" type="number"><input id="s3" type="number"><input id="e3" type="number"></div>
-          <div class="row"><span>4</span><input id="m4" type="number"><input id="s4" type="number"><input id="e4" type="number"></div>
-          <div class="row"><span>5</span><input id="m5" type="number"><input id="s5" type="number"><input id="e5" type="number"></div>
+          <div class="row"><span>1</span><input id="m1" type="number" readonly><input id="s1" type="number" readonly><input id="e1" type="number" min="0" step="1"></div>
+          <div class="row"><span>2</span><input id="m2" type="number" readonly><input id="s2" type="number" readonly><input id="e2" type="number" min="0" step="1"></div>
+          <div class="row"><span>3</span><input id="m3" type="number" readonly><input id="s3" type="number" readonly><input id="e3" type="number" min="0" step="1"></div>
+          <div class="row"><span>4</span><input id="m4" type="number" readonly><input id="s4" type="number" readonly><input id="e4" type="number" min="0" step="1"></div>
+          <div class="row"><span>5</span><input id="m5" type="number" readonly><input id="s5" type="number" readonly><input id="e5" type="number" min="0" step="1"></div>
         </div>
 
         <div class="actions">
-          <button id="calc" type="button" onclick="calcMoyenne();">Calculer</button>
-          <button id="reset" type="button" onclick="resetAll()">Remise à zéro</button>
+          <button id="calc" type="button" disabled>Voir les résultats</button>
         </div>
 
         <div class="results-container">
@@ -483,168 +473,12 @@ Chacun des employés doit trier de trois à cinq boîtes de chevilles, selon le 
         </div>
 
         <div class="footer">
-          <button type="button" onclick="saveTriResultsToQCM(; passerEtapeSuivante()">Étape suivante ➜</button>
+          <button type="button" id="seb-tri-next" class="seb-exercise-nav-locked">Étape suivante ➜</button>
         </div>
       </div>
     </div>
   </div>
-<script>
-// Fonction pour effacer les données de cette page à son ouverture
-function clearPageData() {
-  sessionStorage.removeItem("tri_cheville_data");
-  sessionStorage.removeItem("autoEvaltri_resultats");
-  console.log("Données de la page tri_de_cheville effacées au chargement");
-}
-
-// Appel de la fonction au chargement de la page
-window.addEventListener('DOMContentLoaded', clearPageData);
-</script>
-  <!-- Script principal -->
-  <script>
-    
-    // ---------------- CHRONOMÈTRE ----------------
-    let chronoInterval = null;
-    let chronoSeconds = 0;
-
-    function updateChronoDisplay() {
-      const min = String(Math.floor(chronoSeconds / 60)).padStart(2, "0");
-      const sec = String(chronoSeconds % 60).padStart(2, "0");
-      document.getElementById("chrono-min").textContent = min;
-      document.getElementById("chrono-sec").textContent = sec;
-    }
-
-    function startChrono() {
-      if (chronoInterval) return; // évite plusieurs compteurs
-      chronoInterval = setInterval(() => {
-        chronoSeconds++;
-        updateChronoDisplay();
-      }, 1000);
-    }
-
-    function stopChrono() {
-      clearInterval(chronoInterval);
-      chronoInterval = null;
-    }
-
-    function resetChrono() {
-      stopChrono();
-      chronoSeconds = 0;
-      updateChronoDisplay();
-    }
-
-    updateChronoDisplay(); // initialise à 00:00
-
-    // Harmonisation des noms de fonctions
-    function saveAutoEval() {
-      const selections = [];
-      document.querySelectorAll('#autoEvalForm input[type="checkbox"]:checked')
-        .forEach(cb => selections.push(cb.value));
-      const commentaire = document.getElementById('autoComment')?.value.trim() || "";
-      sessionStorage.setItem("autoEvaltri_resultats", JSON.stringify({ selections, commentaire }));
-   //   console.log("✅ Données autoévaluation enregistrées :", selections, commentaire);
-    }
-
-    function passerEtapeSuivante() {
-      //if (confirm("Souhaitez-vous passer à l'étape suivante ?")) {
-        // Enregistre puis redirige
-        saveAutoEval();
-        window.location.href = "nwtexte.html";
-      }
-    
-
-    // Fonctions de calcul (stubs sûrs si pas encore implémentés)
-    function lireEntier(id) {
-      const v = parseInt(document.getElementById(id)?.value || "0", 10);
-      return isNaN(v) ? 0 : v;
-    }
-
-    function calcMoyenne() {
-      // Convertit (m, s) en secondes, calcule moyenne sur lignes renseignées
-      const lignes = [1,2,3,4,5];
-      let totalSec = 0, nb = 0, totalErr = 0;
-      for (const i of lignes) {
-        const m = lireEntier('m'+i);
-        const s = lireEntier('s'+i);
-        const e = lireEntier('e'+i);
-        if (m || s) { totalSec += (m*60 + s); nb++; }
-        totalErr += e;
-      }
-      // ✅ Transition fluide (1s) entre consigne et autoévaluation
-      const consigne = document.getElementById('consigne');
-      const autoEvalPart = document.getElementById('autoEvalPart');
-      if (consigne && autoEvalPart && !autoEvalPart.classList.contains('visible')) {
-        consigne.classList.add('fade-out');
-        setTimeout(() => {
-          consigne.style.display = 'none';
-          autoEvalPart.style.display = 'block';
-          requestAnimationFrame(() => autoEvalPart.classList.add('visible'));
-          autoEvalPart.scrollIntoView({ behavior: 'smooth' });
-        }, 1000);
-      }
-
-      if (nb === 0) {
-
-        document.getElementById('resMS').textContent = "—";
-        document.getElementById('resErr').textContent = totalErr.toString();
-        document.getElementById('indicator').style.display = "none";
-        return;
-      }
-      const moy = Math.round(totalSec / nb);
-      const mm = Math.floor(moy / 60);
-      const ss = moy % 60;
-      const hh = Math.floor(mm / 60);
-      const mm2 = mm % 60;
-
-      const pad = (n) => String(n).padStart(2, '0');
-      document.getElementById('resMS').textContent = pad(mm)+":"+pad(ss);
-      document.getElementById('resErr').textContent = totalErr.toString();
-    }
-
-    function resetAll() {
-      const ids = ['m1','s1','e1','m2','s2','e2','m3','s3','e3','m4','s4','e4','m5','s5','e5'];
-      ids.forEach(id => { const el = document.getElementById(id); if (el) el.value = ""; });
-      document.getElementById('autoEvalForm').reset();
-      document.getElementById('resHMS').textContent = "—";
-      document.getElementById('resMS').textContent = "—";
-      document.getElementById('resErr').textContent = "—";
-      document.getElementById('indicator').style.display = "none";
-    }
-	
-function saveTriResultsToQCM() {
-
-  // Récupération des 5 tris
-  const tris = [];
-  for (let i = 1; i <= 5; i++) {
-    tris.push({
-      minutes: document.getElementById("m" + i).value || "0",
-      secondes: document.getElementById("s" + i).value || "0",
-      erreurs: document.getElementById("e" + i).value || "0"
-    });
-  }
-
-  // Moyenne et total d’erreurs
-  const moyenne = document.getElementById("resMS").textContent;
-  const totalErreurs = document.getElementById("resErr").textContent;
-
-  // Cases cochées
-  const auto = Array.from(document.querySelectorAll("#autoEvalForm input[type='checkbox']"))
-                    .filter(c => c.checked)
-                    .map(c => c.labels[0].innerText);
-
-  // Commentaire libre
-  const commentaire = document.getElementById("autoComment").value;
-
-  // Sauvegarde dans sessionStorage
-  sessionStorage.setItem("tri_cheville_data", JSON.stringify({
-    tris,
-    moyenne,
-    totalErreurs,
-    auto,
-    commentaire
-  }));
-}
-
-
-  </script>
+<script src="js/seb-parcours.js"></script>
+<script src="js/tri-page.js"></script>
 </body>
 </html>

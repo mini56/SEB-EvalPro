@@ -52,6 +52,9 @@ jobs:
       - name: Functional Carré smoke
         run: xvfb-run -a npm run test:carre-functional
 
+      - name: Functional Tri smoke
+        run: xvfb-run -a npm run test:tri-functional
+
       - name: Verify integrated SEB-IA output
         shell: bash
         run: |

@@ -43,15 +43,25 @@ fs.writeFileSync(runtimePath, runtime, 'utf8');
 //    si la dictée n'a pas été terminée (vérifiée ou abandonnée).
 let tri = fs.readFileSync(triPath, 'utf8');
 const triMarker = 'seb-dictee-required-before-tri';
-if (!tri.includes(triMarker)) {
-  const guard = `\n<script id="${triMarker}">\n(function(){\n  'use strict';\n  try {\n    const raw = sessionStorage.getItem('dictee_data');\n    const data = raw ? JSON.parse(raw) : null;\n    const done = data && (data.status === 'verified' || data.status === 'abandoned');\n    if (!done) window.location.replace('dictee.html');\n  } catch (_) {\n    window.location.replace('dictee.html');\n  }\n})();\n</script>\n`;
-  if (!/<\/head>/i.test(tri)) fail('balise </head> absente de tri_de_cheville.html');
-  tri = tri.replace(/<\/head>/i, guard + '</head>');
+if (tri.includes('js/tri-page.js')) {
+  const triModulePath = path.join(web, 'js', 'tri-page.js');
+  if (!fs.existsSync(triModulePath)) fail('module tri-page.js absent');
+  const triModule = fs.readFileSync(triModulePath, 'utf8');
+  if (!triModule.includes('function ensureDicteeCompleted()') ||
+      !triModule.includes("window.location.replace('dictee.html')")) {
+    fail('garde Dictée modulaire avant Tri absent');
+  }
+} else {
+  if (!tri.includes(triMarker)) {
+    const guard = `\n<script id="${triMarker}">\n(function(){\n  'use strict';\n  try {\n    const raw = sessionStorage.getItem('dictee_data');\n    const data = raw ? JSON.parse(raw) : null;\n    const done = data && (data.status === 'verified' || data.status === 'abandoned');\n    if (!done) window.location.replace('dictee.html');\n  } catch (_) {\n    window.location.replace('dictee.html');\n  }\n})();\n</script>\n`;
+    if (!/<\/head>/i.test(tri)) fail('balise </head> absente de tri_de_cheville.html');
+    tri = tri.replace(/<\/head>/i, guard + '</head>');
+  }
+  if (!tri.includes(triMarker) || !tri.includes("window.location.replace('dictee.html')")) {
+    fail('garde Dictée avant Tri absent');
+  }
+  fs.writeFileSync(triPath, tri, 'utf8');
 }
-if (!tri.includes(triMarker) || !tri.includes("window.location.replace('dictee.html')")) {
-  fail('garde Dictée avant Tri absent');
-}
-fs.writeFileSync(triPath, tri, 'utf8');
 
 // 4) nvmail : son CSS global met width:100% sur tous les input, y compris les checkbox
 //    de la fenêtre d'abandon. On isole uniquement cette modale sur cette page.

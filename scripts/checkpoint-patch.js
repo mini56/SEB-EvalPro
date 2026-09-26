@@ -24,6 +24,22 @@ function patchTri() {
   const { file, html } = readPage('tri_de_cheville.html');
   let out = html;
 
+  if (html.includes('js/tri-page.js')) {
+    const modulePath = path.join(webDir, 'js', 'tri-page.js');
+    if (!fs.existsSync(modulePath)) throw new Error('SEB EvalPro: module tri-page.js introuvable.');
+    const moduleText = fs.readFileSync(modulePath, 'utf8');
+    for (const token of [
+      "const LIVE_KEY = 'seb_evalpro_tri_live_chrono';",
+      'function startChrono()',
+      'function stopChrono()',
+      'function finalizeError(index)',
+      "window.sebParcours.goNext('tri-de-cheville')"
+    ]) {
+      if (!moduleText.includes(token)) throw new Error('SEB EvalPro: contrat Tri modulaire absent: ' + token);
+    }
+    return;
+  }
+
   const prematureSaveBlock = /\n\s*for \(let i = 1; i <= 5; i \+= 1\) \{\s*\['m','s','e'\]\.forEach\(\(prefix\) => \{\s*const input = document\.getElementById\(prefix \+ i\);\s*if \(input\) input\.addEventListener\('change', computeAndPersist\);\s*\}\);\s*\}\s*/m;
   if (!prematureSaveBlock.test(out)) {
     throw new Error('SEB EvalPro: bloc de sauvegarde prématurée du tri introuvable.');

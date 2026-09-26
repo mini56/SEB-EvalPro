@@ -163,6 +163,9 @@ function patchGeneratedPages() {
 
   patchFile('tri_de_cheville.html', (html) => {
     let out = html;
+    // Tri modulaire : la logique validée vit désormais dans source/js/tri-page.js.
+    // Ne plus réinjecter l'ancien moteur historique dans la page générée.
+    if (out.includes('js/tri-page.js')) return out;
     out = out.replace(/window\.addEventListener\('DOMContentLoaded',\s*clearPageData\);/g, '// Conservation des données : ne pas effacer à l’ouverture.');
     out = out.replace('<button id="resetBtn" type="button" onclick="resetChrono()">Remise à zéro</button>', '<button id="resetBtn" type="button">Valider le tri</button>');
     out = out.replace(/\s*<button id="reset" type="button" onclick="resetAll\(\)">Remise à zéro<\/button>/, '');

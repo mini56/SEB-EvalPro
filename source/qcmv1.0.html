@@ -2559,13 +2559,20 @@ try {
         // Temps et erreurs
         triHTML += `<h3>Temps et erreurs :</h3>`;
         triHTML += `<p class="ligne">`;
-        triData.tris.forEach((t, i) => {
+        const trisRealises = Array.isArray(triData.tris)
+          ? triData.tris.filter((t) => {
+              const hasTime = String(t?.minutes ?? '').trim() !== '' || String(t?.secondes ?? '').trim() !== '';
+              const hasErrors = String(t?.erreurs ?? '').trim() !== '';
+              return hasTime && hasErrors;
+            })
+          : [];
+        trisRealises.forEach((t, i) => {
             triHTML += `<span>Tri ${i+1} : ${t.minutes} min ${t.secondes} s — erreurs : ${t.erreurs}</span>`;
         });
         triHTML += `</p>`;
 
         // Moyenne + total erreurs
-        triHTML += `<p><strong>Moyenne des 5 tris :</strong> ${triData.moyenne}</p>`;
+        triHTML += `<p><strong>Moyenne des tris réalisés :</strong> ${triData.moyenne}</p>`;
         triHTML += `<p><strong>Total d’erreurs :</strong> ${triData.totalErreurs}</p>`;
 
         // Autoévaluation

@@ -211,6 +211,22 @@ function patchWordScoring() {
 function patchTriLiveChrono() {
   const { file, html } = read('tri_de_cheville.html');
   let out = html;
+
+  if (html.includes('js/tri-page.js')) {
+    const moduleFile = path.join(webDir, 'js', 'tri-page.js');
+    if (!fs.existsSync(moduleFile)) throw new Error('SEB EvalPro audit: module tri-page.js absent');
+    const moduleText = fs.readFileSync(moduleFile, 'utf8');
+    for (const token of [
+      "const LIVE_KEY = 'seb_evalpro_tri_live_chrono';",
+      'persistLiveChrono();',
+      'function restoreTri()',
+      'function startChrono()',
+      'function stopChrono()'
+    ]) {
+      if (!moduleText.includes(token)) throw new Error('SEB EvalPro audit: reprise Tri modulaire absente: ' + token);
+    }
+    return;
+  }
   out = mustReplace(
     out,
     'let triStarted = false;',

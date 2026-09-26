@@ -25,7 +25,14 @@
     Object.freeze({ id:'stock', file:'stock.html' }),
     Object.freeze({ id:'planning', file:'planning.html' }),
     Object.freeze({ id:'genrenombres', file:'genrenombres.html' }),
-    Object.freeze({ id:'tri-de-cheville', file:'tri_de_cheville.html' }),
+    Object.freeze({
+      id:'tri-de-cheville',
+      file:'tri_de_cheville.html',
+      results:Object.freeze({
+        storage:'tri_cheville_data',
+        autoStorage:'autoEvaltri_resultats'
+      })
+    }),
 
     // Contrat historique conservé : Résultats et bilan continuent de lire page7.
     Object.freeze({
