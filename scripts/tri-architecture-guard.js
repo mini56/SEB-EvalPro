@@ -111,7 +111,7 @@ for (const token of [
   'sessionStorage.getItem("tri_cheville_data")',
   'const trisRealises = Array.isArray(triData.tris)',
   'Moyenne des tris réalisés',
-  'sessionStorage.getItem("autoEvaltri_resultats")'
+  'triData.auto.forEach((rep, i) =>'
 ]) {
   if (!qcm.includes(token)) fail('page Résultats ne récupère plus correctement le Tri: ' + token);
 }
