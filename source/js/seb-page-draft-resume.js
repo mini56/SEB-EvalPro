@@ -9,7 +9,7 @@
   function editables(){ return Array.from(document.querySelectorAll('[contenteditable="true"]')); }
 
   function stockPositions(){
-    if (page !== 'stock.html') return null;
+    if (page !== 'stock.html' || window.sebStock) return null;
     return Array.from(document.querySelectorAll('.pot')).map(function(pot){
       const id = pot.dataset.potId || '';
       const parent = pot.parentElement;
@@ -51,7 +51,7 @@
           .filter(function(index){ return index >= 0; }),
         ui:{},
         stock:stockPositions(),
-        stockValidated:page === 'stock.html' && sessionStorage.getItem('stockCorrect') !== null
+        stockValidated:page === 'stock.html' && !window.sebStock && sessionStorage.getItem('stockCorrect') !== null
       };
 
       ['consigne','autoEvalPart','btnValider','btnSuivant','validBtn','autoEvalBtn','startBtn','stopBtn','resetBtn','resMS','resErr','indicator','fichierSelectionne','resultatScore','autoEvalResult'].forEach(function(id){
@@ -71,7 +71,7 @@
   }
 
   function restoreStock(items){
-    if (page !== 'stock.html' || !Array.isArray(items)) return;
+    if (page !== 'stock.html' || window.sebStock || !Array.isArray(items)) return;
     setTimeout(function(){
       document.querySelectorAll('.case').forEach(function(c){ c.classList.remove('occupied'); });
       items.forEach(function(saved){
@@ -138,7 +138,7 @@
       });
 
       restoreStock(state.stock);
-      if (page === 'stock.html' && state.stockValidated) {
+      if (page === 'stock.html' && !window.sebStock && state.stockValidated) {
         const btn = document.querySelector('.verify-btn');
         if (btn) {
           btn.innerHTML = '➡️ Suivant';
