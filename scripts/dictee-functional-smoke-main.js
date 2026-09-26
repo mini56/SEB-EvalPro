@@ -38,9 +38,17 @@ async function waitForDictee(win) {
 
 async function clearState(win) {
   await win.webContents.executeJavaScript(`
-    sessionStorage.removeItem('dictee_data');
-    sessionStorage.removeItem('seb_exercise_activity:dictee.html');
-    true;
+    (function(){
+      sessionStorage.removeItem('dictee_data');
+      sessionStorage.removeItem('seb_exercise_activity:dictee.html');
+      if (window.sebDictee) {
+        window.sebDictee.loadState();
+        const text=document.getElementById('candidateText');
+        if (text) text.value='';
+        window.sebDictee.saveState();
+      }
+      return true;
+    })()
   `, true);
   await win.reload();
   await waitForDictee(win);
