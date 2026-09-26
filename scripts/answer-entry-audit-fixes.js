@@ -105,7 +105,11 @@ function appendBeforeBody(text, block, label) {
   const newFallback = "          scores['page3_q' + i] = (bonnesReponsesPage3[i] && normalizeSebTime(value) === normalizeSebTime(bonnesReponsesPage3[i])) ? 1 : 0;";
   out = replaceRequired(out, oldFallback, newFallback, 'fallback Page 3 tolérant');
 
-  if (!out.includes("pageNum == 2 || pageNum === '2_1'")) fail('Pages 2/2_1 non numériques après patch', 4);
+  if (modularPage2) {
+    if (!out.includes("pageNum === '2_1'")) fail('Page 2_1 non numérique après patch modulaire', 4);
+  } else if (!out.includes("pageNum == 2 || pageNum === '2_1'")) {
+    fail('Pages 2/2_1 non numériques après patch', 4);
+  }
   if (!out.includes('sameSebNumeric(val, bonnes[i])')) fail('Page 6 non numérique après patch', 4);
   if (!out.includes('normalizeSebAnswerText(input.value)')) fail('Texte à trous non normalisé', 4);
   if (!out.includes('normalizeSebTime(value) === normalizeSebTime(bonnesReponsesPage3[i])')) fail('fallback Page 3 non normalisé', 4);
