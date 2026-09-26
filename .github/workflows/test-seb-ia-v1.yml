@@ -58,6 +58,9 @@ jobs:
       - name: Functional autoeval1 smoke
         run: xvfb-run -a npm run test:autoeval1-functional
 
+      - name: Functional Brique smoke
+        run: xvfb-run -a npm run test:brique-functional
+
       - name: Verify integrated SEB-IA output
         shell: bash
         run: |
