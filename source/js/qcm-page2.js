@@ -137,13 +137,6 @@
     return { source:'empty', restored:false };
   }
 
-  function syncLegacyGlobals(responses, scores) {
-    try {
-      if (typeof reponses === 'object' && reponses) Object.assign(reponses, responses);
-      if (typeof scores === 'object' && scores) Object.assign(scores, scores);
-    } catch (_) {}
-  }
-
   function syncStoredMapsIntoLegacyGlobals() {
     const storedResponses = parseObject(sessionStorage.getItem(RESPONSE_STORAGE));
     const storedScores = parseObject(sessionStorage.getItem(SCORE_STORAGE));
