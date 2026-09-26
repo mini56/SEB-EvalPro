@@ -984,11 +984,13 @@ pre {
 </div>
 <br>
 	<div class="tablecenter">
-   <button id="checkBtn" onclick="saveFractionsPage4(); saveAnswer(4,'Mauvaise',0); nextPage(5);"class="passez">Passez</button>	
-   <button id="checkBtn" onclick="saveFractionsPage4(); saveAnswer(4,'Bonne',1); nextPage(5);"class="suivant">Suivant</button>
+   <button id="page4Pass" type="button" class="passez">Passez</button>	
+   <button id="page4Next" type="button" class="suivant">Suivant</button>
    
    </div>
   </div>
+  <script src="js/qcm-page4.js"></script>
+
   <div id="page5" class="page">
   <!--h2>Page 5</h2-->
   <p><img src="imageqcm/scenario.png" alt="scenario.png" width="45" height="45" style="margin-right:8px;"><strong style="color:#1a73e8;">Scénario:</strong></p><p> L'entreprise va ouvrir un deuxième atelier. Vous participez à l'équipe chargée de déménager une partie du stock de pièces 
@@ -1563,162 +1565,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   });
 });
-/* === Sauvegarde score page 4 === */
-
-function saveFractionsPage4(){
-  let score4 = 0;
-  let totalFrac = 0;
-  document.querySelectorAll('.items-wrapper[data-fraction]').forEach(wrapper => {
-    const frac = (wrapper.dataset.fraction || '').trim();
-    const parts = frac.split('/');
-    const num = Number(parts[0]);
-    const den = Number(parts[1]) || 1;
-    const total = wrapper.querySelectorAll('.item').length;
-    const selected = wrapper.querySelectorAll('.item.selected').length;
-    const expected = Math.round((num / den) * total);
-    totalFrac++;
-    if (selected === expected) score4++;
-  });
-  reponses['page4'] = `${score4}/${totalFrac}`;
-  scores['page4']   = score4;
-  // SAUVEGARDE dans sessionStorage
-  try {
-    sessionStorage.setItem('reponses_data', JSON.stringify(reponses));
-    sessionStorage.setItem('scores_data', JSON.stringify(scores));
-  } catch(e) {}
-}
-
-/* === script pour la page 4 : remplacez l'ancien bloc === */
-document.addEventListener('DOMContentLoaded', function(){
-
-  // --- helpers ---
-  function safeNumber(v){ return isNaN(Number(v)) ? 0 : Number(v); }
-
-  // --- toggle/accessibilité pour chaque item ---
-  function attachToggle(item){
-    if(item._toggleAttached) return;
-    const toggle = () => {
-      const selected = item.classList.toggle('selected');
-      item.setAttribute('aria-pressed', selected ? 'true' : 'false');
-    };
-    item.addEventListener('click', toggle);
-    item.addEventListener('keydown', e => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        toggle();
-      }
-    });
-    item._toggleAttached = true;
-  }
-
-  // attache aux items existants
-  document.querySelectorAll('.items-wrapper .item').forEach(attachToggle);
-
-  // --- créer/assurer existence du bouton Vérifier + zone résultat ---
-  let checkBtn = document.getElementById('checkBtn');
-  const page4 = document.getElementById('page4');
-  if(!checkBtn && page4){
-    checkBtn = document.createElement('button');
-    checkBtn.id = 'checkBtn';
-    checkBtn.textContent = 'Vérifier';
-    checkBtn.style.display = 'block';
-    checkBtn.style.margin = '18px auto 6px auto';
-    page4.appendChild(checkBtn);
-  }
-  let resultDiv = document.getElementById('result');
-  if(!resultDiv && page4){
-    resultDiv = document.createElement('div');
-    resultDiv.id = 'result';
-    resultDiv.style.marginTop = '14px';
-    resultDiv.style.textAlign = 'center';
-    resultDiv.style.fontWeight = '600';
-    page4.appendChild(resultDiv);
-  }
-
-  // --- fonction de vérification (générique pour toutes les wrappers) ---
-  function checkFractions(){
-    const messages = [];
-    document.querySelectorAll('.items-wrapper[data-fraction]').forEach(wrapper => {
-      const frac = (wrapper.dataset.fraction || '').trim();
-      const parts = frac.split('/');
-      const num = safeNumber(parts[0]);
-      const den = safeNumber(parts[1]) || 1;
-      const total = wrapper.querySelectorAll('.item').length;
-      const selected = wrapper.querySelectorAll('.item.selected').length;
-      const expected = Math.round((num / den) * total);
-      if (selected === expected) {
-        messages.push(`✔️ ${frac} : ${selected}/${total} correct`);
-      } else {
-        messages.push(`❌ ${frac} : ${selected}/${total} (attendu ${expected})`);
-      }
-    });
-    if(resultDiv){
-      resultDiv.innerHTML = messages.join('<br>');
-      resultDiv.style.color = messages.every(m => m.startsWith('✔️')) ? 'green' : 'red';
-    } else {
-      alert(messages.join('\n'));
-    }
-  }
-
-  if(checkBtn) checkBtn.addEventListener('click', checkFractions);
-
-  // --- placement "nuage" ---
-  function placeCloud(wrapper){
-    if(!wrapper) return;
-    const frac = (wrapper.dataset.fraction || '').trim();
-    const isCloud = wrapper.dataset.cloud === 'true' || ['2/8','3/12'].includes(frac);
-    if(!isCloud) return;
-
-    wrapper.style.position = 'relative';
-    wrapper.style.display = 'block';
-    wrapper.style.width = '100%';
-    wrapper.style.maxWidth = wrapper.style.maxWidth || '900px';
-    if(!wrapper.style.height) wrapper.style.height = '300px';
-    wrapper.style.marginTop = wrapper.style.marginTop || '12px';
-    wrapper.style.border = wrapper.style.border || '1px dashed #bbb';
-
-    const items = Array.from(wrapper.querySelectorAll('.item'));
-    items.forEach(it => { it.style.position = 'absolute'; attachToggle(it); });
-
-    const root = getComputedStyle(document.documentElement);
-    const itemSize = parseInt(root.getPropertyValue('--item-size')) || 80;
-    const margin = 6;
-    const zoneWidth = wrapper.clientWidth || wrapper.offsetWidth || 900;
-    const zoneHeight = wrapper.clientHeight || parseInt(wrapper.style.height) || 300;
-
-    const placed = [];
-    items.forEach(item => {
-      let attempts = 0;
-      let x, y, overlap;
-      do {
-        x = Math.random() * Math.max(0, zoneWidth - itemSize);
-        y = Math.random() * Math.max(0, zoneHeight - itemSize);
-        attempts++;
-        overlap = placed.some(pos =>
-          Math.abs(pos.x - x) < itemSize + margin &&
-          Math.abs(pos.y - y) < itemSize + margin
-        );
-      } while (overlap && attempts < 400);
-      placed.push({ x, y });
-      item.style.left = `${x}px`;
-      item.style.top  = `${y}px`;
-    });
-  }
-
-  document.querySelectorAll('.items-wrapper').forEach(placeCloud);
-
-  let resizeTimer;
-  window.addEventListener('resize', () => {
-    clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(() => {
-      document.querySelectorAll('.items-wrapper').forEach(wrapper => {
-        wrapper.querySelectorAll('.item').forEach(it => { it.style.left = '0px'; it.style.top = '0px'; });
-        placeCloud(wrapper);
-      });
-    }, 120);
-  });
-
-});
+/* === Page 4 Fractions : logique dans js/qcm-page4.js === */
 
 /* === Navigation entre pages === */
 function nextPage(n){
