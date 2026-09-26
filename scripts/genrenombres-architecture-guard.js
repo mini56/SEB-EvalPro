@@ -32,7 +32,7 @@ for (const token of [
   'data-answer="Des portails"',
   'data-answer="Un œil|un oeil"',
   'data-answer="Des Peugeot"',
-  'data-answer="Des chefs-d’œuvre|Des chefs-d\'oeuvre"'.replace('’','’'),
+  `data-answer="Des chefs-d'œuvre|Des chefs-d'oeuvre"`,
   'data-answer="Des faire-part"',
   'data-answer="Public"',
   'data-answer="Heureux"',
