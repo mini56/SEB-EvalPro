@@ -264,7 +264,10 @@ function patchQcmResume() {
 }
 
 function injectBeforeHeadEnd(html, block) {
-  const index = html.toLowerCase().lastIndexOf('</head>');
+  // Le premier </head> est la vraie fermeture du document. lastIndexOf est
+  // interdit ici car certaines pages contiennent littéralement "</head>"
+  // dans du JavaScript de génération Word.
+  const index = html.toLowerCase().indexOf('</head>');
   if (index < 0) return block + '\n' + html;
   return html.slice(0, index) + block + '\n' + html.slice(index);
 }
