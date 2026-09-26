@@ -4,6 +4,7 @@ const path = require('path');
 const root = path.resolve(__dirname, '..');
 const file = path.join(root, 'app', 'web', 'qcmv1.0.html');
 const moduleFile = path.join(root, 'app', 'web', 'js', 'qcm-page5.js');
+const module51File = path.join(root, 'app', 'web', 'js', 'qcm-page5-1.js');
 
 function fail(message, code = 2) {
   console.error('SEB EvalPro Page 5 results: ' + message);
@@ -13,7 +14,9 @@ function fail(message, code = 2) {
 if (!fs.existsSync(file)) fail('qcmv1.0.html généré introuvable');
 let html = fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n');
 const modularPage5 = html.includes('js/qcm-page5.js');
+const modularPage5_1 = html.includes('js/qcm-page5-1.js');
 let moduleText = '';
+let module51Text = '';
 
 const expectedMap = "const bonnesReponsesPage5   = { 1:'2', 2:'5', 3:'3', 4:'1', 5:'4', 6:'7', 7:'8', 8:'6' };";
 
@@ -37,6 +40,23 @@ if (modularPage5) {
   fail('barème Page 5 inattendu : correction refusée', 3);
 }
 
+if (modularPage5_1) {
+  if (!fs.existsSync(module51File)) fail('module qcm-page5-1.js introuvable', 3);
+  module51Text = fs.readFileSync(module51File, 'utf8').replace(/\r\n/g, '\n');
+  for (const token of [
+    "const STATE_KEY = 'seb_evalpro_qcm_page5_1_state';",
+    "const ALLOWED = Object.freeze(['2', '3', '5']);",
+    'const used = new Set();',
+    'const duplicate = allowed && used.has(response);',
+    "storedResponses['page5_1_q' + i] = result.details[i].reponse;",
+    "storedScores['page5_1_q' + i] = result.details[i].correct ? 1 : 0;",
+    "window.sebParcours.goNext('qcm-5_1')"
+  ]) {
+    if (!module51Text.includes(token)) fail('contrat Page 5.1 modulaire absent: ' + token, 3);
+  }
+  if (html.includes("const bonnesReponsesPage5_1")) fail('ancien barème Page 5.1 encore inline malgré modularisation', 3);
+}
+
 // Les pages historiques encore dans saveTableAnswers (Page 5.1 / Page 6)
 // doivent fusionner l'état déjà persisté avant toute nouvelle écriture.
 const saveStart = 'function saveTableAnswers(pageNum)  {\n';
@@ -48,17 +68,20 @@ if (!html.includes('SEB_PAGE5_RESULTS_PERSISTENCE')) {
   );
 }
 
-// Page 5.1 : persistance immédiate avant le return historique.
-const page51Tail = `    for (let k = 1; k <= 3; k++) {\n      const val = user[k];\n      if (!val || !autorisees.includes(val)) {\n        scores[\`page5_1_q\${k}\`] = 0;\n        continue;\n      }\n      if (dejaUtilise.has(val)) {\n        scores[\`page5_1_q\${k}\`] = 0;\n      } else {\n        scores[\`page5_1_q\${k}\`] = 1;\n        dejaUtilise.add(val);\n      }\n    }\n    return;`;
-if (!html.includes('SEB_PAGE51_IMMEDIATE_PERSIST')) {
-  if (!html.includes(page51Tail)) fail('fin sauvegarde Page 5.1 introuvable', 5);
-  html = html.replace(
-    page51Tail,
-    page51Tail.replace(
-      '    return;',
-      `    // SEB_PAGE51_IMMEDIATE_PERSIST\n    try {\n      sessionStorage.setItem('reponses_data', JSON.stringify(reponses));\n      sessionStorage.setItem('scores_data', JSON.stringify(scores));\n    } catch (_) {}\n    return;`
-    )
-  );
+// Page 5.1 historique : persistance immédiate avant le return.
+// Si Page 5.1 est modulaire, cette responsabilité appartient à qcm-page5-1.js.
+if (!modularPage5_1) {
+  const page51Tail = `    for (let k = 1; k <= 3; k++) {\n      const val = user[k];\n      if (!val || !autorisees.includes(val)) {\n        scores[\`page5_1_q\${k}\`] = 0;\n        continue;\n      }\n      if (dejaUtilise.has(val)) {\n        scores[\`page5_1_q\${k}\`] = 0;\n      } else {\n        scores[\`page5_1_q\${k}\`] = 1;\n        dejaUtilise.add(val);\n      }\n    }\n    return;`;
+  if (!html.includes('SEB_PAGE51_IMMEDIATE_PERSIST')) {
+    if (!html.includes(page51Tail)) fail('fin sauvegarde Page 5.1 introuvable', 5);
+    html = html.replace(
+      page51Tail,
+      page51Tail.replace(
+        '    return;',
+        `    // SEB_PAGE51_IMMEDIATE_PERSIST\n    try {\n      sessionStorage.setItem('reponses_data', JSON.stringify(reponses));\n      sessionStorage.setItem('scores_data', JSON.stringify(scores));\n    } catch (_) {}\n    return;`
+      )
+    );
+  }
 }
 
 // Ancienne Page 5 non modulaire : conserver son snapshot historique.
@@ -94,7 +117,7 @@ if (!html.includes('SEB_PAGE5_RESULTS_RECOVERY')) {
 
 const checks = [
   [html.includes('SEB_PAGE5_RESULTS_PERSISTENCE'), 'fusion persistante pages historiques'],
-  [html.includes('SEB_PAGE51_IMMEDIATE_PERSIST'), 'persistance immédiate Page 5.1'],
+  [modularPage5_1 ? module51Text.includes("sessionStorage.setItem(RESPONSE_STORAGE, JSON.stringify(storedResponses));") : html.includes('SEB_PAGE51_IMMEDIATE_PERSIST'), 'persistance immédiate Page 5.1'],
   [html.includes('SEB_PAGE5_RESULTS_RECOVERY'), 'récupération Résultats stagiaire'],
   [html.includes('afficherLigne("Page 5 — Organisation", "page5", 1, 8);'), 'affichage Page 5 Résultats']
 ];
