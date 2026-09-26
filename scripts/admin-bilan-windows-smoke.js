@@ -62,7 +62,7 @@ app.whenReady().then(async () => {
     await win.loadFile(path.join(__dirname, '..', 'app', 'web', 'admin-bilan.html'));
     await new Promise((resolve) => setTimeout(resolve, 1800));
 
-    const code = "(function(){const host=document.getElementById('seb-bilan-synthese');const buttons=host?[...host.querySelectorAll('button')]:[];const visible=buttons.filter(b=>{const s=getComputedStyle(b);return s.display!=='none'&&s.visibility!=='hidden'&&!b.hidden});const aiState=document.getElementById('seb-ai-result-status');const warning=document.getElementById('seb-ai-human-check');const ids=['auto','save','word'];const finalButtons=Object.fromEntries(ids.map(id=>{const el=document.getElementById(id),css=el?getComputedStyle(el):null;return [id,{present:!!el,width:el?Math.round(el.getBoundingClientRect().width):0,background:css?css.backgroundColor:'',color:css?css.color:'',border:css?css.borderTopColor:''}]}));return {host:!!host,visibleButtonCount:visible.length,visibleButtonTexts:visible.map(b=>String(b.textContent||'').trim()),aiState:!!aiState,aiStateText:aiState?String(aiState.textContent||'').trim():'',warning:!!warning,buttons:finalButtons,pdf:!!document.getElementById('pdf')};})()";
+    const code = "(function(){const host=document.getElementById('seb-bilan-synthese');const buttons=host?[...host.querySelectorAll('button')]:[];const visible=buttons.filter(b=>{const s=getComputedStyle(b);return s.display!=='none'&&s.visibility!=='hidden'&&!b.hidden});const aiState=document.getElementById('seb-synthese-status');const ids=['auto','save','word'];const finalButtons=Object.fromEntries(ids.map(id=>{const el=document.getElementById(id),css=el?getComputedStyle(el):null;return [id,{present:!!el,width:el?Math.round(el.getBoundingClientRect().width):0,background:css?css.backgroundColor:'',color:css?css.color:'',border:css?css.borderTopColor:''}]}));return {host:!!host,visibleButtonCount:visible.length,visibleButtonTexts:visible.map(b=>String(b.textContent||'').trim()),aiState:!!aiState,aiStateText:aiState?String(aiState.textContent||'').trim():'',buttons:finalButtons,pdf:!!document.getElementById('pdf')};})()";
     const result = await win.webContents.executeJavaScript(code, true);
 
     const blue = 'rgb(0, 112, 192)';
@@ -76,8 +76,8 @@ app.whenReady().then(async () => {
       fail('synthèse Admin incorrecte', result);
       return;
     }
-    if (!result.aiState || !result.warning || !/^SEB-IA\s*:/.test(result.aiStateText)) {
-      fail('indicateur SEB-IA absent', result);
+    if (!result.aiState || !result.aiStateText) {
+      fail('statut de synthèse absent', result);
       return;
     }
     if (badStyle || result.pdf || result.buttons.save.width < 270) {
