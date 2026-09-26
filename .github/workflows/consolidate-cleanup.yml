@@ -7,24 +7,36 @@ on:
 
 permissions:
   contents: write
-  actions: read
 
 jobs:
   consolidate:
     if: \${{ !contains(github.event.head_commit.message, '[consolidated]') }}
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - name: Checkout
+      - name: Checkout cleanup branch
         uses: actions/checkout@v4
 
-      - name: Download green reference
-        env:
-          GH_TOKEN: \${{ github.token }}
-        run: gh run download 36262542645 -n green-generated-reference -D /tmp/greenref
+      - name: Checkout last fully green reference
+        uses: actions/checkout@v4
+        with:
+          ref: 65f9b163f18e47cfb55dde9c5ceffaf71074ca49
+          path: _green
+
+      - name: Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Build green reference
+        working-directory: _green
+        run: |
+          npm install --no-audit --no-fund
+          npm run prepare:web
 
       - name: Consolidate validated generated output into sources
         env:
-          GREEN_REF_DIR: /tmp/greenref
+          GREEN_REF_DIR: \${{ github.workspace }}/_green
         run: python scripts/consolidate-green-reference.py
 
       - name: Verify clean preparation and JavaScript syntax
