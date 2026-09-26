@@ -43,15 +43,33 @@ const expectedRows = [
 
 for (const row of expectedRows) {
   if (!source.includes(row)) fail('tableau source modifié: ' + row);
-  if (!html.includes(row)) fail('tableau généré modifié: ' + row);
 }
 if (expectedRows.length !== 20) fail('référence tableau différente de 20 lignes');
 
+function rowSignature(row) {
+  const cells = Array.from(row.matchAll(/<td\b([^>]*)>([\s\S]*?)<\/td>/gi)).map((match) => ({
+    text: match[2].replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim(),
+    correct: /data-correct=["']true["']/i.test(match[1])
+  }));
+  return cells;
+}
+
 const sourceRows=(source.match(/<tr>[\s\S]*?<\/tr>/g)||[]).filter((row)=>row.includes('class="paronyme"'));
+const generatedRows=(html.match(/<tr[\s\S]*?<\/tr>/g)||[]).filter((row)=>row.includes('class="paronyme"'));
 if(sourceRows.length!==20) fail('source Paronymes: '+sourceRows.length+' lignes au lieu de 20');
+if(generatedRows.length!==20) fail('Paronymes généré: '+generatedRows.length+' lignes au lieu de 20');
+
 sourceRows.forEach((row,index)=>{
   const count=(row.match(/data-correct="true"/g)||[]).length;
   if(count!==1) fail('source Paronymes ligne '+(index+1)+': '+count+' réponse(s) correcte(s)');
+});
+
+expectedRows.forEach((expectedRow,index)=>{
+  const expected = rowSignature(expectedRow);
+  const actual = rowSignature(generatedRows[index]);
+  if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+    fail('tableau généré modifié ligne '+(index+1)+' : attendu '+JSON.stringify(expected)+' ; obtenu '+JSON.stringify(actual));
+  }
 });
 
 if (!source.includes('<script src="js/seb-parcours.js"></script>') ||
