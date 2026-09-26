@@ -23,7 +23,7 @@ for (const forbidden of [
   if (pkg.includes(forbidden)) fail('script interdit dans prepare:web: ' + forbidden);
 }
 
-const admin = read('app/web/admin-bilan.html') + '\n' + read('app/web/js/admin-bilan-runtime.js') + '\n' + read('app/web/js/admin-bilan-runtime-tail.js');
+const admin = read('app/web/admin-bilan.html') + '\n' + read('app/web/js/admin-bilan-runtime.js') + '\n' + read('app/web/js/admin-bilan-runtime-01.js') + '\n' + read('app/web/js/admin-bilan-runtime-02.js') + '\n' + read('app/web/js/admin-bilan-runtime-03.js') + '\n' + read('app/web/js/admin-bilan-runtime-04.js') + '\n' + read('app/web/js/admin-bilan-runtime-05.js') + '\n' + read('app/web/js/admin-bilan-runtime-06.js') + '\n' + read('app/web/js/admin-bilan-runtime-07.js') + '\n' + read('app/web/js/admin-bilan-runtime-08.js') + '\n' + read('app/web/js/admin-bilan-runtime-tail.js');
 const qcm = read('app/web/qcmv1.0.html') + '\n' + read('app/web/js/qcm-runtime.js') + '\n' + read('app/web/js/qcm-runtime-ui.js') + '\n' + read('app/web/js/qcm-runtime-tail.js');
 const paronymes = read('app/web/paronymes.html');
 const replayMain = read('src/replay-main.js');
