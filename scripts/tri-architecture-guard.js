@@ -20,7 +20,7 @@ const parcours = read('app/web/js/seb-parcours.js');
 const qcm = read('app/web/qcmv1.0.html');
 
 const protectedText = [
-  'Le tri de chevillles',
+  'Le tri de chevilles',
   'Une mauvaise manipulation a provoqué la chute d’une caisse entière de chevilles au chargement du camion',
   'Chacun des employés doit trier de trois à cinq boîtes de chevilles',
   'Autoévaluation personnelle',
