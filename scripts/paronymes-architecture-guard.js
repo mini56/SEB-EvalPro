@@ -29,7 +29,7 @@ const expectedRows = [
   '<tr><td class="paronyme">Monopole</td><td>Jeu</td><td data-correct="true">Exclusivité</td><td>Acropole</td><td>Un seule pôle</td><td>Solitude</td></tr>',
   '<tr><td class="paronyme">Luire</td><td>Nuire</td><td>Polir</td><td>Eclairer</td><td>Etoiler</td><td data-correct="true">Briller</td></tr>',
   '<tr><td class="paronyme">Quittance</td><td>Paye</td><td>Facture</td><td data-correct="true">Reçu</td><td>Prix</td><td>Quitter</td></tr>',
-  '<tr><td class="paronyme">Proscrire</td><td>Inscrire</td><td>Déduire</td><td>Reproduire</td><td>Souscrire</td><td data-correct="true">Interdire</td></td>',
+  '<tr><td class="paronyme">Proscrire</td><td>Inscrire</td><td>Déduire</td><td>Reproduire</td><td>Souscrire</td><td data-correct="true">Interdire</td></tr>',
   '<tr><td class="paronyme">Guenille</td><td>Hayon</td><td>Ailleurs</td><td data-correct="true">Haillon</td><td>Singe</td><td>Haleur</td></tr>',
   '<tr><td class="paronyme">Verbal</td><td>Conjugué</td><td>Eloquent</td><td>Buccal</td><td data-correct="true">Oral</td><td>Ecrit</td></tr>',
   '<tr><td class="paronyme">Effectif</td><td data-correct="true">Concret</td><td>Affecté</td><td>Affectueux</td><td>Compte</td><td>Réactif</td></tr>',

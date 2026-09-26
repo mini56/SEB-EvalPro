@@ -123,7 +123,14 @@ function insertBeforeLast(text, marker, addition, label) {
     if (correctCount !== 1) fail(`Paronymes: ligne ${index + 1} contient ${correctCount} bonne(s) réponse(s)`, 7);
   });
 
-  if (!out.includes('score++;') || !out.includes('total++;')) {
+  if (out.includes('js/paronymes-page.js')) {
+    const modulePath = path.join(root, 'app', 'web', 'js', 'paronymes-page.js');
+    if (!fs.existsSync(modulePath)) fail('Paronymes: module paronymes-page.js introuvable', 8);
+    const moduleText = fs.readFileSync(modulePath, 'utf8').replace(/\\r\\n/g, '\\n');
+    if (!moduleText.includes('score += 1;') || !moduleText.includes('total += 1;')) {
+      fail('Paronymes: logique modulaire 1 point par ligne introuvable', 8);
+    }
+  } else if (!out.includes('score++;') || !out.includes('total++;')) {
     fail('Paronymes: logique 1 point par ligne introuvable', 8);
   }
 
