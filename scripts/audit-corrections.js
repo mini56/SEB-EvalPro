@@ -138,6 +138,23 @@ function patchGenreNombreResume() {
 
 function patchStockScoring() {
   const { file, html } = read('stock.html');
+
+  if (html.includes('js/stock-page.js')) {
+    const moduleFile = path.join(webDir, 'js', 'stock-page.js');
+    if (!fs.existsSync(moduleFile)) throw new Error('SEB EvalPro audit: module stock-page.js introuvable');
+    const moduleText = fs.readFileSync(moduleFile, 'utf8').replace(/\r\n/g, '\n');
+    for (const token of [
+      "const TOTAL_EVALUATED = 33;",
+      "const EXAMPLE_ID = '8';",
+      "document.querySelectorAll('.pot:not([data-seb-example=\"true\"])')",
+      'function computeScore(mark)',
+      "sessionStorage.setItem(ERROR_KEY, String(score.errors));"
+    ]) {
+      if (!moduleText.includes(token)) throw new Error('SEB EvalPro audit: contrat Stock modulaire absent: ' + token);
+    }
+    return;
+  }
+
   let out = html;
   out = mustReplace(
     out,
