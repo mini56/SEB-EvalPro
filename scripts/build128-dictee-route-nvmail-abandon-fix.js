@@ -7,6 +7,8 @@ const genrePath = path.join(web, 'genrenombres.html');
 const triPath = path.join(web, 'tri_de_cheville.html');
 const nvmailPath = path.join(web, 'nvmail.html');
 const runtimePath = path.join(web, 'js', 'seb-ui-runtime.js');
+const parcoursPath = path.join(web, 'js', 'seb-parcours.js');
+const genreModulePath = path.join(web, 'js', 'genrenombres-page.js');
 
 function fail(message) {
   console.error('SEB EvalPro #128 dictée/nvmail: ' + message);
@@ -19,14 +21,32 @@ for (const file of [genrePath, triPath, nvmailPath, runtimePath]) {
 
 // 1) Parcours normal : Genre/Nombres -> Dictée.
 let genre = fs.readFileSync(genrePath, 'utf8');
-genre = genre.replace(
-  /window\.location\.href\s*=\s*(['"])tri_de_cheville\.html\1\s*;/gi,
-  "window.location.href = 'dictee.html';"
-);
-if (!/window\.location\.href\s*=\s*['"]dictee\.html['"]/i.test(genre)) {
-  fail('Genre/Nombres ne pointe pas vers dictee.html');
+const modularGenre = genre.includes('js/genrenombres-page.js');
+
+if (modularGenre) {
+  if (!fs.existsSync(parcoursPath)) fail('registre central seb-parcours.js introuvable');
+  if (!fs.existsSync(genreModulePath)) fail('module genrenombres-page.js introuvable');
+  const parcours = fs.readFileSync(parcoursPath, 'utf8');
+  const moduleText = fs.readFileSync(genreModulePath, 'utf8');
+  const genrePos = parcours.indexOf("id:'genrenombres'");
+  const dicteePos = parcours.indexOf("id:'dictee'");
+  const triPos = parcours.indexOf("id:'tri-de-cheville'");
+  if (genrePos < 0 || dicteePos <= genrePos || triPos <= dicteePos) {
+    fail('registre central ne route pas Genre/Nombres -> Dictée -> Tri');
+  }
+  if (!moduleText.includes("window.sebParcours.goNext('genrenombres')")) {
+    fail('Genre/Nombres modulaire ne passe pas par le registre central');
+  }
+} else {
+  genre = genre.replace(
+    /window\.location\.href\s*=\s*(['"])tri_de_cheville\.html\1\s*;/gi,
+    "window.location.href = 'dictee.html';"
+  );
+  if (!/window\.location\.href\s*=\s*['"]dictee\.html['"]/i.test(genre)) {
+    fail('Genre/Nombres ne pointe pas vers dictee.html');
+  }
+  fs.writeFileSync(genrePath, genre, 'utf8');
 }
-fs.writeFileSync(genrePath, genre, 'utf8');
 
 // 2) Parcours après abandon de Genre/Nombres : il doit lui aussi passer par la Dictée.
 let runtime = fs.readFileSync(runtimePath, 'utf8');
