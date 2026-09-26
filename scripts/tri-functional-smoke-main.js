@@ -47,8 +47,8 @@ async function inspect(win) {
       const chronoButtons=document.querySelectorAll('.chrono-buttons button');
       return {
         chronoButtons:chronoButtons.length,
-        startText:document.getElementById('startBtn')?.textContent.trim(),
-        stopText:document.getElementById('stopBtn')?.textContent.trim(),
+        startText:(document.getElementById('startBtn')?.textContent || '').replace(/^(?:▶|■|✓|✔|➜|→)\\s*/u,'').trim(),
+        stopText:(document.getElementById('stopBtn')?.textContent || '').replace(/^(?:▶|■|✓|✔|➜|→)\\s*/u,'').trim(),
         resetExists:Boolean(document.getElementById('resetBtn')),
         startDisabled:Boolean(document.getElementById('startBtn')?.disabled),
         stopDisabled:Boolean(document.getElementById('stopBtn')?.disabled),
