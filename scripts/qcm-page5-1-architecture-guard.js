@@ -28,8 +28,10 @@ for (let i = 1; i <= 3; i += 1) {
   if (!slice.includes('id="reponse5_1_' + i + '"')) fail('champ posture absent: ' + i);
 }
 
+if (!/qcm_posture\.(?:png|PNG)/i.test(slice)) {
+  fail('image des postures Page 5_1 absente');
+}
 for (const token of [
-  'qcm_posture.PNG',
   'Sélectionnez les trois bonnes postures parmi les six images proposées.',
   'id="page5_1Pass"',
   'id="page5_1Next"',
