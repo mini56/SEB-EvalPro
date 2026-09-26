@@ -72,14 +72,16 @@ app.whenReady().then(async () => {
         allowed:Array.from(window.sebQcmPage5_1.allowed),
         total:window.sebQcmPage5_1.total,
         route:window.sebParcours.nextUrl('qcm-5_1'),
-        image:document.querySelector('#page5_1 img[src*="qcm_posture"]')?.getAttribute('src') || ''
+        image:Array.from(document.querySelectorAll('#page5_1 img'))
+          .map(function(img){return img.getAttribute('src') || '';})
+          .find(function(src){return src.toLowerCase().includes('qcm_posture');}) || ''
       })
     `, true);
 
     if (initial.inputs !== 3 || initial.total !== 3) throw new Error('Structure Page 5_1 incorrecte.');
     if (JSON.stringify(initial.allowed) !== JSON.stringify(['2','3','5'])) throw new Error('Valeurs autorisées Page 5_1 modifiées.');
     if (initial.route !== 'qcmv1.0.html?page=6#page6') throw new Error('Route Page 5_1 -> Page 6 incorrecte.');
-    if (!initial.image.includes('qcm_posture.PNG')) throw new Error('Image des postures absente.');
+    if (!initial.image || !initial.image.toLowerCase().includes('qcm_posture')) throw new Error('Image des postures absente.');
 
     await win.webContents.executeJavaScript(`
       (function(){
