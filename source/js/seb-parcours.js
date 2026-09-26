@@ -27,7 +27,15 @@
       })
     }),
     Object.freeze({ id:'introbrique', file:'introbrique.html' }),
-    Object.freeze({ id:'brique', file:'brique.html' }),
+    Object.freeze({
+      id:'brique',
+      file:'brique.html',
+      results:Object.freeze({
+        storage:'eval_brique',
+        autoStorage:'eval_brique_auto',
+        checkpointStorage:'seb_evalpro_brique_checkpoint'
+      })
+    }),
     Object.freeze({ id:'stock', file:'stock.html' }),
     Object.freeze({ id:'planning', file:'planning.html' }),
     Object.freeze({ id:'genrenombres', file:'genrenombres.html' }),
