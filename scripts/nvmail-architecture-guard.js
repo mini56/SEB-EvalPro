@@ -22,11 +22,11 @@ const protectedText = [
   'Il vous demande de lui envoyer votre rapport de stage en entreprise.',
   'conseil.perso@sauvegarde56.org',
   'stage-pro@sauvegarde56.org',
-  'Mettre en objet: <strong>Prénom Mail-SEB</strong>',
-  'Ajoutez votre <strong>rapport</strong> en piece jointe.',
+  'Mettez en objet : <strong>Prénom Mail-SEB</strong>',
+  'Ajoutez votre <strong>rapport</strong> en pièce jointe.',
   'Prénom NOM',
   '01.02.34.56.78',
-  "Ensuite passez a l'étape suivante..."
+  "Ensuite, passez à l'étape suivante..."
 ];
 for (const token of protectedText) if (!html.includes(token)) fail('contenu validé modifié: ' + token);
 

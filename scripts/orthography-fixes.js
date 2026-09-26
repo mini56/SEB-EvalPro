@@ -107,18 +107,22 @@ save(path.join(root, 'app/web/qcmv1.0.html'), qcm);
   ]) if (!nwEngine.includes(token)) fail('moteur nwtexte désynchronisé: ' + token, 13);
 }
 
-// Messagerie.
-let mail = patch('app/web/nvmail.html', [
-  ['les adresses email\n\t</strong> suivante:', 'les adresses e-mail\n\t</strong> suivantes :', 'mail adresses'],
-  ['A votre conseiller:', 'À votre conseiller :', 'mail conseiller'],
-  ['En copie a votre responsable de stage:', 'En copie à votre responsable de stage :', 'mail copie'],
-  ['Mettre en objet:', 'Mettez en objet :', 'mail objet'],
-  ['en piece jointe.', 'en pièce jointe.', 'mail pièce jointe'],
-  ['sur le modèle si dessous:', 'sur le modèle ci-dessous :', 'mail ci-dessous'],
-  ["Ensuite passez a l'étape suivante...", "Ensuite, passez à l'étape suivante...", 'mail ensuite']
-]);
-mail = mail.replace(/Scénario:/g, 'Scénario :');
-save(path.join(root, 'app/web/nvmail.html'), mail);
+// Messagerie : les formulations validées sont désormais directement dans source/nvmail.html.
+// Ce contrôle empêche une ancienne source ou une ancienne rustine de les réintroduire.
+const mail = read('app/web/nvmail.html');
+for (const token of [
+  'les adresses e-mail',
+  'suivantes :',
+  'À votre conseiller :',
+  'En copie à votre responsable de stage :',
+  'Mettez en objet :',
+  'en pièce jointe.',
+  'sur le modèle ci-dessous :',
+  "Ensuite, passez à l'étape suivante...",
+  'Scénario :'
+]) {
+  if (!mail.includes(token)) fail('messagerie désynchronisée: ' + token, 14);
+}
 
 // Construction à base de briques.
 let brique = patch('app/web/brique.html', [
