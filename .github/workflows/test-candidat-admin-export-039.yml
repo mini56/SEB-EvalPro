@@ -1,0 +1,194 @@
+name: TEST Candidat Admin Export 0.3.9
+
+on:
+  push:
+    branches:
+      - tmp-windows-setup-039-clean
+
+permissions:
+  contents: read
+
+jobs:
+  candidat-admin-export:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Generate clean web application
+        run: npm run prepare:web
+
+      - name: Candidate storage lifecycle and export import
+        run: npm run test:security
+
+      - name: Candidate full parcours functional smokes
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tests = @(
+            'test:qcm-page2-functional',
+            'test:qcm-page2-1-functional',
+            'test:qcm-page3-functional',
+            'test:qcm-texte-trous-functional',
+            'test:qcm-page4-functional',
+            'test:qcm-page5-functional',
+            'test:qcm-page5-1-functional',
+            'test:qcm-page6-functional',
+            'test:autoeval1-functional',
+            'test:brique-functional',
+            'test:stock-functional',
+            'test:planning-functional',
+            'test:genrenombres-functional',
+            'test:dictee-functional',
+            'test:tri-functional',
+            'test:nwtexte-functional',
+            'test:nvmail-functional',
+            'test:autoeval2-functional',
+            'test:paronymes-functional',
+            'test:carre-functional',
+            'test:qcm-final-functional'
+          )
+          foreach ($test in $tests) {
+            Write-Host "RUN_CANDIDATE_SMOKE=$test"
+            npm run $test
+            if ($LASTEXITCODE -ne 0) { throw "Smoke candidat échoué : $test" }
+          }
+          Write-Host 'CANDIDATE_FULL_PARCOURS_SMOKES: OK'
+
+      - name: Admin functional smoke
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          npx electron --no-sandbox scripts/admin-bar-smoke-electron.js
+          if ($LASTEXITCODE -ne 0) { throw 'Smoke Admin Electron échoué.' }
+          Write-Host 'ADMIN_FUNCTIONAL_SMOKE: OK'
+
+      - name: Direct USB root export import on Windows
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $usbDir = Join-Path $env:RUNNER_TEMP 'seb-usb-root-explicit'
+          New-Item -ItemType Directory -Force -Path $usbDir | Out-Null
+          subst R: $usbDir
+          try {
+            $env:SEB_USB_ROOT = 'R:\'
+            node scripts/candidate-windows-drive-root-smoke.js
+            if ($LASTEXITCODE -ne 0) { throw 'Export/import racine USB Windows échoué.' }
+          }
+          finally {
+            subst R: /D
+          }
+          Write-Host 'WINDOWS_USB_ROOT_EXPORT_IMPORT: OK'
+
+      - name: Download exact green Setup and uninstaller
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $base = 'https://github.com/mini56/SEB-EvalPro/releases/download/seb-evalpro-seb-ia-038-build-1'
+          curl.exe -L --fail --retry 3 --retry-delay 3 -o 'SEB-eval-PRO-0.3.9-Windows-Setup.exe' "$base/SEB-eval-PRO-0.3.9-Windows-Setup.exe"
+          if ($LASTEXITCODE -ne 0) { throw 'Téléchargement Setup 0.3.9 échoué.' }
+          curl.exe -L --fail --retry 3 --retry-delay 3 -o 'SEB-eval-PRO-0.3.9-Windows-Desinstallation.exe' "$base/SEB-eval-PRO-0.3.9-Windows-Desinstallation.exe"
+          if ($LASTEXITCODE -ne 0) { throw 'Téléchargement désinstallateur 0.3.9 échoué.' }
+          $setup = Get-Item 'SEB-eval-PRO-0.3.9-Windows-Setup.exe'
+          if ($setup.Length -ne 142304550) { throw "Taille Setup inattendue : $($setup.Length)" }
+          Write-Host "SETUP_SIZE=$($setup.Length)"
+          Write-Host "SETUP_SHA256=$((Get-FileHash $setup.FullName -Algorithm SHA256).Hash)"
+
+      - name: Real Candidate edition install and launch
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $setup = (Resolve-Path 'SEB-eval-PRO-0.3.9-Windows-Setup.exe').Path
+          $uninstaller = (Resolve-Path 'SEB-eval-PRO-0.3.9-Windows-Desinstallation.exe').Path
+          $installDir = 'C:\SEBEvalPro-Candidate-039-CI'
+          Remove-Item -Recurse -Force $installDir -ErrorAction SilentlyContinue
+          Remove-Item 'HKCU:\Software\SEB EvalPro' -Recurse -Force -ErrorAction SilentlyContinue
+
+          $p = Start-Process -FilePath $setup -ArgumentList @('/S',"/D=$installDir") -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "Installation Candidat échouée : $($p.ExitCode)" }
+          if (-not (Test-Path (Join-Path $installDir 'edition-candidate.flag'))) { throw 'edition-candidate.flag absent.' }
+          if (Test-Path (Join-Path $installDir 'edition-admin.flag')) { throw 'edition-admin.flag présent sur édition Candidat.' }
+          $edition = Get-Content (Join-Path $installDir 'edition.json') -Raw | ConvertFrom-Json
+          if ($edition.edition -ne 'candidate') { throw "edition.json Candidat invalide : $($edition.edition)" }
+
+          $exe = Join-Path $installDir 'SEB-éval-PRO.exe'
+          if (-not (Test-Path $exe)) {
+            $exe = Get-ChildItem $installDir -Filter '*.exe' | Where-Object { $_.Name -notmatch '^Uninstall' } | Select-Object -First 1 -ExpandProperty FullName
+          }
+          if (-not $exe) { throw 'Exécutable édition Candidat introuvable.' }
+          $process = Start-Process -FilePath $exe -PassThru
+          try {
+            Start-Sleep -Seconds 6
+            $process.Refresh()
+            if ($process.HasExited) { throw "Édition Candidat arrêtée au démarrage." }
+            if ($process.MainWindowHandle -eq 0) { throw 'Aucune fenêtre Candidat visible.' }
+            if ([string]$process.MainWindowTitle -match 'Démarrage impossible') { throw 'Écran de blocage sécurité en édition Candidat.' }
+            Write-Host "CANDIDATE_INSTALLED_WINDOW_OK=$($process.MainWindowTitle)"
+          }
+          finally {
+            if ($process -and -not $process.HasExited) { & taskkill.exe /PID $process.Id /T /F | Out-Null }
+          }
+
+          $u = Start-Process -FilePath $uninstaller -ArgumentList '/S' -Wait -PassThru
+          if ($u.ExitCode -ne 0) { throw "Désinstallation Candidat échouée : $($u.ExitCode)" }
+          Start-Sleep -Seconds 2
+          if (Test-Path $installDir) { throw 'Dossier édition Candidat encore présent après désinstallation.' }
+          Write-Host 'REAL_CANDIDATE_EDITION_INSTALL_LAUNCH_UNINSTALL: OK'
+
+      - name: Real Admin edition install and launch
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $setup = (Resolve-Path 'SEB-eval-PRO-0.3.9-Windows-Setup.exe').Path
+          $uninstaller = (Resolve-Path 'SEB-eval-PRO-0.3.9-Windows-Desinstallation.exe').Path
+          $installDir = 'C:\SEBEvalPro-Admin-039-CI'
+          Remove-Item -Recurse -Force $installDir -ErrorAction SilentlyContinue
+          New-Item -Path 'HKCU:\Software\SEB EvalPro' -Force | Out-Null
+          Set-ItemProperty -Path 'HKCU:\Software\SEB EvalPro' -Name Edition -Value 'admin'
+
+          $p = Start-Process -FilePath $setup -ArgumentList @('/S',"/D=$installDir") -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "Installation Admin échouée : $($p.ExitCode)" }
+          if (-not (Test-Path (Join-Path $installDir 'edition-admin.flag'))) { throw 'edition-admin.flag absent.' }
+          if (Test-Path (Join-Path $installDir 'edition-candidate.flag')) { throw 'edition-candidate.flag présent sur édition Admin.' }
+          $edition = Get-Content (Join-Path $installDir 'edition.json') -Raw | ConvertFrom-Json
+          if ($edition.edition -ne 'admin') { throw "edition.json Admin invalide : $($edition.edition)" }
+
+          $exe = Join-Path $installDir 'SEB-éval-PRO.exe'
+          if (-not (Test-Path $exe)) {
+            $exe = Get-ChildItem $installDir -Filter '*.exe' | Where-Object { $_.Name -notmatch '^Uninstall' } | Select-Object -First 1 -ExpandProperty FullName
+          }
+          if (-not $exe) { throw 'Exécutable édition Admin introuvable.' }
+          $process = Start-Process -FilePath $exe -PassThru
+          try {
+            Start-Sleep -Seconds 6
+            $process.Refresh()
+            if ($process.HasExited) { throw "Édition Admin arrêtée au démarrage." }
+            if ($process.MainWindowHandle -eq 0) { throw 'Aucune fenêtre Admin visible.' }
+            if ([string]$process.MainWindowTitle -match 'Démarrage impossible') { throw 'Écran de blocage sécurité en édition Admin.' }
+            Write-Host "ADMIN_INSTALLED_WINDOW_OK=$($process.MainWindowTitle)"
+          }
+          finally {
+            if ($process -and -not $process.HasExited) { & taskkill.exe /PID $process.Id /T /F | Out-Null }
+          }
+
+          $u = Start-Process -FilePath $uninstaller -ArgumentList '/S' -Wait -PassThru
+          if ($u.ExitCode -ne 0) { throw "Désinstallation Admin échouée : $($u.ExitCode)" }
+          Start-Sleep -Seconds 2
+          if (Test-Path $installDir) { throw 'Dossier édition Admin encore présent après désinstallation.' }
+          Write-Host 'REAL_ADMIN_EDITION_INSTALL_LAUNCH_UNINSTALL: OK'
+
+      - name: Final Candidat Admin Export audit marker
+        shell: pwsh
+        run: |
+          Write-Host 'CANDIDAT_SIDE=OK'
+          Write-Host 'ADMIN_SIDE=OK'
+          Write-Host 'EXPORT_IMPORT_SIDE=OK'
