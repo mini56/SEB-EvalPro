@@ -36,14 +36,18 @@ if (!html.includes('SEB_PAGE51_IMMEDIATE_PERSIST')) {
 
 // 3) À la sauvegarde de Page 5, conserver aussi un bloc dédié. Il sert de
 // secours et de diagnostic sans modifier le barème ni l'affichage habituel.
-const page5Branch = `  } else if (pageNum == 5) {\n    bonnes = bonnesReponsesPage5;   start = 1;  end = 8;`;
+const page5Branches = [
+  `  } else if (pageNum == 5) {\n    bonnes = bonnesReponsesPage5;   start = 1;  end = 8;`,
+  `  if (pageNum == 5) {\n    bonnes = bonnesReponsesPage5;   start = 1;  end = 8;`
+];
 if (!html.includes('SEB_PAGE5_ORGANISATION_SNAPSHOT')) {
-  if (!html.includes(page5Branch)) fail('branche Page 5 introuvable', 6);
+  const page5Branch = page5Branches.find((candidate) => html.includes(candidate));
+  if (!page5Branch) fail('branche Page 5 introuvable', 6);
   html = html.replace(page5Branch, `${page5Branch}\n    // SEB_PAGE5_ORGANISATION_SNAPSHOT : créé après la boucle standard ci-dessous.`);
 
-  const beforePage3Extras = `  // champs spécifiques à la page 3 (si présents)\n  if (pageNum == 3) {`;
-  if (!html.includes(beforePage3Extras)) fail('point insertion snapshot Page 5 introuvable', 7);
-  html = html.replace(beforePage3Extras, `  if (pageNum == 5) {\n    try {\n      const organisation = {};\n      for (let i = 1; i <= 8; i++) {\n        organisation[i] = {\n          reponse: reponses[\`page5_q\${i}\`] || '',\n          score: Number(scores[\`page5_q\${i}\`] || 0)\n        };\n      }\n      sessionStorage.setItem('page5_organisation_data', JSON.stringify(organisation));\n    } catch (_) {}\n  }\n\n${beforePage3Extras}`);
+  const beforeGlobalSave = `  // SAUVEGARDE GLOBALE dans sessionStorage`;
+  if (!html.includes(beforeGlobalSave)) fail('point insertion snapshot Page 5 introuvable', 7);
+  html = html.replace(beforeGlobalSave, `  if (pageNum == 5) {\n    try {\n      const organisation = {};\n      for (let i = 1; i <= 8; i++) {\n        organisation[i] = {\n          reponse: reponses[\`page5_q\${i}\`] || '',\n          score: Number(scores[\`page5_q\${i}\`] || 0)\n        };\n      }\n      sessionStorage.setItem('page5_organisation_data', JSON.stringify(organisation));\n    } catch (_) {}\n  }\n\n${beforeGlobalSave}`);
 }
 
 // 4) Résultats stagiaire : si l'ancien reponses_data est incomplet, reconstruire
