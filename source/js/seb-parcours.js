@@ -67,6 +67,13 @@
       })
     }),
     Object.freeze({
+      id:'dictee',
+      file:'dictee.html',
+      results:Object.freeze({
+        storage:'dictee_data'
+      })
+    }),
+    Object.freeze({
       id:'tri-de-cheville',
       file:'tri_de_cheville.html',
       results:Object.freeze({
