@@ -925,13 +925,13 @@ pre {
     </p>
     
 	<div class="tablecenter">
-	<button onclick="saveTextTrous(); nextPage(4);"class="passez">Passez</button>
-	<button onclick="saveTextTrous(); nextPage(4);"class="suivant">Suivant</button>
+	<button id="texteTrousPass" type="button" class="passez">Passez</button>
+	<button id="texteTrousNext" type="button" class="suivant">Suivant</button>
 	
 	</div>
   </div>
 
-  <div id="page4" class="page">
+  <script src="js/qcm-texte-trous.js"></script>\n\n  <div id="page4" class="page">
   <p><img src="imageqcm/scenario.png" alt="scenario.png" width="45" height="45" style="margin-right:8px;"><strong style="color:#1a73e8;">Scénario:</strong></p><p> Vous êtes en train de préparer des lots de pieces dans l'atelier. Certaines pièce sont regroupées par type et doivent être
    emballées selon des fraction précises.</p>
 	 <div style="display:flex; align-items:center; margin-bottom:10px;">
@@ -1834,30 +1834,7 @@ function saveTableAnswers(pageNum)  {
   }
 }
 
-/* === Texte à trous === */
-function saveTextTrous(){
-  const pageId = "pageTexteTrous";
-  const inputs = document.querySelectorAll(`#${pageId} input[type="text"]`);
-  let bonnesReponses = 0;
-  let reponsesPage   = [];
-
-  inputs.forEach(input => {
-    const userAnswer = (input.value || '').trim().toLowerCase();
-    const correct    = (input.dataset && input.dataset.answer)
-                        ? input.dataset.answer.toLowerCase() : '';
-    reponsesPage.push({user:userAnswer, correct:correct});
-    if(userAnswer === correct) bonnesReponses++;
-  });
-
-  reponses[pageId] = reponsesPage;
-  scores[pageId]   = bonnesReponses;
-  // SAUVEGARDE dans sessionStorage
-  try {
-    sessionStorage.setItem('reponses_data', JSON.stringify(reponses));
-    sessionStorage.setItem('scores_data', JSON.stringify(scores));
-  } catch(e) {}
-}
-/*------------------------------------------------------------------------------------------------------------------------*/
+/* === Texte à trous : logique dans js/qcm-texte-trous.js === */\n/*------------------------------------------------------------------------------------------------------------------------*/
 /* === Affichage des résultats (version finale avec page 8 après texte à trous) === */
 
 
