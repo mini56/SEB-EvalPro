@@ -31,7 +31,14 @@ function appendBeforeBody(text, block, label) {
   const { file, text } = read('app/web/qcmv1.0.html');
   let out = text;
 
-  if (!out.includes('function sameSebNumeric')) {
+  const modularPage2 = out.includes('js/qcm-page2.js');
+  const modularPage2_1 = out.includes('js/qcm-page2-1.js');
+  const modularPage3 = out.includes('js/qcm-page3.js');
+  const modularTexteTrous = out.includes('js/qcm-texte-trous.js');
+  const modularPage6 = out.includes('js/qcm-page6.js');
+  const needsLegacyHelpers = !modularPage2 || !modularPage2_1 || !modularTexteTrous || !modularPage6;
+
+  if (needsLegacyHelpers && !out.includes('function sameSebNumeric')) {
     const marker = 'function saveTableAnswers(pageNum)';
     const pos = out.indexOf(marker);
     if (pos < 0) fail('saveTableAnswers introuvable', 4);
@@ -65,18 +72,29 @@ function appendBeforeBody(text, block, label) {
     out = out.slice(0, pos) + helper + out.slice(pos);
   }
 
-  const page6Candidates = [
-    "      scores[`page6_q${i}`] =\n         (bonnes[i] && val.replace(',', '.') === bonnes[i].toString()) ? 1 : 0;",
-    "      scores[`page6_q${i}`] =\n         (bonnes[i] && val.replace(',', '.') === bonnes[i].toString().replace(',', '.')) ? 1 : 0;"
-  ];
-  const page6Old = page6Candidates.find(candidate => out.includes(candidate));
-  if (!page6Old) fail('cible introuvable: comparaison numérique Page 6', 3);
-  out = out.replace(page6Old, "      scores[`page6_q${i}`] =\n         (bonnes[i] && sameSebNumeric(val, bonnes[i])) ? 1 : 0;");
-
-  const modularPage2 = out.includes('js/qcm-page2.js');
-  const modularPage2_1 = out.includes('js/qcm-page2-1.js');
-  const modularPage3 = out.includes('js/qcm-page3.js');
-  const modularTexteTrous = out.includes('js/qcm-texte-trous.js');
+  if (modularPage6) {
+    const modulePath = path.join(root, 'app', 'web', 'js', 'qcm-page6.js');
+    if (!fs.existsSync(modulePath)) fail('Page 6: module qcm-page6.js introuvable', 4);
+    const moduleText = fs.readFileSync(modulePath, 'utf8').replace(/\r\n/g, '\n');
+    for (const token of [
+      'function normalizeNumeric(value)',
+      ".replace(/\\s+/g, '')",
+      ".replace(',', '.')",
+      'function sameNumeric(left, right)',
+      "1:'2300', 2:'7500', 3:'2.5', 4:'8400', 5:'3200'",
+      "6:'450', 7:'750', 8:'5.6', 9:'1250', 10:'4'"
+    ]) {
+      if (!moduleText.includes(token)) fail('Page 6: normalisation numérique modulaire absente: ' + token, 4);
+    }
+  } else {
+    const page6Candidates = [
+      "      scores[`page6_q${i}`] =\n         (bonnes[i] && val.replace(',', '.') === bonnes[i].toString()) ? 1 : 0;",
+      "      scores[`page6_q${i}`] =\n         (bonnes[i] && val.replace(',', '.') === bonnes[i].toString().replace(',', '.')) ? 1 : 0;"
+    ];
+    const page6Old = page6Candidates.find(candidate => out.includes(candidate));
+    if (!page6Old) fail('cible introuvable: comparaison numérique Page 6', 3);
+    out = out.replace(page6Old, "      scores[`page6_q${i}`] =\n         (bonnes[i] && sameSebNumeric(val, bonnes[i])) ? 1 : 0;");
+  }
 
   if (modularPage2) {
     const modulePath = path.join(root, 'app', 'web', 'js', 'qcm-page2.js');
@@ -193,7 +211,11 @@ function appendBeforeBody(text, block, label) {
   } else if (!out.includes("pageNum == 2 || pageNum === '2_1'")) {
     fail('Pages 2/2_1 non numériques après patch', 4);
   }
-  if (!out.includes('sameSebNumeric(val, bonnes[i])')) fail('Page 6 non numérique après patch', 4);
+  if (modularPage6) {
+    if (!out.includes('js/qcm-page6.js')) fail('Page 6 modulaire absente après patch', 4);
+  } else if (!out.includes('sameSebNumeric(val, bonnes[i])')) {
+    fail('Page 6 non numérique après patch', 4);
+  }
   if (modularTexteTrous) {
     if (!out.includes('js/qcm-texte-trous.js')) fail('Texte à trous modulaire absent', 4);
   } else if (!out.includes('normalizeSebAnswerText(input.value)')) {

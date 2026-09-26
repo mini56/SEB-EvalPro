@@ -93,7 +93,20 @@
         allowedValues:Object.freeze(['2','3','5'])
       })
     }),
-    Object.freeze({ id:'qcm-6', file:'qcmv1.0.html', page:'6' }),
+    Object.freeze({
+      id:'qcm-6',
+      file:'qcmv1.0.html',
+      page:'6',
+      results:Object.freeze({
+        responseStorage:'reponses_data',
+        scoreStorage:'scores_data',
+        responsePrefix:'page6_q',
+        unitPrefix:'page6_unite',
+        stateStorage:'seb_evalpro_qcm_page6_state',
+        operationStart:11,
+        operationEnd:20
+      })
+    }),
 
     Object.freeze({
       id:'autoeval1',

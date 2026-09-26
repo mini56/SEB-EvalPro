@@ -1095,10 +1095,12 @@ pre {
 	</div>
 	<div class="tablecenter">
 	
-	<button onclick="saveTableAnswers(6); goToPage('autoeval1.html');" class="passez">Passez</button>
-    <button onclick="saveTableAnswers(6); goToPage('autoeval1.html');" class="suivant">suivant</button>
+	<button id="page6Pass" type="button" class="passez">Passez</button>
+    <button id="page6Next" type="button" class="suivant">suivant</button>
 	</div>
   </div>
+  <script src="js/qcm-page6.js"></script>
+
   <div id="page9" class="page"><h2>Page 9</h2><p>Question factice ici...</p><button onclick="saveAnswer(9,'Bonne',0); nextPage(10);"class="suivant">Suivant</button><button onclick="saveAnswer(9,'Mauvaise',0); nextPage(10);"class="passez">Passez</button></div>
   <div id="page10" class="page"><h2>Page 10</h2><p>Question factice ici...</p><button onclick="saveAnswer(10,'Bonne',0); nextPage(11);"class="suivant">Suivant</button><button onclick="saveAnswer(10,'Mauvaise',0); nextPage(11);"class="passez">Passez</button></div>
   <div id="page11" class="page">
@@ -1432,7 +1434,6 @@ let scores   = {};
 
 /* === Bonnes réponses / ensembles === */
 
-const bonnesReponsesPage6   = { 1:'2300', 2:'7500', 3: '2.5', 4:'8400', 5:'3200' , 6:'450', 7:'750', 8:'5,6', 9:'1250', 10:'4' };
 
 /* === Calculatrice (propre) === */
 (function () {
@@ -1534,39 +1535,7 @@ const bonnesReponsesPage6   = { 1:'2300', 2:'7500', 3: '2.5', 4:'8400', 5:'3200'
 
 
 /* === script pour la page 4 === */
-/* === BLOQUER LES LETTRES DANS LES INPUTS NUMÉRIQUES === */
-document.addEventListener('DOMContentLoaded', function() {
-  // Liste des IDs des inputs qui doivent accepter SEULEMENT des chiffres
-  const numericInputIds = [
-    'reponse6_1', 'reponse6_2', 'reponse6_3', 'reponse6_4', 'reponse6_5',
-	'reponse6_6', 'reponse6_7', 'reponse6_8', 'reponse6_9', 'reponse6_10'
-	
-	
-  ];
-  
-  numericInputIds.forEach(function(id) {
-    const input = document.getElementById(id);
-    if (input) {
-      // Bloquer les lettres à la frappe
-      input.addEventListener('keydown', function(e) {
-        // Autoriser: chiffres, backspace, delete, tab, escape, enter, flèches
-        const allowed = [8, 9, 13, 27, 46, 37, 38, 39, 40, 110, 188, 190];
-        const isNumber = (e.keyCode >= 48 && e.keyCode <= 57) || (e.keyCode >= 96 && e.keyCode <= 105);
-        const isAllowed = allowed.indexOf(e.keyCode) !== -1;
-        
-        if (!isNumber && !isAllowed) {
-          e.preventDefault();
-          return false;
-        }
-      });
-      
-      // Nettoyer l'input en cas de copier-coller
-      input.addEventListener('input', function(e) {
-        this.value = this.value.replace(/[^0-9.,]/g, '');
-      });
-    }
-  });
-});
+/* === Page 6 : logique des réponses numériques dans js/qcm-page6.js === */
 /* === Page 4 Fractions : logique dans js/qcm-page4.js === */
 
 /* === Navigation entre pages === */
@@ -1593,63 +1562,10 @@ function saveAnswer(num, rep, pts){
 }
 
 /* === Sauvegarde des réponses d'un tableau (MODIFIÉE pour inclure commentaires) === */
-function saveTableAnswers(pageNum)  {
-  // --- Cas standard pour les autres pages ---
-  let bonnes, start = 0, end = -1;
-  
-  if (pageNum == 6) {
-    bonnes = bonnesReponsesPage6; start = 1; end = 10;
-    // --- Enregistrer les 10 réponses notées ---
-    for (let i = start; i <= end; i++) {
-      const val = (document.getElementById(`reponse6_${i}`)?.value.trim()) || '';
-      reponses[`page6_q${i}`] = val;
-      scores[`page6_q${i}`] =
-         (bonnes[i] && val.replace(',', '.') === bonnes[i].toString()) ? 1 : 0;
-    }
-
-    // ✅ AJOUT: Enregistrer les unités pour page 6
-    for (let i = 1; i <= 10; i++) {
-      const uniteVal = (document.getElementById(`unite6_${i}`)?.value.trim()) || '';
-      reponses[`page6_unite${i}`] = uniteVal;
-      scores[`page6_unite${i}`] = 0;
-    }
-
-    // --- Enregistrer les 10 champs "Opération" (commentaires) non notés ---
-    for (let i = 11; i <= 20; i++) {
-      const valOp = (document.getElementById(`reponse6_${i}`)?.value.trim()) || '';
-      reponses[`page6_q${i}`] = valOp;
-      scores[`page6_q${i}`]   = 0;
-    }
-    
-    // Sauvegarde dans sessionStorage
-    try {
-      sessionStorage.setItem('reponses_data', JSON.stringify(reponses));
-      sessionStorage.setItem('scores_data', JSON.stringify(scores));
-    } catch(e) {}
-    return; // sortir ici pour page 6
-  } else {
-    return;
-  }
-
-  // Ancien traitement standard conservé temporairement pour compatibilité.
-  for (let i = start; i <= end; i++) {
-    const inputId = `reponse${pageNum}_${i}`;
-    const inputEl = document.getElementById(inputId);
-    const val = inputEl ? (inputEl.value.trim() || '') : '';
-    reponses[`page${pageNum}_q${i}`] = val;
-    scores[`page${pageNum}_q${i}`] =
-      (bonnes && bonnes[i] && val.toString().toUpperCase() === bonnes[i].toString().toUpperCase())
-        ? 1 : 0;
-  }
-
-  // SAUVEGARDE GLOBALE dans sessionStorage
-  try {
-    sessionStorage.setItem('reponses_data', JSON.stringify(reponses));
-    sessionStorage.setItem('scores_data', JSON.stringify(scores));
-    console.log('✅ Réponses sauvegardées:', { reponses, scores });
-  } catch(e) {
-    console.error('❌ Erreur sauvegarde réponses:', e);
-  }
+function saveTableAnswers(pageNum) {
+  // Pont historique conservé pendant la migration progressive du QCM.
+  if (pageNum == 6 && window.sebQcmPage6?.save) return window.sebQcmPage6.save();
+  return;
 }
 
 /* === Texte à trous : logique dans js/qcm-texte-trous.js === */
