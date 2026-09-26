@@ -237,8 +237,8 @@ p.write_text(s,encoding='utf-8')
 p=ROOT/'scripts'/'nwtexte-architecture-guard.js'
 s=p.read_text(encoding='utf-8')
 s=s.replace(
-    "const result = read('app/web/qcmv1.0.html');\nconst bilan = read('app/web/admin-bilan.html');",
-    "const result = read('app/web/qcmv1.0.html') + '\\n' + read('app/web/js/qcm-runtime.js') + '\\n' + read('app/web/js/qcm-runtime-ui.js') + '\\n' + read('app/web/js/qcm-runtime-tail.js');\nconst bilan = read('app/web/admin-bilan.html') + '\\n' + read('app/web/js/admin-bilan-runtime.js') + '\\n' + read('app/web/js/admin-bilan-runtime-tail.js');"
+    "const bilan = read('app/web/admin-bilan.html');",
+    "const bilan = read('app/web/admin-bilan.html') + '\\n' + read('app/web/js/admin-bilan-runtime.js') + '\\n' + read('app/web/js/admin-bilan-runtime-tail.js');"
 )
 p.write_text(s,encoding='utf-8')
 
