@@ -80,6 +80,9 @@ jobs:
       - name: Functional QCM Page 2 smoke
         run: xvfb-run -a npm run test:qcm-page2-functional
 
+      - name: Functional QCM Page 2_1 smoke
+        run: xvfb-run -a npm run test:qcm-page2-1-functional
+
       - name: Verify integrated SEB-IA output
         shell: bash
         run: |
