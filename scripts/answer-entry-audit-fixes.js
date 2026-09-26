@@ -184,7 +184,9 @@ function appendBeforeBody(text, block, label) {
       : "    scores[`page${pageNum}_q${i}`] =\n      (bonnes && bonnes[i] && (pageNum == 3\n        ? normalizeSebTime(val) === normalizeSebTime(bonnes[i])\n        : " + tail + "))\n        ? 1 : 0;";
     numericLabel = 'comparaison numérique Pages 2 et 2_1';
   }
-  out = replaceRequired(out, oldStandard, newStandard, numericLabel);
+  if (!(modularPage2 && modularPage2_1 && modularPage3 && modularPage6)) {
+    out = replaceRequired(out, oldStandard, newStandard, numericLabel);
+  }
 
   if (!modularTexteTrous) {
     const oldTextTrous = "    const userAnswer = (input.value || '').trim().toLowerCase();\n    const correct    = (input.dataset && input.dataset.answer)\n                        ? input.dataset.answer.toLowerCase() : '';";
