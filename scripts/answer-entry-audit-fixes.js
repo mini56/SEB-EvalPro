@@ -76,6 +76,7 @@ function appendBeforeBody(text, block, label) {
   const modularPage2 = out.includes('js/qcm-page2.js');
   const modularPage2_1 = out.includes('js/qcm-page2-1.js');
   const modularPage3 = out.includes('js/qcm-page3.js');
+  const modularTexteTrous = out.includes('js/qcm-texte-trous.js');
 
   if (modularPage2) {
     const modulePath = path.join(root, 'app', 'web', 'js', 'qcm-page2.js');
@@ -124,6 +125,23 @@ function appendBeforeBody(text, block, label) {
     }
   }
 
+  if (modularTexteTrous) {
+    const modulePath = path.join(root, 'app', 'web', 'js', 'qcm-texte-trous.js');
+    if (!fs.existsSync(modulePath)) fail('Texte à trous: module qcm-texte-trous.js introuvable', 4);
+    const moduleText = fs.readFileSync(modulePath, 'utf8').replace(/\r\n/g, '\n');
+    for (const token of [
+      'function normalizeAnswer(value)',
+      ".replace(/\\u00A0/g, ' ')",
+      ".replace(/\\s+/g, ' ')",
+      ".toLocaleLowerCase('fr-FR')",
+      "const PAGE_KEY = 'pageTexteTrous';",
+      'storedResponses[PAGE_KEY] = result.responses;',
+      'storedScores[PAGE_KEY] = result.score;'
+    ]) {
+      if (!moduleText.includes(token)) fail('Texte à trous: contrat modulaire absent: ' + token, 4);
+    }
+  }
+
   const plainStandard = "    scores[`page${pageNum}_q${i}`] =\n      (bonnes && bonnes[i] && val.toString().toUpperCase() === bonnes[i].toString().toUpperCase())\n        ? 1 : 0;";
   const timeStandard = "    scores[`page${pageNum}_q${i}`] =\n      (bonnes && bonnes[i] && (pageNum == 3\n        ? normalizeSebTime(val) === normalizeSebTime(bonnes[i])\n        : val.toString().toUpperCase() === bonnes[i].toString().toUpperCase()))\n        ? 1 : 0;";
   const oldStandard = modularPage3 ? plainStandard : timeStandard;
@@ -150,9 +168,11 @@ function appendBeforeBody(text, block, label) {
   }
   out = replaceRequired(out, oldStandard, newStandard, numericLabel);
 
-  const oldTextTrous = "    const userAnswer = (input.value || '').trim().toLowerCase();\n    const correct    = (input.dataset && input.dataset.answer)\n                        ? input.dataset.answer.toLowerCase() : '';";
-  const newTextTrous = "    const userAnswer = normalizeSebAnswerText(input.value);\n    const correct    = (input.dataset && input.dataset.answer)\n                        ? normalizeSebAnswerText(input.dataset.answer) : '';";
-  out = replaceRequired(out, oldTextTrous, newTextTrous, 'normalisation Texte à trous');
+  if (!modularTexteTrous) {
+    const oldTextTrous = "    const userAnswer = (input.value || '').trim().toLowerCase();\n    const correct    = (input.dataset && input.dataset.answer)\n                        ? input.dataset.answer.toLowerCase() : '';";
+    const newTextTrous = "    const userAnswer = normalizeSebAnswerText(input.value);\n    const correct    = (input.dataset && input.dataset.answer)\n                        ? normalizeSebAnswerText(input.dataset.answer) : '';";
+    out = replaceRequired(out, oldTextTrous, newTextTrous, 'normalisation Texte à trous');
+  }
 
   if (modularPage3) {
     if (!out.includes('window.sebQcmPage3.sameTime(value, window.sebQcmPage3.answers[i])')) {
@@ -174,7 +194,11 @@ function appendBeforeBody(text, block, label) {
     fail('Pages 2/2_1 non numériques après patch', 4);
   }
   if (!out.includes('sameSebNumeric(val, bonnes[i])')) fail('Page 6 non numérique après patch', 4);
-  if (!out.includes('normalizeSebAnswerText(input.value)')) fail('Texte à trous non normalisé', 4);
+  if (modularTexteTrous) {
+    if (!out.includes('js/qcm-texte-trous.js')) fail('Texte à trous modulaire absent', 4);
+  } else if (!out.includes('normalizeSebAnswerText(input.value)')) {
+    fail('Texte à trous non normalisé', 4);
+  }
   if (modularPage3) {
     if (!out.includes('window.sebQcmPage3.sameTime(value, window.sebQcmPage3.answers[i])')) fail('fallback Page 3 modulaire non normalisé', 4);
   } else if (!out.includes('normalizeSebTime(value) === normalizeSebTime(bonnesReponsesPage3[i])')) {
