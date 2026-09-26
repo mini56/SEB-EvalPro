@@ -74,6 +74,9 @@ jobs:
       - name: Functional Dictée smoke
         run: xvfb-run -a npm run test:dictee-functional
 
+      - name: Functional QCM final-page smoke
+        run: xvfb-run -a npm run test:qcm-final-functional
+
       - name: Verify integrated SEB-IA output
         shell: bash
         run: |
