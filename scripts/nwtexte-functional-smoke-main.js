@@ -203,6 +203,10 @@ async function verifyReload(win, expectedText) {
   return result;
 }
 
+// Runner GitHub Linux uniquement : le binaire Electron téléchargé ne peut pas
+// utiliser le helper SUID chrome-sandbox sans privilèges root. Ce switch ne
+// concerne que ce smoke test, jamais l'application SEB EvalPro packagée.
+app.commandLine.appendSwitch('no-sandbox');
 app.commandLine.appendSwitch('disable-gpu');
 app.commandLine.appendSwitch('disable-software-rasterizer');
 
