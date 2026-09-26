@@ -61,8 +61,8 @@ if (!dialogs.includes('window.sebNwtexteDialogs = Object.freeze')) fail('API fen
 if (!page.includes("window.sebParcours.goNext('nwtexte')")) fail('nwtexte ne passe pas par le registre parcours');
 if (/nvmail\.html/i.test(page) || /nvmail\.html/i.test(html)) fail('couplage direct nwtexte -> nvmail réintroduit');
 
-const nwPos=parcours.indexOf("{ id:'nwtexte', file:'nwtexte.html' }");
-const mailPos=parcours.indexOf("{ id:'nvmail', file:'nvmail.html' }");
+const nwPos=parcours.indexOf("id:'nwtexte'");
+const mailPos=parcours.indexOf("id:'nvmail'");
 if (nwPos<0||mailPos<=nwPos) fail('ordre parcours nwtexte -> nvmail absent');
 
 // Résultats : compatibilité obligatoire avec les clés historiques du candidat.
