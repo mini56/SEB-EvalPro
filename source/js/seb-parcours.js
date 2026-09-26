@@ -36,7 +36,16 @@
         checkpointStorage:'seb_evalpro_brique_checkpoint'
       })
     }),
-    Object.freeze({ id:'stock', file:'stock.html' }),
+    Object.freeze({
+      id:'stock',
+      file:'stock.html',
+      results:Object.freeze({
+        correctStorage:'stockCorrect',
+        errorStorage:'stockErrors',
+        totalStorage:'stockTotal',
+        stateStorage:'seb_evalpro_stock_state'
+      })
+    }),
     Object.freeze({ id:'planning', file:'planning.html' }),
     Object.freeze({ id:'genrenombres', file:'genrenombres.html' }),
     Object.freeze({
