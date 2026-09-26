@@ -1,34 +1,27 @@
-name: TEST Admin Bilan 0.3.9 Isolated
+name: DIAG Admin Bilan Load 0.3.9
 
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - tmp-windows-setup-039-final-audit
 
 permissions:
   contents: read
 
 jobs:
-  admin-bilan:
+  diagnose:
     runs-on: windows-latest
     timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '24'
-
       - name: Install dependencies
         run: npm install --no-audit --no-fund
-
       - name: Generate clean web application
         run: npm run prepare:web
-
-      - name: Isolated Admin Bilan smoke
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          npx electron --no-sandbox scripts/admin-bilan-windows-smoke.js
-          if ($LASTEXITCODE -ne 0) { throw 'Smoke Admin Bilan isolé échoué.' }
-          Write-Host 'ADMIN_BILAN_ISOLATED_WINDOWS=OK'
+      - name: Locate Admin Bilan load blocker
+        run: npx electron --no-sandbox scripts/admin-bilan-load-diagnostic.js
