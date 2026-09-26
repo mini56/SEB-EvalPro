@@ -15,6 +15,7 @@ if (!fs.existsSync(file)) fail('qcmv1.0.html généré introuvable');
 let html = fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n');
 const modularPage5 = html.includes('js/qcm-page5.js');
 const modularPage5_1 = html.includes('js/qcm-page5-1.js');
+const modularPage6 = html.includes('js/qcm-page6.js');
 let moduleText = '';
 let module51Text = '';
 
@@ -57,11 +58,16 @@ if (modularPage5_1) {
   if (html.includes("const bonnesReponsesPage5_1")) fail('ancien barème Page 5.1 encore inline malgré modularisation', 3);
 }
 
-// Les pages historiques encore dans saveTableAnswers (Page 5.1 / Page 6)
-// doivent fusionner l'état déjà persisté avant toute nouvelle écriture.
-const saveStart = 'function saveTableAnswers(pageNum)  {\n';
-if (!html.includes('SEB_PAGE5_RESULTS_PERSISTENCE')) {
-  if (!html.includes(saveStart)) fail('fonction saveTableAnswers introuvable', 4);
+// Tant que certaines pages utilisent encore saveTableAnswers, fusionner l'état
+// déjà persisté avant toute nouvelle écriture. Lorsque Page 5, 5.1 et 6 sont
+// toutes modularisées, chaque contrôleur fusionne lui-même reponses_data/scores_data.
+if (!html.includes('SEB_PAGE5_RESULTS_PERSISTENCE') && !(modularPage5 && modularPage5_1 && modularPage6)) {
+  const saveStarts = [
+    'function saveTableAnswers(pageNum)  {\n',
+    'function saveTableAnswers(pageNum) {\n'
+  ];
+  const saveStart = saveStarts.find((candidate) => html.includes(candidate));
+  if (!saveStart) fail('fonction saveTableAnswers introuvable', 4);
   html = html.replace(
     saveStart,
     `${saveStart}  // SEB_PAGE5_RESULTS_PERSISTENCE : fusion avec l'état persistant avant toute écriture.\n  try {\n    const savedResponses = JSON.parse(sessionStorage.getItem('reponses_data') || '{}') || {};\n    const savedScores = JSON.parse(sessionStorage.getItem('scores_data') || '{}') || {};\n    reponses = Object.assign({}, savedResponses, reponses || {});\n    scores = Object.assign({}, savedScores, scores || {});\n  } catch (_) {}\n`
@@ -116,7 +122,7 @@ if (!html.includes('SEB_PAGE5_RESULTS_RECOVERY')) {
 }
 
 const checks = [
-  [html.includes('SEB_PAGE5_RESULTS_PERSISTENCE'), 'fusion persistante pages historiques'],
+  [(modularPage5 && modularPage5_1 && modularPage6) || html.includes('SEB_PAGE5_RESULTS_PERSISTENCE'), 'fusion persistante pages historiques'],
   [modularPage5_1 ? module51Text.includes("sessionStorage.setItem(RESPONSE_STORAGE, JSON.stringify(storedResponses));") : html.includes('SEB_PAGE51_IMMEDIATE_PERSIST'), 'persistance immédiate Page 5.1'],
   [html.includes('SEB_PAGE5_RESULTS_RECOVERY'), 'récupération Résultats stagiaire'],
   [html.includes('afficherLigne("Page 5 — Organisation", "page5", 1, 8);'), 'affichage Page 5 Résultats']
