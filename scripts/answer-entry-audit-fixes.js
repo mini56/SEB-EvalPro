@@ -227,40 +227,16 @@ for (const spec of [
 }
 
 // -----------------------------------------------------------------------------
-// 6. Traitement de texte : restauration du comportement stable antérieur au
-//    correctif Dictée #23. Aucune suggestion/correction pendant la rédaction.
+// 6. Traitement de texte : le moteur externe est la seule source fonctionnelle.
+//    Aucun script inline n'est injecté dans la page.
 // -----------------------------------------------------------------------------
 {
-  const { file, text } = read('app/web/nwtexte.html');
-  let out = text.replace(/spellcheck="true"/g, 'spellcheck="false"');
-  if (!out.includes('id="seb-no-live-text-correction"')) {
-    const patch = [
-      '<script id="seb-no-live-text-correction">',
-      '(function(){',
-      "  'use strict';",
-      '  function disableLiveCorrection(){',
-      "    document.querySelectorAll('#editor,.ql-editor,[contenteditable=\"true\"]').forEach(function(editor){",
-      "      editor.setAttribute('spellcheck', 'false');",
-      "      editor.setAttribute('autocorrect', 'off');",
-      "      editor.setAttribute('autocapitalize', 'off');",
-      '      editor.spellcheck = false;',
-      '    });',
-      '  }',
-      "  document.addEventListener('DOMContentLoaded', function(){",
-      '    disableLiveCorrection();',
-      '    setTimeout(disableLiveCorrection, 0);',
-      '    setTimeout(disableLiveCorrection, 250);',
-      '  });',
-      '})();',
-      '</script>'
-    ].join('\n');
-    out = appendBeforeBody(out, patch, 'Traitement de texte sans correction en direct');
-  }
-  if (/spellcheck="true"/.test(out)) fail('Traitement de texte: correcteur natif encore actif', 9);
-  if (!out.includes('seb-no-live-text-correction')) fail('Traitement de texte: garde anti-correction absente', 9);
+  const { text } = read('app/web/nwtexte.html');
   const engine = read('app/web/js/nwtexte-quill-engine.js').text;
-  if (!engine.includes('scores.page7 = analyse.score.total;') || !engine.includes("sessionStorage.setItem('scores_data'")) fail('Traitement de texte: notation Page 7 absente du moteur Quill', 9);
-  write(file, out);
+  if (/spellcheck="true"/.test(text)) fail('Traitement de texte: correcteur natif encore actif', 9);
+  if (/<script(?![^>]*\bsrc=)[^>]*>/i.test(text)) fail('Traitement de texte: script inline réintroduit', 9);
+  if (!engine.includes("quill.root.setAttribute('spellcheck', 'false')")) fail('Traitement de texte: correcteur Quill encore actif', 9);
+  if (!engine.includes('scores.page7 = analyse.score.total;') || !engine.includes("sessionStorage.setItem('scores_data')")) fail('Traitement de texte: notation Page 7 absente du moteur Quill', 9);
 }
 
 // -----------------------------------------------------------------------------

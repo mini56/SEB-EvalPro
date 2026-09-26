@@ -91,7 +91,7 @@
     simulatedPath = state;
 
     try {
-      if (typeof window.sauvegarderContenuEditeur === 'function') window.sauvegarderContenuEditeur();
+      if (window.sebNwtexteEditor?.saveEvaluation) window.sebNwtexteEditor.saveEvaluation();
     } catch (error) {
       console.warn('SEB EvalPro nwtexte: sauvegarde interne après simulation impossible.', error);
     }
@@ -230,6 +230,8 @@
   }
 
   restoreSimulationState();
-  window.enregistrerFichier = saveCurrentOrOpenDialog;
-  window.enregistrerSousFichier = openSaveDialog;
+  window.sebNwtexteSave = Object.freeze({
+    save: saveCurrentOrOpenDialog,
+    saveAs: openSaveDialog
+  });
 })();

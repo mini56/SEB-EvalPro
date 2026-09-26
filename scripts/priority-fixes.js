@@ -189,18 +189,13 @@ function insertBefore(text, marker, addition, label) {
 }
 
 // -----------------------------------------------------------------------------
-// 5 : neutralisation explicite du correcteur dans Quill et la page générée.
+// 5 : nwtexte propre en source ; contrôle uniquement, aucune réécriture.
 // -----------------------------------------------------------------------------
 {
-  const { target, text } = read('app/web/nwtexte.html');
-  let out = text.replace(/spellcheck="true"/g, 'spellcheck="false"');
-  write(target, out);
-}
-
-{
-  const { target, text } = read('app/web/js/nwtexte-quill-engine.js');
-  let out = text.replace("quill.root.setAttribute('spellcheck', 'true');", "quill.root.setAttribute('spellcheck', 'false');");
-  write(target, out);
+  const nw = read('app/web/nwtexte.html').text;
+  const engine = read('app/web/js/nwtexte-quill-engine.js').text;
+  if (/spellcheck="true"/.test(nw)) fail('nwtexte: spellcheck HTML encore actif', 7);
+  if (!engine.includes("quill.root.setAttribute('spellcheck', 'false')")) fail('nwtexte: spellcheck Quill encore actif', 7);
 }
 
 // Contrôles finaux bloquants.

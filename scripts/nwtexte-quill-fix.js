@@ -4,91 +4,74 @@ const path = require('path');
 const root = path.resolve(__dirname, '..');
 const webRoot = path.join(root, 'app', 'web');
 const nwtextePath = path.join(webRoot, 'nwtexte.html');
-const saveSimulationPath = path.join(webRoot, 'js', 'nwtexte-save-simulation.js');
-const closedDialogsPath = path.join(webRoot, 'js', 'nwtexte-closed-dialogs.js');
 const quillEnginePath = path.join(webRoot, 'js', 'nwtexte-quill-engine.js');
+const pageControllerPath = path.join(webRoot, 'js', 'nwtexte-page.js');
+const parcoursPath = path.join(webRoot, 'js', 'seb-parcours.js');
 const quillDist = path.join(root, 'node_modules', 'quill', 'dist');
 const vendorDir = path.join(webRoot, 'vendor', 'quill');
 
-function fail(message, code) {
-  console.error(`SEB EvalPro nwtexte: ${message}`);
+function fail(message, code = 2) {
+  console.error('SEB EvalPro nwtexte architecture: ' + message);
   process.exit(code);
 }
 
-if (!fs.existsSync(nwtextePath)) fail('nwtexte.html introuvable.', 2);
-if (!fs.existsSync(saveSimulationPath)) fail('simulation d’enregistrement nwtexte introuvable.', 3);
-if (!fs.existsSync(closedDialogsPath)) fail('fenêtres fictives Ouvrir/Image nwtexte introuvables.', 8);
-if (!fs.existsSync(quillEnginePath)) fail('moteur Quill nwtexte introuvable.', 12);
-const quillEngine = fs.readFileSync(quillEnginePath, 'utf8');
-for (const token of [
-  'SEB_NWTEXTE_STABLE_TYPING_FORMAT_124',
-  "let activeTypingFont = 'Calibri'",
-  "let activeTypingSize = '14px'",
-  'rememberTypingFormat(name, value)',
-  'applyTypingFormat(range)'
-]) {
-  if (!quillEngine.includes(token)) fail('stabilisation police/taille nwtexte absente: ' + token, 13);
+for (const file of [nwtextePath, quillEnginePath, pageControllerPath, parcoursPath]) {
+  if (!fs.existsSync(file)) fail('fichier introuvable: ' + path.relative(root, file));
 }
 for (const name of ['quill.js', 'quill.core.css']) {
-  if (!fs.existsSync(path.join(quillDist, name))) fail(`dépendance Quill manquante: ${name}`, 4);
+  if (!fs.existsSync(path.join(quillDist, name))) fail('dépendance Quill manquante: ' + name, 3);
 }
-
-fs.mkdirSync(vendorDir, { recursive: true });
+fs.mkdirSync(vendorDir, { recursive:true });
 fs.copyFileSync(path.join(quillDist, 'quill.js'), path.join(vendorDir, 'quill.js'));
 fs.copyFileSync(path.join(quillDist, 'quill.core.css'), path.join(vendorDir, 'quill.core.css'));
 
-let html = fs.readFileSync(nwtextePath, 'utf8');
-const beforeButtons = (html.match(/<button\b/gi) || []).length;
-const beforeSelects = (html.match(/<select\b/gi) || []).length;
+const html = fs.readFileSync(nwtextePath, 'utf8');
+const engine = fs.readFileSync(quillEnginePath, 'utf8');
+const page = fs.readFileSync(pageControllerPath, 'utf8');
+const parcours = fs.readFileSync(parcoursPath, 'utf8');
 
-if (!html.includes('vendor/quill/quill.core.css')) {
-  html = html.replace('</head>', `<link rel="stylesheet" href="vendor/quill/quill.core.css" id="seb-nwtexte-quill-core">\n<style id="seb-nwtexte-quill-visual-compat">\n#editor.ql-container{font-family:inherit;}\n#editor .ql-editor{padding:0;height:auto;min-height:100%;overflow:visible;font-family:Calibri,sans-serif;font-size:14px;line-height:normal;white-space:pre-wrap;}\n#editor .ql-editor p{margin:0;padding:0;}\n#editor .ql-editor img{max-width:320px;display:block;margin:6px 0;}\n</style>\n</head>`);
-}
-
-html = html.replace(
-  '<div id="editor" contenteditable="true" spellcheck="true"></div>',
-  '<div id="editor" spellcheck="true"></div>'
-);
-
-const realOpenControl = '<div><label style="cursor:pointer; display:block;">📂 Ouvrir<input type="file" id="openFile" accept=".txt,.html" style="display:none;" onchange="ouvrirFichier(this.files)"></label></div>';
-const fakeOpenControl = '<div onclick="ouvrirFichierFictif(); toggleMenu(false)">📂 Ouvrir</div>';
-if (!html.includes(realOpenControl)) fail('contrôle Ouvrir historique introuvable.', 9);
-html = html.replace(realOpenControl, fakeOpenControl);
-
-const realImageControl = '      <input type="file" accept="image/*" onchange="insererImage(this.files)" id="input-image" style="display:none;">\n      <button onclick="document.getElementById(\'input-image\').click()" title="Insérer une image">';
-const fakeImageControl = '      <button onclick="ouvrirImageFictive()" title="Insérer une image">';
-if (!html.includes(realImageControl)) fail('contrôle Image historique introuvable.', 10);
-html = html.replace(realImageControl, fakeImageControl);
-
-const legacyStart = html.indexOf("<script>\n(function () {\n  'use strict';");
-const nextSimpleMarker = '<script>\nfunction nextSimple(){';
-const legacyEnd = html.indexOf(nextSimpleMarker, legacyStart);
-if (legacyStart < 0 || legacyEnd < 0) fail('bloc moteur historique introuvable.', 5);
-
-const replacement = `<script src="vendor/quill/quill.js"></script>\n<script src="js/nwtexte-quill-engine.js"></script>\n<script src="js/nwtexte-save-simulation.js"></script>\n<script src="js/nwtexte-closed-dialogs.js"></script>\n\n`;
-html = html.slice(0, legacyStart) + replacement + html.slice(legacyEnd);
-
-const afterButtons = (html.match(/<button\b/gi) || []).length;
-const afterSelects = (html.match(/<select\b/gi) || []).length;
-if (beforeButtons !== afterButtons || beforeSelects !== afterSelects) {
-  fail(`interface modifiée par erreur (boutons ${beforeButtons}->${afterButtons}, listes ${beforeSelects}->${afterSelects}).`, 6);
-}
-
-for (const required of [
-  'onclick="format(\'bold\')"',
-  'onchange="setFontSize(this.value)"',
-  'onchange="changerInterligne(this.value)"',
-  'onclick="nextSimple()"',
-  'onclick="ouvrirFichierFictif(); toggleMenu(false)"',
-  'onclick="ouvrirImageFictive()"',
+for (const token of [
+  'css/nwtexte.css',
+  'vendor/quill/quill.core.css',
+  'css/nwtexte-quill.css',
+  'vendor/quill/quill.js',
+  'js/seb-parcours.js',
   'js/nwtexte-quill-engine.js',
   'js/nwtexte-save-simulation.js',
-  'js/nwtexte-closed-dialogs.js'
-]) {
-  if (!html.includes(required)) fail(`contrôle de structure absent: ${required}`, 7);
+  'js/nwtexte-closed-dialogs.js',
+  'js/nwtexte-page.js',
+  'id="nw-file-open"',
+  'id="nw-image-button"',
+  'id="nw-skip"',
+  'id="btn-score"'
+]) if (!html.includes(token)) fail('structure nwtexte absente: ' + token, 4);
+
+for (const [regex,label] of [
+  [/<script(?![^>]*\bsrc=)[^>]*>/i, 'script inline'],
+  [/\son[a-z]+\s*=/i, 'gestionnaire inline'],
+  [/contenteditable\s*=/i, 'contenteditable historique'],
+  [/type=["']file["']/i, 'accès fichier Windows'],
+  [/document\.execCommand/i, 'execCommand historique']
+]) if (regex.test(html)) fail(label + ' encore présent dans nwtexte.html', 5);
+
+for (const token of [
+  'window.sebNwtexteEditor = editorApi',
+  'scores.page7 = analyse.score.total;',
+  'responses.page7_contenu_html = analyse.html;',
+  'responses.page7_analyse = analyse;',
+  'score.enregistrement'
+]) if (!engine.includes(token)) fail('contrat moteur absent: ' + token, 6);
+
+if (engine.includes('document.execCommand') || engine.includes('window.enregistrerFichier') ||
+    engine.includes('window.ouvrirFichier') || engine.includes('window.insererImage')) {
+  fail('ancienne API globale encore présente dans le moteur Quill', 7);
+}
+if (!page.includes("window.sebParcours.goNext('nwtexte')") || /nvmail\.html/i.test(page)) {
+  fail('navigation nwtexte encore couplée directement à nvmail', 8);
+}
+if (!parcours.includes("{ id:'nwtexte', file:'nwtexte.html' }") ||
+    !parcours.includes("{ id:'nvmail', file:'nvmail.html' }")) {
+  fail('registre de parcours nwtexte -> nvmail incomplet', 9);
 }
 
-if (/type=["']file["']/i.test(html)) fail('un accès fichier Windows subsiste dans nwtexte.html.', 11);
-
-fs.writeFileSync(nwtextePath, html, 'utf8');
-console.log(`SEB EvalPro nwtexte: Quill 2 + simulations internes intégrés; aucun sélecteur de fichier Windows; interface conservée (${afterButtons} boutons, ${afterSelects} listes).`);
+console.log('SEB EvalPro nwtexte: page pilote propre, moteur Quill unique, navigation centralisée — OK.');
