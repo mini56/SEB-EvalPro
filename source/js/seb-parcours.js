@@ -46,7 +46,16 @@
         stateStorage:'seb_evalpro_stock_state'
       })
     }),
-    Object.freeze({ id:'planning', file:'planning.html' }),
+    Object.freeze({
+      id:'planning',
+      file:'planning.html',
+      results:Object.freeze({
+        scoreStorage:'planningScore',
+        correctionStorage:'planningCorrection',
+        stateStorage:'seb_evalpro_planning_state',
+        validatedStorage:'seb_planning_validated'
+      })
+    }),
     Object.freeze({ id:'genrenombres', file:'genrenombres.html' }),
     Object.freeze({
       id:'tri-de-cheville',
