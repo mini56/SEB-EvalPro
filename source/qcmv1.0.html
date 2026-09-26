@@ -863,14 +863,14 @@ pre {
     </table>
 	
 	<br>
-	<button onclick="saveTableAnswers(3); saveAnswer(3,'Mauvaise réponse',0); nextPage('pageTexteTrous');"class="passez">Passez</button>
-    <button onclick="saveTableAnswers(3); saveAnswer(3,'Bonne réponse',1); nextPage('pageTexteTrous');"class="suivant">Suivant</button>
+	<button id="page3Pass" type="button" class="passez">Passez</button>
+    <button id="page3Next" type="button" class="suivant">Suivant</button>
     
   </div>
   </div>
   </div>
   
-  <!-- FIN PAGE 3 -->
+  <script src="js/qcm-page3.js"></script>\n  <!-- FIN PAGE 3 -->
 
   <!-- PAGE TEXTE A TROUS -->
   <div id="pageTexteTrous" class="page">
@@ -1423,11 +1423,6 @@ let reponses = {};
 let scores   = {};
 
 /* === Bonnes réponses / ensembles === */
-const bonnesReponsesPage3   = {
-  1:"9h15", 2:'8h50', 3:'9h05', 4:'9h20', 5:'8h45', 6:'5h15',
-  7:'9h45', 8:'9h15', 9:'9h30', 10:'9h55', 11:'9h25', 12:'2h35',
-  13:'0h31', 14:'1h03'
-};
 
 const bonnesReponsesPage5   = { 1:'2', 2:'5', 3:'3', 4:'1', 5:'4', 6:'7', 7:'8', 8:'6' };
 const bonnesReponsesPage5_1 = { autorisees: ['2','3','5'] };
@@ -1782,9 +1777,7 @@ function saveTableAnswers(pageNum)  {
   // --- Cas standard pour les autres pages ---
   let bonnes, start = 0, end = -1;
   
-  if (pageNum == 3) {
-    bonnes = bonnesReponsesPage3;   start = 1;  end = 14;
-  } else if (pageNum == 5) {
+  if (pageNum == 5) {
     bonnes = bonnesReponsesPage5;   start = 1;  end = 8;
   } else if (pageNum == 6) {
     bonnes = bonnesReponsesPage6; start = 1; end = 10;
@@ -1820,7 +1813,7 @@ function saveTableAnswers(pageNum)  {
     return;
   }
 
-  // Pour pages 3 et 5
+  // Pour page 5
   for (let i = start; i <= end; i++) {
     const inputId = `reponse${pageNum}_${i}`;
     const inputEl = document.getElementById(inputId);
@@ -1831,13 +1824,6 @@ function saveTableAnswers(pageNum)  {
         ? 1 : 0;
   }
 
-  // champs spécifiques à la page 3 (si présents)
-  if (pageNum == 3) {
-    const avgR = document.getElementById('reponse3_avg_reception');
-    const avgS = document.getElementById('reponse3_avg_rangement');
-    reponses['page3_avg_reception'] = avgR ? (avgR.value.trim() || '') : '';
-    reponses['page3_avg_rangement'] = avgS ? (avgS.value.trim() || '') : '';
-  }
   // SAUVEGARDE GLOBALE dans sessionStorage
   try {
     sessionStorage.setItem('reponses_data', JSON.stringify(reponses));
