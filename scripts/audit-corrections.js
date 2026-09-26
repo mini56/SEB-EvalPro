@@ -157,6 +157,23 @@ function patchStockScoring() {
 function patchAutoEval1() {
   const { file, html } = read('autoeval1.html');
   let out = html;
+
+  // Version modulaire : les deux anciennes corrections inline sont désormais
+  // intégrées dans le contrôleur source et ne doivent plus être réinjectées.
+  if (out.includes('js/autoeval1-page.js')) {
+    const moduleFile = path.join(webDir, 'js', 'autoeval1-page.js');
+    if (!fs.existsSync(moduleFile)) throw new Error('SEB EvalPro audit: module autoeval1 introuvable');
+    const moduleText = fs.readFileSync(moduleFile, 'utf8').replace(/\r\n/g, '\n');
+    for (const token of [
+      "sessionStorage.setItem(STORAGE_KEY, JSON.stringify(data));",
+      "window.sebParcours.goNext('autoeval1')",
+      'function validateAndNext()'
+    ]) {
+      if (!moduleText.includes(token)) throw new Error('SEB EvalPro audit: contrat autoeval1 modulaire absent: ' + token);
+    }
+    return;
+  }
+
   out = mustReplace(
     out,
     'onclick="saveAutoEval1(); passerEtapeSuivante()"',
