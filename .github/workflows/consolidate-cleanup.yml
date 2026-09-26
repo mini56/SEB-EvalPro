@@ -1,0 +1,44 @@
+name: Consolidate Cleanup Sources
+
+on:
+  push:
+    branches:
+      - tmp-cleanup-current-source
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  consolidate:
+    if: \${{ !contains(github.event.head_commit.message, '[consolidated]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download green reference
+        env:
+          GH_TOKEN: \${{ github.token }}
+        run: gh run download 36262542645 -n green-generated-reference -D /tmp/greenref
+
+      - name: Consolidate validated generated output into sources
+        env:
+          GREEN_REF_DIR: /tmp/greenref
+        run: python scripts/consolidate-green-reference.py
+
+      - name: Verify clean preparation and JavaScript syntax
+        shell: bash
+        run: |
+          npm run prepare:web
+          for f in source/js/*.js src/*.js; do node --check "$f" >/dev/null; done
+          echo "CLEAN_SOURCE_SYNTAX=OK"
+
+      - name: Commit consolidated sources
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add source overrides src scripts/prepare-web.js scripts/source-html-architecture-guard.js scripts/*architecture-guard.js scripts/parcours-registry-guard.js scripts/build159-clean-regression-guard.js package.json
+          git commit -m "Consolidate validated build patches into canonical sources [consolidated]"
+          git push
