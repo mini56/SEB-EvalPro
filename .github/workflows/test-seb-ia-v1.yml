@@ -46,6 +46,9 @@ jobs:
       - name: Functional autoeval2 smoke
         run: xvfb-run -a npm run test:autoeval2-functional
 
+      - name: Functional paronymes smoke
+        run: xvfb-run -a npm run test:paronymes-functional
+
       - name: Verify integrated SEB-IA output
         shell: bash
         run: |

@@ -199,7 +199,7 @@ Votre mission : retrouver, parmi plusieurs propositions, le paronyme qui convien
             <!--h3 style="margin:0; font-size:18px; color:#233345;">Sélectionnez dans chaque ligne, le mot qui a le sens le plus proche du mot souligné.</h3-->
             <table>
                 <!--tr>Une seule réponse possible par ligne.</tr-->
-                <tr><td class="paronyme">Apitoiement</td><td>Pitié</td><td>Appétence</td><td data-correct="true">Attendrissement</td><td>Capiteux</td><td>Piété</td></tr>
+                <tr><td class="paronyme">Apitoiement</td><td data-correct="true">Pitié</td><td>Appétence</td><td>Indifférence</td><td>Capiteux</td><td>Piété</td></tr>
                 <tr><td class="paronyme">Idéaux</td><td>Rèves</td><td>Idées</td><td>Pensées</td><td>Géniaux</td><td data-correct="true">Parfait</td></tr>
 				<tr><td class="paronyme">Enseignent</td><td>Disent</td><td>Marquent</td><td>Saignent</td><td data-correct="true">Instruise</td><td>Assignent</td></tr>
 				<tr><td class="paronyme">Arboré</td><td>Abhorré</td><td>Planté</td><td>Détesté</td><td data-correct="true">Boisé</td><td>Orée</td></tr>
@@ -234,111 +234,13 @@ Votre mission : retrouver, parmi plusieurs propositions, le paronyme qui convien
                 Une seule réponse possible par ligne.
             </ul>
         
-    <button id="btnCheck" class="btn" onclick="verifierReponses()">Vérifier</button>
+    <button id="btnCheck" class="btn" type="button">Vérifier</button>
     
 </div>
         
 </div>
 
-<script>
-// Rendre les cellules cliquables (sauf la première colonne avec class="paronyme")
-document.querySelectorAll('td:not(.paronyme)').forEach(cell => {
-    cell.addEventListener('click', function() {
-        // Ne rien faire si déjà vérifié
-        if (this.classList.contains('correct-answer') || this.classList.contains('wrong-answer')) {
-            return;
-        }
-        
-        // Retirer la sélection des autres cellules de la même ligne
-        const row = this.parentElement;
-        row.querySelectorAll('td:not(.paronyme)').forEach(td => {
-            td.classList.remove('selected');
-        });
-        
-        // Ajouter la sélection à cette cellule
-        this.classList.add('selected');
-    });
-});
-
-function verifierReponses() {
-    let score = 0;
-    let total = 0;
-    let reponsesParonymes = []; // ✅ Changé de "reponses" à "reponsesParonymes"
-    
-    document.querySelectorAll('tr').forEach((row, index) => {
-        const paronyme = row.querySelector('.paronyme');
-        if (!paronyme) return;
-        
-        const selected = row.querySelector('td.selected');
-        const corrects = row.querySelectorAll('td[data-correct="true"]');
-        
-        total++;
-        
-        let isCorrect = false;
-        let userAnswer = '';
-        let correctAnswers = [];
-        
-        corrects.forEach(c => correctAnswers.push(c.textContent.trim()));
-        
-        if (selected) {
-            userAnswer = selected.textContent.trim();
-            
-            if (selected.dataset.correct === "true") {
-                selected.classList.add('correct-answer');
-                selected.classList.remove('wrong-answer', 'selected');
-                score++;
-                isCorrect = true;
-            } else {
-                selected.classList.add('wrong-answer');
-                selected.classList.remove('correct-answer', 'selected');
-                corrects.forEach(c => c.classList.add('correct-answer'));
-            }
-        } else {
-            userAnswer = '(non repondu)';
-            corrects.forEach(c => c.classList.add('correct-answer'));
-        }
-        
-        reponsesParonymes.push({
-            paronyme: paronyme.textContent.trim(),
-            reponseUtilisateur: userAnswer,
-            bonnesReponses: correctAnswers,
-            correct: isCorrect
-        });
-        
-        row.querySelectorAll('td:not(.paronyme)').forEach(td => {
-            td.style.cursor = 'default';
-        });
-    });
-    
-    // ✅ SAUVEGARDE DANS sessionStorage
-    try {
-        sessionStorage.setItem('paronymes_score', score.toString());
-        sessionStorage.setItem('paronymes_total', total.toString());
-        sessionStorage.setItem('paronymes_reponses', JSON.stringify(reponsesParonymes));
-        
-        console.log('✅ Score paronymes enregistré:', score + '/' + total);
-        console.log('📋 Réponses:', reponsesParonymes);
-        
-    } catch(e) {
-        console.error('❌ Erreur sauvegarde paronymes:', e);
-    }
-    
-    alert('Score : ' + score + ' / ' + total);
-    
-    // ✅ AJOUTER BOUTON SUIVANT
-    const btnCheck = document.getElementById('btnCheck');
-    if (btnCheck) {
-        btnCheck.style.display = 'none';
-        
-        const btnNext = document.createElement('button');
-        btnNext.className = 'btn';
-        btnNext.textContent = 'Suivant →';
-        btnNext.onclick = () => window.location.href = 'carre.html';
-        
-        btnCheck.parentElement.appendChild(btnNext);
-    }
-}
- 
-</script>
+<script src="js/seb-parcours.js"></script>
+<script src="js/paronymes-page.js"></script>
 </body>
 </html>

@@ -156,9 +156,15 @@ for (const spec of [
 {
   const { file, text } = read('app/web/paronymes.html');
   let out = text;
-  const rowRegex = /<tr><td class="paronyme">Apitoiement<\/td><td(?: data-correct="true")?>Pitié<\/td><td>Appétence<\/td><td(?: data-correct="true")?>Attendrissement<\/td><td>Capiteux<\/td><td>Piété<\/td><\/tr>/;
-  if (!rowRegex.test(out)) fail('Paronymes: ligne Apitoiement introuvable', 7);
-  out = out.replace(rowRegex, '<tr><td class="paronyme">Apitoiement</td><td data-correct="true">Pitié</td><td>Appétence</td><td>Indifférence</td><td>Capiteux</td><td>Piété</td></tr>');
+  const finalRow = '<tr><td class="paronyme">Apitoiement</td><td data-correct="true">Pitié</td><td>Appétence</td><td>Indifférence</td><td>Capiteux</td><td>Piété</td></tr>';
+  const legacyRowRegex = /<tr><td class="paronyme">Apitoiement<\/td><td(?: data-correct="true")?>Pitié<\/td><td>Appétence<\/td><td(?: data-correct="true")?>Attendrissement<\/td><td>Capiteux<\/td><td>Piété<\/td><\/tr>/;
+  if (out.includes(finalRow)) {
+    // Source déjà alignée sur la correction validée.
+  } else if (legacyRowRegex.test(out)) {
+    out = out.replace(legacyRowRegex, finalRow);
+  } else {
+    fail('Paronymes: ligne Apitoiement introuvable', 7);
+  }
   const rows = (out.match(/<tr>[\s\S]*?<\/tr>/g) || []).filter((row) => row.includes('class="paronyme"'));
   if (rows.length !== 20) fail('Paronymes: ' + rows.length + ' lignes au lieu de 20', 7);
   rows.forEach((row, index) => {
