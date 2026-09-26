@@ -128,7 +128,7 @@ try {
   if (qcmCompatInjected && fs.existsSync(qcmCompatPath)) {
     let qcmCompatHtml = fs.readFileSync(qcmCompatPath, 'utf8').replace(/\r\n/g, '\n');
     const compatRegex = new RegExp(
-      '<script\\s+id=["\\']' + qcmCompatMarker + '["\\'][^>]*>\\n?([\\s\\S]*?)\\n?<\\/script>',
+      "<script\\s+id=[\"']" + qcmCompatMarker + "[\"'][^>]*>\\n?([\\s\\S]*?)\\n?<\\/script>",
       'i'
     );
     const match = qcmCompatHtml.match(compatRegex);
