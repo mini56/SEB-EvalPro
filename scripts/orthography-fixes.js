@@ -109,7 +109,7 @@ save(path.join(root, 'app/web/qcmv1.0.html'), qcm);
 
 // Messagerie : les formulations validées sont désormais directement dans source/nvmail.html.
 // Ce contrôle empêche une ancienne source ou une ancienne rustine de les réintroduire.
-const mail = read('app/web/nvmail.html');
+const mail = load('app/web/nvmail.html').text;
 for (const token of [
   'les adresses e-mail',
   'suivantes :',
