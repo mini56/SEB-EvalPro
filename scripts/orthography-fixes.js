@@ -216,7 +216,14 @@ patchBilan('app/web/bilan.html');
 }
 {
   const { text } = load('app/web/planning.html');
-  if (!text.includes('q7:"Spaghettis"')) fail('Planning: solution q7 non synchronisée avec Spaghettis', 12);
+  const modulePath = path.join(root, 'app', 'web', 'js', 'planning-page.js');
+  if (text.includes('js/planning-page.js')) {
+    if (!fs.existsSync(modulePath)) fail('Planning: module planning-page.js introuvable', 12);
+    const moduleText = fs.readFileSync(modulePath, 'utf8').replace(/\r\n/g, '\n');
+    if (!moduleText.includes("q7:'Spaghettis'")) fail('Planning: solution q7 modulaire non synchronisée avec Spaghettis', 12);
+  } else if (!text.includes('q7:"Spaghettis"')) {
+    fail('Planning: solution q7 non synchronisée avec Spaghettis', 12);
+  }
 }
 {
   const { text } = load('app/web/js/nwtexte-quill-engine.js');
