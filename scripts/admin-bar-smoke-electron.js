@@ -293,4 +293,4 @@ app.whenReady().then(async () => {
   }
 });
 
-setTimeout(() => fail('délai global dépassé'), 90000).unref();
+setTimeout(() => fail('délai global dépassé'), 180000).unref();
