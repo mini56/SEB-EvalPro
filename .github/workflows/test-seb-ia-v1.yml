@@ -49,6 +49,9 @@ jobs:
       - name: Functional paronymes smoke
         run: xvfb-run -a npm run test:paronymes-functional
 
+      - name: Functional Carré smoke
+        run: xvfb-run -a npm run test:carre-functional
+
       - name: Verify integrated SEB-IA output
         shell: bash
         run: |

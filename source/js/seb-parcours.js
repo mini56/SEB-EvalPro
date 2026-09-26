@@ -51,7 +51,15 @@
 
     Object.freeze({ id:'autoeval2', file:'autoeval2.html' }),
     Object.freeze({ id:'paronymes', file:'paronymes.html' }),
-    Object.freeze({ id:'carre', file:'carre.html' }),
+    Object.freeze({
+      id:'carre',
+      file:'carre.html',
+      results:Object.freeze({
+        scoreStorage:'carre_magique_score',
+        errorStorage:'carre_magique_erreurs',
+        displayStorage:'puzzleErrors'
+      })
+    }),
 
     Object.freeze({ id:'qcm-11', file:'qcmv1.0.html', page:'11' }),
     Object.freeze({ id:'qcm-finale', file:'qcmv1.0.html', page:'finale' })
