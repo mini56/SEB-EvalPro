@@ -32,6 +32,26 @@ function appendBeforeBody(text, addition, label) {
 {
   const { file, text } = read('app/web/planning.html');
   let out = text;
+  const modularPlanning = out.includes('js/planning-page.js');
+
+  if (modularPlanning) {
+    const modulePath = path.join(root, 'app', 'web', 'js', 'planning-page.js');
+    if (!fs.existsSync(modulePath)) fail('module planning-page.js introuvable', 4);
+    const moduleText = fs.readFileSync(modulePath, 'utf8').replace(/\r\n/g, '\n');
+    for (const token of [
+      "const DONE_KEY = 'seb_planning_validated';",
+      'function anyPlanningEntry(answers)',
+      'function lockPlanning()',
+      'function validatePlanning()',
+      "sessionStorage.setItem(SCORE_KEY, String(score));",
+      "sessionStorage.setItem(CORRECTION_KEY, JSON.stringify(correction));",
+      "window.sebParcours.goNext('planning')"
+    ]) {
+      if (!moduleText.includes(token)) fail('verrouillage Planning modulaire incomplet: ' + token, 4);
+    }
+  } else {
+  const { file, text } = read('app/web/planning.html');
+  let out = text;
 
   if (!out.includes('id="seb-planning-lock99"')) {
     const patch = `
@@ -109,6 +129,18 @@ function appendBeforeBody(text, addition, label) {
   }
 
   if (!out.includes('seb-planning-lock99') || !out.includes("validate.style.setProperty('display', 'none', 'important')")) {
+    fail('verrouillage Planning incomplet', 4);
+  }
+  write(file, out);
+
+  }
+
+  if (modularPlanning) {
+    const moduleText = fs.readFileSync(path.join(root, 'app', 'web', 'js', 'planning-page.js'), 'utf8');
+    if (!moduleText.includes("validate.style.setProperty('display', 'none', 'important')")) {
+      fail('verrouillage Planning modulaire incomplet', 4);
+    }
+  } else if (!out.includes('seb-planning-lock99') || !out.includes("validate.style.setProperty('display', 'none', 'important')")) {
     fail('verrouillage Planning incomplet', 4);
   }
   write(file, out);
