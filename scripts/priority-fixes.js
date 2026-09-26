@@ -142,6 +142,21 @@ function insertBefore(text, marker, addition, label) {
 {
   const { target, text } = read('app/web/stock.html');
   let out = text;
+
+  if (out.includes('js/stock-page.js')) {
+    const modulePath = path.join(root, 'app', 'web', 'js', 'stock-page.js');
+    if (!fs.existsSync(modulePath)) fail('Stock: module stock-page.js introuvable', 5);
+    const moduleText = fs.readFileSync(modulePath, 'utf8').replace(/\r\n/g, '\n');
+    for (const token of [
+      "const TOTAL_EVALUATED = 33;",
+      "const EXAMPLE_ID = '8';",
+      "element.dataset.sebExample = 'true';",
+      "document.querySelectorAll('.pot:not([data-seb-example=\"true\"])')",
+      "sessionStorage.setItem(TOTAL_KEY, String(TOTAL_EVALUATED));"
+    ]) {
+      if (!moduleText.includes(token)) fail('Stock modulaire: règle exemple/33 absente: ' + token, 5);
+    }
+  } else {
   out = replaceOnce(
     out,
     "            if (examplePot && targetCase) {\n                targetCase.appendChild(examplePot);",
@@ -157,6 +172,10 @@ function insertBefore(text, marker, addition, label) {
   out = out.replace(/\$\{correctCount\} \/ 34/g, '${correctCount} / 33');
   out = out.replace('sessionStorage.setItem("stockTotal", 34);', 'sessionStorage.setItem("stockTotal", 33);');
   if (!out.includes('stockTotal", 33')) fail('stockTotal 33 absent après correction', 5);
+  write(target, out);
+
+  }
+
   write(target, out);
 }
 
@@ -213,8 +232,8 @@ function insertBefore(text, marker, addition, label) {
     [main.includes("admin:open-candidate-results"), 'accès admin résultats candidat'],
     [preload.includes('adminCandidateResultsWorkspace') && preload.includes('showReadOnlyCandidateResults'), 'accès résultats candidat Admin'],
     [qcm.includes('normalizeSebTime(val) === normalizeSebTime(bonnes[i])'), 'normalisation heures page 3'],
-    [stock.includes('data-seb-example') || stock.includes('sebExample'), 'marquage exemple stock'],
-    [stock.includes('stockTotal", 33'), 'total stock 33'],
+    [(stock.includes('data-seb-example') || stock.includes('sebExample') || (fs.existsSync(path.join(root, 'app', 'web', 'js', 'stock-page.js')) && read('app/web/js/stock-page.js').text.includes("const EXAMPLE_ID = '8';"))), 'marquage exemple stock'],
+    [(stock.includes('stockTotal", 33') || (fs.existsSync(path.join(root, 'app', 'web', 'js', 'stock-page.js')) && read('app/web/js/stock-page.js').text.includes('const TOTAL_EVALUATED = 33;'))), 'total stock 33'],
     [bilan.includes('mso-page-orientation:portrait'), 'Word portrait'],
     [!bilan.includes('id="pdf"'), 'PDF supprimé'],
     [nw.includes('spellcheck="false"'), 'nwtexte sans spellcheck'],
