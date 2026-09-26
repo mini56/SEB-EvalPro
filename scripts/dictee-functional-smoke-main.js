@@ -100,6 +100,7 @@ app.whenReady().then(async () => {
     if (initial.inlineScripts !== 0) throw new Error('Scripts inline encore présents dans la Dictée finale.');
     if (initial.feedbackDisplay !== 'none') throw new Error('Correction candidat non masquée.');
 
+    await win.webContents.executeJavaScript('window.alert = function(){}; true;', true);
     const empty = await win.webContents.executeJavaScript('window.sebDictee.verify()', true);
     if (empty !== null) throw new Error('Une dictée vide a été validée.');
     const emptyStatus = await win.webContents.executeJavaScript('window.sebDictee.getState().status', true);
