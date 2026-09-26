@@ -1,0 +1,4 @@
+#editor.ql-container{font-family:inherit;}
+#editor .ql-editor{padding:0;height:auto;min-height:100%;overflow:visible;font-family:Calibri,sans-serif;font-size:14px;line-height:normal;white-space:pre-wrap;}
+#editor .ql-editor p{margin:0;padding:0;}
+#editor .ql-editor img{max-width:320px;display:block;margin:6px 0;}

@@ -1,0 +1,112 @@
+name: TEST SEB-IA V1
+
+on:
+  push:
+    branches:
+      - tmp-seb-ia-v1
+  pull_request:
+    branches:
+      - tmp-split-candidat-admin-ai-pack
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  seb-ia-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Test SEB-IA engine
+        run: npm run test:seb-ia
+
+      - name: Test candidate data security
+        run: npm run test:security
+
+      - name: Generate web application
+        run: npm run prepare:web
+
+
+      - name: Functional nwtexte smoke
+        run: xvfb-run -a npm run test:nwtexte-functional
+
+      - name: Functional nvmail smoke
+        run: xvfb-run -a npm run test:nvmail-functional
+
+      - name: Functional autoeval2 smoke
+        run: xvfb-run -a npm run test:autoeval2-functional
+
+      - name: Functional paronymes smoke
+        run: xvfb-run -a npm run test:paronymes-functional
+
+      - name: Functional Carré smoke
+        run: xvfb-run -a npm run test:carre-functional
+
+      - name: Functional Tri smoke
+        run: xvfb-run -a npm run test:tri-functional
+
+      - name: Functional autoeval1 smoke
+        run: xvfb-run -a npm run test:autoeval1-functional
+
+      - name: Functional Brique smoke
+        run: xvfb-run -a npm run test:brique-functional
+
+      - name: Functional Stock smoke
+        run: xvfb-run -a npm run test:stock-functional
+
+      - name: Functional Planning smoke
+        run: xvfb-run -a npm run test:planning-functional
+
+      - name: Functional Genre-Nombre smoke
+        run: xvfb-run -a npm run test:genrenombres-functional
+
+      - name: Functional Dictée smoke
+        run: xvfb-run -a npm run test:dictee-functional
+
+      - name: Functional QCM final-page smoke
+        run: xvfb-run -a npm run test:qcm-final-functional
+
+      - name: Functional QCM Page 2 smoke
+        run: xvfb-run -a npm run test:qcm-page2-functional
+
+      - name: Functional QCM Page 2_1 smoke
+        run: xvfb-run -a npm run test:qcm-page2-1-functional
+
+      - name: Functional QCM Page 3 smoke
+        run: xvfb-run -a npm run test:qcm-page3-functional
+
+      - name: Functional QCM Texte à trous smoke
+        run: xvfb-run -a npm run test:qcm-texte-trous-functional
+
+      - name: Functional QCM Page 4 smoke
+        run: xvfb-run -a npm run test:qcm-page4-functional
+
+      - name: Functional QCM Page 5 smoke
+        run: xvfb-run -a npm run test:qcm-page5-functional
+
+      - name: Functional QCM Page 5_1 smoke
+        run: xvfb-run -a npm run test:qcm-page5-1-functional
+
+      - name: Functional QCM Page 6 smoke
+        run: xvfb-run -a npm run test:qcm-page6-functional
+
+      - name: Verify integrated SEB-IA output
+        shell: bash
+        run: |
+          test -f src/seb-ia-engine.js
+          grep -q "SEB_IA_ENGINE" app/web/js/admin-bilan-runtime-tail.js
+          grep -q "SEB_HISTORY_SEB_IA_V1" src/bilan-history-preload.js
+          ! grep -q "build165plus-local-ai-prototype.js" package.json
+          ! grep -q "Ministral-3-8B-Instruct" build/installer.nsh
+          echo "SEB-IA V1 integration checks passed."

@@ -1,0 +1,361 @@
+const assert=require('assert');
+const engine=require('../src/seb-ia-engine');
+
+function rows(defaultLevel='I'){
+  return Object.keys(engine.META).map((key)=>({key,level:defaultLevel,comment:'',detail:''}));
+}
+function set(list,key,level,comment='',detail=''){
+  const row=list.find((r)=>r.key===key);
+  if(!row)throw new Error('clé inconnue: '+key);
+  row.level=level;row.comment=comment;row.detail=detail;
+}
+function make(candidate, list){return engine.generate({candidate,rows:list})}
+function words(text){return String(text||'').trim().split(/\s+/).filter(Boolean).length}
+
+(function stableAndDifferent(){
+  const aRows=rows('I');
+  set(aRows,'fabrication-decoupe','II','Les découpes ne sont pas droites ou incomplètes.');
+  set(aRows,'organisation','III','Réalise la tâche avec de nombreuses erreurs nécessitant un accompagnement.');
+  const snap={civilite:'M.',nom:'TEST'};
+  const a=make(snap,aRows),b=make(snap,aRows);
+  assert(a.ok,a.validation.errors.join(' | '));
+  assert.strictEqual(a.text,b.text,'un même tableau doit produire exactement la même synthèse');
+
+  const cRows=JSON.parse(JSON.stringify(aRows));
+  set(cRows,'planning','III','N’est pas en capacité de déterminer l’ordre d’exécution des tâches.');
+  const c=make(snap,cRows);
+  assert(c.ok,c.validation.errors.join(' | '));
+  assert.notStrictEqual(a.text,c.text,'un tableau différent doit pouvoir produire une synthèse différente');
+})();
+
+(function allPositive(){
+  const out=make({civilite:'Mme',nom:'POSITIF'},rows('I'));
+  assert(out.ok,out.validation.errors.join(' | '));
+  assert(!/difficultés marquées|accompagnement régulier|reste difficile/i.test(out.text),'profil I ne doit pas être dégradé');
+  assert(/acquis|points d’appui|correctement/i.test(out.text),'profil I doit conserver un sens positif');
+})();
+
+(function allDifficult(){
+  const out=make({civilite:'M.',nom:'DIFFICULTE'},rows('III'));
+  assert(out.ok,out.validation.errors.join(' | '));
+  assert(/difficult|accompagnement|fragile|complexe/i.test(out.text),'profil III doit faire apparaître les difficultés');
+  assert(!/acquis solides dans l’ensemble|aucune difficulté particulière/i.test(out.text),'profil III ne doit pas être présenté comme maîtrisé');
+})();
+
+(function abandonAndNe(){
+  const list=rows('I');
+  set(list,'math-problemes','III','Exercice abandonné.');
+  set(list,'fabrication-finition','NE','Non évalué.');
+  const out=make({civilite:'Mme',nom:'ABANDON'},list);
+  assert(out.ok,out.validation.errors.join(' | '));
+  assert(/interromp|hors interprétation|pas été mené/i.test(out.text),'abandon doit rester visible');
+  assert(/pas pu être évalu|hors interprétation|interromp/i.test(out.text),'NE doit rester visible');
+})();
+
+(function abandonReasonFromJourney(){
+  const list=rows('I');
+  set(list,'planning','NE','Non évalué.');
+  const out=engine.generate({
+    candidate:{civilite:'Mme',nom:'MOTIF'},
+    rows:list,
+    abandons:[{
+      key:'planning.html',
+      exercice:'Planification — Le restaurant',
+      raisons:['Je ne comprends pas la consigne','L’exercice est trop difficile'],
+      commentaire:'La personne souhaite arrêter cet exercice.'
+    }]
+  });
+  assert(out.ok,out.validation.errors.join(' | '));
+  assert(/Planification — Le restaurant/i.test(out.text),'exercice abandonné absent de la synthèse');
+  assert(/Je ne comprends pas la consigne/i.test(out.text),'premier motif du parcours perdu');
+  assert(/L’exercice est trop difficile/i.test(out.text),'second motif du parcours perdu');
+  assert(/La personne souhaite arrêter cet exercice/i.test(out.text),'commentaire d’abandon perdu');
+  assert.strictEqual(out.stats.abandoned,1,'abandon du parcours non comptabilisé');
+})();
+
+(function attribution(){
+  const list=rows('I');
+  set(list,'tri-erreurs','II',"Entre 1.1 et 2% d'erreur. 8 erreurs. Monsieur indique que cet exercice est éprouvant pour lui.");
+  set(list,'tri-temps','II','Moyenne 13 : 52');
+  const out=make({civilite:'M.',nom:'ATTRIBUTION'},list);
+  assert(out.ok,out.validation.errors.join(' | '));
+  assert(/Monsieur indique que cet exercice est éprouvant pour lui/i.test(out.text),'une déclaration du candidat doit rester attribuée');
+  assert(!/capacité de concentration|maintenir son attention/i.test(out.text),'le tri ne doit pas produire une inférence sur l’attention');
+  assert(/13 min 52 s/.test(out.text),'le temps explicitement fourni doit être conservé quand il est repris');
+})();
+
+(function numericSafety(){
+  const list=rows('I');
+  set(list,'expression','II','58 % de réponses correctes.');
+  set(list,'math-problemes','III','28 % de réponses correctes.');
+  const out=make({civilite:'Mme',nom:'CHIFFRES'},list);
+  assert(out.ok,out.validation.errors.join(' | '));
+  const allowed=new Set(['58','28']);
+  const digits=out.text.match(/\d+/g)||[];
+  for(const d of digits)assert(allowed.has(d),'nombre inventé dans la synthèse: '+d);
+})();
+
+(function punctuationAndRepetition(){
+  const list=rows('II');
+  set(list,'organisation','I');
+  set(list,'planning','III');
+  set(list,'texte','III');
+  set(list,'mail','I');
+  const out=make({civilite:'M.',nom:'STYLE'},list);
+  assert(out.ok,out.validation.errors.join(' | '));
+  assert(!/\bet\s+et\b/i.test(out.text),'enchaînement "et et" interdit');
+  assert(!/\b(?:Toutefois|Cependant|En revanche)\b[^.]{0,220}\b\1\b/i.test(out.text),'connecteur contrastif répété dans une même phrase');
+  assert(!/[ \t]{2,}/.test(out.text),'espaces multiples interdits');
+  assert(!/\bà le\b|\bde le\b/i.test(out.text),'contractions françaises incorrectes');
+  assert(!/\S;/.test(out.text),'espace française avant point-virgule absente');
+  const sentences=out.text.match(/[^.!?]+[.!?]+/g)||[];
+  assert(!sentences.some((s)=>s.trim().length>240),'phrase trop longue');
+  const starts=sentences.map(s=>String(s).trim().toLocaleLowerCase('fr-FR').replace(/^[^a-zà-ÿ]+/i,'').split(/\s+/).slice(0,3).join(' '));
+  for(let i=2;i<starts.length;i++)assert(!(starts[i]&&starts[i]===starts[i-1]&&starts[i]===starts[i-2]),'trois phrases consécutives avec le même départ: '+starts[i]);
+})();
+
+
+(function controlledVocabulary(){
+  assert(engine.VOCABULARY,'banque de vocabulaire SEB-IA absente');
+  assert(engine.VOCABULARY.support.length>=5,'vocabulaire réussite trop pauvre');
+  assert(engine.VOCABULARY.consolidation.length>=5,'vocabulaire consolidation trop pauvre');
+  assert(engine.VOCABULARY.difficulty.length>=5,'vocabulaire difficulté trop pauvre');
+  assert(engine.VOCABULARY.contrast.length>=5,'connecteurs de contraste trop pauvres');
+  assert(engine.VOCABULARY.addition.length>=5,'connecteurs d’ajout trop pauvres');
+})();
+
+
+(function realTableCommentsCoverage(){
+  const list=rows('I');
+  set(list,'fabrication-plan','III',"A besoin qu'on lui montre un exemple ou d'utiliser un gabarit pour commencer l'exercice.");
+  set(list,'fabrication-tracage','III','Les traits ne sont pas droits et pas aux dimensions attendues.');
+  set(list,'fabrication-decoupe','III','La personne n’utilise pas toujours les ciseaux de manière adaptée.');
+  set(list,'fabrication-assemblage','II','La personne demande des consignes supplémentaires pour assembler.');
+  set(list,'fabrication-finition','III',"L’aspect du produit n'est pas conforme aux exigences, pas ou peu de finition.");
+  set(list,'briques-identification','III',"La personne a besoin de consignes supplémentaires et qu'on lui montre un exemple pour commencer l'exercice.");
+  set(list,'briques-manipulation','II','Reconnait les pièces mais les assemble avec difficulté.');
+  set(list,'carre','II',"Est en capacité d'identifier les contraintes d'un problème structuré et d'en résoudre partiellement les relations.");
+  set(list,'organisation','II',"Est en capacité d'effectuer une tâche de gestion de stock multicritère, mais produit des erreurs.");
+  set(list,'planning','II',"Est en capacité de déterminer l’ordre d’exécution de tâches les unes par rapport aux autres mais produit des erreurs.");
+  set(list,'texte','III','Ne sait pas utiliser un logiciel de traitement de texte.');
+  set(list,'mail','II','A besoin d’aide pour envoyer un message et/ou des oublis de consignes sont révélés.');
+  set(list,'expression','III',"La structure des phrases et l’orthographe grammaticale n’est pas correcte.");
+  set(list,'math-enonce','II','A compris et exécuté partiellement une consigne unique.');
+  set(list,'math-problemes','III','La personne a recouru à des stratégies inappropriées ou sans liens avec les exigences de la situation.');
+  const out=make({civilite:'Mme',nom:'COMMENTAIRES'},list);
+  assert(out.ok,out.validation.errors.join(' | '));
+  assert(/exemple|gabarit/i.test(out.text),'besoin de modèle/gabarit perdu');
+  assert(/ciseaux/i.test(out.text),'utilisation des ciseaux perdue');
+  assert(!/cutter/i.test(out.text),'ancienne référence au cutter réintroduite');
+  assert(/consignes supplémentaires|indications complémentaires/i.test(out.text),'besoin de consignes assemblage perdu');
+  assert(/peu présentes|très limité/i.test(out.text),'finitions faibles perdues');
+  assert(/pièces sont reconnues|identification des pièces/i.test(out.text),'distinction briques reconnues/assemblage perdue');
+  assert(/partielle|partiellement/i.test(out.text),'raisonnement partiel perdu');
+  assert(/multicritère|plusieurs critères/i.test(out.text),'organisation multicritère perdue');
+  assert(/ordre d’exécution|enchaînement/i.test(out.text),'planning avec erreurs perdu');
+  assert(/traitement de texte/i.test(out.text),'commentaire traitement de texte perdu');
+  assert(/messagerie|message/i.test(out.text),'commentaire messagerie perdu');
+  assert(/orthographe|structuration/i.test(out.text),'commentaire expression perdu');
+  assert(/consigne.*part/i.test(out.text),'commentaire math consigne perdu');
+  assert(/stratégies|méthode/i.test(out.text),'commentaire problèmes maths perdu');
+})();
+
+(function durantReferenceCase(){
+  const list=rows('I');
+  set(list,'fabrication-plan','I',"La personne n'a pas besoin d'aide pour commencer l'exercice.");
+  set(list,'fabrication-tracage','II','Les traits sont droits mais pas aux dimensions indiquées.');
+  set(list,'fabrication-decoupe','I','Les découpes sont conformes.');
+  set(list,'fabrication-assemblage','I',"La personne n'a pas besoin d'aide et l'assemblage est conforme.");
+  set(list,'fabrication-finition','II',"L’aspect du produit n'est pas conforme aux exigences, les opérations de finition ne sont pas effectuées avec précision.");
+  set(list,'briques-identification','I',"La personne n'a pas besoin d'aide pour commencer l'exercice.");
+  set(list,'briques-manipulation','I','Assemble les pièces sans difficultés. - 1 erreur.');
+  set(list,'carre','III',"A des difficultés à identifier les contraintes d'un problème structuré et à établir les relations entre ses éléments. - 10 erreurs.");
+  set(list,'organisation','III','Réalise la tâche avec de nombreuses erreurs nécessitant un accompagnement. - 30 erreurs.');
+  set(list,'planning','III',"N’est pas en capacité de déterminer l’ordre d’exécution de tâches les unes par rapport aux autres. - 12 erreurs.");
+  set(list,'tri-temps','I','Moyenne 00:03','N°1 : 00 min 02 s · N°2 : 00 min 04 s · N°3 : 00 min 03 s · N°4 : 00 min 05 s · N°5 : 00 min 02 s');
+  set(list,'tri-erreurs','I','6 erreurs. Fiabilité satisfaisante.');
+  set(list,'texte','II','A besoin d’aide pour utiliser un logiciel de traitement de texte pour produire un travail individuel présentable à un tiers. - 4 erreurs.');
+  set(list,'mail','I','Est capable d’envoyer seule un message hiérarchisé par des codes et à deux destinataires convenus. - 1 erreur.');
+  set(list,'expression','II','Structure des phrases et orthographe globalement correcte. Idées présentées de manière ordonnée. - 59 % de réponses correctes.');
+  set(list,'math-enonce','I','Comprend et exécute une consigne unique. - 100 % de réponses correctes.');
+  set(list,'math-problemes','I','Est capable de calculer, mettre en œuvre des algorithmes et de traiter des problèmes de pourcentages et d’échelles liés à la vie courante. - 93 % de réponses correctes.');
+  const out=make({civilite:'M.',nom:'XX',prenom:'YY',date:'2026-09-19'},list);
+  assert(out.ok,'cas XX refusé: '+out.validation.errors.join(' | '));
+  assert(!/la découpe et le pliage et l[’']assemblage/i.test(out.text),'double coordination "et" réintroduite');
+  assert(!/En expression écrite,\s+l[’']expression écrite/i.test(out.text),'répétition expression écrite réintroduite');
+  assert((out.text.match(/demande encore une méthode plus structurée/gi)||[]).length<=1,'même structure répétée pour organisation/planification');
+  assert(/dimensions|mesures/i.test(out.text),'commentaire précis sur les dimensions perdu');
+  assert(/finitions|aspect final/i.test(out.text),'commentaire précis sur les finitions perdu');
+  assert(/contraintes/i.test(out.text),'difficulté de raisonnement sur contraintes perdue');
+  assert(/ordre|enchaînement|ordonner/i.test(out.text),'difficulté de planification perdue');
+  assert(/traitement de texte/i.test(out.text),'traitement de texte absent');
+  assert(/messagerie|message/i.test(out.text),'messagerie absente');
+  for(const pct of ['59','100','93'])assert(out.text.includes(pct+' %'),'pourcentage '+pct+' % non intégré');
+  assert(!/excellent|parfait|exceptionnel|remarquable/i.test(out.text),'intensification non justifiée');
+  assert(!/\bà le\b|\bde le\b/i.test(out.text),'contraction française incorrecte');
+  assert(!/0 min 03 s|6 erreurs/i.test(out.text),'métriques de tri recopiées sans utilité');
+  assert(words(out.text)>=250,'cas XX devenu trop court: '+words(out.text)+' mots');
+  assert(words(out.text)<320,'cas XX trop long: '+words(out.text)+' mots');
+  assert(/Dans l’ensemble|Au terme du parcours|Les acquis|Les résultats/i.test(out.text),'conclusion descriptive absente');
+  console.log('SEB-IA XX: '+words(out.text)+' mots.\n'+out.text);
+})();
+
+
+(function realisticProfileBattery(){
+  const profiles=[];
+
+  {
+    const list=rows('I');
+    set(list,'fabrication-tracage','II','Les traits sont droits mais pas toujours aux dimensions indiquées.');
+    set(list,'fabrication-finition','II','Les finitions demandent encore davantage de précision.');
+    set(list,'texte','II','A besoin d’aide pour certaines fonctions du traitement de texte.');
+    set(list,'expression','II','Structure des phrases correcte. Idées présentées de manière ordonnée. - 68 % de réponses correctes.');
+    set(list,'math-enonce','I','Comprend et exécute une consigne unique. - 92 % de réponses correctes.');
+    set(list,'math-problemes','I','Résout les problèmes proposés. - 88 % de réponses correctes.');
+    profiles.push({
+      name:'appuis-majoritaires',
+      out:make({civilite:'Mme',nom:'APPUI',prenom:'TEST'},list),
+      must:[/fabrication/i,/traitement de texte/i,/68 %/,/92 %/,/88 %/]
+    });
+  }
+
+  {
+    const list=rows('III');
+    set(list,'briques-identification','II','A besoin de consignes supplémentaires pour commencer.');
+    set(list,'tri-temps','I','Moyenne 10 : 48');
+    set(list,'tri-erreurs','I','Fiabilité satisfaisante.');
+    set(list,'mail','II','Le message est envoyé mais la pièce jointe reste à sécuriser.');
+    set(list,'expression','III','Orthographe pas toujours correcte. - 31 % de réponses correctes.');
+    set(list,'math-enonce','II','Comprend les consignes simples avec quelques repères. - 54 % de réponses correctes.');
+    set(list,'math-problemes','III','Les problèmes restent difficiles. - 22 % de réponses correctes.');
+    profiles.push({
+      name:'difficultes-majoritaires',
+      out:make({civilite:'M.',nom:'DIFFICULTES',prenom:'TEST'},list),
+      must:[/difficult|accompagnement|fragile|complexe/i,/31 %/,/54 %/,/22 %/]
+    });
+  }
+
+  {
+    const list=rows('NE');
+    set(list,'fabrication-plan','I',"La personne n'a pas besoin d'aide pour commencer l'exercice.");
+    set(list,'fabrication-decoupe','II','Les découpes manquent encore de régularité.');
+    set(list,'briques-identification','I','Le schéma est compris.');
+    set(list,'tri-temps','II','Moyenne 13 : 05');
+    set(list,'tri-erreurs','II','Quelques erreurs sont relevées.');
+    set(list,'expression','II','Production écrite partiellement maîtrisée. - 57 % de réponses correctes.');
+    profiles.push({
+      name:'nombreux-non-evalues',
+      out:make({civilite:'Mme',nom:'NE',prenom:'TEST'},list),
+      must:[/pas pu être évalu|hors interprétation/i,/57 %/]
+    });
+  }
+
+  {
+    const list=rows('I');
+    set(list,'planning','NE','Non évalué.');
+    set(list,'carre','NE','Non évalué.');
+    set(list,'texte','NE','Non évalué.');
+    const out=engine.generate({
+      candidate:{civilite:'M.',nom:'ABANDONS',prenom:'TEST'},
+      rows:list,
+      abandons:[
+        {key:'planning.html',exercice:'Planification — Le restaurant',raisons:['Je ne comprends pas la consigne'],commentaire:''},
+        {key:'carre-magique.html',exercice:'Carré magique',raisons:['L’exercice est trop difficile'],commentaire:'La personne souhaite arrêter.'},
+        {key:'nwtexte.html',exercice:'Traitement de texte',raisons:[],commentaire:'Arrêt demandé pendant l’exercice.'}
+      ]
+    });
+    profiles.push({
+      name:'abandons-multiples',
+      out,
+      must:[/Planification — Le restaurant/i,/Carré magique/i,/Traitement de texte/i,/Je ne comprends pas la consigne/i,/L’exercice est trop difficile/i]
+    });
+  }
+
+  {
+    const list=rows('II');
+    set(list,'fabrication-plan','I',"La personne n'a pas besoin d'aide pour commencer l'exercice.");
+    set(list,'fabrication-decoupe','III','Les découpes ne sont pas droites ou restent incomplètes.');
+    set(list,'briques-identification','I','Lecture du schéma sans aide.');
+    set(list,'briques-manipulation','III','Plusieurs erreurs dans la manipulation et l’assemblage.');
+    set(list,'carre','III',"Difficultés à identifier les contraintes d'un problème structuré et à établir les relations.");
+    set(list,'organisation','I','Classe les éléments selon les critères attendus.');
+    set(list,'planning','III',"N’est pas en capacité de déterminer l’ordre d’exécution des tâches.");
+    set(list,'tri-temps','I','Moyenne 11 : 18');
+    set(list,'tri-erreurs','III','Fiabilité insuffisante.');
+    set(list,'texte','I','Réalise le document demandé sans aide.');
+    set(list,'mail','III','L’objet et la pièce jointe ne sont pas correctement renseignés.');
+    profiles.push({
+      name:'tres-contraste',
+      out:make({civilite:'Mme',nom:'CONTRASTE',prenom:'TEST'},list),
+      must:[/contraintes/i,/ordre|enchaînement|ordonner/i,/outils numériques|traitement de texte|messagerie/i]
+    });
+  }
+
+  {
+    const list=rows('II');
+    set(list,'expression','II','Les idées sont présentées de manière ordonnée. - 59 % de réponses correctes.');
+    set(list,'math-enonce','I','Comprend et exécute les consignes. - 100 % de réponses correctes.');
+    set(list,'math-problemes','III','La résolution de problèmes reste difficile. - 34 % de réponses correctes.');
+    set(list,'tri-temps','II','Moyenne 13 : 42');
+    set(list,'tri-erreurs','II','Entre 1.1 et 2 % d’erreur. - 7 erreurs.');
+    profiles.push({
+      name:'fortement-chiffre',
+      out:make({civilite:'M.',nom:'CHIFFRE',prenom:'TEST'},list),
+      must:[/59 %/,/100 %/,/34 %/,/13 min 42 s/]
+    });
+  }
+
+  for(const p of profiles){
+    assert(p.out.ok,p.name+': '+p.out.validation.errors.join(' | '));
+    const wc=words(p.out.text);
+    assert(wc>=120,p.name+': synthèse trop courte ('+wc+' mots)');
+    assert(wc<380,p.name+': synthèse trop longue ('+wc+' mots)');
+    for(const re of p.must)assert(re.test(p.out.text),p.name+': information attendue absente: '+re);
+    assert(!/potentiel|diagnostic|profil psychologique|fonctionnement cognitif|orientation professionnelle/i.test(p.out.text),p.name+': inférence interdite');
+    assert(!/la lecture du plan constituent/i.test(p.out.text),p.name+': accord singulier/pluriel incorrect');
+    assert(!/la découpe demandent/i.test(p.out.text),p.name+': accord singulier/pluriel incorrect');
+    assert(!/pliage et l[’']assemblage et les finitions/i.test(p.out.text),p.name+': coordination répétée');
+    assert(!/(?:volet fabrication|opérations de fabrication)\.\s+(?:Une|Des)/i.test(p.out.text),p.name+': ouverture fabrication isolée');
+    assert(!/opérations de fabrication, les différentes opérations/i.test(p.out.text),p.name+': répétition opérations de fabrication');
+    assert(!/Concernant les outils numériques,\s+(?:concernant|pour)\b/i.test(p.out.text),p.name+': double cadrage outils numériques');
+    assert(!/En mathématiques,\s+dans cette situation\b/i.test(p.out.text),p.name+': cadrage mathématique lourd');
+    assert((p.out.text.match(/\bLa compétence liée\b/g)||[]).length<=5,p.name+': forme « La compétence liée » trop répétée');
+    assert((p.out.text.match(/\bLa mise en œuvre\b/g)||[]).length<=4,p.name+': forme « La mise en œuvre » trop répétée');
+    console.log('\nSEB-IA PROFIL REALISTE ['+p.name+'] — '+wc+' mots\n'+p.out.text+'\n');
+  }
+  const byName=Object.fromEntries(profiles.map(p=>[p.name,p.out.text]));
+  assert(!/difficultés plus marquées dans certaines situations/i.test(byName['nombreux-non-evalues']),'profil avec nombreux NE présenté à tort comme difficile');
+  assert(/partiel|non évalu|hors interprétation/i.test(byName['abandons-multiples']),'conclusion des abandons doit signaler la couverture incomplète');
+  assert(!/difficile Le commentaire|disponibles Le commentaire/i.test(byName['abandons-multiples']),'ponctuation entre motif et commentaire incorrecte');
+  assert(!/aux calculs et la résolution de problèmes|des calculs et la résolution de problèmes/i.test(byName['fortement-chiffre']),'coordination grammaticale mathématique incorrecte');
+})();
+
+(function stress(){
+  const levels=['I','II','III','NE'];
+  const seen=new Set();
+  let totalWords=0;
+  for(let i=0;i<300;i++){
+    const list=Object.keys(engine.META).map((key,j)=>{
+      let level=levels[(i*7+j*3+(i>>2))%4],comment='',detail='';
+      if((i+j)%17===0)comment='Exercice abandonné.';
+      if(key==='expression'&&level!=='NE'&&!comment)comment=(45+(i+j)%51)+' % de réponses correctes.';
+      if(key==='math-problemes'&&level!=='NE'&&!comment)comment=(35+(i*3+j)%66)+' % de réponses correctes.';
+      if(key==='tri-temps'&&level!=='NE'&&!comment)detail='Moyenne '+(9+(i%6))+' : '+String((i*7)%60).padStart(2,'0');
+      return{key,level,comment,detail};
+    });
+    const out=make({civilite:i%2?'M.':'Mme',nom:'STRESS'+i},list);
+    assert(out.ok,'stress '+i+': '+out.validation.errors.join(' | '));
+    assert(!/potentiel|diagnostic|profil psychologique|projet professionnel adapté|fonctionnement cognitif/i.test(out.text),'inférence interdite au stress '+i);
+    assert(!/cutter/i.test(out.text),'ancienne référence cutter au stress '+i);
+    const wc=words(out.text);
+    assert(wc<380,'synthèse anormalement longue au stress '+i+' : '+wc+' mots');
+    assert((out.text.match(/\bnécessite(?:nt)?\b/gi)||[]).length<=5,'tournure « nécessite » trop répétée au stress '+i);
+    assert((out.text.match(/\bdemande(?:nt)?\b/gi)||[]).length<=5,'tournure « demande » trop répétée au stress '+i);
+    assert((out.text.match(/\bLa compétence liée\b/g)||[]).length<=6,'forme « La compétence liée » trop répétée au stress '+i);
+    seen.add(out.text);totalWords+=words(out.text);
+  }
+  assert(seen.size>=295,'diversité rédactionnelle insuffisante');
+  console.log('SEB-IA stress: 300 profils, '+seen.size+' synthèses distinctes, moyenne '+Math.round(totalWords/300)+' mots.');
+})();
+
+console.log('SEB-IA V1: tous les contrôles rédactionnels et sémantiques sont passés.');

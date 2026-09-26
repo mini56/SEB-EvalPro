@@ -237,6 +237,44 @@ html, body {
 
   </style>
   
+<link rel="stylesheet" href="css/seb-in-app-alert.css" id="seb-evalpro-in-app-alert-css">
+
+<style id="seb-nvmail-abandon-layout-fix">
+#seb-evalpro-abandon-box label.seb-abandon-choice {
+  display:grid !important;
+  grid-template-columns:20px minmax(0,1fr) !important;
+  align-items:start !important;
+  column-gap:12px !important;
+  width:100% !important;
+  margin:0 !important;
+  padding:8px 4px !important;
+  box-sizing:border-box !important;
+}
+#seb-evalpro-abandon-box label.seb-abandon-choice input[type="checkbox"] {
+  width:16px !important;
+  min-width:16px !important;
+  max-width:16px !important;
+  height:16px !important;
+  min-height:16px !important;
+  padding:0 !important;
+  margin:2px 0 0 0 !important;
+  display:block !important;
+  box-sizing:border-box !important;
+}
+#seb-evalpro-abandon-box label.seb-abandon-choice span {
+  display:block !important;
+  width:auto !important;
+  margin:0 !important;
+  padding:0 !important;
+  text-align:left !important;
+  line-height:1.35 !important;
+}
+#seb-evalpro-abandon-comment {
+  width:100% !important;
+  max-width:100% !important;
+  box-sizing:border-box !important;
+}
+</style>
 </head>
 <body>
 <div id="page8" class="page">
@@ -244,47 +282,47 @@ html, body {
   <!-- Colonne gauche -->
   <div id="left">
     <br>
-	<p><img src="imageqcm/scenario.PNG" alt="scenario" width="45" height="45" style="margin-right:8px;"><strong style="color:#1a73e8;">Scénario:</strong></p>
+	<p><img src="imageqcm/scenario.png" alt="scenario" width="45" height="45" style="margin-right:8px;"><strong style="color:#1a73e8;">Scénario :</strong></p>
 	<p> Votre conseiller vous contacte par e-mail pour vous prévenir que votre rendez-vous est déplacé.
-	Il vous demande de lui envoyer votre rapport de stage en entreprise.</p><p> Vous devez répondre à son e-mail. Envoyez votre message sur <strong>les adresses email
-	</strong> suivante:</p>
-	<p> A votre conseiller:  <u style="color:#1a73e8;text-decoration: underline;">conseil.perso@Sauvegarde56.org</u></p>
+	Il vous demande de lui envoyer votre rapport de stage en entreprise.</p><p> Vous devez répondre à son e-mail. Envoyez votre message sur <strong>les adresses e-mail
+	</strong> suivantes :</p>
+	<p> À votre conseiller :  <u style="color:#1a73e8;text-decoration: underline;">conseil.perso@sauvegarde56.org</u></p>
 	
-	<p> En copie a votre responsable de stage:  <u style="color:#1a73e8;text-decoration: underline;">stage-pro@Sauvegarde56.org</u></p>
+	<p> En copie à votre responsable de stage :  <u style="color:#1a73e8;text-decoration: underline;">stage-pro@sauvegarde56.org</u></p>
 	
 	<br>
 	<p>Dans l'éditeur, mettre en forme votre texte en respectant les consignes ci-dessous.</p>
 	 <div style="display:flex; align-items:center; margin-bottom:10px;">
-      <img src="imageqcm/avatar_transparant.PNG" alt="avatar" width="45" height="45" style="margin-right:8px;">
+      <img src="imageqcm/avatar_transparant.png" alt="avatar" width="45" height="45" style="margin-right:8px;">
       <p><strong style="color:#1a73e8;">Consigne :</strong></p>
 	  </div>
-	  <p>Mettre en objet: <strong>Prénom Mail-SEB</strong></p>
-	  <p>Ajoutez votre <strong>rapport</strong> en piece jointe.</p>
+	  <p>Mettez en objet : <strong>Prénom Mail-SEB</strong></p>
+	  <p>Ajoutez votre <strong>rapport</strong> en pièce jointe.</p>
 	  <p>Saisissez un message avec une formule de politesse en introduction et à la fin puis une signature avec votre prénom,
-	  nom et numéro de téléphone sur le modèle si dessous:</p>
+	  nom et numéro de téléphone sur le modèle ci-dessous :</p>
 	  <p>Prénom NOM</p>
 	  <p>01.02.34.56.78</p>
 	  <br>
-	  <P>Ensuite passez a l'étape suivante...</p>
+	  <P>Ensuite, passez à l'étape suivante...</p>
 	  </div>
 
   <!-- Colonne droite -->
   <div id="right">
 
 <!-- Fenêtre modale avec fichiers fictifs -->
-<div class="overlay" id="overlay" onclick="fermerFichierModal()"></div>
+<div class="overlay" id="overlay"></div>
 
 <div class="modal" id="modalFichier">
   <h3>Sélectionnez un fichier</h3>
   <ul>
-    <li onclick="choisirFichier('CV_Julie.pdf')">📄 CV_Julie.pdf</li>
-    <li onclick="choisirFichier('Rapport_stage.docx')">📄 Rapport_stage.docx</li>
-    <li onclick="choisirFichier('Facture_2023.xlsx')">📄 Facture_2023.xlsx</li>
-    <li onclick="choisirFichier('Memo.txt')">📄 Memo.txt</li>
+    <li data-seb-file="CV_Julie.pdf">📄 CV_Julie.pdf</li>
+    <li data-seb-file="Rapport_stage.docx">📄 Rapport_stage.docx</li>
+    <li data-seb-file="Facture_2023.xlsx">📄 Facture_2023.xlsx</li>
+    <li data-seb-file="Memo.txt">📄 Memo.txt</li>
   </ul>
 </div>
 
-<form id="formEmail" onsubmit="evaluerFormulaire(event)">
+<form id="formEmail">
   <h2 style="color:#1a73e8;">Nouveau message.&#9993;</h2>
 
   <label for="to">À :</label>
@@ -300,7 +338,7 @@ html, body {
   <textarea id="message" name="message" rows="6"></textarea>
 
   <label>Pièce jointe :</label>
-  <div class="fake-file-input" onclick="ouvrirFichierModal()">📂 Parcourir…</div>
+  <div class="fake-file-input" id="nvmail-file-picker">📂 Parcourir…</div>
   <div class="selected-file" id="fichierSelectionne">Aucun fichier sélectionné</div>
 
   <button type="submit"><strong>Envoyer 📧 </strong></button>
@@ -309,393 +347,21 @@ html, body {
 </form>
 
 	<div class="editor-footer">
-  <button onclick="passerVersAutoEval()">Passer</button>
-  <button onclick="passerVersAutoEval()">Suivant -></button>
+  <button id="nvmail-skip" type="button">Passer</button>
+  <button id="nvmail-next" type="button">Suivant -></button>
 
 </div>
   </div>
   </div>
   </div>
-<script>
-// ============================================
-// SYSTÈME D'ÉVALUATION PAGE 8 - FORMULAIRE EMAIL
-// Version complète avec validation stricte
-// ============================================
+<script src="js/seb-parcours.js"></script>
+<script src="js/nvmail-page.js"></script>
 
-// SEB_SIGNATURE_CANDIDAT_NORMALISEE
-function normaliserIdentiteMail(value) {
-  return String(value || '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLocaleLowerCase('fr-FR')
-    .replace(/[^a-z0-9]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
 
-function signatureCandidatValide(message, prenomCandidat, nomCandidat) {
-  const messageNormalise = normaliserIdentiteMail(message);
-  const prenomNormalise = normaliserIdentiteMail(prenomCandidat);
-  const nomNormalise = normaliserIdentiteMail(nomCandidat);
-  if (!messageNormalise || !prenomNormalise || !nomNormalise) return false;
+<script src="js/seb-in-app-alert.js" id="seb-evalpro-in-app-alert-script"></script>
+<script src="js/seb-page-draft-resume.js" id="seb-evalpro-page-draft-resume"></script>
+<script src="js/seb-visual-branding.js" id="seb-evalpro-visual-branding"></script>
 
-  const prenomNom = (prenomNormalise + ' ' + nomNormalise).trim();
-  const nomPrenom = (nomNormalise + ' ' + prenomNormalise).trim();
-
-  return messageNormalise.includes(prenomNom) || messageNormalise.includes(nomPrenom);
-}
-
-function evaluerFormulaire(event) {
-  event.preventDefault();
-  
-  const destinataire = document.getElementById('to').value.trim();
-  const copie = document.getElementById('cc').value.trim();
-  const objet = document.getElementById('subject').value.trim();
-  const message = document.getElementById('message').value.trim();
-  const fichierSelectionne = document.getElementById('fichierSelectionne').textContent.trim();
-  
-  const prenomCandidat = getPrenomCandidat();
-  const nomCandidat = getNomCandidat();
-  
-  let score = 0;
-  const maxScore = 6;
-  let details = [];
-  
-  // ============================================
-  // CRITÈRE 1 : Destinataire (À:)
-  // ============================================
-  if (destinataire.toLowerCase() === 'conseil.perso@sauvegarde56.org') {
-    score++;
-    details.push('✅ Destinataire correct (1 pt)');
-  } else {
-    details.push('❌ Destinataire incorrect (0 pt)');
-  }
-  
-  // ============================================
-  // CRITÈRE 2 : Copie (Cc:)
-  // ============================================
-  if (copie.toLowerCase() === 'stage-pro@sauvegarde56.org') {
-    score++;
-    details.push('✅ Copie (Cc) correcte (1 pt)');
-  } else {
-    details.push('❌ Copie (Cc) incorrecte (0 pt)');
-  }
-  
-  // CRITÈRE 3 : Objet (format : Prénom Mail-SEB)
-  let objetOK = false;
-  if (prenomCandidat && objet) {
-    // Accepte "Mail-SEB" uniquement"
-    const hasMailSEB = objet.includes('Mail-SEB');
-    const prenomMajuscule = prenomCandidat.charAt(0).toUpperCase() + prenomCandidat.slice(1).toLowerCase();
-    const hasPrenom = objet.includes(prenomMajuscule);
-    objetOK = hasMailSEB && hasPrenom;
-  } else if (!prenomCandidat) {
-    objetOK = objet.includes('Mail-SEB');
-  }
-  
-  if (objetOK) {
-    score++;
-    details.push('✅ Objet correct (1 pt)');
-  } else {
-    details.push('❌ Objet incorrect (0 pt)');
-  }
-  
-  // ============================================
-  // CRITÈRE 4 : Pièce jointe
-  // ============================================
-  if (fichierSelectionne === 'Rapport_stage.docx') {
-    score++;
-    details.push('✅ Pièce jointe correcte (1 pt)');
-  } else {
-    details.push('❌ Pièce jointe incorrecte (0 pt)');
-  }
-  
-  // ============================================
-  // CRITÈRE 5 : Signature (Prénom NOM ou NOM Prénom, casse libre)
-  // ============================================
-  const signatureOK = signatureCandidatValide(message, prenomCandidat, nomCandidat);
-  
-  if (signatureOK) {
-    score++;
-    details.push('✅ Signature complète (1 pt)');
-  } else {
-    details.push('❌ Signature incomplète (0 pt)');
-  }
-  
-  // ============================================
-  // CRITÈRE 6 : Numéro de téléphone (10 chiffres)
-  // ============================================
-  const regexPoints = /\d{2}\.\d{2}\.\d{2}\.\d{2}\.\d{2}/;
-  const regexVirgules = /\d{2},\d{2},\d{2},\d{2},\d{2}/;
-  const regexSlashes = /\d{2}\/\d{2}\/\d{2}\/\d{2}\/\d{2}/;
-  const regexEspaces = /\d{2}\s\d{2}\s\d{2}\s\d{2}\s\d{2}/;
-  const regexSansPoints = /\b0\d{9}\b/;
-  
-  const hasTelephone = regexPoints.test(message) || regexVirgules.test(message) || 
-                       regexSlashes.test(message) || regexEspaces.test(message) || 
-                       regexSansPoints.test(message);
-  
-  if (hasTelephone) {
-    score++;
-    details.push('✅ Numéro de téléphone présent (1 pt)');
-  } else {
-    details.push('❌ Numéro de téléphone manquant (0 pt)');
-  }
-  
-  // ============================================
-  // SAUVEGARDE DANS sessionStorage
-  // ============================================
-  saveEmailAnswers(destinataire, copie, objet, message, fichierSelectionne);
-  
-  // ============================================
-  // AFFICHAGE DES RÉSULTATS
-  // ============================================
-  const resultat = document.getElementById('resultatScore');
-  const pourcentage = Math.round((score / maxScore) * 100);
-  
-  let appreciation = '';
-  if (pourcentage >= 90) appreciation = 'Excellent ! 🎉';
-  else if (pourcentage >= 75) appreciation = 'Très bien ! 👍';
-  else if (pourcentage >= 50) appreciation = 'Bien, mais peut mieux faire 📝';
-  else appreciation = 'À améliorer ⚠️';
-  
-  resultat.innerHTML = `
-    <h3 style="text-align: left; margin-top: 20px; padding: 15px; background: #1a73e8; color: white; border-radius: 6px;">Message envoyé ! 👍</h3>
-    <!--p style="font-size: 24px; color: ${pourcentage >= 75 ? '#28a745' : pourcentage >= 50 ? '#ffc107' : '#dc3545'};">
-      ${score} / ${maxScore} points (${pourcentage}%)
-    </p-->
-    <!--p style="font-size: 18px; margin: 10px 0;">${appreciation}</p>
-    <div style="text-align: left; margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 6px;">
-      ${details.map(d => `<div style="margin: 5px 0;">${d}</div>`).join('')}
-    </div-->
-  `;
-  
-  resultat.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-}
-
-// ============================================
-// SAUVEGARDE DES RÉPONSES DANS sessionStorage
-// Version corrigée - Calcul automatique du score total (6 critères)
-// ============================================
-function saveEmailAnswers(to, cc, subject, message, file) {
-  // Récupération du prénom et nom du candidat depuis qcmv1.0
-  const prenomCandidat = getPrenomCandidat();
-  const nomCandidat = getNomCandidat();
-  
-  // Calcul des scores individuels
-  const score_to = (to.toLowerCase() === 'conseil.perso@sauvegarde56.org') ? 1 : 0;
-  const score_cc = (cc.toLowerCase() === 'stage-pro@sauvegarde56.org') ? 1 : 0;
-  
-  // Validation de l'objet : doit contenir "Mail-SEB" (majuscules) ET le prénom avec majuscule
-  let score_subject = 0;
-  if (prenomCandidat && subject) {
-    const hasMailSEB= subject.includes('Mail-SEB');
-    const prenomMajuscule = prenomCandidat.charAt(0).toUpperCase() + prenomCandidat.slice(1).toLowerCase();
-    const hasPrenom = subject.includes(prenomMajuscule);
-    
-    if (hasMailSEB && hasPrenom) {
-      score_subject = 1;
-    }
-  } else if (!prenomCandidat && subject.includes('Mail-SEB')) {
-    score_subject = 1;
-  }
-  
-  const score_file = (file === 'Rapport_stage.docx') ? 1 : 0;
-  
-  // Validation de la signature : nom et prénom saisis en première page,
-  // acceptés dans les deux ordres et sans tenir compte des majuscules/minuscules.
-  const score_signature = signatureCandidatValide(message, prenomCandidat, nomCandidat) ? 1 : 0;
-  
-  // Validation du numéro de téléphone (10 chiffres avec différents séparateurs)
-  let score_telephone = 0;
-  if (message) {
-    // Format avec points : 02.05.06.05.14
-    const regexPoints = /\d{2}\.\d{2}\.\d{2}\.\d{2}\.\d{2}/;
-    // Format avec virgules : 06,10,34,45,79
-    const regexVirgules = /\d{2},\d{2},\d{2},\d{2},\d{2}/;
-    // Format avec slashes : 06/10/34/45/79
-    const regexSlashes = /\d{2}\/\d{2}\/\d{2}\/\d{2}\/\d{2}/;
-    // Format avec espaces : 06 10 34 45 79
-    const regexEspaces = /\d{2}\s\d{2}\s\d{2}\s\d{2}\s\d{2}/;
-    // Format sans séparateur : 0297801478
-    const regexSansPoints = /\b0\d{9}\b/;
-    
-    if (regexPoints.test(message) || regexVirgules.test(message) || 
-        regexSlashes.test(message) || regexEspaces.test(message) || 
-        regexSansPoints.test(message)) {
-      score_telephone = 1;
-    }
-  }
-  
-  // CALCUL DU SCORE TOTAL (somme des 6 critères)
-  const score_total = score_to + score_cc + score_subject + score_file + score_signature + score_telephone;
-  
-  const data = {
-    page8_to: to,
-    page8_cc: cc,
-    page8_subject: subject,
-    page8_message: message,
-    page8_file: file,
-    // Scores individuels
-    score_to: score_to,
-    score_cc: score_cc,
-    score_subject: score_subject,
-    score_file: score_file,
-    score_signature: score_signature,
-    score_telephone: score_telephone,
-    // Score total calculé automatiquement
-    score_total: score_total
-  };
-  
-  try {
-    sessionStorage.setItem('page8_data', JSON.stringify(data));
-    console.log('✅ Données page 8 sauvegardées:', data);
-    console.log(`📊 Score total: ${score_total}/6`);
-  } catch (e) {
-    console.error('❌ Erreur sauvegarde sessionStorage:', e);
-  }
-}
-
-// ============================================
-// RÉCUPÉRATION DU PRÉNOM DU CANDIDAT
-// ============================================
-function getPrenomCandidat() {
-  try {
-    // Essaie d'abord de récupérer depuis candidat_data (format qcmv1.0)
-    const candidatData = sessionStorage.getItem('candidat_data');
-    if (candidatData) {
-      const data = JSON.parse(candidatData);
-      if (data.prénom) return data.prénom;
-    }
-    
-    // Fallback sur l'ancien format
-    const stored = sessionStorage.getItem('candidat_prenom');
-    if (stored) return stored;
-  } catch (e) {
-    console.error('Erreur récupération prénom:', e);
-  }
-  
-  const params = new URLSearchParams(window.location.search);
-  const prenomURL = params.get('prenom');
-  if (prenomURL) return prenomURL;
-  
-  return '';
-}
-
-// ============================================
-// RÉCUPÉRATION DU NOM DU CANDIDAT
-// ============================================
-function getNomCandidat() {
-  try {
-    // Essaie d'abord de récupérer depuis candidat_data (format qcmv1.0)
-    const candidatData = sessionStorage.getItem('candidat_data');
-    if (candidatData) {
-      const data = JSON.parse(candidatData);
-      if (data.nom) return data.nom;
-    }
-    
-    // Fallback sur l'ancien format
-    const stored = sessionStorage.getItem('candidat_nom');
-    if (stored) return stored;
-  } catch (e) {
-    console.error('Erreur récupération nom:', e);
-  }
-  
-  const params = new URLSearchParams(window.location.search);
-  const nomURL = params.get('nom');
-  if (nomURL) return nomURL;
-  
-  return '';
-}
-
-// ============================================
-// FONCTIONS GESTION MODALE FICHIERS
-// ============================================
-function ouvrirFichierModal() {
-  document.getElementById('overlay').style.display = 'block';
-  document.getElementById('modalFichier').style.display = 'block';
-}
-
-function fermerFichierModal() {
-  document.getElementById('overlay').style.display = 'none';
-  document.getElementById('modalFichier').style.display = 'none';
-}
-
-function choisirFichier(nomFichier) {
-  document.getElementById('fichierSelectionne').textContent = nomFichier;
-  fermerFichierModal();
-}
-
-// ============================================
-// NAVIGATION VERS PAGE SUIVANTE
-// ============================================
-function passerVersAutoEval() {
-  const destinataire = document.getElementById('to').value.trim();
-  const copie = document.getElementById('cc').value.trim();
-  const objet = document.getElementById('subject').value.trim();
-  const message = document.getElementById('message').value.trim();
-  const fichier = document.getElementById('fichierSelectionne').textContent.trim();
-
-  // Sauvegarde avec calcul automatique du score
-  saveEmailAnswers(destinataire, copie, objet, message, fichier);
-
-  // Redirection vers la page d'autoévaluation
-  window.location.href = "autoeval2.html";
-}
-
-function goToPage(pageName) {
-  // Sauvegarde automatique avant navigation
-  const destinataire = document.getElementById('to').value.trim();
-  const copie = document.getElementById('cc').value.trim();
-  const objet = document.getElementById('subject').value.trim();
-  const message = document.getElementById('message').value.trim();
-  const fichier = document.getElementById('fichierSelectionne').textContent.trim();
-  
-  saveEmailAnswers(destinataire, copie, objet, message, fichier);
-  
-  // Navigation
-  window.location.href = pageName;
-}
-
-function nextPage(pageName) {
-  // Redirige vers la page d'autoévaluation
-  window.location.href = "autoeval2.html";
-}
-
-// ============================================
-// EXPOSITION DES FONCTIONS GLOBALEMENT
-// ============================================
-window.evaluerFormulaire = evaluerFormulaire;
-window.ouvrirFichierModal = ouvrirFichierModal;
-window.fermerFichierModal = fermerFichierModal;
-window.choisirFichier = choisirFichier;
-window.goToPage = goToPage;
-window.passerVersAutoEval = passerVersAutoEval;
-window.nextPage = nextPage;
-
-// ============================================
-// INITIALISATION AU CHARGEMENT
-// ============================================
-// ============================================
-// INITIALISATION AU CHARGEMENT
-// ============================================
-document.addEventListener('DOMContentLoaded', function() {
-  // NETTOYAGE des données page 8 pour éviter les réponses d'un candidat précédent
-  try {
-    sessionStorage.removeItem('page8_data');
-    console.log('🧹 Données page 8 nettoyées au chargement');
-  } catch (e) {
-    console.warn('⚠️ Erreur nettoyage page 8:', e);
-  }
-  
-  // Vide tous les champs du formulaire
-  document.getElementById('to').value = '';
-  document.getElementById('cc').value = '';
-  document.getElementById('subject').value = '';
-  document.getElementById('message').value = '';
-  document.getElementById('fichierSelectionne').textContent = 'Aucun fichier sélectionné';
-});
-</script>
-
+<script id="seb-ui-runtime-loader" src="js/seb-ui-runtime.js"></script>
 </body>
 </html>

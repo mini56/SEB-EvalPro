@@ -183,12 +183,12 @@ jobs:
             if ($proc -and -not $proc.HasExited) { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue }
           }
 
-      - name: Smoke test Qwen full factual coverage on GARCIA
+      - name: Smoke test Qwen full factual coverage on XX
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           node scripts/qwen-rich-context-smoke.js
-          if ($LASTEXITCODE -ne 0) { throw 'Test réel Qwen sur le cas GARCIA échoué.' }
+          if ($LASTEXITCODE -ne 0) { throw 'Test réel Qwen sur le cas XX échoué.' }
 
       - name: Ensure ImageMagick
         shell: pwsh

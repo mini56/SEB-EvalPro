@@ -181,6 +181,7 @@ td.wrong-answer {
         .btn { font-size:16px; width:220px }
     }
 </style>
+<link rel="stylesheet" href="css/seb-in-app-alert.css" id="seb-evalpro-in-app-alert-css">
 </head>
 <body>
 <div class="container">
@@ -199,26 +200,26 @@ Votre mission : retrouver, parmi plusieurs propositions, le paronyme qui convien
             <!--h3 style="margin:0; font-size:18px; color:#233345;">Sélectionnez dans chaque ligne, le mot qui a le sens le plus proche du mot souligné.</h3-->
             <table>
                 <!--tr>Une seule réponse possible par ligne.</tr-->
-                <tr><td class="paronyme">Apitoiement</td><td>Pitié</td><td>Appétence</td><td data-correct="true">Attendrissement</td><td>Capiteux</td><td>Piété</td></tr>
-                <tr><td class="paronyme">Idéaux</td><td>Rèves</td><td>Idées</td><td>Pensées</td><td>Géniaux</td><td data-correct="true">Parfait</td></tr>
-				<tr><td class="paronyme">Enseignent</td><td>Disent</td><td>Marquent</td><td>Saignent</td><td data-correct="true">Instruise</td><td>Assignent</td></tr>
+                <tr><td class="paronyme">Apitoiement</td><td data-correct="true">Pitié</td><td>Appétence</td><td>Indifférence</td><td>Capiteux</td><td>Piété</td></tr>
+                <tr><td class="paronyme">Idéaux</td><td>Rêves</td><td>Idées</td><td>Pensées</td><td>Géniaux</td><td data-correct="true">Parfaits</td></tr>
+				<tr><td class="paronyme">Enseignent</td><td>Disent</td><td>Marquent</td><td>Saignent</td><td data-correct="true">Instruisent</td><td>Assignent</td></tr>
 				<tr><td class="paronyme">Arboré</td><td>Abhorré</td><td>Planté</td><td>Détesté</td><td data-correct="true">Boisé</td><td>Orée</td></tr>
 				<tr><td class="paronyme">Glorieux</td><td data-correct="true">Prestigieux</td><td>Ordinaire</td><td>Méritant</td><td>Glossaire</td><td>Fort</td></tr>
 				<tr><td class="paronyme">Maugréer</td><td>Maudire</td><td>Chanter mal</td><td data-correct="true">Râler</td><td>Agréer</td><td>Souffrir</td></tr>
-				<tr><td class="paronyme">Pilier</td><td>Piller</td><td>Voler</td><td data-correct="true">Colonne</td><td>Piler</td><td>Epiler</td></tr>
-				<tr><td class="paronyme">Monopole</td><td>Jeu</td><td data-correct="true">Exclusivité</td><td>Acropole</td><td>Un seule pôle</td><td>Solitude</td></tr>
-				<tr><td class="paronyme">Luire</td><td>Nuire</td><td>Polir</td><td>Eclairer</td><td>Etoiler</td><td data-correct="true">Briller</td></tr>
+				<tr><td class="paronyme">Pilier</td><td>Piller</td><td>Voler</td><td data-correct="true">Colonne</td><td>Piler</td><td>Épiler</td></tr>
+				<tr><td class="paronyme">Monopole</td><td>Jeu</td><td data-correct="true">Exclusivité</td><td>Acropole</td><td>Un seul pôle</td><td>Solitude</td></tr>
+				<tr><td class="paronyme">Luire</td><td>Nuire</td><td>Polir</td><td>Éclairer</td><td>Étoiler</td><td data-correct="true">Briller</td></tr>
 				<tr><td class="paronyme">Quittance</td><td>Paye</td><td>Facture</td><td data-correct="true">Reçu</td><td>Prix</td><td>Quitter</td></tr>
-				<tr><td class="paronyme">Proscrire</td><td>Inscrire</td><td>Déduire</td><td>Reproduire</td><td>Souscrire</td><td data-correct="true">Interdire</td></td>
+				<tr><td class="paronyme">Proscrire</td><td>Inscrire</td><td>Déduire</td><td>Reproduire</td><td>Souscrire</td><td data-correct="true">Interdire</td></tr>
 				<tr><td class="paronyme">Guenille</td><td>Hayon</td><td>Ailleurs</td><td data-correct="true">Haillon</td><td>Singe</td><td>Haleur</td></tr>
-				<tr><td class="paronyme">Verbal</td><td>Conjugué</td><td>Eloquent</td><td>Buccal</td><td data-correct="true">Oral</td><td>Ecrit</td></tr>
+				<tr><td class="paronyme">Verbal</td><td>Conjugué</td><td>Éloquent</td><td>Buccal</td><td data-correct="true">Oral</td><td>Écrit</td></tr>
 				<tr><td class="paronyme">Effectif</td><td data-correct="true">Concret</td><td>Affecté</td><td>Affectueux</td><td>Compte</td><td>Réactif</td></tr>
-				<tr><td class="paronyme">Abréger</td><td>Abrevoir</td><td>Abérration</td><td>Aboutir</td><td data-correct="true">Réduire</td><td>Déplacer</td></tr>
+				<tr><td class="paronyme">Abréger</td><td>Abrevoir</td><td>Aberration</td><td>Aboutir</td><td data-correct="true">Réduire</td><td>Déplacer</td></tr>
 				<tr><td class="paronyme">Synonyme</td><td>Signaler</td><td data-correct="true">Pareil</td><td>Anonyme</td><td>Signifier</td><td>Canoniser</td></tr>
 				<tr><td class="paronyme">Mobiliser</td><td>Aménager</td><td>Immobilier</td><td>Verbaliser</td><td>Signifier</td><td data-correct="true">Appeler</td></tr>
-				<tr><td class="paronyme">Différent</td><td>Prétend</td><td data-correct="true">Conflit</td><td>Vérifier</td><td>Argent</td><td>Eloquent</td></tr>
+				<tr><td class="paronyme">Différend</td><td>Prétend</td><td data-correct="true">Conflit</td><td>Vérifier</td><td>Argent</td><td>Éloquent</td></tr>
 				<tr><td class="paronyme">Lucratif</td><td>Luxueux</td><td>Création</td><td data-correct="true">Rentable</td><td>Gratuit</td><td>Généreux</td></tr>
-				<tr><td class="paronyme">Raboter</td><td>Robotiser</td><td data-correct="true">Revoir</td><td>Cuisiner</td><td>Aboutir</td><td>Dérober</td></tr>
+				<tr><td class="paronyme">Raboter</td><td>Robotiser</td><td data-correct="true">Aplanir</td><td>Cuisiner</td><td>Aboutir</td><td>Dérober</td></tr>
             </table>
         </div>
     </div>
@@ -234,111 +235,18 @@ Votre mission : retrouver, parmi plusieurs propositions, le paronyme qui convien
                 Une seule réponse possible par ligne.
             </ul>
         
-    <button id="btnCheck" class="btn" onclick="verifierReponses()">Vérifier</button>
+    <button id="btnCheck" class="btn" type="button">Vérifier</button>
     
 </div>
         
 </div>
 
-<script>
-// Rendre les cellules cliquables (sauf la première colonne avec class="paronyme")
-document.querySelectorAll('td:not(.paronyme)').forEach(cell => {
-    cell.addEventListener('click', function() {
-        // Ne rien faire si déjà vérifié
-        if (this.classList.contains('correct-answer') || this.classList.contains('wrong-answer')) {
-            return;
-        }
-        
-        // Retirer la sélection des autres cellules de la même ligne
-        const row = this.parentElement;
-        row.querySelectorAll('td:not(.paronyme)').forEach(td => {
-            td.classList.remove('selected');
-        });
-        
-        // Ajouter la sélection à cette cellule
-        this.classList.add('selected');
-    });
-});
+<script src="js/seb-parcours.js"></script>
+<script src="js/paronymes-page.js"></script>
+<script src="js/seb-in-app-alert.js" id="seb-evalpro-in-app-alert-script"></script>
+<script src="js/seb-page-draft-resume.js" id="seb-evalpro-page-draft-resume"></script>
+<script src="js/seb-visual-branding.js" id="seb-evalpro-visual-branding"></script>
 
-function verifierReponses() {
-    let score = 0;
-    let total = 0;
-    let reponsesParonymes = []; // ✅ Changé de "reponses" à "reponsesParonymes"
-    
-    document.querySelectorAll('tr').forEach((row, index) => {
-        const paronyme = row.querySelector('.paronyme');
-        if (!paronyme) return;
-        
-        const selected = row.querySelector('td.selected');
-        const corrects = row.querySelectorAll('td[data-correct="true"]');
-        
-        total++;
-        
-        let isCorrect = false;
-        let userAnswer = '';
-        let correctAnswers = [];
-        
-        corrects.forEach(c => correctAnswers.push(c.textContent.trim()));
-        
-        if (selected) {
-            userAnswer = selected.textContent.trim();
-            
-            if (selected.dataset.correct === "true") {
-                selected.classList.add('correct-answer');
-                selected.classList.remove('wrong-answer', 'selected');
-                score++;
-                isCorrect = true;
-            } else {
-                selected.classList.add('wrong-answer');
-                selected.classList.remove('correct-answer', 'selected');
-                corrects.forEach(c => c.classList.add('correct-answer'));
-            }
-        } else {
-            userAnswer = '(non repondu)';
-            corrects.forEach(c => c.classList.add('correct-answer'));
-        }
-        
-        reponsesParonymes.push({
-            paronyme: paronyme.textContent.trim(),
-            reponseUtilisateur: userAnswer,
-            bonnesReponses: correctAnswers,
-            correct: isCorrect
-        });
-        
-        row.querySelectorAll('td:not(.paronyme)').forEach(td => {
-            td.style.cursor = 'default';
-        });
-    });
-    
-    // ✅ SAUVEGARDE DANS sessionStorage
-    try {
-        sessionStorage.setItem('paronymes_score', score.toString());
-        sessionStorage.setItem('paronymes_total', total.toString());
-        sessionStorage.setItem('paronymes_reponses', JSON.stringify(reponsesParonymes));
-        
-        console.log('✅ Score paronymes enregistré:', score + '/' + total);
-        console.log('📋 Réponses:', reponsesParonymes);
-        
-    } catch(e) {
-        console.error('❌ Erreur sauvegarde paronymes:', e);
-    }
-    
-    alert('Score : ' + score + ' / ' + total);
-    
-    // ✅ AJOUTER BOUTON SUIVANT
-    const btnCheck = document.getElementById('btnCheck');
-    if (btnCheck) {
-        btnCheck.style.display = 'none';
-        
-        const btnNext = document.createElement('button');
-        btnNext.className = 'btn';
-        btnNext.textContent = 'Suivant →';
-        btnNext.onclick = () => window.location.href = 'carre.html';
-        
-        btnCheck.parentElement.appendChild(btnNext);
-    }
-}
- 
-</script>
+<script id="seb-ui-runtime-loader" src="js/seb-ui-runtime.js"></script>
 </body>
 </html>

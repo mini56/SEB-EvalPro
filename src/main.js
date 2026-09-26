@@ -1,12 +1,15 @@
-const { app, BrowserWindow, ipcMain, screen, dialog, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, dialog, Menu, safeStorage, powerMonitor, shell, nativeImage } = require('electron');
+// SEB_PRIORITY_FIXES_MAIN
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
-const { createLocalAiService } = require('./local-ai');
 const { getEditionCapabilities } = require('./edition');
 const { createCandidateStore } = require('./candidate-store-main');
 const { createCandidateTransfer } = require('./candidate-transfer-main');
+const { configureLocalKey, readJsonFile, encodeJson, migrateJsonFile, migrateJsonTree } = require('./candidate-data-crypto');
+const { createCandidateLocalProtection } = require('./candidate-local-protection');
+const { internalStorageRoot, documentsWordRoot, migrateLegacyDocumentsStorage } = require('./storage-layout');
 
 const ADMIN_PASSWORD_SHA256 = 'c800892ba3f11b33d36eedf7d3c4297f2b6c02e2c347dda8954b4c577f6666b5';
 const STATE_VERSION = 1;
@@ -20,17 +23,74 @@ let splashStartedAt = 0;
 let adminSessionUnlocked = false;
 let downloadRoutingInstalled = false;
 const editionCapabilities = getEditionCapabilities();
-const localAi = editionCapabilities.canAi ? createLocalAiService({ app }) : null;
 let candidateStore = null;
 let candidateTransfer = null;
+let candidateProtection = null;
 let adminExportCandidateDir = null;
 let adminCandidateResultsMode = false;
 let lastCandidateSaveError = '';
 let allowApplicationExit = false;
 let candidateKeyGuardProcess = null;
+let candidateWindowsReturnGuardInstalled = false;
 // SEB_TEMP_WINDOWS_RECOVERY : temporaire pendant la phase de stabilisation.
 const TEMP_ALLOW_WINDOWS_RECOVERY = true;
 let stateWriteCounter = 0;
+
+// SEB_ADMIN_WINDOWS_SHELL_MODE
+const ADMIN_TASKBAR_OVERLAY_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAEZklEQVR4nLWXW3bbNhCGP4AgRYmS49hpmofuI4vok12voQ/JBrqEbsB+yBra5KmLyE7aJr5LFC8g0AfMxLQin8huO+fMASWC+P8Z3P4xjMyAsYBNrc3BOsgKsAXkk/Sc5eAc2Ez6B2CA6CH04DsYWhg66DsIHoYeQkgeAxAhArgxuBHw7D6wK5PnJbgJuAJcfkfABIgDxB5CB74Fn4Nv0nvfCYRPbRBwEyG6DXCbgckTuCvBTSGfJS9miUReJgLZFgJDk4D7OnnmoF+DNeCNBBshxpQN4xQ8S+A2BzsR4AqKORQLmMyTF1MoypSFzKWBTZT0d0JgDd0yuSugdWCt4IiFQbi4TfAS3EyA96Dcg3Jf2jlMqkTC5VsI9DCswa8SeHsDebGRLSExGMBDcDrnGvlMIn4G5XOYqj+D6UIIvInxPQ/YmTHHK+huhagsWs2AJqFv5cHJgrOFpH0u4AcwO4TZgfg+lG9j/PAQsJqSOzXmaJJ2S5ZJpmT+0/JXAi5Fn5XgqpT2yXOYHsLsBVSHUB3A9OcYf9OPPo5nc8NexzT82xg/vDPmJJPoBTzKNvzCw+zDtEyRF/tQHkL1EuYvoXoB819i/GMX4IeIAPxqzI+fYfk3rD7B8gLqG2hr6Fwh0c8g35j72QFMnwKu/ZXEAUyHtEhDB75PuyAC0fwA+xL99DuoXsHiFSy+h7nO+TbwcYSbwNv6nRpz9Bcs/4TbT7C6gHoJrZ2MMiD7frKAyVPAt73T79/G+GEhY8+hqNLBVrhCjlc98Sp5+SDCDtG+jnErcT3YVlA04D0Eq8euZCIvwelWemz02n/zO/39Jsb3JeRTwSnBWdmGSiQrRhfUY6L/1v9qeplpa7O720/9ccv9kbaBZfUyuue7DLTLVGwz0Rt6AxsrV+M9fwrorv2CuGLZId3lwd/5bihPtA2sYOUaDX2SUEMH/v8k0CaF5LW1AuzbJCb6BvyZMcewe8q/ZTrOmTHHTVJIvSgn7wQ8W4uMWkG3gu4/Qd4wESqdYqyhtxK5V/AltLfQnhpzNGb/VBvfBbcytpKoobOdpKIW8GtorqG5guadMSfjQXa9EbWffvfOmJMrGfcGmltolYDrYLDgRRW1ekqJ7LbjSD4aszOJceYuYH0J9SWsrxOBRgj0poKiGOmBsRr6N4pII7+A9TmsPoufQ32VCLRr8EaizUSQ5qqCn6oJ1U6NObqC5gLqC6jPpb2SKVgnYeqNnMmZquLqa1U8E1Vc7kE5S6r494eAz4z5qYbuRub88uv0t7WA9zAYleUP1QXPRr6AshrJ7QyyUW04dKO64FYIXI8W31IWXgODTx5cTB8HjcCkk9AgRaRouaGFoYa+gokScJAZ0tnt7xNol0JCtl5Xp8h9e6cJQ4DotFBUEr38VgJR7goVlA14LVJVckttGNr7W7pbpe3Wr1LUfZuq5GFIY4eAiA8lIQNBKp0iykTIBCHSiIKSDGhpNrTJ/TqB97Wcdk0q07+o4XGJ/g/1kYxVdSt3vwAAAABJRU5ErkJggg==';
+let adminTaskbarOverlayIcon = null;
+
+function getAdminTaskbarOverlayIcon() {
+  if (!adminTaskbarOverlayIcon || adminTaskbarOverlayIcon.isEmpty()) {
+    adminTaskbarOverlayIcon = nativeImage.createFromDataURL(ADMIN_TASKBAR_OVERLAY_DATA_URL);
+  }
+  return adminTaskbarOverlayIcon;
+}
+
+function applyAdminWindowMode(unlocked) {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  const isUnlocked = !!unlocked;
+
+  if (isUnlocked) {
+    try { stopCandidateKeyGuard(); } catch (_) {}
+    try { mainWindow.setAlwaysOnTop(false); } catch (_) {}
+    try { mainWindow.setSkipTaskbar(false); } catch (_) {}
+    try { mainWindow.setKiosk(false); } catch (_) {}
+    try { mainWindow.setFullScreen(false); } catch (_) {}
+    if (process.platform === 'win32') {
+      try { mainWindow.setOverlayIcon(getAdminTaskbarOverlayIcon(), 'Mode administrateur déverrouillé'); } catch (_) {}
+    }
+    setTimeout(() => {
+      if (!mainWindow || mainWindow.isDestroyed() || !adminSessionUnlocked) return;
+      try { mainWindow.maximize(); } catch (_) {}
+      try { applyAdaptiveZoom(); } catch (_) {}
+    }, 120);
+  } else {
+    const restoreCandidateShell = () => {
+      if (!mainWindow || mainWindow.isDestroyed() || adminSessionUnlocked) return;
+      try { startCandidateKeyGuard(); } catch (_) {}
+      try { mainWindow.setSkipTaskbar(true); } catch (_) {}
+      try { mainWindow.setAlwaysOnTop(true); } catch (_) {}
+      try { mainWindow.setFullScreen(true); } catch (_) {}
+      try { mainWindow.setKiosk(true); } catch (_) {}
+      try { mainWindow.moveTop(); } catch (_) {}
+      try { mainWindow.show(); } catch (_) {}
+      try { mainWindow.focus(); } catch (_) {}
+      try { mainWindow.webContents.focus(); } catch (_) {}
+      try { enforceCandidateWindowLock(true); } catch (_) {}
+      try { applyAdaptiveZoom(); } catch (_) {}
+    };
+    if (process.platform === 'win32') {
+      try { mainWindow.setOverlayIcon(null, ''); } catch (_) {}
+    }
+    restoreCandidateShell();
+    [40, 120, 300, 700].forEach((delay) => setTimeout(restoreCandidateShell, delay));
+  }
+
+  try { mainWindow.setMenuBarVisibility(false); } catch (_) {}
+  try { mainWindow.focus(); } catch (_) {}
+}
+
 
 function candidateKeyGuardExecutable() {
   return app.isPackaged
@@ -66,15 +126,54 @@ function stateFilePath() {
   return path.join(app.getPath('userData'), 'evaluation-state.json');
 }
 
+function sebInternalRoot() {
+  return internalStorageRoot(app.getPath('userData'));
+}
+
 function sebDocumentsRoot() {
-  return path.join(app.getPath('documents'), 'SEB EvalPro');
+  return documentsWordRoot(app.getPath('documents'));
+}
+
+function getCandidateProtection() {
+  if (!candidateProtection) {
+    candidateProtection = createCandidateLocalProtection({
+      documentsPath: app.getPath('documents'),
+      userDataPath: app.getPath('userData'),
+      dataRoot: sebInternalRoot(),
+      safeStorage
+    });
+  }
+  return candidateProtection;
+}
+
+function initializeCandidateSecurity() {
+  const protection = getCandidateProtection();
+  const localKey = protection.initializeKey();
+  if (!Buffer.isBuffer(localKey) || localKey.length !== 32) {
+    throw new Error('Clé locale des données candidat invalide.');
+  }
+
+  configureLocalKey(localKey);
+  localKey.fill(0);
+  protection.restoreStateFromBackupIfNeeded();
+
+  // Un dossier candidat individuel illisible ne doit jamais bloquer tout SEB EvalPro.
+  // Les migrations parcourent les fichiers un par un et ignorent ceux qui ne peuvent
+  // pas être décodés. Ils resteront intacts pour diagnostic/récupération ultérieure.
+  const store = getCandidateStore();
+  const folders = store.migrateCandidateFolderNames();
+  const migrated = migrateJsonTree(store.paths.candidatesRoot);
+  migrateJsonFile(stateFilePath());
+  protection.backupState();
+  console.log('SEB EvalPro confidentialité candidat: clé locale Windows protégée et sauvegardée, dossiers codés=' + folders.renamed + ', JSON chiffrés=' + migrated.files + '.');
 }
 
 function getCandidateStore() {
   if (!candidateStore) {
     candidateStore = createCandidateStore({
       documentsPath: app.getPath('documents'),
-      userDataPath: app.getPath('userData')
+      userDataPath: app.getPath('userData'),
+      dataRoot: sebInternalRoot()
     });
   }
   return candidateStore;
@@ -83,18 +182,20 @@ function getCandidateStore() {
 function getCandidateTransfer() {
   if (!candidateTransfer) {
     candidateTransfer = createCandidateTransfer({
-      documentsPath: app.getPath('documents')
+      documentsPath: app.getPath('documents'),
+      userDataPath: app.getPath('userData'),
+      dataRoot: sebInternalRoot()
     });
   }
   return candidateTransfer;
 }
 
 function bilanDocumentsDir() {
-  return path.join(sebDocumentsRoot(), 'Bilans');
+  return sebDocumentsRoot();
 }
 
 function ensureSebDocumentsFolders() {
-  fs.mkdirSync(bilanDocumentsDir(), { recursive: true });
+  fs.mkdirSync(sebDocumentsRoot(), { recursive: true });
   getCandidateStore().ensureRoots();
 }
 
@@ -129,18 +230,25 @@ function installDownloadRouting() {
     if (!/\.docx?$/i.test(filename)) return;
     try {
       ensureSebDocumentsFolders();
-      const candidateExportDir = getCandidateStore().getActiveExportDir();
-      const targetDirectory = adminExportCandidateDir || candidateExportDir || bilanDocumentsDir();
-      const isCurrentCandidateWord = !!adminExportCandidateDir && /^Evaluation_.+\.docx?$/i.test(filename);
-      if (isCurrentCandidateWord) {
-        const target = path.join(targetDirectory, filename);
-        item.setSavePath(target);
-        item.once('done', (_downloadEvent, state) => {
-          if (state === 'completed') cleanupNumberedCandidateWordCopies(targetDirectory, filename);
-        });
-      } else {
-        item.setSavePath(uniqueOutputPath(targetDirectory, filename));
-      }
+      const candidateExportDir = adminExportCandidateDir || getCandidateStore().getActiveExportDir();
+      const visibleDirectory = bilanDocumentsDir();
+      const visibleTarget = /^Evaluation_.+\.docx?$/i.test(filename)
+        ? path.join(visibleDirectory, filename)
+        : uniqueOutputPath(visibleDirectory, filename);
+      item.setSavePath(visibleTarget);
+      item.once('done', (_downloadEvent, state) => {
+        if (state !== 'completed') return;
+        cleanupNumberedCandidateWordCopies(visibleDirectory, filename);
+        if (!candidateExportDir) return;
+        try {
+          fs.mkdirSync(candidateExportDir, { recursive:true });
+          const archiveTarget = path.join(candidateExportDir, path.basename(visibleTarget));
+          fs.copyFileSync(visibleTarget, archiveTarget);
+          cleanupNumberedCandidateWordCopies(candidateExportDir, path.basename(archiveTarget));
+        } catch (error) {
+          console.error('Archivage interne du Word impossible:', error && error.message ? error.message : String(error));
+        }
+      });
     } catch (_) {}
   });
 }
@@ -158,9 +266,13 @@ function defaultState() {
 
 function readState() {
   try {
-    const raw = fs.readFileSync(stateFilePath(), 'utf8');
-    const parsed = JSON.parse(raw);
-    return { ...defaultState(), ...parsed };
+    const protection = getCandidateProtection();
+    protection.restoreStateFromBackupIfNeeded();
+    let parsed = readJsonFile(stateFilePath());
+    if ((!parsed || typeof parsed !== 'object') && fs.existsSync(protection.paths.backupStatePath)) {
+      parsed = readJsonFile(protection.paths.backupStatePath);
+    }
+    return parsed && typeof parsed === 'object' ? { ...defaultState(), ...parsed } : defaultState();
   } catch (_) {
     return defaultState();
   }
@@ -199,10 +311,11 @@ function writeState(nextState) {
     version: STATE_VERSION,
     updatedAt: new Date().toISOString()
   };
-  atomicReplaceState(target, JSON.stringify(safeState, null, 2));
+  atomicReplaceState(target, encodeJson(safeState));
 
   try {
     getCandidateStore().saveSnapshot(safeState);
+    getCandidateProtection().backupState();
     lastCandidateSaveError = '';
   } catch (error) {
     lastCandidateSaveError = error && error.message ? error.message : String(error);
@@ -284,6 +397,72 @@ function reinforceCandidateWindowLock() {
   }
 }
 
+// SEB_WINDOWS_RETURN_KIOSK_GUARD
+// Après une veille ou un verrouillage Windows, le Shell peut remettre la barre
+// des tâches au premier plan alors qu'Electron pense encore être en mode kiosk.
+// On force donc une vraie réaffirmation du mode candidat à chaque retour Windows.
+function forceCandidateWindowLockAfterWindowsReturn(reason = 'windows-return') {
+  if (adminSessionUnlocked || allowApplicationExit || !mainWindow || mainWindow.isDestroyed()) return;
+
+  const win = mainWindow;
+  startCandidateKeyGuard();
+
+  try {
+    if (win.isMinimized()) win.restore();
+    if (!win.isVisible()) win.show();
+
+    win.setSkipTaskbar(true);
+    win.setMenuBarVisibility(false);
+    win.setAlwaysOnTop(true);
+
+    // Windows peut conserver un état plein écran logique tout en réaffichant
+    // la barre des tâches. Le basculement kiosk force Windows à recalculer le
+    // z-order et les contraintes plein écran, même si isKiosk() vaut déjà true.
+    if (process.platform === 'win32') {
+      win.setKiosk(false);
+      win.setFullScreen(false);
+      win.setKiosk(true);
+      win.setFullScreen(true);
+    } else {
+      if (!win.isKiosk()) win.setKiosk(true);
+      if (!win.isFullScreen()) win.setFullScreen(true);
+    }
+
+    win.setSkipTaskbar(true);
+    win.setAlwaysOnTop(true);
+    win.show();
+    if (typeof win.moveTop === 'function') win.moveTop();
+    win.focus();
+  } catch (error) {
+    console.warn('SEB EvalPro : réaffirmation kiosk après retour Windows impossible (' + reason + ').', error);
+  }
+
+  // Plusieurs passes couvrent le délai de réinitialisation de l'Explorer Windows
+  // après écran verrouillé / veille, sans supprimer la touche Windows temporaire.
+  for (const delay of [80, 250, 600, 1200, 2200]) {
+    setTimeout(() => {
+      if (adminSessionUnlocked || allowApplicationExit || !mainWindow || mainWindow.isDestroyed()) return;
+      enforceCandidateWindowLock(true);
+      try {
+        mainWindow.setSkipTaskbar(true);
+        mainWindow.setAlwaysOnTop(true);
+        if (typeof mainWindow.moveTop === 'function') mainWindow.moveTop();
+      } catch (_) {}
+    }, delay);
+  }
+}
+
+function installCandidateWindowsReturnGuard() {
+  if (candidateWindowsReturnGuardInstalled) return;
+  candidateWindowsReturnGuardInstalled = true;
+
+  for (const eventName of ['resume', 'unlock-screen', 'user-did-become-active']) {
+    powerMonitor.on(eventName, () => {
+      if (!adminSessionUnlocked) forceCandidateWindowLockAfterWindowsReturn(eventName);
+    });
+  }
+}
+
 function setSplashProgress(percent, message) {
   if (!splashWindow || splashWindow.isDestroyed()) return;
   const value = Math.max(0, Math.min(100, Number(percent) || 0));
@@ -335,7 +514,8 @@ function finishStartup() {
   setTimeout(() => {
     if (!mainWindow || mainWindow.isDestroyed()) return;
     mainWindow.show();
-    enforceCandidateWindowLock(true);
+    applyAdminWindowMode(adminSessionUnlocked);
+    if (!adminSessionUnlocked) enforceCandidateWindowLock(true);
     applyAdaptiveZoom();
     if (splashWindow && !splashWindow.isDestroyed()) splashWindow.close();
     // La fermeture du splash peut brièvement rendre la barre des tâches Windows
@@ -363,6 +543,7 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
+      spellcheck: false,
       devTools: false,
       navigateOnDragDrop: false
     }
@@ -374,6 +555,7 @@ function createWindow() {
   mainWindow.loadFile(existingWebPage(state.lastEvaluationPage || state.lastPage));
 
   mainWindow.webContents.on('did-finish-load', () => {
+    applyAdminWindowMode(adminSessionUnlocked);
     applyAdaptiveZoom();
   });
 
@@ -488,9 +670,89 @@ function createWindow() {
   });
 }
 
+function showStartupSecurityError(error) {
+  const message = String(error && error.message ? error.message : error || 'Erreur de sécurité inconnue.');
+  console.error('SEB EvalPro démarrage sécurisé impossible:', message);
+
+  if (splashWindow && !splashWindow.isDestroyed()) {
+    try { splashWindow.close(); } catch (_) {}
+  }
+
+  mainWindow = new BrowserWindow({
+    width: 860,
+    height: 520,
+    show: true,
+    center: true,
+    resizable: true,
+    backgroundColor: '#ffffff',
+    title: 'SEB EvalPro - Démarrage impossible',
+    autoHideMenuBar: true,
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      devTools: false
+    }
+  });
+  mainWindow.setMenuBarVisibility(false);
+
+  const safeMessage = message
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+
+  const html = `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>SEB EvalPro</title>
+  <style>
+    body{font-family:Arial,sans-serif;margin:0;background:#f5f7fa;color:#222}
+    .card{max-width:760px;margin:60px auto;background:#fff;border:1px solid #ccd6e0;border-radius:10px;padding:28px 32px;box-shadow:0 8px 28px rgba(0,0,0,.12)}
+    h1{margin:0 0 18px;color:#c00000;font-size:25px}
+    p{line-height:1.55}
+    .msg{margin:18px 0;padding:14px;background:#fff5f5;border-left:4px solid #c00000;white-space:pre-wrap}
+    .note{color:#555;font-size:14px}
+  </style></head><body><div class="card">
+    <h1>SEB EvalPro ne peut pas accéder aux données sécurisées</h1>
+    <p>Le programme a bien démarré, mais la protection générale des données candidat n'a pas pu être initialisée.</p>
+    <div class="msg">${safeMessage}</div>
+    <p><strong>Aucun dossier candidat n'a été supprimé ni remplacé.</strong></p>
+    <p class="note">Fermez cette fenêtre puis faites vérifier la clé locale ou sa copie de récupération. Un dossier candidat individuel endommagé ne doit pas provoquer cet écran : seuls les problèmes concernant la clé générale du poste peuvent bloquer l'accès sécurisé aux données.</p>
+  </div></body></html>`;
+
+  mainWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+  });
+}
+
 function startApplication() {
-  ensureSebDocumentsFolders();
+  // Toujours créer une interface visible avant les contrôles de sécurité.
+  // Une erreur de clé ne doit jamais laisser un simple processus invisible.
   createSplashWindow();
+  setSplashProgress(10, 'Migration du stockage local…');
+
+  try {
+    const migration = migrateLegacyDocumentsStorage({
+      documentsPath: app.getPath('documents'),
+      userDataPath: app.getPath('userData')
+    });
+    if (!migration.completed) {
+      console.warn('SEB EvalPro 0.3.8 : migration Documents incomplète, anciennes données conservées.', migration);
+    } else {
+      console.log(
+        'SEB EvalPro 0.3.8 : stockage interne migré ; dossiers Documents retirés=' +
+        migration.removedDirectories + ', fichiers Word visibles conservés=' + migration.wordExports + '.'
+      );
+    }
+
+    setSplashProgress(16, 'Vérification de la protection des données…');
+    initializeCandidateSecurity();
+    ensureSebDocumentsFolders();
+  } catch (error) {
+    showStartupSecurityError(error);
+    return;
+  }
+
   setTimeout(() => {
     setSplashProgress(20, 'Préparation du programme…');
     createWindow();
@@ -527,13 +789,7 @@ ipcMain.handle('admin:verify', (_event, password) => {
   const ok = verifyAdminPassword(password);
   if (ok) {
     adminSessionUnlocked = true;
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.setAlwaysOnTop(false);
-      mainWindow.setSkipTaskbar(false);
-      mainWindow.setKiosk(false);
-      mainWindow.setFullScreen(false);
-      mainWindow.focus();
-    }
+    applyAdminWindowMode(true);
   }
   return ok;
 });
@@ -547,21 +803,25 @@ ipcMain.on('app:edition-sync', (event) => { event.returnValue = { ...editionCapa
 ipcMain.handle('app:edition', () => ({ ...editionCapabilities }));
 
 ipcMain.handle('admin:lock', () => {
+  // SEB_ADMIN_LOCK_RETURNS_TO_PRIVACY
   adminSessionUnlocked = false;
   adminExportCandidateDir = null;
+  adminCandidateResultsMode = false;
+  applyAdminWindowMode(false);
   if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.setSkipTaskbar(true);
-    mainWindow.setKiosk(true);
-    mainWindow.setFullScreen(true);
-    mainWindow.setAlwaysOnTop(true);
-    reinforceCandidateWindowLock();
+    const state = readState();
+    const target = existingWebPage(state.lastEvaluationPage || 'qcmv1.0.html');
+    setTimeout(() => {
+      if (!mainWindow || mainWindow.isDestroyed() || adminSessionUnlocked) return;
+      mainWindow.loadFile(target);
+    }, 90);
   }
   return true;
 });
 
 ipcMain.handle('candidate:set-admin-export-context', (_event, candidateId) => {
   if (!adminSessionUnlocked) return false;
-  const root = path.join(sebDocumentsRoot(), 'Candidats');
+  const root = path.join(sebInternalRoot(), 'Candidats');
   const record = getCandidateTransfer().listCandidateRecords(root, false)
     .find((item) => String(item.candidateId) === String(candidateId || ''));
   if (!record) {
@@ -578,37 +838,92 @@ ipcMain.handle('candidate:active', () => {
   return getCandidateStore().getActiveCandidate();
 });
 
-ipcMain.handle('admin:export-candidates', async () => {
-  if (!mainWindow || !adminSessionUnlocked) return { ok: false, error: 'Accès administrateur requis.' };
+ipcMain.handle('candidate:complete-active', (_event, mode) => {
+  const completionMode = String(mode || '');
+  if (!['admin-manual', 'admin-export', 'candidate-final-page'].includes(completionMode)) {
+    return { ok:false, error:'Mode de fin de parcours invalide.' };
+  }
+  if (['admin-manual', 'admin-export'].includes(completionMode) && !adminSessionUnlocked) {
+    return { ok:false, error:'Accès administrateur requis.' };
+  }
   try {
-    const selection = await dialog.showOpenDialog(mainWindow, {
-      title: 'Choisir la clé USB ou son dossier racine',
-      buttonLabel: 'Exporter ici',
-      properties: ['openDirectory', 'createDirectory']
-    });
-    if (selection.canceled || !selection.filePaths || !selection.filePaths[0]) {
-      return { ok: false, cancelled: true };
-    }
-    const result = getCandidateTransfer().exportAll(selection.filePaths[0]);
-    return { ok: true, ...result };
+    const currentState = readState();
+    const completed = getCandidateStore().completeActiveCandidate(currentState, completionMode);
+    if (!completed) return { ok:false, error:'Aucun parcours candidat actif sur ce PC.' };
+    writeState(defaultState());
+    return { ok:true, ...completed };
   } catch (error) {
-    return { ok: false, error: error && error.message ? error.message : String(error) };
+    return { ok:false, error:error && error.message ? error.message : String(error) };
   }
 });
 
-ipcMain.handle('admin:import-candidates', async () => {
+ipcMain.handle('admin:export-candidates', async (_event, password, destinationOptions = {}) => {
+  if (!mainWindow || !adminSessionUnlocked) return { ok: false, error: 'Accès administrateur requis.' };
+  try {
+    const mode = String(destinationOptions && destinationOptions.mode || 'existing');
+
+    if (mode === 'create') {
+      const rawFolderName = String(destinationOptions && destinationOptions.folderName || '').trim();
+      const folderName = rawFolderName.replace(/[<>:"/\\|?*\u0000-\u001F]/g, '_').replace(/[. ]+$/g, '').trim();
+      if (!folderName || folderName === '.' || folderName === '..') {
+        return { ok:false, error:'Le nom du dossier d’export est invalide.' };
+      }
+
+      const selection = await dialog.showOpenDialog(mainWindow, {
+        title: 'Choisir la clé USB où créer le nouveau dossier',
+        buttonLabel: 'Créer le dossier ici',
+        properties: ['openDirectory']
+      });
+      if (selection.canceled || !selection.filePaths || !selection.filePaths[0]) {
+        return { ok:false, cancelled:true };
+      }
+
+      const parent = selection.filePaths[0];
+      const destination = path.join(parent, folderName);
+      if (fs.existsSync(destination)) {
+        return {
+          ok:false,
+          error:'Ce dossier existe déjà sur la clé. Choisissez « Choisir un dossier existant » pour y ajouter les nouveaux candidats.'
+        };
+      }
+      fs.mkdirSync(destination, { recursive:false });
+      const result = getCandidateTransfer().exportAll(destination, password);
+      return { ok:true, ...result, createdExportFolder:true };
+    }
+
+    if (mode !== 'existing') {
+      return { ok:false, error:'Choix de destination d’export invalide.' };
+    }
+
+    const selection = await dialog.showOpenDialog(mainWindow, {
+      title: 'Choisir un dossier existant sur la clé USB',
+      buttonLabel: 'Exporter dans ce dossier',
+      properties: ['openDirectory']
+    });
+    if (selection.canceled || !selection.filePaths || !selection.filePaths[0]) {
+      return { ok:false, cancelled:true };
+    }
+
+    const result = getCandidateTransfer().exportAll(selection.filePaths[0], password);
+    return { ok:true, ...result, createdExportFolder:false };
+  } catch (error) {
+    return { ok:false, error:error && error.message ? error.message : String(error) };
+  }
+});
+
+ipcMain.handle('admin:import-candidates', async (_event, password) => {
   if (!editionCapabilities.canImport) return { ok:false, error:'Import réservé à la version Administrateur.' };
   if (!mainWindow || !adminSessionUnlocked) return { ok: false, error: 'Accès administrateur requis.' };
   try {
     const selection = await dialog.showOpenDialog(mainWindow, {
-      title: 'Choisir la racine de la clé USB contenant les dossiers candidats',
-      buttonLabel: 'Importer',
+      title: 'Choisir la clé USB contenant les fichiers candidats .seb',
+      buttonLabel: 'Importer depuis cette clé',
       properties: ['openDirectory']
     });
     if (selection.canceled || !selection.filePaths || !selection.filePaths[0]) {
       return { ok: false, cancelled: true };
     }
-    const result = getCandidateTransfer().importAll(selection.filePaths[0]);
+    const result = getCandidateTransfer().importAll(selection.filePaths[0], password);
     return { ok: true, ...result };
   } catch (error) {
     return { ok: false, error: error && error.message ? error.message : String(error) };
@@ -630,7 +945,6 @@ ipcMain.handle('admin:open-candidate-browser', (_event, candidateId) => {
 });
 
 ipcMain.handle('admin:return-candidate-browser', (_event, candidateId) => {
-  if (localAi) localAi.cancelCurrent('Fermeture du candidat');
   return loadAdminCandidateBrowser(candidateId);
 });
 
@@ -660,21 +974,41 @@ ipcMain.handle('admin:return-evaluation', () => {
 });
 
 ipcMain.handle('ai:status', () => {
-  if (!editionCapabilities.canAi || !localAi) return { available:false, offline:true, edition:editionCapabilities.edition, error:'IA non disponible dans la version Candidat.' };
-  if (!adminSessionUnlocked) return { available: false, offline: true, error: 'Accès administrateur requis.' };
-  return localAi.status();
+  if (!editionCapabilities.canAi) {
+    return { available:false, offline:true, integrated:false, edition:editionCapabilities.edition, error:'SEB-IA est réservée à la version Administrateur.' };
+  }
+  if (!adminSessionUnlocked) return { available:false, offline:true, integrated:true, error:'Accès administrateur requis.' };
+  return { available:true, offline:true, integrated:true, model:'SEB-IA V1', runtime:'moteur rédactionnel intégré' };
 });
 
-ipcMain.handle('ai:rewrite-synthesis', async (_event, text) => {
-  if (!editionCapabilities.canAi || !localAi) return { ok:false, error:'IA non disponible dans la version Candidat.' };
-  if (!adminSessionUnlocked) return { ok: false, error: 'Accès administrateur requis.' };
-  return localAi.rewrite(String(text || ''));
+ipcMain.handle('ai:rewrite-synthesis', async () => {
+  if (!editionCapabilities.canAi) return { ok:false, error:'SEB-IA est réservée à la version Administrateur.' };
+  if (!adminSessionUnlocked) return { ok:false, error:'Accès administrateur requis.' };
+  return { ok:false, integrated:true, error:'SEB-IA génère directement la synthèse à partir du tableau ; aucune reformulation externe n’est nécessaire.' };
 });
 
-ipcMain.handle('ai:cancel-current', () => {
-  if (!editionCapabilities.canAi || !localAi) return { ok:true, cancelled:false, offline:true };
-  if (!adminSessionUnlocked) return { ok:false, cancelled:false, error:'Accès administrateur requis.' };
-  return localAi.cancelCurrent('Fermeture du candidat');
+ipcMain.handle('ai:cancel-current', () => ({ ok:true, cancelled:false, offline:true, integrated:true }));
+
+// SEB_CANDIDATE_REPLAY_PROTO_MAIN
+require('./replay-main')({
+  app,
+  ipcMain,
+  getAdminUnlocked: () => adminSessionUnlocked,
+  buildNumber: "6"
+});
+require('./bilan-history-main')({
+  app,
+  ipcMain,
+  getAdminUnlocked: () => adminSessionUnlocked,
+  buildNumber: "6"
+});
+
+require('./candidate-catalog-main')({
+  app,
+  ipcMain,
+  getAdminUnlocked: () => adminSessionUnlocked,
+  getActiveCandidate: () => getCandidateStore().getActiveCandidate(),
+  dataRoot: sebInternalRoot()
 });
 
 require('./session-close')({
@@ -682,19 +1016,17 @@ require('./session-close')({
   ipcMain,
   getMainWindow: () => mainWindow,
   getAdminUnlocked: () => adminSessionUnlocked,
-  setAdminUnlocked: (value) => { adminSessionUnlocked = !!value; },
-  readState,
-  writeState,
-  defaultState,
-  finalizeCandidateSession: (state) => getCandidateStore().closeActiveCandidate(state)
+  setAdminUnlocked: (value) => { adminSessionUnlocked = !!value; applyAdminWindowMode(adminSessionUnlocked); }
 });
 
-app.whenReady().then(startApplication);
+app.whenReady().then(() => {
+  installCandidateWindowsReturnGuard();
+  startApplication();
+});
 
 app.on('before-quit', () => {
   allowApplicationExit = true;
   stopCandidateKeyGuard();
-  if (localAi) localAi.stop();
 });
 
 app.on('window-all-closed', () => {

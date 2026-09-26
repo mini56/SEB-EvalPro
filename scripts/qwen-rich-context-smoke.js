@@ -26,7 +26,7 @@ const rows = {
   'math-problemes': {level:'I',select:'I. Est capable de calculer, mettre en œuvre des algorithmes et de traiter des problèmes de pourcentages et d’échelles liés à la vie courante.',detail:'- 89 % de réponses correctes'}
 };
 
-const profile=buildRichProfile({candidate:{civilite:'Monsieur',nom:'Garcia',prenom:'josé',date:'2026-09-22'},rows});
+const profile=buildRichProfile({candidate:{civilite:'Monsieur',nom:'XX',prenom:'yy',date:'2026-09-22'},rows});
 assert(profile.domaines_reussite.some(x=>/restaurant/i.test(x)),'La planification réussie doit être dans les réussites.');
 assert(Array.isArray(profile.trame_factuelle)&&profile.trame_factuelle.length>=8,'La trame factuelle par domaines doit être construite.');
 const domaine=n=>profile.trame_factuelle.find(x=>String(x.domaine).toLowerCase().includes(n));
@@ -54,7 +54,7 @@ const payload=JSON.stringify({kind:'seb-qwen-rich-context-v1',profile});
     if(!result?.ok) throw new Error(result?.error||'Qwen direct: génération refusée');
     const text=String(result.text||'').trim();
     assert.strictEqual(result.guard,'qwen-factual-frame-v6','La trame factuelle v6 doit être active.');
-    assert(text.startsWith('Monsieur GARCIA José a participé'),'Le début institutionnel doit être conservé.');
+    assert(text.startsWith('Monsieur XX YY a participé'),'Le début institutionnel doit être conservé.');
     assert(text.length>=700,'La synthèse ne doit pas être anormalement courte.');
     assert(text.split(/\n\s*\n/).filter(Boolean).length>=4,'La synthèse doit contenir au moins quatre paragraphes.');
 
@@ -117,7 +117,7 @@ const payload=JSON.stringify({kind:'seb-qwen-rich-context-v1',profile});
     assert(!/monsieur convient de noter/.test(norm),'La tournure impersonnelle "Il convient" ne doit plus être cassée.');
     assert(!/qu['’]monsieur/.test(norm),'Le remplacement mécanique il/elle ne doit plus produire qu’Monsieur.');
 
-    console.log('QWEN_LIGHT_FACTUAL_GARCIA: OK');
+    console.log('QWEN_LIGHT_FACTUAL_XX: OK');
 
     const cancelStarted=Date.now();
     const pendingCancellation=service.rewrite(payload);

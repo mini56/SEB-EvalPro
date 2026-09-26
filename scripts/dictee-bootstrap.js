@@ -67,13 +67,41 @@ fs.readdirSync(webRoot)
   .forEach(name => fs.unlinkSync(path.join(webRoot, name)));
 
 // Exécuter le patch d'intégration existant puis supprimer le fichier temporaire.
+// Compatibilité temporaire : l'ancien patch compressé cherche encore une redirection
+// physique Genre/Nombres -> Tri pour l'intercaler vers la Dictée. La page modulaire
+// passe désormais par seb-parcours.js ; on lui fournit donc ce marqueur uniquement
+// pendant l'exécution du patch, puis on le retire du HTML généré.
 const patchPayload = path.join(__dirname, 'dictee-patch.js.gz.b64');
 const patchTemp = path.join(__dirname, '.dictee-patch.generated.js');
+const genreCompatPath = path.join(webRoot, 'genrenombres.html');
+const genreCompatMarker = 'seb-dictee-legacy-route-compat';
+let genreCompatInjected = false;
+
+if (fs.existsSync(genreCompatPath)) {
+  let genreCompatHtml = fs.readFileSync(genreCompatPath, 'utf8');
+  if (genreCompatHtml.includes('js/genrenombres-page.js') && !genreCompatHtml.includes(genreCompatMarker)) {
+    const compatScript = `\n<script id="${genreCompatMarker}">window.location.href = 'tri_de_cheville.html';</script>\n`;
+    genreCompatHtml = /<\/body>/i.test(genreCompatHtml)
+      ? genreCompatHtml.replace(/<\/body>/i, compatScript + '</body>')
+      : genreCompatHtml + compatScript;
+    fs.writeFileSync(genreCompatPath, genreCompatHtml, 'utf8');
+    genreCompatInjected = true;
+  }
+}
+
 decodeGzipBase64File(patchPayload, patchTemp);
 try {
   require(patchTemp);
 } finally {
   try { fs.unlinkSync(patchTemp); } catch (_) {}
+  if (genreCompatInjected && fs.existsSync(genreCompatPath)) {
+    let genreCompatHtml = fs.readFileSync(genreCompatPath, 'utf8');
+    genreCompatHtml = genreCompatHtml.replace(
+      /\s*<script\s+id=["']seb-dictee-legacy-route-compat["'][^>]*>[\s\S]*?<\/script>\s*/i,
+      '\n'
+    );
+    fs.writeFileSync(genreCompatPath, genreCompatHtml, 'utf8');
+  }
 }
 
 // Audio définitif validé par l'utilisateur : enregistrement fixe Microsoft Julie.

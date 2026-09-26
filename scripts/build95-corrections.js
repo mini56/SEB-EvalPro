@@ -117,22 +117,29 @@ patchExerciseLayout('app/web/tri_de_cheville.html', '#right', 'tri');
 {
   const { file, text } = read('app/web/carre.html');
   let out = text;
-  if (!out.includes('SEB_CARRE_LOCK95')) {
-    out = replaceOnce(
-      out,
-      '            isValidated = true;',
-      `            isValidated = true;\n            // SEB_CARRE_LOCK95 : aucune seconde tentative après affichage des réponses.\n            document.querySelectorAll('.cell').forEach(cell => { cell.disabled = true; });\n            const resetButton = document.querySelector('.btn-reset');\n            if (resetButton) { resetButton.disabled = true; resetButton.style.display = 'none'; }\n            const validateButton = document.getElementById('btnValidate');\n            if (validateButton) { validateButton.disabled = true; validateButton.style.display = 'none'; }`,
-      'verrouillage après validation carré magique'
-    );
-    out = replaceOnce(
-      out,
-      '        function reset() {',
-      `        function reset() {\n            if (isValidated) return;`,
-      'blocage recommencer après validation carré magique'
-    );
+  const modular = out.includes('js/carre-page.js');
+  if (modular) {
+    const moduleText = read('app/web/js/carre-page.js').text;
+    if (!moduleText.includes('SEB_CARRE_LOCK95')) fail('verrouillage carré magique modulaire absent', 6);
+    if (!moduleText.includes('if (isValidated) return;')) fail('blocage recommencer carré magique modulaire absent', 6);
+  } else {
+    if (!out.includes('SEB_CARRE_LOCK95')) {
+      out = replaceOnce(
+        out,
+        '            isValidated = true;',
+        `            isValidated = true;\n            // SEB_CARRE_LOCK95 : aucune seconde tentative après affichage des réponses.\n            document.querySelectorAll('.cell').forEach(cell => { cell.disabled = true; });\n            const resetButton = document.querySelector('.btn-reset');\n            if (resetButton) { resetButton.disabled = true; resetButton.style.display = 'none'; }\n            const validateButton = document.getElementById('btnValidate');\n            if (validateButton) { validateButton.disabled = true; validateButton.style.display = 'none'; }`,
+        'verrouillage après validation carré magique'
+      );
+      out = replaceOnce(
+        out,
+        '        function reset() {',
+        `        function reset() {\n            if (isValidated) return;`,
+        'blocage recommencer après validation carré magique'
+      );
+    }
+    if (!out.includes('SEB_CARRE_LOCK95')) fail('verrouillage carré magique absent', 6);
+    write(file, out);
   }
-  if (!out.includes('SEB_CARRE_LOCK95')) fail('verrouillage carré magique absent', 6);
-  write(file, out);
 }
 
 // -----------------------------------------------------------------------------
@@ -155,6 +162,9 @@ patchExerciseLayout('app/web/tri_de_cheville.html', '#right', 'tri');
   const tri = read('app/web/tri_de_cheville.html').text;
   const brique = read('app/web/brique.html').text;
   const carre = read('app/web/carre.html').text;
+  const carreModule = fs.existsSync(path.join(root, 'app', 'web', 'js', 'carre-page.js'))
+    ? read('app/web/js/carre-page.js').text
+    : '';
   const bilan = read('app/web/admin-bilan.html').text;
   const checks = [
     [runtime.includes("new Set(['page2','page2_1','page3','page4','page5','page5_1','page6','pageTexteTrous','page8'])"), 'allowlist abandon QCM'],
@@ -162,7 +172,7 @@ patchExerciseLayout('app/web/tri_de_cheville.html', '#right', 'tri');
     [runtime.includes('#page4 .fraction-title'), 'fractions non normalisées'],
     [tri.includes('seb-tri-compact95') && tri.includes("document.querySelector('#right')"), 'tri élargi + abandon droite'],
     [brique.includes('seb-brique-compact95') && brique.includes("document.querySelector('#left')"), 'brique élargie + abandon gauche'],
-    [carre.includes('SEB_CARRE_LOCK95'), 'carré verrouillé après validation'],
+    [(carre.includes('SEB_CARRE_LOCK95') || carreModule.includes('SEB_CARRE_LOCK95')), 'carré verrouillé après validation'],
     [bilan.includes(".seb-admin-abandon-section,.seb-admin-abandon-row').forEach(el=>el.remove())"), 'abandons exclus Word']
   ];
   const failed = checks.filter((entry) => !entry[0]).map((entry) => entry[1]);

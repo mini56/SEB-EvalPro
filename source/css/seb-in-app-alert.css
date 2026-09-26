@@ -1,0 +1,7 @@
+#seb-evalpro-alert-layer{position:fixed;inset:0;z-index:2147483647;background:rgba(0,0,0,.42);display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;font-family:Arial,sans-serif}
+#seb-evalpro-alert-box{width:min(460px,92vw);max-height:82vh;overflow:auto;background:#fff;border:1px solid #aaa;border-radius:10px;box-shadow:0 14px 45px rgba(0,0,0,.34);padding:20px;box-sizing:border-box}
+#seb-evalpro-alert-title{font-size:19px;font-weight:700;color:#0070c0;margin:0 0 12px}
+#seb-evalpro-alert-message{font-size:16px;line-height:1.45;color:#222;white-space:pre-wrap;overflow-wrap:anywhere}
+#seb-evalpro-alert-actions{display:flex;justify-content:flex-end;margin-top:18px}
+#seb-evalpro-alert-ok{min-width:100px;padding:9px 18px;border:0;border-radius:6px;background:#0070c0;color:#fff;font:700 15px Arial,sans-serif;cursor:pointer}
+#seb-evalpro-alert-ok:focus{outline:3px solid rgba(0,112,192,.28);outline-offset:2px}

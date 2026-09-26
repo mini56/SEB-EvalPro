@@ -1,14 +1,25 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const { findCandidateDir, listCandidateDirs, selectCandidate } = require('./candidate-folder-utils');
+const { listCandidateDirs, selectCandidate } = require('./candidate-folder-utils');
+const { readJsonFile, encodeJson } = require('./candidate-data-crypto');
 
-module.exports = function registerCandidateReplay({ app, ipcMain, getAdminUnlocked, buildNumber }) {
+module.exports = function registerCandidateReplay({ app, ipcMain, getAdminUnlocked, buildNumber, dataRoot = null }) {
   const BUILD = String(buildNumber || 'DEV');
   const TYPE = 'SEB_EVALPRO_PARCOURS_ARCHIVE';
   const SCHEMA_VERSION = 2;
   const captureQueues = new Map();
   let replayAtomicCounter = 0;
+  const storageRoot = dataRoot || path.join(app.getPath('userData'), 'storage');
+  const candidatesRoot = path.join(storageRoot, 'Candidats');
+  const legacyAdminRoot = path.join(storageRoot, 'Admin');
+
+  function findCandidateDirInternal(candidate) {
+    const current = selectCandidate(listCandidateDirs(candidatesRoot, false), candidate);
+    if (current) return current.candidateDir;
+    const legacy = selectCandidate(listCandidateDirs(legacyAdminRoot, true), candidate);
+    return legacy ? legacy.candidateDir : null;
+  }
   const ARCHIVE_MARKER_KEYS = new Set([
     'seb_evalpro_replay_archive',
     'seb_evalpro_replay_archive_file',
@@ -16,7 +27,7 @@ module.exports = function registerCandidateReplay({ app, ipcMain, getAdminUnlock
   ]);
 
   function parcoursDir() {
-    return path.join(app.getPath('documents'), 'SEB EvalPro', 'parcours');
+    return path.join(storageRoot, 'parcours');
   }
 
   function pendingRoot() {
@@ -192,7 +203,7 @@ module.exports = function registerCandidateReplay({ app, ipcMain, getAdminUnlock
   }
 
   function readManifest(folderPath) {
-    return JSON.parse(fs.readFileSync(path.join(folderPath, 'manifest.json'), 'utf8'));
+    return readJsonFile(path.join(folderPath, 'manifest.json'));
   }
 
   function verifyArchiveDirectory(folderPath, manifest) {
@@ -222,9 +233,54 @@ module.exports = function registerCandidateReplay({ app, ipcMain, getAdminUnlock
     return legacySnapshotSha(archive.snapshot) === String(archive.integritySha256);
   }
 
+  async function captureFullPage(webContents) {
+    let attachedHere = false;
+    try {
+      const dbg = webContents.debugger;
+      if (!dbg.isAttached()) {
+        dbg.attach('1.3');
+        attachedHere = true;
+      }
+      await dbg.sendCommand('Page.enable');
+      const metrics = await dbg.sendCommand('Page.getLayoutMetrics');
+      const content = metrics.cssContentSize || metrics.contentSize || {};
+      const width = Math.max(1, Math.ceil(Number(content.width) || 0));
+      const height = Math.max(1, Math.ceil(Number(content.height) || 0));
+      if (width > 1 && height > 1) {
+        const shot = await dbg.sendCommand('Page.captureScreenshot', {
+          format: 'png',
+          fromSurface: true,
+          captureBeyondViewport: true,
+          clip: { x: 0, y: 0, width, height, scale: 1 }
+        });
+        const png = Buffer.from(String(shot && shot.data || ''), 'base64');
+        if (png.length) return { png, size: { width, height }, fullPage: true };
+      }
+    } catch (_) {
+      // Repli ci-dessous sur capturePage() si le protocole DevTools est indisponible.
+    } finally {
+      if (attachedHere) {
+        try { webContents.debugger.detach(); } catch (_) {}
+      }
+    }
+    const image = await webContents.capturePage();
+    if (!image || image.isEmpty()) throw new Error('Capture visuelle vide.');
+    return { png: image.toPNG(), size: image.getSize(), fullPage: false };
+  }
+
   async function capturePage(event, payload) {
     const token = safeToken(payload && payload.token);
     if (!token) return { ok: false, error: 'Jeton de parcours invalide.' };
+    // SEB_ADMIN_CAPTURE_BACKEND_GUARD
+    // SEB_ADMIN_CAPTURE_ADMINMODE_GUARD
+    if (getAdminUnlocked()) {
+      return { ok: false, skipped: true, adminWorkBlocked: true };
+    }
+    let senderPage = '';
+    try { senderPage = path.basename(new URL(event.sender.getURL()).pathname).toLowerCase(); } catch (_) {}
+    if (senderPage === 'admin-bilan.html' || senderPage === 'bilan.html') {
+      return { ok: false, skipped: true, adminWorkBlocked: true };
+    }
     return enqueueCapture(token, async () => {
     try {
       const pageKey = safePageKey(payload && payload.pageKey);
@@ -232,11 +288,13 @@ module.exports = function registerCandidateReplay({ app, ipcMain, getAdminUnlock
       cleanupOldPending();
       ensurePendingRoot();
 
-      const image = await event.sender.capturePage();
-      if (!image || image.isEmpty()) return { ok: false, error: 'Capture visuelle vide.' };
-      const png = image.toPNG();
+      const capture = await Promise.race([
+        captureFullPage(event.sender),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Capture Replay trop longue.')), 2000))
+      ]);
+      const png = capture.png;
       if (!png || !png.length) return { ok: false, error: 'Capture PNG vide.' };
-      const size = image.getSize();
+      const size = capture.size;
 
       const index = readPendingIndex(token);
       const existing = index.pages[pageKey];
@@ -291,7 +349,7 @@ module.exports = function registerCandidateReplay({ app, ipcMain, getAdminUnlock
         return { ok: false, error: 'Candidat non identifié : archive non créée.' };
       }
 
-      const candidateDir = findCandidateDir(app.getPath('documents'), candidate);
+      const candidateDir = findCandidateDirInternal(candidate);
       if (!candidateDir) {
         return { ok: false, error: 'Dossier candidat introuvable : replay non créé.' };
       }
@@ -305,7 +363,7 @@ module.exports = function registerCandidateReplay({ app, ipcMain, getAdminUnlock
 
       const snapshotSha256 = sha256Json(snapshot);
       const datePart = safePart(candidate.date || new Date().toISOString().slice(0, 10), 'DATE');
-      const base = [safePart(candidate.nom, 'NOM'), safePart(candidate.prenom, 'PRENOM'), datePart, `BUILD-${safePart(BUILD, 'DEV')}`, snapshotSha256.slice(0, 12)].join('_');
+      const base = ['REPLAY', safePart(path.basename(candidateDir), 'CAND'), datePart, `BUILD-${safePart(BUILD, 'DEV')}`, snapshotSha256.slice(0, 12)].join('_');
       const folderName = base;
       const targetFolder = path.join(candidateReplayRoot, folderName);
       const manifestPath = path.join(targetFolder, 'manifest.json');
@@ -359,7 +417,7 @@ module.exports = function registerCandidateReplay({ app, ipcMain, getAdminUnlock
         slides
       };
       manifest.integritySha256 = computeArchiveIntegrity(manifest);
-      fs.writeFileSync(path.join(tempFolder, 'manifest.json'), JSON.stringify(manifest, null, 2), 'utf8');
+      fs.writeFileSync(path.join(tempFolder, 'manifest.json'), encodeJson(manifest), 'utf8');
       fs.renameSync(tempFolder, targetFolder);
       // SEB_CANDIDATE_AUTONOMOUS_REPLAY: le dossier candidat est la source unique du replay.
 
@@ -371,8 +429,7 @@ module.exports = function registerCandidateReplay({ app, ipcMain, getAdminUnlock
   });
 
   function candidateRecordById(candidateId) {
-    const root = path.join(app.getPath('documents'), 'SEB EvalPro', 'Candidats');
-    return listCandidateDirs(root, false).find((record) => String(record.candidateId) === String(candidateId || '')) || null;
+    return listCandidateDirs(candidatesRoot, false).find((record) => String(record.candidateId) === String(candidateId || '')) || null;
   }
 
   function loadCandidateArchive(candidateId, requestedName) {
@@ -385,7 +442,7 @@ module.exports = function registerCandidateReplay({ app, ipcMain, getAdminUnlock
     try {
       const stat = fs.statSync(fullPath);
       if (stat.isFile() && name.toLowerCase().endsWith('.json')) {
-        const archive = JSON.parse(fs.readFileSync(fullPath, 'utf8'));
+        const archive = readJsonFile(fullPath);
         if (!verifyLegacyArchive(archive)) {
           return { ok:false, corruption:true, error:'ATTENTION : le replay est modifié ou corrompu. Il n’a pas été ouvert.' };
         }
@@ -490,7 +547,7 @@ module.exports = function registerCandidateReplay({ app, ipcMain, getAdminUnlock
         } else if (entry.isFile() && entry.name.toLowerCase().endsWith('.json')) {
           const stat = fs.statSync(fullPath);
           try {
-            const archive = JSON.parse(fs.readFileSync(fullPath, 'utf8'));
+            const archive = readJsonFile(fullPath);
             results.push({
               filename: entry.name,
               candidate: archive.candidate || {},
@@ -521,7 +578,7 @@ module.exports = function registerCandidateReplay({ app, ipcMain, getAdminUnlock
       if (!fs.existsSync(fullPath)) return { ok: false, error: 'Archive introuvable.' };
       const stat = fs.statSync(fullPath);
       if (stat.isFile() && name.toLowerCase().endsWith('.json')) {
-        const archive = JSON.parse(fs.readFileSync(fullPath, 'utf8'));
+        const archive = readJsonFile(fullPath);
         if (!verifyLegacyArchive(archive)) return { ok: false, error: 'Archive historique modifiée ou corrompue.' };
         return {
           ok: true,

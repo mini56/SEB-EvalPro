@@ -69,6 +69,11 @@ while ((match = scriptRe.exec(html))) {
   try {
     new vm.Script(code);
   } catch (error) {
+    console.error('--- SCRIPT ADMIN-BILAN INVALIDE #' + scriptNo + ' ---');
+    console.error(error && error.stack ? error.stack : error);
+    const numbered = code.split('\n').map((line, index) => String(index + 1).padStart(4, '0') + ': ' + line);
+    console.error(numbered.join('\n'));
+    console.error('--- FIN SCRIPT INVALIDE ---');
     fail('JavaScript admin-bilan invalide après correction (script ' + scriptNo + ') : ' + error.message);
   }
 }

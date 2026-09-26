@@ -58,8 +58,28 @@ function replayBlocked() {
   return false;
 }
 
+function adminWorkBlocked() {
+  const page = pageName().toLowerCase();
+  if (page === 'admin-bilan.html' || page === 'bilan.html') return true;
+  const adminButton = document.getElementById('seb-evalpro-admin');
+  if (adminButton && /^verrouiller$/i.test(String(adminButton.textContent || '').trim())) return true;
+  return !!(
+    document.getElementById('seb-evalpro-admin-dialog') ||
+    document.getElementById('seb-evalpro-session-close-dialog') ||
+    document.getElementById('seb-bilan-history-chooser') ||
+    document.getElementById('seb-bilan-history-editor') ||
+    document.getElementById('seb-replay-chooser') ||
+    document.getElementById('seb-replay-viewer')
+  );
+}
+
+function adminInteractionTarget(target) {
+  if (!target || !target.closest) return false;
+  return !!target.closest('#seb-evalpro-topbar,#seb-evalpro-admin-dialog,#seb-evalpro-session-close-dialog,#seb-bilan-history-chooser,#seb-bilan-history-editor,#seb-replay-chooser,#seb-replay-viewer');
+}
+
 async function captureNow(reason) {
-  if (!document.body || replayBlocked()) return false;
+  if (!document.body || replayBlocked() || adminWorkBlocked()) return false;
   const descriptor = pageDescriptor();
   try {
     const result = await ipcRenderer.invoke('replay:capture-page', {
@@ -143,24 +163,20 @@ function continueNavigation(control) {
 }
 
 function install() {
-  if (!document.documentElement) return;
+  if (!document.documentElement || adminWorkBlocked()) return;
   if (document.documentElement.dataset.sebReplayNavigationCaptureInstalled === '1') return;
   document.documentElement.dataset.sebReplayNavigationCaptureInstalled = '1';
 
   // Les champs de la page 3 sont nombreux : une capture au changement de champ
   // garantit qu'un remplissage rapide n'attend pas le debounce générique.
-  document.addEventListener('change', () => {
-    setTimeout(() => { captureNow('change-immediate'); }, 70);
-  }, true);
-  document.addEventListener('focusout', () => {
-    setTimeout(() => { captureNow('focusout'); }, 70);
-  }, true);
+
+
 
   // Capture bloquante uniquement au moment d'une vraie navigation. La page
   // courante reste affichée jusqu'à la fin de capture, puis l'action d'origine
   // reprend. Cela supprime la course qui pouvait archiver page3 déjà vidée.
   document.addEventListener('click', async (event) => {
-    if (replayingNavigation || replayBlocked()) return;
+    if (replayingNavigation || replayBlocked() || adminWorkBlocked() || adminInteractionTarget(event.target)) return;
     const control = event.target && event.target.closest ? event.target.closest('button,a') : null;
     if (!isNavigationControl(control)) return;
 

@@ -1,18 +1,23 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { encodeJson, readJsonFile } = require('./candidate-data-crypto');
+const { codedFolderName } = require('./candidate-folder-utils');
 
 function createCandidateStore(options = {}) {
   const documentsPath = options.documentsPath;
   const userDataPath = options.userDataPath;
+  const dataRoot = options.dataRoot || (documentsPath ? path.join(documentsPath, 'SEB EvalPro') : null);
   const now = typeof options.now === 'function' ? options.now : () => new Date();
 
-  if (!documentsPath) throw new Error('documentsPath requis');
+  if (!dataRoot) throw new Error('dataRoot requis');
   if (!userDataPath) throw new Error('userDataPath requis');
 
-  const sebRoot = path.join(documentsPath, 'SEB EvalPro');
+  const sebRoot = dataRoot;
   const candidatesRoot = path.join(sebRoot, 'Candidats');
+  const systemRoot = path.join(sebRoot, 'System');
   const activePointerPath = path.join(userDataPath, 'active-candidate.json');
+  const activePointerBackupPath = path.join(systemRoot, 'active-candidate.json');
   let atomicWriteCounter = 0;
 
   function ensureDirectory(directory) {
@@ -22,15 +27,16 @@ function createCandidateStore(options = {}) {
 
   function ensureRoots() {
     ensureDirectory(candidatesRoot);
+    ensureDirectory(systemRoot);
     ensureDirectory(userDataPath);
-    return { sebRoot, candidatesRoot };
+    return { sebRoot, candidatesRoot, systemRoot };
   }
 
   function atomicWriteJson(target, value) {
     ensureDirectory(path.dirname(target));
     atomicWriteCounter += 1;
     const temp = `${target}.${process.pid}.${atomicWriteCounter}.tmp`;
-    fs.writeFileSync(temp, JSON.stringify(value, null, 2), 'utf8');
+    fs.writeFileSync(temp, encodeJson(value), 'utf8');
     let lastError = null;
     for (let attempt = 0; attempt < 5; attempt += 1) {
       try {
@@ -48,11 +54,7 @@ function createCandidateStore(options = {}) {
   }
 
   function readJson(target) {
-    try {
-      return JSON.parse(fs.readFileSync(target, 'utf8'));
-    } catch (_) {
-      return null;
-    }
+    return readJsonFile(target);
   }
 
   function removeFile(target) {
@@ -154,11 +156,36 @@ function createCandidateStore(options = {}) {
     };
   }
 
-  function readActivePointer() {
-    const pointer = readJson(activePointerPath);
-    if (!pointer || !pointer.candidateDir || !pointer.candidateId) return null;
-    if (!fs.existsSync(pointer.candidateDir)) return null;
+  function writeActivePointer(pointer) {
+    atomicWriteJson(activePointerPath, pointer);
+    atomicWriteJson(activePointerBackupPath, pointer);
     return pointer;
+  }
+
+  function removeActivePointer() {
+    removeFile(activePointerPath);
+    removeFile(activePointerBackupPath);
+  }
+
+  function validPointer(pointer) {
+    return !!pointer && !!pointer.candidateDir && !!pointer.candidateId && fs.existsSync(pointer.candidateDir);
+  }
+
+  function readActivePointer() {
+    const primary = readJson(activePointerPath);
+    if (validPointer(primary)) {
+      // Répare la copie de récupération si nécessaire.
+      const backup = readJson(activePointerBackupPath);
+      if (!validPointer(backup) || String(backup.candidateId) !== String(primary.candidateId)) {
+        try { atomicWriteJson(activePointerBackupPath, primary); } catch (_) {}
+      }
+      return primary;
+    }
+
+    const backup = readJson(activePointerBackupPath);
+    if (!validPointer(backup)) return null;
+    try { atomicWriteJson(activePointerPath, backup); } catch (_) {}
+    return backup;
   }
 
   function manifestPath(candidateDir) {
@@ -173,13 +200,46 @@ function createCandidateStore(options = {}) {
     atomicWriteJson(manifestPath(candidateDir), manifest);
   }
 
-  function buildFolderName(identity) {
-    return [
-      sanitizeSegment(identity.nom).toUpperCase(),
-      sanitizeSegment(identity.prenom),
-      sanitizeSegment(identity.lieu),
-      sanitizeSegment(identity.groupe)
-    ].join('_');
+  function buildFolderName(candidateId, shortId = '') {
+    return codedFolderName(candidateId, shortId);
+  }
+
+  function migrateCandidateFolderNames() {
+    ensureRoots();
+    const pointer = readActivePointer();
+    let renamed = 0;
+    let entries = [];
+    try { entries = fs.readdirSync(candidatesRoot, { withFileTypes:true }); } catch (_) { entries = []; }
+
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      const oldDir = path.join(candidatesRoot, entry.name);
+      const manifest = readManifest(oldDir);
+      if (!manifest || !manifest.candidateId) continue;
+      const desiredBase = buildFolderName(manifest.candidateId, manifest.shortId);
+      if (entry.name === desiredBase || entry.name.startsWith(desiredBase + '_')) continue;
+
+      let target = path.join(candidatesRoot, desiredBase);
+      let index = 2;
+      while (fs.existsSync(target)) {
+        const existing = readManifest(target);
+        if (existing && String(existing.candidateId || '') === String(manifest.candidateId)) break;
+        target = path.join(candidatesRoot, desiredBase + '_' + index);
+        index += 1;
+      }
+
+      if (path.resolve(oldDir) !== path.resolve(target)) {
+        fs.renameSync(oldDir, target);
+        renamed += 1;
+      }
+
+      const folderName = path.basename(target);
+      writeManifest(target, { ...manifest, folderName, privacyFolderMigratedAt:now().toISOString() });
+      if (pointer && String(pointer.candidateId || '') === String(manifest.candidateId)) {
+        writeActivePointer({ ...pointer, folderName, candidateDir:target });
+      }
+    }
+    return { renamed };
   }
 
   function existingCandidateForIdentity(identity) {
@@ -194,14 +254,14 @@ function createCandidateStore(options = {}) {
       const candidateDir = path.join(candidatesRoot, entry.name);
       const manifest = readManifest(candidateDir);
       if (!manifest || !manifest.candidateId) continue;
+      if (['TERMINE', 'SESSION_FERMEE'].includes(String(manifest.status || ''))) continue;
       if (candidateIdentityKey(manifest.candidat || {}) !== expectedKey) continue;
       records.push({ candidateDir, folderName:entry.name, manifest });
     }
     if (!records.length) return null;
-    const canonical = buildFolderName(identity);
     records.sort((a,b) => {
-      const ac = a.folderName === canonical ? 0 : 1;
-      const bc = b.folderName === canonical ? 0 : 1;
+      const ac = /^CAND-/i.test(a.folderName) ? 0 : 1;
+      const bc = /^CAND-/i.test(b.folderName) ? 0 : 1;
       if (ac !== bc) return ac - bc;
       return String(a.manifest.createdAt || '').localeCompare(String(b.manifest.createdAt || ''));
     });
@@ -221,7 +281,7 @@ function createCandidateStore(options = {}) {
       identityKey:identity.identityKey,
       createdAt:String(manifest.createdAt || now().toISOString())
     };
-    atomicWriteJson(activePointerPath, pointer);
+    writeActivePointer(pointer);
     return pointer;
   }
 
@@ -230,7 +290,7 @@ function createCandidateStore(options = {}) {
 
     const candidateId = crypto.randomUUID();
     const shortId = candidateId.replace(/-/g, '').slice(0, 6).toUpperCase();
-    const baseFolderName = buildFolderName(identity);
+    const baseFolderName = buildFolderName(candidateId, shortId);
     let folderName = baseFolderName;
     let candidateDir = path.join(candidatesRoot, folderName);
     let index = 2;
@@ -285,11 +345,12 @@ function createCandidateStore(options = {}) {
       identityKey: identity.identityKey,
       createdAt
     };
-    atomicWriteJson(activePointerPath, pointer);
+    writeActivePointer(pointer);
     return pointer;
   }
 
   function ensureActiveCandidate(state) {
+    migrateCandidateFolderNames();
     const identity = candidateIdentityFromState(state);
     if (!identity) return null;
 
@@ -342,7 +403,7 @@ function createCandidateStore(options = {}) {
       candidateId: active.candidateId,
       shortId: active.shortId,
       folderName: active.folderName,
-      status: manifest.status === 'SESSION_FERMEE' ? 'SESSION_FERMEE' : 'EN_COURS',
+      status: ['TERMINE', 'SESSION_FERMEE'].includes(String(manifest.status || '')) ? String(manifest.status) : 'EN_COURS',
       updatedAt: now().toISOString(),
       candidat: identity ? identity.original : manifest.candidat
     });
@@ -379,7 +440,7 @@ function createCandidateStore(options = {}) {
     return ensureDirectory(path.join(active.candidateDir, 'bilan', 'exports'));
   }
 
-  function closeActiveCandidate(state) {
+  function completeActiveCandidate(state, completionReason = 'admin-manual') {
     const active = readActivePointer();
     if (!active) return null;
 
@@ -388,26 +449,34 @@ function createCandidateStore(options = {}) {
     }
 
     const manifest = readManifest(active.candidateDir) || {};
-    const closedAt = now().toISOString();
+    const completedAt = now().toISOString();
     writeManifest(active.candidateDir, {
       ...manifest,
       schemaVersion: 1,
       candidateId: active.candidateId,
       shortId: active.shortId,
       folderName: active.folderName,
-      status: 'SESSION_FERMEE',
-      updatedAt: closedAt,
-      closedAt
+      status: 'TERMINE',
+      updatedAt: completedAt,
+      completedAt,
+      completionReason: String(completionReason || 'admin-manual'),
+      closedAt: manifest.closedAt || completedAt
     });
 
-    removeFile(activePointerPath);
+    removeActivePointer();
 
     return {
       candidateId: active.candidateId,
       folderName: active.folderName,
       candidateDir: active.candidateDir,
-      status: 'SESSION_FERMEE'
+      status: 'TERMINE',
+      completedAt,
+      completionReason: String(completionReason || 'admin-manual')
     };
+  }
+
+  function closeActiveCandidate(state) {
+    return completeActiveCandidate(state, 'legacy-close');
   }
 
   return {
@@ -416,12 +485,16 @@ function createCandidateStore(options = {}) {
     saveSnapshot,
     getActiveCandidate,
     getActiveExportDir,
+    completeActiveCandidate,
     closeActiveCandidate,
     candidateIdentityFromState,
+    migrateCandidateFolderNames,
     paths: {
       sebRoot,
       candidatesRoot,
-      activePointerPath
+      activePointerPath,
+      activePointerBackupPath,
+      systemRoot
     }
   };
 }

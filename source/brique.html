@@ -376,7 +376,14 @@
     button.passez:hover {
          background-color: #0056b3; color: red; /* Survol */
          }	
-  </style>
+  #secretCode::placeholder {
+  font-size: 14px;
+  letter-spacing: 0;
+  line-height: normal;
+  color: #64748b;
+  opacity: 1;
+}
+</style>
 
   <link rel="icon" type="image/svg+xml"
 href='data:image/svg+xml;utf8,
@@ -394,6 +401,7 @@ href='data:image/svg+xml;utf8,
   <rect x="42" y="74" width="12" height="12" rx="2" fill="%23F9B233"/>
   <rect x="62" y="74" width="12" height="12" rx="2" fill="%23F9B233"/>
 </svg>'>
+<link rel="stylesheet" href="css/seb-in-app-alert.css" id="seb-evalpro-in-app-alert-css">
 </head>
 
 <body>
@@ -401,14 +409,14 @@ href='data:image/svg+xml;utf8,
     <div class="header">
       <div class="title-row">
         <h1>
-          Construction a base de briques.
+          Construction à base de briques.
         </h1>
         <!--img class="icon-svg" src="imageqcm/avatar_transparant.png" alt="Avatar décoratif"-->
       </div>
-      <div><p><img src="imageqcm/scenario.png" alt="scenario.png" width="65" height="65" style="margin-right:8px; float : left ;"><strong style="color:#1a73e8;">Scénario:</strong>
+      <div><p><img src="imageqcm/scenario.png" alt="scenario.png" width="65" height="65" style="margin-right:8px; float : left ;"><strong style="color:#1a73e8;">Scénario :</strong>
  Le week-end prochain, l’entreprise organise une porte ouverte pour présenter ses nouveaux modèles en fabrication.</p>
 <p><strong>Votre tâche :</strong> vous devez assembler le dernier modèle de voiture pour le présenter. On vous demande d’évaluer le temps pour l’assembler et le niveau de difficulté que vous lui accordez.
-Réclamer votre boite de briques et commencer l’assemblage... </p></div>
+Réclamez votre boîte de briques et commencez l’assemblage... </p></div>
     </div>
 
     <div class="main">
@@ -417,15 +425,15 @@ Réclamer votre boite de briques et commencer l’assemblage... </p></div>
         <!-- Bloc1 -->
         <div id="consigne">
 		
-          <h1> <img src="imageqcm/avatar_transparant.png" alt="avatar" width="45" height="45" style="margin-right:8px;"> Consignes:</h1>
-          <p><strong>Lisez les indications avant de commencer l’exercice:</strong></p>
+          <h1> <img src="imageqcm/avatar_transparant.png" alt="avatar" width="45" height="45" style="margin-right:8px;"> Consignes :</h1>
+          <p><strong>Lisez les indications avant de commencer l’exercice :</strong></p>
           <ul>
             <li><strong> Déclenchez le chronomètre</strong> quand vous commencez l’assemblage et <strong>stoppez-le</strong> une fois le modèle terminé.</li>
-			<li><strong> Faite évaluer</strong> ensuite votre modèle.</strong></li>
-            <li>Quand vous avez fini appuyer sur <strong>Valider</strong> pour continuer.</li>
+			<li><strong> Faites évaluer</strong> ensuite votre modèle.</strong></li>
+            <li>Quand vous avez fini, appuyez sur <strong>Valider</strong> pour continuer.</li>
           </ul>
         
- <div><p><img src="imageqcm/brique.JPG" alt="img_brique.jpg" width="480" height="370" style=" margin: auto; display: block;"></div></div>
+ <div><p><img src="imageqcm/brique.jpg" alt="img_brique.jpg" width="480" height="370" style=" margin: auto; display: block;"></div></div>
         <!-- Partie Autoévaluation (cachée au début) -->
         <div id="autoEvalPart">
 	  <!-- Bloc2-->
@@ -438,40 +446,40 @@ Réclamer votre boite de briques et commencer l’assemblage... </p></div>
   
 </div>
 
-        <h2>Votre ressenti?</h2>
+        <h2>Votre ressenti ?</h2>
         <p><strong>Cochez les affirmations qui correspondent le mieux à votre expérience pendant cette activité.</strong></p>
 
         <form id="autoEvalForm">
           <div class="fr-checkbox-group">
             <input type="checkbox" id="ease_br" name="auto" value="ease_br">
-            <label class="fr-label" for="ease">Je me suis senti(e) à l’aise dans l'exercices proposés.</label>
+            <label class="fr-label" for="ease_br">Je me suis senti(e) à l’aise dans l’exercice proposé.</label>
           </div>
 
           <div class="fr-checkbox-group">
             <input type="checkbox" id="difficulties_br" name="auto" value="difficulties_br">
-            <label class="fr-label" for="difficulties">J’ai rencontré des difficultés. J'ai eu besoin d'aide.</label>
+            <label class="fr-label" for="difficulties_br">J’ai rencontré des difficultés. J'ai eu besoin d'aide.</label>
           </div>
 
           <div class="fr-checkbox-group">
             <input type="checkbox" id="progress_br" name="auto" value="progress_br">
-            <label class="fr-label" for="progress">J'ai pu progressé dans mon assemblage.</label>
+            <label class="fr-label" for="progress_br">J’ai pu progresser dans mon assemblage.</label>
           </div>
 
           <div class="fr-checkbox-group">
             <input type="checkbox" id="motivation_br" name="auto" value="motivation_br">
-            <label class="fr-label" for="motivation">j'ai été fatigué(e) par cette exercice.</label>
+            <label class="fr-label" for="motivation_br">J’ai été fatigué(e) par cet exercice.</label>
           </div>
 
           <div class="fr-checkbox-group">
             <input type="checkbox" id="stress_br" name="auto" value="stress_br">
-            <label class="fr-label" for="stress">Je me suis senti(e) stressé(e) ou bloqué(e) à certains moments.</label>
+            <label class="fr-label" for="stress_br">Je me suis senti(e) stressé(e) ou bloqué(e) à certains moments.</label>
           </div>
 
           <p style="margin-top:10px;"><strong>Laissez un commentaire pour préciser votre ressenti :</strong></p>
           <textarea id="autoComment" rows="8" placeholder="Écrivez ici votre remarque libre..."></textarea>
 		  <div class="valid">
 		  <button type="button" id="autoEvalBtn">Valider mon autoévaluation</button>
-		  <!--button  onclick="goToPage('tri_de_cheville.html')"> Suivant -> </button-->
+		  <!--button data-seb-handler-click="brique-001"> Suivant -> </button-->
 		  </div>
         </form>
         </div> <!-- fin autoEvalPart -->
@@ -489,20 +497,19 @@ Réclamer votre boite de briques et commencer l’assemblage... </p></div>
           <div class="chrono-buttons">
             <button id="startBtn" type="button">Démarrer</button>
             <button id="stopBtn" type="button" disabled>Stop</button>
-            <button id="resetBtn" type="button">Remise à zéro</button>
-          </div>
+            </div>
         </div>
         <div class="class="chrono-card">
 		<div style="padding-bottom: 6px;" >
 		<!-- À placer dans la carte chrono, après les autres inputs -->
 		<div style="padding: 10px;">
-          <label for="temps" ><strong>Temps passé sur le modèle: :</strong></label>
+          <label for="temps" ><strong>Temps passé sur le modèle :</strong></label>
           <input id="temps" type="text" readonly style="width: 80px;">
 		  </div>
         <!----------------------------------------------------------->
         </div>
 		  <div style="padding: 10px;">
-		  <span><label for="nivDiff"><strong>Nombre d'érreur(s) :   </strong></label></span><input id="nivDiff" style='width:40px'  type="number" min="1" max="10">
+		  <span><label for="nivDiff"><strong>Nombre d’erreur(s) :   </strong></label></span><input id="nivDiff" style='width:40px'  type="number" min="0" max="10">
 		  
 		  </br>
 		  </div>
@@ -510,7 +517,7 @@ Réclamer votre boite de briques et commencer l’assemblage... </p></div>
 		   <div>
 		   </br>
 		   <div style="padding: 10px;">
-        <span><label for="secretCode"><strong>Code de validation : 🔑 </strong></label></span><input type="text" id="secretCode" maxlength="10" placeholder="Entrez le code" style="width: 120px;">
+        <span><label for="secretCode"><strong>Code de validation : 🔑 </strong></label></span><input type="password" id="secretCode" maxlength="10" placeholder="Entrez le code" autocomplete="off" spellcheck="false" style="width: 150px; font-size: 28px; letter-spacing: 7px; line-height: 1;">
 		
 	   </div>
        </div>
@@ -522,125 +529,25 @@ Réclamer votre boite de briques et commencer l’assemblage... </p></div>
       </div>
     </div>
   </div>
-  <script>
-// Fonction pour effacer les données de cette page à son ouverture
-function clearPageData() {
-  sessionStorage.removeItem("eval_brique");
-  sessionStorage.removeItem("eval_brique_auto");
-  console.log("Données de la page brique effacées au chargement");
-}
+  <script src="js/seb-parcours.js"></script>
+<script src="js/brique-page.js"></script>
 
-// Appel de la fonction au chargement de la page
-window.addEventListener('DOMContentLoaded', clearPageData);
 
-function goToPage(){
-  try { 
-    if (typeof goToPage === 'function') return goToPage('tri_de_cheville.html'); 
-  } catch(e){ 
-    console.error(e); 
-  }
-  
-  window.location.href = 'tri_de_cheville.html';
-}
-</script>
- <script>
-	
-													 
-    let chronoInterval = null;
-    let chronoSeconds = 0;
 
-    function updateChrono() {
-      document.getElementById("chrono-min").textContent = String(Math.floor(chronoSeconds / 60)).padStart(2, "0");
-      document.getElementById("chrono-sec").textContent = String(chronoSeconds % 60).padStart(2, "0");
-															  
-															  
-    }
+<script src="js/brique-runtime.js"></script><script src="js/seb-in-app-alert.js" id="seb-evalpro-in-app-alert-script"></script>
+<script src="js/seb-page-draft-resume.js" id="seb-evalpro-page-draft-resume"></script>
+<script src="js/seb-visual-branding.js" id="seb-evalpro-visual-branding"></script>
 
-    document.getElementById("startBtn").onclick = function () {
-      if (chronoInterval) return;
-      chronoInterval = setInterval(() => {
-        chronoSeconds++;
-        updateChrono();
-      }, 1000);
-      this.disabled = true;
-      document.getElementById("stopBtn").disabled = false;
-    };
+<script id="seb-ui-runtime-loader" src="js/seb-ui-runtime.js"></script>
 
-    document.getElementById("stopBtn").onclick = function () {
-      clearInterval(chronoInterval);
-      chronoInterval = null;
-      document.getElementById("temps").value = document.getElementById("chrono-min").textContent + ":" + document.getElementById("chrono-sec").textContent;
-      document.getElementById("startBtn").disabled = false;
-      this.disabled = true;
-    };
-
-    document.getElementById("resetBtn").onclick = function () {
-      clearInterval(chronoInterval);
-      chronoInterval = null;
-      chronoSeconds = 0;
-      updateChrono();
-      document.getElementById("temps").value = "";
-      document.getElementById("startBtn").disabled = false;
-      document.getElementById("stopBtn").disabled = true;
-    };
-
-    const errInput = document.getElementById("nivDiff");
-    const codeInput = document.getElementById("secretCode");
-    const validBtn = document.getElementById("validBtn");
-    const msgDiv = document.getElementById("msg");
-
-										  
-    function checkInputs() {
-      const errFilled = errInput.value.trim() !== "";
-      const codeValid = /^svg56$/i.test(codeInput.value.trim());
-      validBtn.disabled = !(errFilled && codeValid);
-      if (!codeValid && codeInput.value.trim().length >= 5) {
-        msgDiv.textContent = "Code incorrect !";
-      } else {
-        msgDiv.textContent = "";
-      }
-    }
-
-    errInput.addEventListener("input", checkInputs);
-    codeInput.addEventListener("input", checkInputs);
-																
-    validBtn.onclick = function () {
-  const datas = {
-    temps: document.getElementById("temps").value,
-    niveau: errInput.value,
-    code: codeInput.value,
-  };
-  // ✅ Sauvegarder dans sessionStorage au lieu de localStorage
-      sessionStorage.setItem("eval_brique", JSON.stringify(datas));
-  //    msgDiv.textContent = "Données enregistrées !";
- //     validBtn.disabled = true;
-																	 
-      const consigne = document.getElementById("consigne");
-      const autoEvalPart = document.getElementById("autoEvalPart");
-      if (consigne && autoEvalPart) {
-        consigne.classList.add("fade-out");
-        setTimeout(() => {
-          consigne.style.display = "none";
-          autoEvalPart.style.display = "block";
-          autoEvalPart.classList.add("visible");
-          autoEvalPart.scrollIntoView({ behavior: "smooth" });
-        }, 1000);
-		
-      }
-    };
-													
-    const autoEvalBtn = document.getElementById("autoEvalBtn");
-    autoEvalBtn.onclick = function () {
-  const checkedBoxes = Array.from(document.querySelectorAll("#autoEvalForm input[type='checkbox']:checked")).map(cb => cb.name);
-  const comment = document.getElementById("autoComment").value.trim();
-  const autoEvalData = { choix: checkedBoxes, commentaire: comment };
-  // ✅ Sauvegarder dans sessionStorage
-  sessionStorage.setItem("eval_brique_auto", JSON.stringify(autoEvalData));
- //     alert("Autoévaluation sauvegardée !");
-      document.getElementById("autoEvalForm").reset();
-	  window.location.href="stock.html";
-    };
-
-  </script>
+<style id="seb-brique-compact95">
+.wrapper{max-width:none!important;width:100%!important;padding:8px 12px!important;gap:8px!important;}
+.header{padding:8px 14px!important;}
+.main{gap:8px!important;}
+#left,#right{padding:8px!important;gap:8px!important;}
+#seb-evalpro-abandon-fixed{position:static!important;left:auto!important;right:auto!important;top:auto!important;bottom:auto!important;margin:8px auto 0!important;align-self:center!important;min-width:220px!important;}
+</style>
+<script src="js/brique-runtime-tail.js"></script>
+<script src="js/brique-events.js"></script>
 </body>
 </html>

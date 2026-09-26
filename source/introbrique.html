@@ -39,6 +39,7 @@
     pointer-events: none;
   }
 </style>
+<link rel="stylesheet" href="css/seb-in-app-alert.css" id="seb-evalpro-in-app-alert-css">
 </head>
 
 <body>
@@ -48,18 +49,11 @@
 
 <div id="fade"></div>
 
-<script>
-const video = document.getElementById("introVideo");
-const fade = document.getElementById("fade");
 
-video.onended = () => {
-  fade.style.opacity = 1;
 
-  setTimeout(() => {
-    window.location.href = "brique.html";
-  }, 1500);
-};
-</script>
+<script src="js/introbrique-page.js"></script><script src="js/seb-in-app-alert.js" id="seb-evalpro-in-app-alert-script"></script>
+<script src="js/seb-visual-branding.js" id="seb-evalpro-visual-branding"></script>
 
+<script id="seb-ui-runtime-loader" src="js/seb-ui-runtime.js"></script>
 </body>
 </html>

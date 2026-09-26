@@ -115,34 +115,6 @@ function bilanLabel(item) {
 }
 
 
-function confirmCandidateDeletion(item) {
-  return new Promise((resolve) => {
-    const old = document.getElementById('seb-candidate-delete-confirm');
-    if (old) old.remove();
-    const overlay = document.createElement('div');
-    overlay.id = 'seb-candidate-delete-confirm';
-    overlay.innerHTML = `
-      <div class="seb-delete-card" role="dialog" aria-modal="true" aria-label="Supprimer le candidat">
-        <div class="seb-delete-head">Supprimer le candidat</div>
-        <div class="seb-delete-body">
-          <b>${escapeHtml(item.nom)} ${escapeHtml(item.prenom)}</b><br><br>
-          Cette suppression est définitive. Le dossier candidat complet, ses données, résultats, bilans, révisions, replay et documents Word seront supprimés.
-        </div>
-        <div class="seb-delete-actions">
-          <button type="button" id="seb-delete-cancel">Annuler</button>
-          <button type="button" id="seb-delete-confirm" class="danger">Supprimer définitivement</button>
-        </div>
-      </div>`;
-    document.body.appendChild(overlay);
-    const finish = (value) => { overlay.remove(); resolve(value); };
-    overlay.querySelector('#seb-delete-cancel').addEventListener('click', () => finish(false));
-    overlay.querySelector('#seb-delete-confirm').addEventListener('click', () => finish(true));
-    overlay.addEventListener('keydown', (event) => { if (event.key === 'Escape') finish(false); });
-    overlay.tabIndex = -1;
-    overlay.focus();
-  });
-}
-
 async function openCandidateDetail(candidateId, onChanged) {
   const old = document.getElementById('seb-candidate-detail');
   if (old) old.remove();
@@ -171,7 +143,6 @@ async function openCandidateDetail(candidateId, onChanged) {
       <div class="seb-cc-detail-actions">
         <button type="button" id="seb-cc-detail-bilan" class="primary">Faire le bilan</button>
         <button type="button" id="seb-cc-detail-close">Fermer</button>
-        <button type="button" id="seb-cc-detail-delete" class="danger">Supprimer</button>
       </div>
     </div>`;
   document.body.appendChild(overlay);
@@ -280,17 +251,7 @@ async function openCandidateDetail(candidateId, onChanged) {
     await beginCandidateBilan(candidateId, overlay);
   });
   overlay.querySelector('#seb-cc-detail-close').addEventListener('click', () => overlay.remove());
-  overlay.querySelector('#seb-cc-detail-delete').addEventListener('click', async () => {
-    const confirmed = await confirmCandidateDeletion(item);
-    if (!confirmed) return;
-    const deleted = await ipcRenderer.invoke('candidate-catalog:delete', candidateId);
-    if (!deleted || !deleted.ok) {
-      alert((deleted && deleted.error) || 'Suppression du candidat impossible.');
-      return;
-    }
-    overlay.remove();
-    if (typeof onChanged === 'function') await onChanged();
-  });
+
 }
 
 async function beginCandidateResults(candidateId, detailOverlay = null) {

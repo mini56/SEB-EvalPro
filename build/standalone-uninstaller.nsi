@@ -11,7 +11,7 @@ RequestExecutionLevel admin
 ShowInstDetails show
 Icon "app-icon.ico"
 
-VIProductVersion "0.1.0.0"
+VIProductVersion "${APP_VERSION}.0"
 VIAddVersionKey /LANG=1036 "ProductName" "SEB-éval-PRO - Désinstallation"
 VIAddVersionKey /LANG=1036 "FileDescription" "Désinstallation complète de SEB-éval-PRO"
 VIAddVersionKey /LANG=1036 "ProductVersion" "${APP_VERSION}"
@@ -27,7 +27,7 @@ VIAddVersionKey /LANG=1036 "LegalCopyright" "Sauvegarde 56"
 
 Function .onInit
   IfSilent silent_mode
-  MessageBox MB_ICONQUESTION|MB_YESNO "Cette opération va désinstaller SEB-éval-PRO, supprimer les anciens raccourcis et nettoyer les données techniques/cache de l'application.$\r$\n$\r$\nLes bilans et documents exportés dans Documents seront conservés.$\r$\n$\r$\nContinuer ?" IDYES confirmed
+  MessageBox MB_ICONQUESTION|MB_YESNO "Cette opération va désinstaller SEB-éval-PRO et supprimer les anciens raccourcis.$\r$\n$\r$\nLe stockage interne des candidats, la clé locale, la reprise d'un parcours et les exports Word dans Documents seront conservés.$\r$\n$\r$\nContinuer ?" IDYES confirmed
   Abort
 confirmed:
   Return
@@ -174,14 +174,6 @@ Function CleanupKnownFolders
   RMDir /r "$LOCALAPPDATA\Programs\SEB EvalPro"
   RMDir /r "$LOCALAPPDATA\Programs\seb-evalpro"
 
-  RMDir /r "$APPDATA\SEB-éval-PRO"
-  RMDir /r "$APPDATA\SEB-eval-PRO"
-  RMDir /r "$APPDATA\SEB EvalPro"
-  RMDir /r "$APPDATA\seb-evalpro"
-  RMDir /r "$LOCALAPPDATA\SEB-éval-PRO"
-  RMDir /r "$LOCALAPPDATA\SEB-eval-PRO"
-  RMDir /r "$LOCALAPPDATA\SEB EvalPro"
-  RMDir /r "$LOCALAPPDATA\seb-evalpro"
 
   Delete "$DESKTOP\SEB-éval-PRO.lnk"
   Delete "$DESKTOP\SEB-eval-PRO.lnk"
@@ -228,14 +220,6 @@ Function VerifyCleanup
   IfFileExists "$LOCALAPPDATA\Programs\SEB-eval-PRO" remain_install_ascii
   IfFileExists "$LOCALAPPDATA\Programs\SEB EvalPro" remain_install_space
   IfFileExists "$LOCALAPPDATA\Programs\seb-evalpro" remain_install_lower
-  IfFileExists "$APPDATA\SEB-éval-PRO" remain_appdata_accent
-  IfFileExists "$APPDATA\SEB-eval-PRO" remain_appdata_ascii
-  IfFileExists "$APPDATA\SEB EvalPro" remain_appdata_space
-  IfFileExists "$APPDATA\seb-evalpro" remain_appdata_lower
-  IfFileExists "$LOCALAPPDATA\SEB-éval-PRO" remain_local_accent
-  IfFileExists "$LOCALAPPDATA\SEB-eval-PRO" remain_local_ascii
-  IfFileExists "$LOCALAPPDATA\SEB EvalPro" remain_local_space
-  IfFileExists "$LOCALAPPDATA\seb-evalpro" remain_local_lower
   Return
 remain_install_accent:
   DetailPrint "Encore présent : $LOCALAPPDATA\Programs\SEB-éval-PRO"
@@ -248,30 +232,6 @@ remain_install_space:
   Goto fail_cleanup
 remain_install_lower:
   DetailPrint "Encore présent : $LOCALAPPDATA\Programs\seb-evalpro"
-  Goto fail_cleanup
-remain_appdata_accent:
-  DetailPrint "Encore présent : $APPDATA\SEB-éval-PRO"
-  Goto fail_cleanup
-remain_appdata_ascii:
-  DetailPrint "Encore présent : $APPDATA\SEB-eval-PRO"
-  Goto fail_cleanup
-remain_appdata_space:
-  DetailPrint "Encore présent : $APPDATA\SEB EvalPro"
-  Goto fail_cleanup
-remain_appdata_lower:
-  DetailPrint "Encore présent : $APPDATA\seb-evalpro"
-  Goto fail_cleanup
-remain_local_accent:
-  DetailPrint "Encore présent : $LOCALAPPDATA\SEB-éval-PRO"
-  Goto fail_cleanup
-remain_local_ascii:
-  DetailPrint "Encore présent : $LOCALAPPDATA\SEB-eval-PRO"
-  Goto fail_cleanup
-remain_local_space:
-  DetailPrint "Encore présent : $LOCALAPPDATA\SEB EvalPro"
-  Goto fail_cleanup
-remain_local_lower:
-  DetailPrint "Encore présent : $LOCALAPPDATA\seb-evalpro"
   Goto fail_cleanup
 fail_cleanup:
   StrCpy $7 1
@@ -286,7 +246,7 @@ Section "Désinstallation complète"
   Call CleanupHKLM64
   Call CleanupHKLM32
 
-  DetailPrint "Suppression des dossiers techniques, caches et raccourcis..."
+  DetailPrint "Suppression de l'installation et des raccourcis ; conservation des données candidat et de reprise..."
   StrCpy $8 0
 cleanup_retry:
   Call CleanupKnownFolders
@@ -308,6 +268,6 @@ cleanup_failed:
 
 cleanup_ok:
   SetErrorLevel 0
-  DetailPrint "SEB-éval-PRO a été désinstallé. Les bilans et documents exportés ont été conservés."
+  DetailPrint "SEB-éval-PRO a été désinstallé. Le stockage interne candidat, les données de reprise et les exports Word ont été conservés."
 cleanup_done:
 SectionEnd
