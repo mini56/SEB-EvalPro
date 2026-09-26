@@ -10,7 +10,18 @@
   // les scénarios, consignes, réponses ou résultats existants.
   const steps = Object.freeze([
     Object.freeze({ id:'qcm-1', file:'qcmv1.0.html', page:'1' }),
-    Object.freeze({ id:'qcm-2', file:'qcmv1.0.html', page:'2' }),
+    Object.freeze({
+      id:'qcm-2',
+      file:'qcmv1.0.html',
+      page:'2',
+      results:Object.freeze({
+        responseStorage:'reponses_data',
+        scoreStorage:'scores_data',
+        responsePrefix:'page2_q',
+        unitPrefix:'page2_unite',
+        stateStorage:'seb_evalpro_qcm_page2_state'
+      })
+    }),
     Object.freeze({ id:'qcm-2_1', file:'qcmv1.0.html', page:'2_1' }),
     Object.freeze({ id:'qcm-3', file:'qcmv1.0.html', page:'3' }),
     Object.freeze({ id:'qcm-texte-trous', file:'qcmv1.0.html', page:'pageTexteTrous' }),
