@@ -236,7 +236,14 @@ for (const spec of [
   if (/spellcheck="true"/.test(text)) fail('Traitement de texte: correcteur natif encore actif', 9);
   if (/<script(?![^>]*\bsrc=)[^>]*>/i.test(text)) fail('Traitement de texte: script inline réintroduit', 9);
   if (!engine.includes("quill.root.setAttribute('spellcheck', 'false')")) fail('Traitement de texte: correcteur Quill encore actif', 9);
-  if (!engine.includes('scores.page7 = analyse.score.total;') || !engine.includes("sessionStorage.setItem('scores_data')")) fail('Traitement de texte: notation Page 7 absente du moteur Quill', 9);
+  const hasPage7Score = engine.includes('scores.page7 = analyse.score.total;');
+  const hasScoresWrite = engine.includes("sessionStorage.setItem('scores_data'");
+  if (!hasPage7Score || !hasScoresWrite) {
+    console.error('NWTEXTE_ENGINE_DIAG page7Score=' + hasPage7Score + ' scoresWrite=' + hasScoresWrite + ' length=' + engine.length);
+    const savePos = engine.indexOf('function saveEvaluation');
+    console.error(engine.slice(Math.max(0, savePos - 500), savePos >= 0 ? savePos + 4500 : 4500));
+    fail('Traitement de texte: notation Page 7 absente du moteur Quill', 9);
+  }
 }
 
 // -----------------------------------------------------------------------------
