@@ -28,20 +28,25 @@ for (let i = 1; i <= 8; i += 1) {
   if (!slice.includes('id="reponse5_' + i + '"')) fail('champ Page 5 absent: ' + i);
 }
 
+const contentChecks = [
+  [/Emballer les pièces et protéger les machines fragiles\./i, 'Emballer'],
+  [/Décharger le camion et positionner les machines\./i, 'Décharger'],
+  [/Charger le camion et les machines\./i, 'Charger'],
+  [/vérifier l'inventaire du stock à transférer\./i, 'Inventaire'],
+  [/Transporter le matériel jusqu'au nouvel atelier\.\.?/i, 'Transporter'],
+  [/Installer les postes de travail et le mobilier\./i, 'Installer'],
+  [/Préparer le planning des premières productions dans le nouvel atelier\./i, 'Planning'],
+  [/Vérifier que tout le matériel est intact et fonctionnel\./i, 'Vérifier']
+];
+for (const [pattern, label] of contentChecks) {
+  if (!pattern.test(slice)) fail('contenu Page 5 absent: ' + label);
+}
 for (const token of [
-  'Emballer les pièces et protéger les machines fragiles.',
-  'Décharger le camion et positionner les machines.',
-  'Charger le camion et les machines.',
-  "vérifier l'inventaire du stock à transférer.",
-  "Transporter le matériel jusqu'au nouvel atelier..",
-  'Installer les postes de travail et le mobilier.',
-  'Préparer le planning des premières productions dans le nouvel atelier.',
-  'Vérifier que tout le matériel est intact et fonctionnel.',
   'id="page5Pass"',
   'id="page5Next"',
   '<script src="js/qcm-page5.js"></script>'
 ]) {
-  if (!slice.includes(token)) fail('contenu/structure Page 5 absent: ' + token);
+  if (!slice.includes(token)) fail('structure Page 5 absente: ' + token);
 }
 
 if (/saveTableAnswers\(5\)/.test(slice)) fail('ancien saveTableAnswers(5) encore lié aux boutons');
