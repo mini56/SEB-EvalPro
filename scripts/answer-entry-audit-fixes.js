@@ -74,6 +74,8 @@ function appendBeforeBody(text, block, label) {
   out = out.replace(page6Old, "      scores[`page6_q${i}`] =\n         (bonnes[i] && sameSebNumeric(val, bonnes[i])) ? 1 : 0;");
 
   const modularPage2 = out.includes('js/qcm-page2.js');
+  const modularPage2_1 = out.includes('js/qcm-page2-1.js');
+
   if (modularPage2) {
     const modulePath = path.join(root, 'app', 'web', 'js', 'qcm-page2.js');
     if (!fs.existsSync(modulePath)) fail('Page 2: module qcm-page2.js introuvable', 4);
@@ -89,13 +91,36 @@ function appendBeforeBody(text, block, label) {
     }
   }
 
+  if (modularPage2_1) {
+    const modulePath = path.join(root, 'app', 'web', 'js', 'qcm-page2-1.js');
+    if (!fs.existsSync(modulePath)) fail('Page 2_1: module qcm-page2-1.js introuvable', 4);
+    const moduleText = fs.readFileSync(modulePath, 'utf8').replace(/\r\n/g, '\n');
+    for (const token of [
+      'function normalizeNumeric(value)',
+      ".replace(/\\s+/g, '')",
+      ".replace(',', '.')",
+      'function sameNumeric(left, right)',
+      "const answers = Object.freeze({ 6:'10', 7:'75', 8:'12', 9:'24', 10:'165' });",
+      "this.value.replace(/[^0-9.,]/g, '')"
+    ]) {
+      if (!moduleText.includes(token)) fail('Page 2_1: normalisation/filtrage modulaire absent: ' + token, 4);
+    }
+  }
+
   const oldStandard = "    scores[`page${pageNum}_q${i}`] =\n      (bonnes && bonnes[i] && (pageNum == 3\n        ? normalizeSebTime(val) === normalizeSebTime(bonnes[i])\n        : val.toString().toUpperCase() === bonnes[i].toString().toUpperCase()))\n        ? 1 : 0;";
-  const newStandard = modularPage2
-    ? "    scores[`page${pageNum}_q${i}`] =\n      (bonnes && bonnes[i] && (pageNum == 3\n        ? normalizeSebTime(val) === normalizeSebTime(bonnes[i])\n        : pageNum === '2_1'\n          ? sameSebNumeric(val, bonnes[i])\n          : val.toString().toUpperCase() === bonnes[i].toString().toUpperCase()))\n        ? 1 : 0;"
-    : "    scores[`page${pageNum}_q${i}`] =\n      (bonnes && bonnes[i] && (pageNum == 3\n        ? normalizeSebTime(val) === normalizeSebTime(bonnes[i])\n        : (pageNum == 2 || pageNum === '2_1')\n          ? sameSebNumeric(val, bonnes[i])\n          : val.toString().toUpperCase() === bonnes[i].toString().toUpperCase()))\n        ? 1 : 0;";
-  out = replaceRequired(out, oldStandard, newStandard, modularPage2
-    ? 'comparaison numérique Page 2_1 + module Page 2'
-    : 'comparaison numérique Pages 2 et 2_1');
+  let newStandard;
+  let numericLabel;
+  if (modularPage2 && modularPage2_1) {
+    newStandard = "    scores[`page${pageNum}_q${i}`] =\n      (bonnes && bonnes[i] && (pageNum == 3\n        ? normalizeSebTime(val) === normalizeSebTime(bonnes[i])\n        : val.toString().toUpperCase() === bonnes[i].toString().toUpperCase()))\n        ? 1 : 0;";
+    numericLabel = 'comparaisons numériques modularisées Pages 2 et 2_1';
+  } else if (modularPage2) {
+    newStandard = "    scores[`page${pageNum}_q${i}`] =\n      (bonnes && bonnes[i] && (pageNum == 3\n        ? normalizeSebTime(val) === normalizeSebTime(bonnes[i])\n        : pageNum === '2_1'\n          ? sameSebNumeric(val, bonnes[i])\n          : val.toString().toUpperCase() === bonnes[i].toString().toUpperCase()))\n        ? 1 : 0;";
+    numericLabel = 'comparaison numérique Page 2_1 + module Page 2';
+  } else {
+    newStandard = "    scores[`page${pageNum}_q${i}`] =\n      (bonnes && bonnes[i] && (pageNum == 3\n        ? normalizeSebTime(val) === normalizeSebTime(bonnes[i])\n        : (pageNum == 2 || pageNum === '2_1')\n          ? sameSebNumeric(val, bonnes[i])\n          : val.toString().toUpperCase() === bonnes[i].toString().toUpperCase()))\n        ? 1 : 0;";
+    numericLabel = 'comparaison numérique Pages 2 et 2_1';
+  }
+  out = replaceRequired(out, oldStandard, newStandard, numericLabel);
 
   const oldTextTrous = "    const userAnswer = (input.value || '').trim().toLowerCase();\n    const correct    = (input.dataset && input.dataset.answer)\n                        ? input.dataset.answer.toLowerCase() : '';";
   const newTextTrous = "    const userAnswer = normalizeSebAnswerText(input.value);\n    const correct    = (input.dataset && input.dataset.answer)\n                        ? normalizeSebAnswerText(input.dataset.answer) : '';";
@@ -105,7 +130,11 @@ function appendBeforeBody(text, block, label) {
   const newFallback = "          scores['page3_q' + i] = (bonnesReponsesPage3[i] && normalizeSebTime(value) === normalizeSebTime(bonnesReponsesPage3[i])) ? 1 : 0;";
   out = replaceRequired(out, oldFallback, newFallback, 'fallback Page 3 tolérant');
 
-  if (modularPage2) {
+  if (modularPage2 && modularPage2_1) {
+    if (out.includes("pageNum === '2_1'") || out.includes("pageNum == 2 || pageNum === '2_1'")) {
+      fail('ancienne comparaison Pages 2/2_1 encore présente après modularisation', 4);
+    }
+  } else if (modularPage2) {
     if (!out.includes("pageNum === '2_1'")) fail('Page 2_1 non numérique après patch modulaire', 4);
   } else if (!out.includes("pageNum == 2 || pageNum === '2_1'")) {
     fail('Pages 2/2_1 non numériques après patch', 4);
