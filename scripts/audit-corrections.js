@@ -30,6 +30,9 @@ function injectBeforeBodyEnd(html, block) {
 function patchQcm() {
   const { file, html } = read('qcmv1.0.html');
   let out = html;
+  const externalRuntime = out.includes('js/qcm-runtime.js');
+  const runtimeLoaded = externalRuntime ? read('js/qcm-runtime.js') : null;
+  let logic = runtimeLoaded ? runtimeLoaded.html : out;
 
   if (out.includes('js/qcm-page6.js')) {
     const { html: page6 } = read('js/qcm-page6.js');
@@ -45,42 +48,44 @@ function patchQcm() {
       }
     }
   } else {
-    out = mustReplace(
-      out,
+    logic = mustReplace(
+      logic,
       "(bonnes[i] && val.replace(',', '.') === bonnes[i].toString())",
       "(bonnes[i] && val.replace(',', '.') === bonnes[i].toString().replace(',', '.'))",
       'conversion page 6 avec virgule ou point'
     );
   }
 
-  out = mustReplace(
-    out,
+  logic = mustReplace(
+    logic,
     /\s*total \+= scoreTexte;\s*totalQuestions \+= 8;/,
     "\n      // Le traitement de texte est évalué séparément dans le bilan : il n'entre pas dans le score général.",
     'exclusion ancien texte libre du score général'
   );
 
-  out = mustReplace(
-    out,
+  logic = mustReplace(
+    logic,
     /\s*total \+= score7;\s*totalQuestions \+= scoreMax;/,
     "\n    // Le traitement de texte est évalué séparément dans le bilan : il n'entre pas dans le score général.",
     'exclusion traitement de texte du score général'
   );
 
-  out = mustReplace(
-    out,
+  logic = mustReplace(
+    logic,
     'const scoreMax = 7;',
     'const scoreMax = 8;',
     'score maximum traitement de texte affiché'
   );
 
-  out = mustReplace(
-    out,
+  logic = mustReplace(
+    logic,
     "html += `<span class=\"${analyse.score.texte_taille ? 'correct' : 'incorrect'}\">${analyse.score.texte_taille ? '✓' : '✗'} Taille 12px (détecté: ${analyse.texte.taille || 'inconnue'})</span>`;",
     "html += `<span class=\"${analyse.score.texte_taille ? 'correct' : 'incorrect'}\">${analyse.score.texte_taille ? '✓' : '✗'} Taille 12px (détecté: ${analyse.texte.taille || 'inconnue'})</span>`;\n    html += `<span class=\"${analyse.score.enregistrement ? 'correct' : 'incorrect'}\">${analyse.score.enregistrement ? '✓' : '✗'} Enregistrement via le menu Fichier</span>`;",
     'affichage critère enregistrement traitement de texte'
   );
 
+  if (runtimeLoaded) write(runtimeLoaded.file, logic);
+  else out = logic;
   write(file, out);
 }
 
