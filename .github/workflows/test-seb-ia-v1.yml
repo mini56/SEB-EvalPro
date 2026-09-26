@@ -61,6 +61,9 @@ jobs:
       - name: Functional Brique smoke
         run: xvfb-run -a npm run test:brique-functional
 
+      - name: Functional Stock smoke
+        run: xvfb-run -a npm run test:stock-functional
+
       - name: Verify integrated SEB-IA output
         shell: bash
         run: |
