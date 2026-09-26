@@ -37,6 +37,9 @@ jobs:
       - name: Generate web application
         run: npm run prepare:web
 
+      - name: Functional nwtexte smoke
+        run: xvfb-run -a npm run test:nwtexte-functional
+
       - name: Verify integrated SEB-IA output
         shell: bash
         run: |
