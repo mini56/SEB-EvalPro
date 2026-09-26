@@ -22,7 +22,18 @@
         stateStorage:'seb_evalpro_qcm_page2_state'
       })
     }),
-    Object.freeze({ id:'qcm-2_1', file:'qcmv1.0.html', page:'2_1' }),
+    Object.freeze({
+      id:'qcm-2_1',
+      file:'qcmv1.0.html',
+      page:'2_1',
+      results:Object.freeze({
+        responseStorage:'reponses_data',
+        scoreStorage:'scores_data',
+        responsePrefix:'page2_1_q',
+        unitPrefix:'page2_1_unite',
+        stateStorage:'seb_evalpro_qcm_page2_1_state'
+      })
+    }),
     Object.freeze({ id:'qcm-3', file:'qcmv1.0.html', page:'3' }),
     Object.freeze({ id:'qcm-texte-trous', file:'qcmv1.0.html', page:'pageTexteTrous' }),
     Object.freeze({ id:'qcm-4', file:'qcmv1.0.html', page:'4' }),
