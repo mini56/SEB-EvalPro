@@ -23,7 +23,26 @@ async function waitForBrique(win) {
     if (ready) return;
     await sleep(50);
   }
-  throw new Error('Contrôleur Brique non initialisé.');
+  let diagnostic = null;
+  try {
+    diagnostic = await win.webContents.executeJavaScript(`
+      (function(){
+        return {
+          href:location.href,
+          title:document.title,
+          readyState:document.readyState,
+          sebBrique:Boolean(window.sebBrique),
+          sebParcours:Boolean(window.sebParcours),
+          start:Boolean(document.getElementById('startBtn')),
+          form:Boolean(document.getElementById('autoEvalForm')),
+          scripts:Array.from(document.scripts).map(function(script){ return script.src || script.id || '[inline]'; })
+        };
+      })()
+    `, true);
+  } catch (error) {
+    diagnostic = { executeError:String(error && error.message ? error.message : error) };
+  }
+  throw new Error('Contrôleur Brique non initialisé. Diagnostic=' + JSON.stringify(diagnostic) + ' BrowserURL=' + win.webContents.getURL());
 }
 
 async function initialState(win) {
