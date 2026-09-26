@@ -191,6 +191,28 @@ function patchAutoEval1() {
 
 function patchBriqueZeroErrorsAndCheckpoint() {
   const { file, html } = read('brique.html');
+
+  if (html.includes('js/brique-page.js')) {
+    if (!/<input\s+id="nivDiff"[^>]*\bmin="0"\s+max="10"/.test(html)) {
+      throw new Error('SEB EvalPro audit: zéro erreur Brique non autorisé');
+    }
+    const moduleFile = path.join(webDir, 'js', 'brique-page.js');
+    if (!fs.existsSync(moduleFile)) throw new Error('SEB EvalPro audit: module brique-page.js introuvable');
+    const moduleText = fs.readFileSync(moduleFile, 'utf8').replace(/\r\n/g, '\n');
+    for (const token of [
+      "const DATA_KEY = 'eval_brique';",
+      "const AUTO_KEY = 'eval_brique_auto';",
+      "const CHECKPOINT_KEY = 'seb_evalpro_brique_checkpoint';",
+      'const PERIOD_SECONDS = 1;',
+      'function persistCheckpoint(force)',
+      'function restoreCheckpoint()',
+      "window.sebParcours.goNext('brique')"
+    ]) {
+      if (!moduleText.includes(token)) throw new Error('SEB EvalPro audit: contrat Brique modulaire absent: ' + token);
+    }
+    return;
+  }
+
   let out = html;
   out = mustReplace(out, 'type="number" min="1" max="10"', 'type="number" min="0" max="10"', 'zéro erreur briques');
   out = mustReplace(out, 'const PERIOD_SECONDS = 10 * 60;', 'const PERIOD_SECONDS = 1;', 'checkpoint briques chaque seconde');
