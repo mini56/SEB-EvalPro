@@ -258,7 +258,9 @@
       setTimeout(() => {
         consigne.style.display = 'none';
         autoEvalPart.style.display = 'block';
-        requestAnimationFrame(() => autoEvalPart.classList.add('visible'));
+        // La visibilité fonctionnelle ne dépend jamais de requestAnimationFrame :
+        // une fenêtre Electron masquée ou reprise après pause peut suspendre les frames.
+        autoEvalPart.classList.add('visible');
       }, 300);
     } else {
       autoEvalPart.style.display = 'block';
