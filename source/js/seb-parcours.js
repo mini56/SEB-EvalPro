@@ -69,7 +69,18 @@
         totalFractions:3
       })
     }),
-    Object.freeze({ id:'qcm-5', file:'qcmv1.0.html', page:'5' }),
+    Object.freeze({
+      id:'qcm-5',
+      file:'qcmv1.0.html',
+      page:'5',
+      results:Object.freeze({
+        responseStorage:'reponses_data',
+        scoreStorage:'scores_data',
+        snapshotStorage:'page5_organisation_data',
+        responsePrefix:'page5_q',
+        stateStorage:'seb_evalpro_qcm_page5_state'
+      })
+    }),
     Object.freeze({ id:'qcm-5_1', file:'qcmv1.0.html', page:'5_1' }),
     Object.freeze({ id:'qcm-6', file:'qcmv1.0.html', page:'6' }),
 
