@@ -91,10 +91,19 @@ function write(file, text) { fs.writeFileSync(file, text, 'utf8'); }
 }
 
 // Résultat candidat : affichage Traitement de texte /8 et point Enregistrement.
+// Ce correctif est idempotent : une source déjà migrée en /8 ne doit jamais
+// être ramenée vers un ancien état intermédiaire.
 {
   let qcm = read(qcmPath);
-  if (!qcm.includes('const scoreMax = 7;')) fail('scoreMax /7 introuvable');
-  qcm = qcm.replace('const scoreMax = 7;', 'const scoreMax = 8;');
+  if (qcm.includes('const scoreMax = 7;')) {
+    qcm = qcm.replace('const scoreMax = 7;', 'const scoreMax = 8;');
+  }
+  if (!qcm.includes('const scoreMax = 8;')) fail('résultat Traitement /8 absent');
+
+  // Retirer l'ancien libellé transitoire s'il subsiste afin d'éviter deux lignes
+  // d'enregistrement dans la page Résultats.
+  qcm = qcm.replace(/^.*analyse\.score\.enregistrement.*Enregistrement via le menu Fichier.*\n?/m, '');
+  qcm = qcm.replace(/^.*analyse\.score\.enregistrement.*Enregistrement conforme.*\n?/m, '');
 
   const sizeNeedle = "Taille 12px (détecté:";
   const sizePos = qcm.indexOf(sizeNeedle);
@@ -106,7 +115,7 @@ function write(file, text) { fs.writeFileSync(file, text, 'utf8'); }
 
   if (qcm.includes("Score obtenu : ' + score + ' / 10")) fail('ancien calcul Traitement /10 encore présent');
   if (!qcm.includes('const scoreMax = 8;')) fail('résultat Traitement /8 absent');
-  if (!qcm.includes('Enregistrement conforme')) fail('critère Enregistrement absent du résultat');
+  if ((qcm.match(/Enregistrement conforme/g) || []).length !== 1) fail('critère Enregistrement dupliqué ou absent');
   write(qcmPath, qcm);
 }
 
