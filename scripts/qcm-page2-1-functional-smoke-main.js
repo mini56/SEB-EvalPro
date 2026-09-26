@@ -235,7 +235,9 @@ app.whenReady().then(async () => {
     const afterPage3Save = await win.webContents.executeJavaScript(`
       (function(){
         document.getElementById('reponse3_1').value='9h15';
-        saveTableAnswers(3);
+        document.getElementById('reponse3_1').dispatchEvent(new Event('input',{bubbles:true}));
+        if (!window.sebQcmPage3) throw new Error('Contrôleur Page 3 absent après navigation.');
+        window.sebQcmPage3.save();
         const r=JSON.parse(sessionStorage.getItem('reponses_data')||'{}');
         const s=JSON.parse(sessionStorage.getItem('scores_data')||'{}');
         return {
@@ -249,7 +251,7 @@ app.whenReady().then(async () => {
     if (afterPage3Save.p2 !== '1020' || afterPage3Save.p2s !== 1 ||
         afterPage3Save.p21 !== '165' || afterPage3Save.p21s !== 1 ||
         afterPage3Save.p3 !== '9h15') {
-      throw new Error('Une sauvegarde Page 3 écrase les données Pages 2/2_1.');
+      throw new Error('Une sauvegarde modulaire Page 3 écrase les données Pages 2/2_1.');
     }
 
     console.log('QCM_PAGE2_1_FUNCTIONAL_SMOKE: OK');
