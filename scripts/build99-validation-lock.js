@@ -154,6 +154,26 @@ function appendBeforeBody(text, addition, label) {
 {
   const { file, text } = read('app/web/genrenombres.html');
   let out = text;
+  const modularGenreNombre = out.includes('js/genrenombres-page.js');
+
+  if (modularGenreNombre) {
+    const modulePath = path.join(root, 'app', 'web', 'js', 'genrenombres-page.js');
+    if (!fs.existsSync(modulePath)) fail('module genrenombres-page.js introuvable', 5);
+    const moduleText = fs.readFileSync(modulePath, 'utf8').replace(/\r\n/g, '\n');
+    for (const token of [
+      "const DONE_KEY = 'seb_genrenombres_validated';",
+      'function anyEntry(values)',
+      'function lockAfterCheck()',
+      'function verify()',
+      "sessionStorage.setItem(ERRORS_KEY, String(result.errors));",
+      "window.sebParcours.goNext('genrenombres')"
+    ]) {
+      if (!moduleText.includes(token)) fail('verrouillage Genre/Nombre modulaire incomplet: ' + token, 5);
+    }
+    if (!out.includes('id="btnNextGenreNombre"')) fail('bouton Suivant Genre/Nombre modulaire absent', 5);
+  } else {
+  const { file, text } = read('app/web/genrenombres.html');
+  let out = text;
 
   if (!out.includes('id="seb-genrenombres-lock99"')) {
     const patch = `
@@ -246,6 +266,20 @@ function appendBeforeBody(text, addition, label) {
   if (!out.includes('seb-genrenombres-lock99') || !out.includes('btnNextGenreNombre')) {
     fail('verrouillage Singulier/Pluriel incomplet', 5);
   }
+  write(file, out);
+
+  }
+
+  if (modularGenreNombre) {
+    const moduleText = fs.readFileSync(path.join(root, 'app', 'web', 'js', 'genrenombres-page.js'), 'utf8');
+    if (!moduleText.includes("check.style.setProperty('display', 'none', 'important')") ||
+        !moduleText.includes("next.style.setProperty('display', 'inline-flex', 'important')")) {
+      fail('verrouillage Genre/Nombre modulaire incomplet', 5);
+    }
+  } else if (!out.includes('seb-genrenombres-lock99') || !out.includes('btnNextGenreNombre')) {
+    fail('verrouillage Singulier/Pluriel incomplet', 5);
+  }
+
   write(file, out);
 }
 
