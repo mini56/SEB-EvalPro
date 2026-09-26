@@ -18,6 +18,7 @@ const html = read('app/web/brique.html');
 const page = read('app/web/js/brique-page.js');
 const parcours = read('app/web/js/seb-parcours.js');
 const qcm = read('app/web/qcmv1.0.html');
+const resume = read('app/web/js/seb-page-draft-resume.js');
 
 for (const token of [
   'id="startBtn"',
@@ -63,6 +64,8 @@ for (const token of [
   'function saveAutoEvaluation()',
   'function restoreMainEvaluation()',
   'function restoreAutoEvaluation()',
+  'function restoreCanonicalState()',
+  'setTimeout(function () {',
   '.map((cb) => cb.value);',
   "sessionStorage.setItem(DATA_KEY, JSON.stringify(data));",
   "sessionStorage.setItem(AUTO_KEY, JSON.stringify(data));",
@@ -97,6 +100,13 @@ for (const token of [
   '"stress_br"'
 ]) {
   if (!qcm.includes(token)) fail('page Résultats ne récupère plus Brique: ' + token);
+}
+
+for (const token of [
+  "const structuralContainer = id === 'consigne' || id === 'autoEvalPart';",
+  "!structuralContainer && saved.text !== null"
+]) {
+  if (!resume.includes(token)) fail('protection reprise structurelle Brique absente: ' + token);
 }
 
 console.log('SEB EvalPro garde Brique: chrono, code, zéro erreur, reprise, autoévaluation, Résultats et navigation centrale — OK.');

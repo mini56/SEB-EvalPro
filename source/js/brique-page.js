@@ -213,11 +213,15 @@
     return true;
   }
 
-  function install() {
+  function restoreCanonicalState() {
     restoreCheckpoint();
     restoreMainEvaluation();
     restoreAutoEvaluation();
     updateChrono();
+  }
+
+  function install() {
+    restoreCanonicalState();
 
     document.getElementById('startBtn')?.addEventListener('click', startChrono);
     document.getElementById('stopBtn')?.addEventListener('click', stopChrono);
@@ -226,6 +230,13 @@
     document.getElementById('validBtn')?.addEventListener('click', validateMainEvaluation);
     document.getElementById('autoEvalBtn')?.addEventListener('click', completeAutoEvaluation);
     checkInputs();
+
+    // Le brouillon générique restaure aussi l'interface à DOMContentLoaded.
+    // Les valeurs officielles Brique doivent rester prioritaires.
+    setTimeout(function () {
+      restoreCanonicalState();
+      checkInputs();
+    }, 0);
   }
 
   const api = Object.freeze({
