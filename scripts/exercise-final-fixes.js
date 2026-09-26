@@ -56,6 +56,24 @@ function insertBeforeLast(text, marker, addition, label) {
   const { target, text } = read('app/web/brique.html');
   let out = text;
 
+  if (out.includes('js/brique-page.js')) {
+    const modulePath = path.join(root, 'app', 'web', 'js', 'brique-page.js');
+    if (!fs.existsSync(modulePath)) fail('Brique: module brique-page.js introuvable', 4);
+    const moduleText = fs.readFileSync(modulePath, 'utf8').replace(/\r\n/g, '\n');
+
+    if (out.includes('id="resetBtn"')) fail('la remise à zéro Brique est encore active', 4);
+    if (!out.includes('type="password" id="secretCode"')) fail('le code Brique n’est pas masqué', 5);
+    if (!/<input\s+id="nivDiff"[^>]*\bmin="0"\s+max="10"/.test(out)) fail('Brique: zéro erreur non autorisé', 5);
+    for (const token of [
+      "rawCode.toLowerCase() === 'svg56'",
+      "msgDiv.textContent = 'Code correct — renseignez le nombre d’erreurs.'",
+      "msgDiv.textContent = 'Renseignez le nombre d’erreurs avant de valider.'",
+      'function validateMainEvaluation()'
+    ]) {
+      if (!moduleText.includes(token)) fail('Brique: validation modulaire absente: ' + token, 5);
+    }
+  } else {
+
   out = replaceOnce(
     out,
     '            <button id="resetBtn" type="button">Remise à zéro</button>\n',
@@ -101,6 +119,8 @@ function insertBeforeLast(text, marker, addition, label) {
   }
   if (!out.includes('type="password" id="secretCode"')) fail('le code Brique n’est pas masqué', 5);
   if (!out.includes('Code correct — renseignez le nombre d’erreurs.')) fail('retour de validation du code Brique absent', 5);
+
+  }
 
   write(target, out);
 }
