@@ -19,7 +19,7 @@ const qcm = read('app/web/qcmv1.0.html');
 
 const protectedText = [
   '🏙️ Puzzle Gratte-ciel',
-  "C'est la journée de cohésion d'équipe, régulièrement l'équipe est invitée à se retrouver pour partager un moment convivial.",
+  "C'est la journée de cohésion d'équipe. Régulièrement, l'équipe est invitée à se retrouver pour partager un moment convivial.",
   "À cette occasion, la cheffe d'équipe a préparé un petit défi ! Elle propose à chacun une grille à compléter.",
   '📋 Règles du jeu',
   'Placez les chiffres <strong>1, 2, 3, 4</strong> dans chaque case',
