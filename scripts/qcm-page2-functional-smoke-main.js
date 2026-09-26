@@ -203,10 +203,11 @@ app.whenReady().then(async () => {
           ({
             page:location.search,
             visible:Boolean(document.getElementById('page2_1')?.classList.contains('visible')),
-            controller:Boolean(window.sebQcmPage2)
+            controller:Boolean(window.sebQcmPage2),
+            nextController:Boolean(window.sebQcmPage2_1)
           })
         `, true);
-        if (state.page.includes('page=2_1') && state.visible && state.controller) {
+        if (state.page.includes('page=2_1') && state.visible && state.controller && state.nextController) {
           navigated = true;
           break;
         }
@@ -218,7 +219,8 @@ app.whenReady().then(async () => {
     const preserved = await win.webContents.executeJavaScript(`
       (function(){
         document.getElementById('reponse2_1_6').value='10';
-        saveTableAnswers('2_1');
+        document.getElementById('reponse2_1_6').dispatchEvent(new Event('input',{bubbles:true}));
+        window.sebQcmPage2_1.save();
         const r=JSON.parse(sessionStorage.getItem('reponses_data')||'{}');
         const s=JSON.parse(sessionStorage.getItem('scores_data')||'{}');
         return {
@@ -231,7 +233,7 @@ app.whenReady().then(async () => {
     `, true);
 
     if (preserved.p2 !== '1020' || preserved.p2score !== 1 || preserved.p21 !== '10' || preserved.p21score !== 1) {
-      throw new Error('Page 2 perdue lors de la sauvegarde Page 2_1.');
+      throw new Error('Page 2 non préservée lors de la sauvegarde modulaire Page 2_1.');
     }
 
     console.log('QCM_PAGE2_FUNCTIONAL_SMOKE: OK');
