@@ -14,7 +14,7 @@
     "test:nwtexte": "npm run prepare:web && node scripts/nwtexte-architecture-guard.js",
     "audit:names": "node scripts/audit-repository-names.js",
     "test:security": "node scripts/storage-layout-smoke.js && node scripts/candidate-local-protection-smoke.js && node scripts/candidate-store-smoke.js && node scripts/candidate-transfer-smoke.js && node scripts/candidate-lifecycle-smoke.js && node scripts/candidate-full-cycle-github-smoke.js && node scripts/candidate-loss-prevention-smoke.js && node scripts/candidate-catalog-smoke.js",
-    "test:nwtexte-functional": "electron scripts/nwtexte-functional-smoke-main.js",
+    "test:nwtexte-functional": "electron --no-sandbox scripts/nwtexte-functional-smoke-main.js",
     "test:parcours": "npm run prepare:web && node scripts/parcours-registry-guard.js"
   },
   "dependencies": {
