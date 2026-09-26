@@ -18,7 +18,7 @@ const html = read('app/web/genrenombres.html');
 const page = read('app/web/js/genrenombres-page.js');
 const parcours = read('app/web/js/seb-parcours.js');
 const resume = read('app/web/js/seb-page-draft-resume.js');
-const qcm = read('app/web/qcmv1.0.html');
+const qcm = read('app/web/qcmv1.0.html') + '\n' + read('app/web/js/qcm-runtime.js') + '\n' + read('app/web/js/qcm-runtime-ui.js') + '\n' + read('app/web/js/qcm-runtime-tail.js');
 
 const answerInputs = html.match(/input type="text" data-answer="[^"]+"/g) || [];
 if (answerInputs.length !== 20) fail('20 champs Genre/Nombre attendus, trouvé ' + answerInputs.length);

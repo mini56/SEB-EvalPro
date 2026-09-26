@@ -1,4 +1,3 @@
-
 function verifierDonnees() {
 
     let messages = [];
@@ -51,9 +50,7 @@ function verifierDonnees() {
     alert(messages.join("\n\n"));
 }
 
-
-/* ---- bloc inline historique suivant ---- */
-
+/* ---- migrated final runtime block ---- */
 
 // --- AUTO-REMPLISSAGE DU TABLEAU RÉCAP EN FONCTION DES SÉLECTIONS ---
 
@@ -99,9 +96,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 });
 
-
-/* ---- bloc inline historique suivant ---- */
-
+/* ---- migrated final runtime block ---- */
 
     /**
      * Détermine le niveau d'évaluation en fonction du texte sélectionné
@@ -905,27 +900,3 @@ ${table.outerHTML}
   document.body.removeChild(link);
   setTimeout(() => URL.revokeObjectURL(url), 100);
 }
-  
-/* === Liaison externe des commandes HTML Bilan === */
-(function () {
-  'use strict';
-  function runAction(action) {
-    switch (action) {
-      case 'autofill-bilan': if (typeof window.autoRemplirBilan === 'function') window.autoRemplirBilan(); return;
-      case 'verify-data': if (typeof window.verifierDonnees === 'function') window.verifierDonnees(); return;
-      case 'test-alert': window.alert('OK !'); return;
-      case 'export-word': if (typeof window.exportToWord === 'function') window.exportToWord(); return;
-      default: return;
-    }
-  }
-  function bind() {
-    document.querySelectorAll('[data-seb-bilan-action]').forEach(function (element) {
-      if (element.dataset.sebBilanBound === '1') return;
-      element.dataset.sebBilanBound = '1';
-      element.addEventListener('click', function (event) { event.preventDefault(); runAction(element.dataset.sebBilanAction || ''); });
-    });
-  }
-  window.sebBilanPage = Object.freeze({ bind, runAction });
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind, { once:true });
-  else bind();
-})();

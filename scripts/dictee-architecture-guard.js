@@ -20,7 +20,7 @@ const page = read('app/web/js/dictee-page.js');
 const parcours = read('app/web/js/seb-parcours.js');
 const runtime = read('app/web/js/seb-ui-runtime.js');
 const tri = read('app/web/js/tri-page.js');
-const qcm = read('app/web/qcmv1.0.html');
+const qcm = read('app/web/qcmv1.0.html') + '\n' + read('app/web/js/qcm-runtime.js') + '\n' + read('app/web/js/qcm-runtime-ui.js') + '\n' + read('app/web/js/qcm-runtime-tail.js');
 
 try { new vm.Script(page); } catch (error) { fail('dictee-page.js invalide: ' + error.message); }
 

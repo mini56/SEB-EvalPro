@@ -1,10 +1,16 @@
 const { contextBridge, ipcRenderer } = require('electron');
 const path = require('path');
+const replayPrototype = require('./replay-preload');
+const replayNavigationCapture = require('./replay-navigation-capture');
+const bilanHistory = require('./bilan-history-preload');
+const candidateCatalog = require('./candidate-catalog-preload');
+// SEB_CANDIDATE_REPLAY_PROTO_PRELOAD
 const editionCapabilities = ipcRenderer.sendSync('app:edition-sync') || {
   edition:'admin', canBilan:true, canAi:true, canImport:true, canExport:true
 };
 
 const BAR_HEIGHT = 44;
+// SEB_PRIORITY_FIXES_PRELOAD
 const HOTZONE_HEIGHT = 5;
 const BAR_HIDE_DELAY = 1000;
 const SAVE_DEBOUNCE_MS = 750;
@@ -634,6 +640,34 @@ function showTransferMessage(title, message, isError = false) {
   });
 }
 
+
+// SEB_ADMIN_STATE_SYNC_AFTER_EARLY_BAR
+function sebSyncAdminBarState() {
+  const bar = document.getElementById('seb-evalpro-topbar');
+  if (!bar) return;
+  const adminButton = document.getElementById('seb-evalpro-admin');
+  const bilanButton = document.getElementById('seb-evalpro-bilan');
+  const returnButton = document.getElementById('seb-evalpro-return');
+  const exportCandidatesButton = document.getElementById('seb-evalpro-export-candidates');
+  const importCandidatesButton = document.getElementById('seb-evalpro-import-candidates');
+  const closeSessionButton = document.getElementById('seb-evalpro-close-session');
+  const onBilan = isAdminBilanPage();
+  const onCandidateResults = !!adminCandidateResultsWorkspace;
+  const onAdminDetail = onBilan || onCandidateResults;
+  if (adminButton) {
+    adminButton.hidden = false;
+    adminButton.textContent = adminUnlocked ? 'Verrouiller' : 'Administrateur';
+  }
+  if (bilanButton) bilanButton.hidden = true;
+  if (returnButton) {
+    returnButton.hidden = !adminUnlocked || !onAdminDetail;
+    returnButton.textContent = 'Retour au candidat';
+  }
+  if (exportCandidatesButton) exportCandidatesButton.hidden = !adminUnlocked;
+  if (importCandidatesButton) importCandidatesButton.hidden = !adminUnlocked;
+  if (closeSessionButton) closeSessionButton.hidden = !adminUnlocked;
+}
+
 function injectAdminBar() {
   if (!document.body || document.getElementById('seb-evalpro-topbar')) return;
 
@@ -641,6 +675,7 @@ function injectAdminBar() {
   bar.id = 'seb-evalpro-topbar';
   bar.innerHTML = `
     <div class="seb-evalpro-name">SEB EvalPro</div>
+    <div id="seb-evalpro-build" class="seb-evalpro-build">Build #6</div>
     <div id="seb-evalpro-candidate-badge" class="seb-evalpro-candidate-badge" hidden></div>
     <div class="seb-evalpro-spacer"></div>
     <button id="seb-evalpro-return" type="button" hidden>Retour à l'évaluation</button>
@@ -664,6 +699,7 @@ function injectAdminBar() {
     #seb-evalpro-topbar{position:fixed;top:0;left:0;right:0;height:${BAR_HEIGHT}px;z-index:2147483646;display:flex;align-items:center;gap:8px;padding:0 12px;box-sizing:border-box;background:#0070c0;color:#fff;font-family:Arial,sans-serif;box-shadow:0 1px 4px rgba(0,0,0,.25);transform:translateY(-100%);transition:transform .16s ease;will-change:transform}
     #seb-evalpro-topbar.seb-evalpro-visible{transform:translateY(0)}
     #seb-evalpro-topbar .seb-evalpro-name{font-size:18px;font-weight:700;white-space:nowrap}
+    #seb-evalpro-topbar .seb-evalpro-build{font-size:12px;font-weight:700;white-space:nowrap;opacity:.9;padding:3px 7px;border:1px solid rgba(255,255,255,.55);border-radius:10px}
     #seb-evalpro-topbar .seb-evalpro-candidate-badge{font-size:13px;font-weight:700;white-space:nowrap;padding:5px 9px;border:1px solid rgba(255,255,255,.55);border-radius:4px;background:rgba(255,255,255,.14)}
     #seb-evalpro-topbar .seb-evalpro-spacer{flex:1}
     #seb-evalpro-topbar button{font-family:Arial,sans-serif;font-size:14px;font-weight:400;padding:6px 12px;border:1px solid rgba(255,255,255,.75);border-radius:4px;background:#fff;color:#0070c0;cursor:pointer}
@@ -671,6 +707,62 @@ function injectAdminBar() {
     #seb-evalpro-topbar #seb-evalpro-finish-candidate{background:#fff4e5;color:#8a4b00;border-color:#fff}
     #seb-evalpro-topbar #seb-evalpro-close-session{background:#c00000;color:#fff;border-color:#fff}
     #seb-evalpro-topbar #seb-evalpro-close-session:hover{background:#a00000}
+    /* SEB_ADMIN_BUTTON_POLISH */
+    #seb-evalpro-topbar button,
+    #seb-evalpro-admin-dialog button,
+    #seb-evalpro-session-close-dialog button,
+    #seb-evalpro-transfer-dialog button,
+    #seb-evalpro-results-dialog button,
+    #seb-replay-chooser button,
+    #seb-replay-viewer button,
+    #seb-bilan-history-chooser button,
+    #seb-bilan-history-editor button{
+      background:#fff!important;color:#0070c0!important;border:2px solid #0070c0!important;border-radius:6px!important;
+      box-shadow:0 2px 5px rgba(0,0,0,.18),inset 0 1px 0 rgba(255,255,255,.95)!important;
+      font-weight:700!important;cursor:pointer;transition:background .12s ease,box-shadow .12s ease,transform .12s ease
+    }
+    /* La barre Admin reste volontairement plus légère que les boutons de dialogue. */
+    #seb-evalpro-topbar button{font-weight:400!important}
+    #seb-evalpro-topbar button:hover,
+    #seb-evalpro-admin-dialog button:hover,
+    #seb-evalpro-session-close-dialog button:hover,
+    #seb-evalpro-transfer-dialog button:hover,
+    #seb-evalpro-results-dialog button:hover,
+    #seb-replay-chooser button:hover,
+    #seb-replay-viewer button:hover,
+    #seb-bilan-history-chooser button:hover,
+    #seb-bilan-history-editor button:hover{
+      background:#f5f9fd!important;box-shadow:0 3px 7px rgba(0,0,0,.22),inset 0 1px 0 #fff!important;transform:translateY(-1px)
+    }
+    #seb-evalpro-topbar button:active,
+    #seb-evalpro-admin-dialog button:active,
+    #seb-evalpro-session-close-dialog button:active,
+    #seb-evalpro-transfer-dialog button:active,
+    #seb-evalpro-results-dialog button:active,
+    #seb-replay-chooser button:active,
+    #seb-replay-viewer button:active,
+    #seb-bilan-history-chooser button:active,
+    #seb-bilan-history-editor button:active{transform:translateY(0);box-shadow:inset 0 1px 3px rgba(0,0,0,.20)!important}
+    #seb-evalpro-topbar #seb-evalpro-close-session,
+    #seb-evalpro-session-close-dialog button.danger,
+    #seb-bilan-history-chooser button.danger,
+    #seb-bilan-history-editor button.danger{
+      background:#fff!important;color:#c00000!important;border-color:#c00000!important
+    }
+    #seb-evalpro-topbar #seb-evalpro-close-session:hover,
+    #seb-evalpro-session-close-dialog button.danger:hover,
+    #seb-bilan-history-chooser button.danger:hover,
+    #seb-bilan-history-editor button.danger:hover{background:#fff4f4!important}
+    #seb-evalpro-topbar button:disabled,
+    #seb-evalpro-admin-dialog button:disabled,
+    #seb-evalpro-session-close-dialog button:disabled,
+    #seb-evalpro-transfer-dialog button:disabled,
+    #seb-evalpro-results-dialog button:disabled,
+    #seb-replay-chooser button:disabled,
+    #seb-replay-viewer button:disabled,
+    #seb-bilan-history-chooser button:disabled,
+    #seb-bilan-history-editor button:disabled{opacity:.48!important;transform:none!important;cursor:default!important}
+
   `;
   document.head.appendChild(style);
   document.body.prepend(bar);
@@ -1034,6 +1126,15 @@ function injectAdminBar() {
       return;
     }
 
+    // SEB_BUILD135_REPLAY_CLOSE_GUARD
+    if (replayPrototype && typeof replayPrototype.ensureFinalArchive === 'function') {
+      const replayArchive = await replayPrototype.ensureFinalArchive();
+      if (!replayArchive || replayArchive.ok !== true) {
+        scheduleHideBar();
+        return;
+      }
+    }
+
     closingSession = true;
     clearTimeout(saveTimer);
     if (periodicSaveTimer) clearInterval(periodicSaveTimer);
@@ -1139,8 +1240,21 @@ async function completeCandidateFromFinalPage() {
 }
 
 window.addEventListener('DOMContentLoaded', async () => {
+  document.documentElement.setAttribute('spellcheck', 'false');
+  document.querySelectorAll('input, textarea, [contenteditable]').forEach((el) => {
+    el.setAttribute('spellcheck', 'false');
+    el.setAttribute('autocorrect', 'off');
+    el.setAttribute('autocapitalize', 'off');
+  });
   adminUnlocked = await ipcRenderer.invoke('admin:status');
   injectAdminBar();
+  sebSyncAdminBarState();
+  setTimeout(sebSyncAdminBarState, 80);
+  setTimeout(sebSyncAdminBarState, 300);
+  replayPrototype.install();
+  replayNavigationCapture.install();
+  bilanHistory.install();
+  candidateCatalog.install({ beforeNavigate: () => saveNow(true) });
   if (adminCandidateResultsWorkspace) {
     showReadOnlyCandidateResults();
   } else {
@@ -1160,6 +1274,12 @@ window.addEventListener('DOMContentLoaded', async () => {
   }
 });
 
+
+window.addEventListener('pageshow', async () => {
+  try { adminUnlocked = await ipcRenderer.invoke('admin:status'); } catch (_) {}
+  sebSyncAdminBarState();
+});
+
 window.addEventListener('beforeunload', () => {
   if (!closingSession && !adminNavigationLeaving && !isAdminCandidatesPage()) saveNow(true);
 });
@@ -1169,3 +1289,242 @@ contextBridge.exposeInMainWorld('sebEvalPro', {
   verifyAdminPassword: (password) => ipcRenderer.invoke('admin:verify-password', password),
   sebIaStatus: () => ipcRenderer.invoke('ai:status')
 });
+
+// SEB_PRIVACY_SCREEN_103
+(function(){
+  'use strict';
+
+  const PRIVACY_KEY = 'seb_evalpro_privacy_screen';
+  const MODE_TEMP = 'temporary';
+  const MODE_FINAL = 'final';
+  let privacyMode = '';
+
+  function readPrivacyMode(){
+    try {
+      const value = String(window.localStorage.getItem(PRIVACY_KEY) || '');
+      return value === MODE_TEMP || value === MODE_FINAL ? value : '';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  privacyMode = readPrivacyMode();
+
+  // En cas de redémarrage pendant que l'écran de confidentialité était actif,
+  // empêcher un flash des données avant création du voile.
+  if (privacyMode) {
+    try { document.documentElement.style.setProperty('visibility', 'hidden', 'important'); } catch (_) {}
+  }
+
+  function savePrivacyMode(mode){
+    privacyMode = mode === MODE_TEMP || mode === MODE_FINAL ? mode : '';
+    try {
+      if (privacyMode) window.localStorage.setItem(PRIVACY_KEY, privacyMode);
+      else window.localStorage.removeItem(PRIVACY_KEY);
+    } catch (_) {}
+    try { saveNow(true); } catch (_) {}
+    refreshPrivacy();
+  }
+
+  function onFinalResults(){
+    if (String(pageName() || '').toLowerCase() !== 'qcmv1.0.html') return false;
+    const page = document.getElementById('pageFinale');
+    return !!(page && page.classList.contains('visible'));
+  }
+
+  function ensurePrivacyStyle(){
+    if (document.getElementById('seb-evalpro-privacy-style')) return;
+    const style = document.createElement('style');
+    style.id = 'seb-evalpro-privacy-style';
+    style.textContent =
+      '#seb-evalpro-privacy-toggle{position:fixed!important;right:18px!important;bottom:18px!important;z-index:2147483643!important;margin:0!important;padding:10px 15px!important;border:0!important;border-radius:8px!important;background:#0070c0!important;color:#fff!important;font:700 14px Arial,sans-serif!important;box-shadow:0 3px 12px rgba(0,0,0,.24)!important;cursor:pointer!important}' +
+      '#seb-evalpro-privacy-toggle:hover{background:#005c9e!important}' +
+      '#seb-evalpro-privacy-layer{position:fixed;inset:0;background:#fff;display:none;align-items:center;justify-content:center;overflow:hidden;font-family:Arial,sans-serif}' +
+      '#seb-evalpro-privacy-layer img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center;user-select:none;-webkit-user-drag:none}' +
+      '#seb-evalpro-privacy-hide{position:absolute!important;left:50%!important;bottom:24px!important;transform:translateX(-50%)!important;margin:0!important;padding:11px 20px!important;border:0!important;border-radius:8px!important;background:#0070c0!important;color:#fff!important;font:700 15px Arial,sans-serif!important;box-shadow:0 3px 12px rgba(0,0,0,.25)!important;cursor:pointer!important}' +
+      '#seb-evalpro-final-privacy-wrap{display:flex!important;justify-content:center!important;margin:22px 0 12px!important}' +
+      '#seb-evalpro-final-privacy{margin:0!important;padding:11px 20px!important;border:0!important;border-radius:8px!important;background:#0070c0!important;color:#fff!important;font:700 15px Arial,sans-serif!important;cursor:pointer!important}';
+    (document.head || document.documentElement).appendChild(style);
+  }
+
+  // SEB_ADMIN_HOME_PRIVACY_BUTTON_IN_BAR
+  function placePrivacyToggleForAdminHome(button){
+    if (!button) return button;
+    const onAdminHome = typeof isAdminCandidatesPage === 'function' && isAdminCandidatesPage();
+    if (!onAdminHome) return button;
+    const bar = document.getElementById('seb-evalpro-topbar');
+    if (!bar) return button;
+    if (button.parentElement !== bar) bar.appendChild(button);
+    const centered = {
+      position:'absolute', left:'50%', right:'auto', bottom:'auto', top:'50%',
+      transform:'translate(-50%, -50%)', zIndex:'2147483647', margin:'0',
+      padding:'6px 12px', border:'2px solid #0070c0', borderRadius:'6px',
+      background:'#fff', color:'#0070c0', whiteSpace:'nowrap',
+      font:'700 14px Arial, sans-serif', boxShadow:'0 2px 5px rgba(0,0,0,.18)'
+    };
+    Object.entries(centered).forEach(([name, value]) => {
+      const cssName = name.replace(/[A-Z]/g, (letter) => '-' + letter.toLowerCase());
+      button.style.setProperty(cssName, value, 'important');
+    });
+    return button;
+  }
+
+  function ensurePrivacyToggle(){
+    let button = document.getElementById('seb-evalpro-privacy-toggle');
+    if (button) return placePrivacyToggleForAdminHome(button);
+    button = document.createElement('button');
+    button.id = 'seb-evalpro-privacy-toggle';
+    button.type = 'button';
+    button.textContent = 'Afficher l’écran d’accueil';
+    button.addEventListener('click', function(){
+      savePrivacyMode(MODE_TEMP);
+    });
+    document.body.appendChild(button);
+    return placePrivacyToggleForAdminHome(button);
+  }
+
+  function ensurePrivacyLayer(){
+    let layer = document.getElementById('seb-evalpro-privacy-layer');
+    if (layer) return layer;
+
+    layer = document.createElement('div');
+    layer.id = 'seb-evalpro-privacy-layer';
+    layer.setAttribute('role', 'dialog');
+    layer.setAttribute('aria-modal', 'true');
+
+    const image = document.createElement('img');
+    image.src = 'imageqcm/seb-evalpro-privacy-screen.jpg';
+    image.alt = 'SEB-éval-PRO';
+    image.draggable = false;
+
+    const hide = document.createElement('button');
+    hide.id = 'seb-evalpro-privacy-hide';
+    hide.type = 'button';
+    hide.textContent = 'Masquer l’écran d’accueil';
+    hide.addEventListener('click', function(){
+      if (privacyMode === MODE_TEMP) savePrivacyMode('');
+    });
+
+    layer.appendChild(image);
+    layer.appendChild(hide);
+    document.body.appendChild(layer);
+    return layer;
+  }
+
+  function ensureFinalPrivacyButton(){
+    if (String(pageName() || '').toLowerCase() !== 'qcmv1.0.html') return null;
+    const page = document.getElementById('pageFinale');
+    if (!page) return null;
+
+    let wrap = document.getElementById('seb-evalpro-final-privacy-wrap');
+    if (!wrap) {
+      wrap = document.createElement('div');
+      wrap.id = 'seb-evalpro-final-privacy-wrap';
+
+      const button = document.createElement('button');
+      button.id = 'seb-evalpro-final-privacy';
+      button.type = 'button';
+      button.textContent = 'Revenir à l’écran SEB-éval-PRO';
+      button.addEventListener('click', function(){
+        savePrivacyMode(MODE_FINAL);
+      });
+
+      wrap.appendChild(button);
+      page.appendChild(wrap);
+    }
+    return wrap;
+  }
+
+  function refreshPrivacy(){
+    if (!document.body) return;
+
+    const adminPage = isAdminBilanPage();
+    const toggle = ensurePrivacyToggle();
+    const layer = ensurePrivacyLayer();
+    const hide = layer.querySelector('#seb-evalpro-privacy-hide');
+    const finalWrap = ensureFinalPrivacyButton();
+    const finalResults = onFinalResults();
+
+    if (adminPage) {
+      toggle.style.setProperty('display', 'none', 'important');
+      layer.style.setProperty('display', 'none', 'important');
+      if (finalWrap) finalWrap.style.setProperty('display', 'none', 'important');
+      document.documentElement.style.removeProperty('visibility');
+      return;
+    }
+
+    if (finalWrap) {
+      finalWrap.style.setProperty('display', finalResults && privacyMode !== MODE_FINAL ? 'flex' : 'none', 'important');
+    }
+
+    if (privacyMode === MODE_TEMP) {
+      toggle.style.setProperty('display', 'none', 'important');
+      layer.style.zIndex = '2147483647';
+      layer.style.setProperty('display', 'flex', 'important');
+      hide.style.setProperty('display', 'block', 'important');
+      hide.setAttribute('aria-hidden', 'false');
+    } else if (privacyMode === MODE_FINAL && !adminUnlocked) {
+      toggle.style.setProperty('display', 'none', 'important');
+      layer.style.zIndex = '2147483644';
+      layer.style.setProperty('display', 'flex', 'important');
+      hide.style.setProperty('display', 'none', 'important');
+      hide.setAttribute('aria-hidden', 'true');
+    } else {
+      layer.style.setProperty('display', 'none', 'important');
+      hide.style.setProperty('display', 'none', 'important');
+      toggle.style.setProperty('display', (String(pageName() || '').toLowerCase() === 'introbrique.html' || finalResults) ? 'none' : 'block', 'important');
+    }
+
+    document.documentElement.style.removeProperty('visibility');
+  }
+
+  function startPrivacy(){
+    if (!document.body) return;
+    ensurePrivacyStyle();
+    refreshPrivacy();
+
+    const observer = new MutationObserver(function(){
+      setTimeout(refreshPrivacy, 0);
+    });
+    observer.observe(document.documentElement, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['class', 'hidden']
+    });
+
+    document.addEventListener('click', function(event){
+      const admin = event.target && event.target.closest ? event.target.closest('#seb-evalpro-admin') : null;
+      if (!admin) return;
+      setTimeout(refreshPrivacy, 0);
+      setTimeout(refreshPrivacy, 250);
+    }, true);
+  }
+
+  if (document.readyState === 'loading') {
+    window.addEventListener('DOMContentLoaded', function(){
+      // injectAdminBar() est asynchrone au démarrage; un court délai permet de
+      // récupérer aussi le statut Administrateur avant le premier rafraîchissement.
+      setTimeout(startPrivacy, 0);
+    }, { once: true });
+  } else {
+    setTimeout(startPrivacy, 0);
+  }
+})();
+
+
+// SEB_LOCAL_AI_ADMIN_BAR_FAILSAFE
+function sebLocalAiEnsureAdminBar() {
+  try {
+    if (document.body) injectAdminBar();
+  } catch (error) {
+    console.error('SEB EvalPro: impossible d’injecter la barre Administrateur', error);
+  }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', sebLocalAiEnsureAdminBar, { once: true });
+} else {
+  sebLocalAiEnsureAdminBar();
+}
+setTimeout(sebLocalAiEnsureAdminBar, 250);

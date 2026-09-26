@@ -15,7 +15,7 @@ function read(rel) {
 const html = read('app/web/nvmail.html');
 const page = read('app/web/js/nvmail-page.js');
 const parcours = read('app/web/js/seb-parcours.js');
-const results = read('app/web/qcmv1.0.html');
+const results = read('app/web/qcmv1.0.html') + '\n' + read('app/web/js/qcm-runtime.js') + '\n' + read('app/web/js/qcm-runtime-ui.js') + '\n' + read('app/web/js/qcm-runtime-tail.js');
 
 const protectedText = [
   'Votre conseiller vous contacte par e-mail pour vous prévenir que votre rendez-vous est déplacé.',

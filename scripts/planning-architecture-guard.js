@@ -18,7 +18,7 @@ const html = read('app/web/planning.html');
 const page = read('app/web/js/planning-page.js');
 const parcours = read('app/web/js/seb-parcours.js');
 const resume = read('app/web/js/seb-page-draft-resume.js');
-const qcm = read('app/web/qcmv1.0.html');
+const qcm = read('app/web/qcmv1.0.html') + '\n' + read('app/web/js/qcm-runtime.js') + '\n' + read('app/web/js/qcm-runtime-ui.js') + '\n' + read('app/web/js/qcm-runtime-tail.js');
 
 for (let i = 1; i <= 15; i += 1) {
   if (!html.includes('id="q' + i + '"')) fail('liste Planning absente: q' + i);

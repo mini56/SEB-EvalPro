@@ -233,9 +233,54 @@ module.exports = function registerCandidateReplay({ app, ipcMain, getAdminUnlock
     return legacySnapshotSha(archive.snapshot) === String(archive.integritySha256);
   }
 
+  async function captureFullPage(webContents) {
+    let attachedHere = false;
+    try {
+      const dbg = webContents.debugger;
+      if (!dbg.isAttached()) {
+        dbg.attach('1.3');
+        attachedHere = true;
+      }
+      await dbg.sendCommand('Page.enable');
+      const metrics = await dbg.sendCommand('Page.getLayoutMetrics');
+      const content = metrics.cssContentSize || metrics.contentSize || {};
+      const width = Math.max(1, Math.ceil(Number(content.width) || 0));
+      const height = Math.max(1, Math.ceil(Number(content.height) || 0));
+      if (width > 1 && height > 1) {
+        const shot = await dbg.sendCommand('Page.captureScreenshot', {
+          format: 'png',
+          fromSurface: true,
+          captureBeyondViewport: true,
+          clip: { x: 0, y: 0, width, height, scale: 1 }
+        });
+        const png = Buffer.from(String(shot && shot.data || ''), 'base64');
+        if (png.length) return { png, size: { width, height }, fullPage: true };
+      }
+    } catch (_) {
+      // Repli ci-dessous sur capturePage() si le protocole DevTools est indisponible.
+    } finally {
+      if (attachedHere) {
+        try { webContents.debugger.detach(); } catch (_) {}
+      }
+    }
+    const image = await webContents.capturePage();
+    if (!image || image.isEmpty()) throw new Error('Capture visuelle vide.');
+    return { png: image.toPNG(), size: image.getSize(), fullPage: false };
+  }
+
   async function capturePage(event, payload) {
     const token = safeToken(payload && payload.token);
     if (!token) return { ok: false, error: 'Jeton de parcours invalide.' };
+    // SEB_ADMIN_CAPTURE_BACKEND_GUARD
+    // SEB_ADMIN_CAPTURE_ADMINMODE_GUARD
+    if (getAdminUnlocked()) {
+      return { ok: false, skipped: true, adminWorkBlocked: true };
+    }
+    let senderPage = '';
+    try { senderPage = path.basename(new URL(event.sender.getURL()).pathname).toLowerCase(); } catch (_) {}
+    if (senderPage === 'admin-bilan.html' || senderPage === 'bilan.html') {
+      return { ok: false, skipped: true, adminWorkBlocked: true };
+    }
     return enqueueCapture(token, async () => {
     try {
       const pageKey = safePageKey(payload && payload.pageKey);
@@ -243,11 +288,13 @@ module.exports = function registerCandidateReplay({ app, ipcMain, getAdminUnlock
       cleanupOldPending();
       ensurePendingRoot();
 
-      const image = await event.sender.capturePage();
-      if (!image || image.isEmpty()) return { ok: false, error: 'Capture visuelle vide.' };
-      const png = image.toPNG();
+      const capture = await Promise.race([
+        captureFullPage(event.sender),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Capture Replay trop longue.')), 2000))
+      ]);
+      const png = capture.png;
       if (!png || !png.length) return { ok: false, error: 'Capture PNG vide.' };
-      const size = image.getSize();
+      const size = capture.size;
 
       const index = readPendingIndex(token);
       const existing = index.pages[pageKey];

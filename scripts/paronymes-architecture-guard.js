@@ -16,7 +16,7 @@ const source = read('source/paronymes.html');
 const html = read('app/web/paronymes.html');
 const page = read('app/web/js/paronymes-page.js');
 const parcours = read('app/web/js/seb-parcours.js');
-const qcm = read('app/web/qcmv1.0.html');
+const qcm = read('app/web/qcmv1.0.html') + '\n' + read('app/web/js/qcm-runtime.js') + '\n' + read('app/web/js/qcm-runtime-ui.js') + '\n' + read('app/web/js/qcm-runtime-tail.js');
 
 const expectedRows = [
   '<tr><td class="paronyme">Apitoiement</td><td data-correct="true">Pitié</td><td>Appétence</td><td>Indifférence</td><td>Capiteux</td><td>Piété</td></tr>',

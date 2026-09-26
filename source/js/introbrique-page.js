@@ -1,4 +1,3 @@
-
 const video = document.getElementById("introVideo");
 const fade = document.getElementById("fade");
 

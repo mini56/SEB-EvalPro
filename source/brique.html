@@ -401,6 +401,7 @@ href='data:image/svg+xml;utf8,
   <rect x="42" y="74" width="12" height="12" rx="2" fill="%23F9B233"/>
   <rect x="62" y="74" width="12" height="12" rx="2" fill="%23F9B233"/>
 </svg>'>
+<link rel="stylesheet" href="css/seb-in-app-alert.css" id="seb-evalpro-in-app-alert-css">
 </head>
 
 <body>
@@ -408,14 +409,14 @@ href='data:image/svg+xml;utf8,
     <div class="header">
       <div class="title-row">
         <h1>
-          Construction a base de briques.
+          Construction à base de briques.
         </h1>
         <!--img class="icon-svg" src="imageqcm/avatar_transparant.png" alt="Avatar décoratif"-->
       </div>
-      <div><p><img src="imageqcm/scenario.png" alt="scenario.png" width="65" height="65" style="margin-right:8px; float : left ;"><strong style="color:#1a73e8;">Scénario:</strong>
+      <div><p><img src="imageqcm/scenario.png" alt="scenario.png" width="65" height="65" style="margin-right:8px; float : left ;"><strong style="color:#1a73e8;">Scénario :</strong>
  Le week-end prochain, l’entreprise organise une porte ouverte pour présenter ses nouveaux modèles en fabrication.</p>
 <p><strong>Votre tâche :</strong> vous devez assembler le dernier modèle de voiture pour le présenter. On vous demande d’évaluer le temps pour l’assembler et le niveau de difficulté que vous lui accordez.
-Réclamer votre boite de briques et commencer l’assemblage... </p></div>
+Réclamez votre boîte de briques et commencez l’assemblage... </p></div>
     </div>
 
     <div class="main">
@@ -424,15 +425,15 @@ Réclamer votre boite de briques et commencer l’assemblage... </p></div>
         <!-- Bloc1 -->
         <div id="consigne">
 		
-          <h1> <img src="imageqcm/avatar_transparant.png" alt="avatar" width="45" height="45" style="margin-right:8px;"> Consignes:</h1>
-          <p><strong>Lisez les indications avant de commencer l’exercice:</strong></p>
+          <h1> <img src="imageqcm/avatar_transparant.png" alt="avatar" width="45" height="45" style="margin-right:8px;"> Consignes :</h1>
+          <p><strong>Lisez les indications avant de commencer l’exercice :</strong></p>
           <ul>
             <li><strong> Déclenchez le chronomètre</strong> quand vous commencez l’assemblage et <strong>stoppez-le</strong> une fois le modèle terminé.</li>
-			<li><strong> Faite évaluer</strong> ensuite votre modèle.</strong></li>
-            <li>Quand vous avez fini appuyer sur <strong>Valider</strong> pour continuer.</li>
+			<li><strong> Faites évaluer</strong> ensuite votre modèle.</strong></li>
+            <li>Quand vous avez fini, appuyez sur <strong>Valider</strong> pour continuer.</li>
           </ul>
         
- <div><p><img src="imageqcm/brique.JPG" alt="img_brique.jpg" width="480" height="370" style=" margin: auto; display: block;"></div></div>
+ <div><p><img src="imageqcm/brique.jpg" alt="img_brique.jpg" width="480" height="370" style=" margin: auto; display: block;"></div></div>
         <!-- Partie Autoévaluation (cachée au début) -->
         <div id="autoEvalPart">
 	  <!-- Bloc2-->
@@ -445,13 +446,13 @@ Réclamer votre boite de briques et commencer l’assemblage... </p></div>
   
 </div>
 
-        <h2>Votre ressenti?</h2>
+        <h2>Votre ressenti ?</h2>
         <p><strong>Cochez les affirmations qui correspondent le mieux à votre expérience pendant cette activité.</strong></p>
 
         <form id="autoEvalForm">
           <div class="fr-checkbox-group">
             <input type="checkbox" id="ease_br" name="auto" value="ease_br">
-            <label class="fr-label" for="ease_br">Je me suis senti(e) à l’aise dans l'exercices proposés.</label>
+            <label class="fr-label" for="ease_br">Je me suis senti(e) à l’aise dans l’exercice proposé.</label>
           </div>
 
           <div class="fr-checkbox-group">
@@ -461,12 +462,12 @@ Réclamer votre boite de briques et commencer l’assemblage... </p></div>
 
           <div class="fr-checkbox-group">
             <input type="checkbox" id="progress_br" name="auto" value="progress_br">
-            <label class="fr-label" for="progress_br">J'ai pu progressé dans mon assemblage.</label>
+            <label class="fr-label" for="progress_br">J’ai pu progresser dans mon assemblage.</label>
           </div>
 
           <div class="fr-checkbox-group">
             <input type="checkbox" id="motivation_br" name="auto" value="motivation_br">
-            <label class="fr-label" for="motivation_br">j'ai été fatigué(e) par cette exercice.</label>
+            <label class="fr-label" for="motivation_br">J’ai été fatigué(e) par cet exercice.</label>
           </div>
 
           <div class="fr-checkbox-group">
@@ -478,7 +479,7 @@ Réclamer votre boite de briques et commencer l’assemblage... </p></div>
           <textarea id="autoComment" rows="8" placeholder="Écrivez ici votre remarque libre..."></textarea>
 		  <div class="valid">
 		  <button type="button" id="autoEvalBtn">Valider mon autoévaluation</button>
-		  <!--button data-historical-target="tri_de_cheville.html"> Suivant -> </button-->
+		  <!--button data-seb-handler-click="brique-001"> Suivant -> </button-->
 		  </div>
         </form>
         </div> <!-- fin autoEvalPart -->
@@ -502,13 +503,13 @@ Réclamer votre boite de briques et commencer l’assemblage... </p></div>
 		<div style="padding-bottom: 6px;" >
 		<!-- À placer dans la carte chrono, après les autres inputs -->
 		<div style="padding: 10px;">
-          <label for="temps" ><strong>Temps passé sur le modèle: :</strong></label>
+          <label for="temps" ><strong>Temps passé sur le modèle :</strong></label>
           <input id="temps" type="text" readonly style="width: 80px;">
 		  </div>
         <!----------------------------------------------------------->
         </div>
 		  <div style="padding: 10px;">
-		  <span><label for="nivDiff"><strong>Nombre d'érreur(s) :   </strong></label></span><input id="nivDiff" style='width:40px'  type="number" min="0" max="10">
+		  <span><label for="nivDiff"><strong>Nombre d’erreur(s) :   </strong></label></span><input id="nivDiff" style='width:40px'  type="number" min="0" max="10">
 		  
 		  </br>
 		  </div>
@@ -531,5 +532,22 @@ Réclamer votre boite de briques et commencer l’assemblage... </p></div>
   <script src="js/seb-parcours.js"></script>
 <script src="js/brique-page.js"></script>
 
+
+
+<script src="js/brique-runtime.js"></script><script src="js/seb-in-app-alert.js" id="seb-evalpro-in-app-alert-script"></script>
+<script src="js/seb-page-draft-resume.js" id="seb-evalpro-page-draft-resume"></script>
+<script src="js/seb-visual-branding.js" id="seb-evalpro-visual-branding"></script>
+
+<script id="seb-ui-runtime-loader" src="js/seb-ui-runtime.js"></script>
+
+<style id="seb-brique-compact95">
+.wrapper{max-width:none!important;width:100%!important;padding:8px 12px!important;gap:8px!important;}
+.header{padding:8px 14px!important;}
+.main{gap:8px!important;}
+#left,#right{padding:8px!important;gap:8px!important;}
+#seb-evalpro-abandon-fixed{position:static!important;left:auto!important;right:auto!important;top:auto!important;bottom:auto!important;margin:8px auto 0!important;align-self:center!important;min-width:220px!important;}
+</style>
+<script src="js/brique-runtime-tail.js"></script>
+<script src="js/brique-events.js"></script>
 </body>
 </html>

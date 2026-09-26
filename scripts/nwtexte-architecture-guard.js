@@ -18,8 +18,8 @@ const page = read('app/web/js/nwtexte-page.js');
 const save = read('app/web/js/nwtexte-save-simulation.js');
 const dialogs = read('app/web/js/nwtexte-closed-dialogs.js');
 const parcours = read('app/web/js/seb-parcours.js');
-const result = read('app/web/qcmv1.0.html');
-const bilan = read('app/web/admin-bilan.html');
+const result = read('app/web/qcmv1.0.html') + '\n' + read('app/web/js/qcm-runtime.js') + '\n' + read('app/web/js/qcm-runtime-ui.js') + '\n' + read('app/web/js/qcm-runtime-tail.js');
+const bilan = read('app/web/admin-bilan.html') + '\n' + read('app/web/js/admin-bilan-runtime.js') + '\n' + read('app/web/js/admin-bilan-runtime-tail.js');
 
 const protectedText = [
   'Scénario :',

@@ -15,7 +15,7 @@ function read(rel) {
 const html = read('app/web/autoeval2.html');
 const page = read('app/web/js/autoeval2-page.js');
 const parcours = read('app/web/js/seb-parcours.js');
-const qcm = read('app/web/qcmv1.0.html');
+const qcm = read('app/web/qcmv1.0.html') + '\n' + read('app/web/js/qcm-runtime.js') + '\n' + read('app/web/js/qcm-runtime-ui.js') + '\n' + read('app/web/js/qcm-runtime-tail.js');
 
 const protectedText = [
   'Autoévaluation personnelle',

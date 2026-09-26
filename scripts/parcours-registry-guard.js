@@ -69,7 +69,7 @@ if (!mail || mail.storage !== 'page8_data' || mail.scoreKey !== 'score_total') {
 }
 
 // Vérification directe de la page Résultats générée.
-const qcm = read('app/web/qcmv1.0.html');
+const qcm = read('app/web/qcmv1.0.html') + '\n' + read('app/web/js/qcm-runtime.js') + '\n' + read('app/web/js/qcm-runtime-ui.js') + '\n' + read('app/web/js/qcm-runtime-tail.js');
 for (const token of [
   "if (reponses['page7_analyse'])",
   "scores['page7']",

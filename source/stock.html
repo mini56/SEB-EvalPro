@@ -364,11 +364,12 @@ ul.puce li::before {
             transform: scale(0.98);
         }
     </style>
+<link rel="stylesheet" href="css/seb-in-app-alert.css" id="seb-evalpro-in-app-alert-css">
 </head>
 <body>
     <div class="container">
 	<div>
-        <p><img class="imageqcm/scenario.png" src="imageqcm/scenario.png" alt="scenario.png" width="45" height="45" style="margin-right:8px;"><strong style="color:#1a73e8;">Scénario:</strong>
+        <p><img class="imageqcm/scenario.png" src="imageqcm/scenario.png" alt="scenario.png" width="45" height="45" style="margin-right:8px;"><strong style="color:#1a73e8;">Scénario :</strong>
 		<span>  </span>
 		<strong>Vous êtes chargé de mettre de l'ordre dans le stock des divers produits de l'entreprise. À vous de ranger, suivant les critères,
 		les produits à leur bonne place.</strong></p>
@@ -376,12 +377,12 @@ ul.puce li::before {
 	
         <div class="info-panel">
 		 
-		 <p style="margin-left:10px;">Ranger les flacons , un par emplacement, selon les consignes suivantes:</p>
+		 <p style="margin-left:10px;">Rangez les flacons, un par emplacement, selon les consignes suivantes :</p>
 		 </br>
-		 <p><strong style="color:#1a73e8;">Consignes:</strong></p>
+		 <p><strong style="color:#1a73e8;">Consignes :</strong></p>
 		 
          <p class="puce" style="margin-left:20px;">Sur chaque étagère, les flacons seront placés en ordre alphabétique puis, le cas échéant, selon le dosage en ordre décroissant.</p>
-	     <p class="puce" style="margin-left:20px;">Les flacons en double ou ne convenant pas aux casiers 1 et 2 seront palcés en 3, selon les mémé critères.</p>
+	     <p class="puce" style="margin-left:20px;">Les flacons en double ou ne convenant pas aux casiers 1 et 2 seront placés dans le casier 3, selon les mêmes critères.</p>
          <div style="display:flex; align-items:center; margin-bottom:10px;">
           <img src="imageqcm/avatar_transparant.png" alt="avatar" width="45" height="45" style="margin-right:8px;">
           <p><strong style="color:#1a73e8;">Comment ça fonctionne ?</strong> Glissez-déposez les pots dans les bonnes étagères selon les règles affichées. Vous disposez d'une zone de tri pour vous aider si vous en avez besoin.</p>
@@ -407,7 +408,7 @@ ul.puce li::before {
                 <div class="row-etageres">
                     <!-- Étagère 1 -->
                     <div class="etagere">
-                        <div class="pancarte">Casier1️⃣  Ranger ici les flacons de A à K, sauf E et G</div>
+                        <div class="pancarte">Casier 1️⃣  Ranger ici les flacons de A à K, sauf E et G</div>
                         <div class="etagere-content">
                             <div class="niveau" data-etagere="1" data-niveau="3">
                                 <div class="niveau-label">26% et moins</div>
@@ -441,7 +442,7 @@ ul.puce li::before {
 
                     <!-- Étagère 2 -->
                     <div class="etagere">
-                        <div class="pancarte">Casier2️⃣  Ranger ici les flacons de L à U, sauf M, O, P</div>
+                        <div class="pancarte">Casier 2️⃣  Ranger ici les flacons de L à U, sauf M, O, P</div>
                         <div class="etagere-content">
                             <div class="niveau" data-etagere="2" data-niveau="3">
                                 <div class="niveau-label">29% et moins</div>
@@ -476,7 +477,7 @@ ul.puce li::before {
 
                 <!-- Étagère Large -->
                 <div class="etagere etagere-large">
-                    <div class="pancarte">Casier3️⃣  Ranger ici les flacons en double ou ne convenant pas aux étagères 1 et 2</div>
+                    <div class="pancarte">Casier 3️⃣  Ranger ici les flacons en double ou ne convenant pas aux étagères 1 et 2</div>
                     <div class="niveau-large" data-etagere="3" data-niveau="1">
                         <div class="case" data-case="1"></div>
                         <div class="case" data-case="2"></div>
@@ -497,5 +498,10 @@ ul.puce li::before {
 
     <script src="js/seb-parcours.js"></script>
     <script src="js/stock-page.js"></script>
+<script src="js/seb-in-app-alert.js" id="seb-evalpro-in-app-alert-script"></script>
+<script src="js/seb-page-draft-resume.js" id="seb-evalpro-page-draft-resume"></script>
+<script src="js/seb-visual-branding.js" id="seb-evalpro-visual-branding"></script>
+
+<script id="seb-ui-runtime-loader" src="js/seb-ui-runtime.js"></script>
 </body>
 </html>

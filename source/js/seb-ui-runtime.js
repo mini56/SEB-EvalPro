@@ -58,6 +58,7 @@
   };
 
   const QCM_EXCLUDED = new Set(['page0', 'pageFinale', 'bilanPage']);
+  const QCM_EXERCISE_IDS = new Set(['page2','page2_1','page3','page4','page5','page5_1','page6','pageTexteTrous','page8']);
   let mutationScheduled = false;
 
   function pageName() {
@@ -161,7 +162,8 @@
   function skipButton(button) {
     return !!button.closest(
       '#toolbar,.toolbar-row2,.ql-toolbar,#calc-container,#seb-evalpro-topbar,' +
-      '#seb-evalpro-admin-dialog,#seb-evalpro-session-close-dialog,#seb-evalpro-abandon-layer'
+      '#seb-evalpro-admin-dialog,#seb-evalpro-session-close-dialog,#seb-evalpro-abandon-layer,' +
+      '#page4 .fraction-title,#page4 .items-wrapper'
     );
   }
 
@@ -237,11 +239,19 @@
     const file = pageName();
     if (file === 'qcmv1.0.html') {
       const scope = visibleQcmPage();
-      if (!scope || !scope.id || QCM_EXCLUDED.has(scope.id)) return null;
+      if (!scope || !scope.id || !QCM_EXERCISE_IDS.has(scope.id)) return null;
       const label = QCM_LABELS[scope.id] || headingLabel(scope, 'QCM — ' + scope.id);
       return { file, qcmPage: scope.id, scope, label, key: file + '#' + scope.id };
     }
     if (!EXERCISE_FILES.has(file)) return null;
+    if (file === 'brique.html' || file === 'tri_de_cheville.html') {
+      const auto = document.getElementById('autoEvalPart');
+      if (auto) {
+        let visible = auto.classList.contains('visible');
+        try { visible = visible || window.getComputedStyle(auto).display !== 'none'; } catch (_) {}
+        if (visible) return null;
+      }
+    }
     return {
       file,
       qcmPage: '',
@@ -255,7 +265,7 @@
     const file = pageName();
     if (file === 'qcmv1.0.html') {
       document.querySelectorAll('.page').forEach((scope) => {
-        if (!scope.id || QCM_EXCLUDED.has(scope.id)) return;
+        if (!scope.id || !QCM_EXERCISE_IDS.has(scope.id)) return;
         scope.querySelectorAll('button').forEach((button) => {
           if (!isPassButton(button)) return;
           button.dataset.sebLegacyPasser = '1';
@@ -272,6 +282,52 @@
       button.hidden = true;
       button.style.setProperty('display', 'none', 'important');
     });
+  }
+
+
+  function autoEvalHasResponse(form) {
+    if (!form) return false;
+    const checked = form.querySelector('input[type="checkbox"]:checked');
+    const text = Array.from(form.querySelectorAll('textarea,input[type="text"]')).some((el) => String(el.value || '').trim() !== '');
+    return !!checked || text;
+  }
+
+  function protectAutoEvaluations() {
+    const form = document.getElementById('autoEvalForm');
+    if (!form) return;
+    const file = pageName();
+    const standalone = file === 'autoeval1.html' || file === 'autoeval2.html';
+    document.querySelectorAll('button').forEach((button) => {
+      if (skipButton(button)) return;
+      const inAuto = standalone || !!button.closest('#autoEvalPart');
+      if (!inAuto) return;
+      const label = stripActionIcon(button.textContent).toLowerCase();
+      if (/^(passer|passez|étape suivante|etape suivante|page suivante|suivant)\b/.test(label)) {
+        button.hidden = true;
+        button.style.setProperty('display', 'none', 'important');
+      }
+    });
+
+    if (document.documentElement.dataset.sebAutoEvalGuard === '1') return;
+    document.documentElement.dataset.sebAutoEvalGuard = '1';
+    document.addEventListener('click', function (event) {
+      const button = event.target && event.target.closest ? event.target.closest('button') : null;
+      if (!button) return;
+      const currentForm = document.getElementById('autoEvalForm');
+      if (!currentForm) return;
+      const currentFile = pageName();
+      const inStandalone = currentFile === 'autoeval1.html' || currentFile === 'autoeval2.html';
+      const inIntegrated = !!button.closest('#autoEvalPart');
+      if (!inStandalone && !inIntegrated) return;
+      const label = stripActionIcon(button.textContent).toLowerCase();
+      const validatesAuto = button.id === 'autoEvalBtn' || (/valider/.test(label) && /autoévaluation|autoevaluation/.test(label));
+      if (!validatesAuto) return;
+      if (autoEvalHasResponse(currentForm)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.stopImmediatePropagation) event.stopImmediatePropagation();
+      window.alert('Merci de compléter cette autoévaluation avant de continuer : cochez au moins une proposition ou saisissez un commentaire.');
+    }, true);
   }
 
   function readAbandons() {
@@ -468,8 +524,13 @@
   function refreshAbandonButton() {
     const button = ensureAbandonButton();
     const context = currentExerciseContext();
-    button.style.display = context ? 'inline-flex' : 'none';
-    if (context) button.title = 'Abandonner : ' + context.label;
+    if (context) {
+      button.style.setProperty('display', 'inline-flex', 'important');
+      button.title = 'Abandonner : ' + context.label;
+    } else {
+      button.style.setProperty('display', 'none', 'important');
+      button.title = '';
+    }
   }
 
   function renderAdminAbandons() {
@@ -522,6 +583,7 @@
     ensureStyles();
     normalizeButtons(document);
     hideLegacyPassButtons();
+    protectAutoEvaluations();
     refreshAbandonButton();
     renderAdminAbandons();
   }
@@ -542,5 +604,214 @@
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true });
+  else init();
+})();
+
+
+// SEB_EXERCISE_NAVIGATION_GUARD98
+(function(){
+  'use strict';
+
+  const TRUE_FILES = new Set([
+    'brique.html','stock.html','planning.html','genrenombres.html',
+    'tri_de_cheville.html','nwtexte.html','nvmail.html','paronymes.html','carre.html'
+  ]);
+  const QCM_IDS = new Set(['page2','page2_1','page3','page4','page5','page5_1','page6','pageTexteTrous','page8']);
+  let scheduled = false;
+
+  function fileName(){
+    try { return decodeURIComponent((window.location.pathname.split('/').pop() || '').toLowerCase()); }
+    catch (_) { return ''; }
+  }
+
+  function clean(value){
+    return String(value || '')
+      .replace(/\s+/g, ' ')
+      .replace(/^(?:➡️|➡|➜|→|←|✓|✔|▶️|▶|⏹️|⏹|■|📊|🧮|💾|✉️|✉)\s*/u, '')
+      .replace(/\s*(?:->|→|➜)\s*$/u, '')
+      .trim();
+  }
+
+  function visibleQcmExercise(){
+    const page = Array.from(document.querySelectorAll('.page')).find(function(node){ return node.classList.contains('visible'); });
+    return page && QCM_IDS.has(page.id) ? page : null;
+  }
+
+  function context(){
+    const file = fileName();
+    if (file === 'qcmv1.0.html') {
+      const scope = visibleQcmExercise();
+      return scope ? { file:file, scope:scope, key:file + '#' + scope.id } : null;
+    }
+    if (!TRUE_FILES.has(file)) return null;
+    return { file:file, scope:document.body, key:file };
+  }
+
+  function activityKey(ctx){ return 'seb_exercise_activity:' + ctx.key; }
+  function hasActivityFlag(ctx){ return sessionStorage.getItem(activityKey(ctx)) === '1'; }
+  function setActivity(ctx){
+    if (!ctx) return;
+    sessionStorage.setItem(activityKey(ctx), '1');
+  }
+
+  function hasMeaningfulValues(scope){
+    if (!scope || !scope.querySelectorAll) return false;
+    if (scope.querySelector('input[type="checkbox"]:checked,input[type="radio"]:checked,.item.selected,[aria-pressed="true"]')) return true;
+
+    const fields = Array.from(scope.querySelectorAll('input,textarea,select'));
+    for (const field of fields) {
+      const type = String(field.type || '').toLowerCase();
+      if (['hidden','button','submit','reset','file','checkbox','radio'].includes(type)) continue;
+      if (field.tagName === 'SELECT') {
+        const value = String(field.value == null ? '' : field.value).trim();
+        if (field.selectedIndex > 0 && value !== '' && value !== '_') return true;
+        continue;
+      }
+      if (String(field.value == null ? '' : field.value).trim() !== '') return true;
+    }
+
+    const editable = Array.from(scope.querySelectorAll('[contenteditable="true"],.ql-editor'));
+    if (editable.some(function(node){
+      const text = String(node.innerText || node.textContent || '').replace(/\u200B/g, '').trim();
+      return text !== '' || !!node.querySelector('img');
+    })) return true;
+
+    const file = fileName();
+    if (file === 'stock.html' && scope.querySelector('.case .pot,#zone-tri .pot,.etagere .pot')) return true;
+    return false;
+  }
+
+  function storageExists(key){ return sessionStorage.getItem(key) !== null; }
+
+  function ready(ctx){
+    if (!ctx) return true;
+
+    if (!hasActivityFlag(ctx) && hasMeaningfulValues(ctx.scope)) setActivity(ctx);
+    const activity = hasActivityFlag(ctx);
+
+    if (ctx.file === 'tri_de_cheville.html') {
+      if (typeof window.sebEvalProTriNavigationReady === 'function') return !!window.sebEvalProTriNavigationReady();
+      return sessionStorage.getItem('seb_tri_navigation_ready') === '1';
+    }
+    if (ctx.file === 'brique.html') return activity && storageExists('eval_brique') && storageExists('eval_brique_auto');
+    if (ctx.file === 'stock.html') return activity && storageExists('stockTotal');
+    if (ctx.file === 'planning.html') return activity && storageExists('planningScore');
+    if (ctx.file === 'genrenombres.html') return activity && storageExists('erreurs_exercice');
+    if (ctx.file === 'nvmail.html') return activity && storageExists('page8_data');
+    if (ctx.file === 'paronymes.html') return activity && storageExists('paronymes_score');
+    if (ctx.file === 'carre.html') return activity && storageExists('carre_magique_score');
+    if (ctx.file === 'nwtexte.html') return activity;
+
+    // Pages d'exercices QCM : le bouton Suivant n'est pas disponible tant
+    // qu'aucune réponse / sélection n'a été effectuée sur la page visible.
+    if (ctx.file === 'qcmv1.0.html') return activity;
+    return activity;
+  }
+
+  function isNavigationButton(button){
+    if (!button || button.id === 'seb-evalpro-abandon-fixed') return false;
+    if (button.closest('#seb-evalpro-topbar,#seb-evalpro-admin-dialog,#seb-evalpro-session-close-dialog,#seb-evalpro-abandon-layer')) return false;
+    const label = clean(button.textContent).toLowerCase();
+    return /^(suivant|page suivante|étape suivante|etape suivante|continuer)\b/.test(label);
+  }
+
+  function belongsToContext(button, ctx){
+    if (!ctx) return false;
+    if (ctx.file === 'qcmv1.0.html') return ctx.scope.contains(button);
+    return document.body.contains(button);
+  }
+
+  function ensureStyle(){
+    if (document.getElementById('seb-exercise-navigation-guard-style')) return;
+    const style = document.createElement('style');
+    style.id = 'seb-exercise-navigation-guard-style';
+    style.textContent = 'button.seb-exercise-nav-locked{display:none!important}';
+    (document.head || document.documentElement).appendChild(style);
+  }
+
+  function enforce(){
+    scheduled = false;
+    ensureStyle();
+    const ctx = context();
+    if (!ctx) {
+      document.querySelectorAll('.seb-exercise-nav-locked').forEach(function(button){ button.classList.remove('seb-exercise-nav-locked'); });
+      return;
+    }
+    const unlocked = ready(ctx);
+    document.querySelectorAll('button').forEach(function(button){
+      if (!isNavigationButton(button) || !belongsToContext(button, ctx)) return;
+      button.classList.toggle('seb-exercise-nav-locked', !unlocked);
+      button.setAttribute('aria-hidden', unlocked ? 'false' : 'true');
+      if (!unlocked) button.tabIndex = -1;
+      else if (button.tabIndex < 0) button.removeAttribute('tabindex');
+    });
+  }
+
+  function schedule(){
+    if (scheduled) return;
+    scheduled = true;
+    requestAnimationFrame(enforce);
+  }
+
+  function markFromEvent(event){
+    const ctx = context();
+    if (!ctx) return;
+    const target = event.target;
+    if (!target || (ctx.file === 'qcmv1.0.html' && !ctx.scope.contains(target))) return;
+
+    if (event.type === 'input' || event.type === 'change' || event.type === 'drop' || event.type === 'dragstart') {
+      setActivity(ctx);
+      schedule();
+      return;
+    }
+
+    if (event.type === 'click') {
+      const interactive = target.closest && target.closest('.item,[aria-pressed],td:not(.paronyme),.pot,.case,[contenteditable="true"],.fake-file-input');
+      if (interactive) {
+        setActivity(ctx);
+        schedule();
+        return;
+      }
+      const button = target.closest && target.closest('button');
+      if (button) {
+        const label = clean(button.textContent).toLowerCase();
+        if (/^(démarrer|demarrer)\b/.test(label)) {
+          setActivity(ctx);
+          schedule();
+        }
+      }
+    }
+  }
+
+  document.addEventListener('click', function(event){
+    const button = event.target && event.target.closest ? event.target.closest('button') : null;
+    if (!button || !isNavigationButton(button)) return;
+    const ctx = context();
+    if (!ctx || !belongsToContext(button, ctx) || ready(ctx)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.stopImmediatePropagation) event.stopImmediatePropagation();
+    window.alert(ctx.file === 'tri_de_cheville.html'
+      ? 'Terminez au moins 3 tris puis validez l’autoévaluation avant de passer à l’étape suivante.'
+      : 'Vous devez réaliser l’exercice avant de passer à l’étape suivante. Si vous souhaitez arrêter cet exercice, utilisez « Abandonner l’exercice ».');
+  }, true);
+
+  ['input','change','click','drop','dragstart'].forEach(function(type){
+    document.addEventListener(type, markFromEvent, true);
+  });
+
+  function init(){
+    ensureStyle();
+    enforce();
+    new MutationObserver(schedule).observe(document.body, {
+      childList:true,
+      subtree:true,
+      characterData:true,
+      attributes:true,
+      attributeFilter:['class','style','hidden','aria-pressed']
+    });
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once:true });
   else init();
 })();

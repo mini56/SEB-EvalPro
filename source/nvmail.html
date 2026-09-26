@@ -237,6 +237,44 @@ html, body {
 
   </style>
   
+<link rel="stylesheet" href="css/seb-in-app-alert.css" id="seb-evalpro-in-app-alert-css">
+
+<style id="seb-nvmail-abandon-layout-fix">
+#seb-evalpro-abandon-box label.seb-abandon-choice {
+  display:grid !important;
+  grid-template-columns:20px minmax(0,1fr) !important;
+  align-items:start !important;
+  column-gap:12px !important;
+  width:100% !important;
+  margin:0 !important;
+  padding:8px 4px !important;
+  box-sizing:border-box !important;
+}
+#seb-evalpro-abandon-box label.seb-abandon-choice input[type="checkbox"] {
+  width:16px !important;
+  min-width:16px !important;
+  max-width:16px !important;
+  height:16px !important;
+  min-height:16px !important;
+  padding:0 !important;
+  margin:2px 0 0 0 !important;
+  display:block !important;
+  box-sizing:border-box !important;
+}
+#seb-evalpro-abandon-box label.seb-abandon-choice span {
+  display:block !important;
+  width:auto !important;
+  margin:0 !important;
+  padding:0 !important;
+  text-align:left !important;
+  line-height:1.35 !important;
+}
+#seb-evalpro-abandon-comment {
+  width:100% !important;
+  max-width:100% !important;
+  box-sizing:border-box !important;
+}
+</style>
 </head>
 <body>
 <div id="page8" class="page">
@@ -244,7 +282,7 @@ html, body {
   <!-- Colonne gauche -->
   <div id="left">
     <br>
-	<p><img src="imageqcm/scenario.PNG" alt="scenario" width="45" height="45" style="margin-right:8px;"><strong style="color:#1a73e8;">Scénario :</strong></p>
+	<p><img src="imageqcm/scenario.png" alt="scenario" width="45" height="45" style="margin-right:8px;"><strong style="color:#1a73e8;">Scénario :</strong></p>
 	<p> Votre conseiller vous contacte par e-mail pour vous prévenir que votre rendez-vous est déplacé.
 	Il vous demande de lui envoyer votre rapport de stage en entreprise.</p><p> Vous devez répondre à son e-mail. Envoyez votre message sur <strong>les adresses e-mail
 	</strong> suivantes :</p>
@@ -255,7 +293,7 @@ html, body {
 	<br>
 	<p>Dans l'éditeur, mettre en forme votre texte en respectant les consignes ci-dessous.</p>
 	 <div style="display:flex; align-items:center; margin-bottom:10px;">
-      <img src="imageqcm/avatar_transparant.PNG" alt="avatar" width="45" height="45" style="margin-right:8px;">
+      <img src="imageqcm/avatar_transparant.png" alt="avatar" width="45" height="45" style="margin-right:8px;">
       <p><strong style="color:#1a73e8;">Consigne :</strong></p>
 	  </div>
 	  <p>Mettez en objet : <strong>Prénom Mail-SEB</strong></p>
@@ -320,5 +358,10 @@ html, body {
 <script src="js/nvmail-page.js"></script>
 
 
+<script src="js/seb-in-app-alert.js" id="seb-evalpro-in-app-alert-script"></script>
+<script src="js/seb-page-draft-resume.js" id="seb-evalpro-page-draft-resume"></script>
+<script src="js/seb-visual-branding.js" id="seb-evalpro-visual-branding"></script>
+
+<script id="seb-ui-runtime-loader" src="js/seb-ui-runtime.js"></script>
 </body>
 </html>

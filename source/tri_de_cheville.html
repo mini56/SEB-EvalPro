@@ -347,6 +347,7 @@ href='data:image/svg+xml;utf8,
   <rect x="42" y="74" width="12" height="12" rx="2" fill="%23F9B233"/>
   <rect x="62" y="74" width="12" height="12" rx="2" fill="%23F9B233"/>
 </svg>'>
+<link rel="stylesheet" href="css/seb-in-app-alert.css" id="seb-evalpro-in-app-alert-css">
 </head>
 
 <body>
@@ -354,15 +355,12 @@ href='data:image/svg+xml;utf8,
     <div class="header">
       <div class="title-row">
         <h1>
-          Le tri de chevillles
+          Le tri de chevilles
         </h1>
         <!--img class="icon-svg" src="imageqcm/avatar_transparant.png" alt="Avatar décoratif"-->
       </div>
-      <div><p><img src="imageqcm/scenario.png" alt="scenario.png" width="65" height="65" style="margin-right:8px; float : left ;"><strong style="color:#1a73e8;">Scénario:</strong>
-Une mauvaise manipulation a provoqué la chute d’une caisse entière de chevilles au chargement du camion, semant le désordre, 
-tout est mélangé. Un client important attend sa commande en urgence, et la production est à l’arrêt.Toute l’équipe est mobilisée pour remettre de l’ordre,
- trier les boites chevilles par couleurs et permettre à la livraison d’être honorée dans les temps.
-Chacun des employés doit trier de trois à cinq boîtes de chevilles, selon le temps disponible, et noter les temps passés.</p></div>
+      <div><p><img src="imageqcm/scenario.png" alt="scenario.png" width="65" height="65" style="margin-right:8px; float : left ;"><strong style="color:#1a73e8;">Scénario :</strong>
+Une mauvaise manipulation a provoqué la chute d’une caisse entière de chevilles au chargement du camion, semant le désordre, tout est mélangé. Un client important attend sa commande en urgence, et la production est à l’arrêt. Toute l’équipe est mobilisée pour remettre de l’ordre, trier les boîtes de chevilles par couleurs et permettre à la livraison d’être honorée dans les temps. Chacun des employés doit trier de trois à cinq boîtes de chevilles, selon le temps disponible, et noter les temps passés.</p></div>
     </div>
 
     <div class="main">
@@ -371,8 +369,8 @@ Chacun des employés doit trier de trois à cinq boîtes de chevilles, selon le 
         <!-- Bloc1 -->
         <div id="consigne">
 		
-          <h1> <img src="imageqcm/avatar_transparant.png" alt="avatar" width="45" height="45" style="margin-right:8px;"> Consignes:</h1>
-          <p><strong>Lisez les indications avant de commencer l’exercice:</strong></p>
+          <h1> <img src="imageqcm/avatar_transparant.png" alt="avatar" width="45" height="45" style="margin-right:8px;"> Consignes :</h1>
+          <p><strong>Lisez les indications avant de commencer l’exercice :</strong></p>
           <ul>
             <li>Pour chaque boîte de chevilles, cliquez sur <strong>Démarrer le chronomètre</strong> au moment où vous commencez le tri.</li>
             <li>Lorsque le tri est terminé, cliquez sur <strong>Arrêter le chronomètre</strong>. Le temps est automatiquement reporté dans les cases Minutes et Secondes.</li>
@@ -382,7 +380,7 @@ Chacun des employés doit trier de trois à cinq boîtes de chevilles, selon le 
             <li>À partir de 3 tris complets, cliquez sur <strong>Voir les résultats</strong> pour afficher votre moyenne, le nombre total d’erreurs et compléter votre autoévaluation personnelle.</li>
           </ul>
         
- <div><p><img src="imageqcm/chariot.PNG" alt="img_chariot" width="480" height="370" style=" margin: auto; display: block;"></div></div>
+ <div><p><img src="imageqcm/chariot.png" alt="img_chariot" width="480" height="370" style=" margin: auto; display: block;"></div></div>
         <!-- Partie Autoévaluation (cachée au début) -->
         <div id="autoEvalPart">
 	  <!-- Bloc2-->
@@ -393,11 +391,11 @@ Chacun des employés doit trier de trois à cinq boîtes de chevilles, selon le 
   </h1>
   <p>À cette étape, évaluez votre ressenti et votre progression.</p>
   <ul>
-    <li>Vous passerrez ensuite à l'étape suivante.</li>
+    <li>Vous passerez ensuite à l'étape suivante.</li>
   </ul>
 </div>
 
-        <h2>Votre ressenti:</h2>
+        <h2>Votre ressenti :</h2>
         <p>Cochez les affirmations qui correspondent le mieux à votre expérience pendant cette activité.</p>
 
         <form id="autoEvalForm">
@@ -480,5 +478,19 @@ Chacun des employés doit trier de trois à cinq boîtes de chevilles, selon le 
   </div>
 <script src="js/seb-parcours.js"></script>
 <script src="js/tri-page.js"></script>
+<script src="js/seb-in-app-alert.js" id="seb-evalpro-in-app-alert-script"></script>
+<script src="js/seb-page-draft-resume.js" id="seb-evalpro-page-draft-resume"></script>
+<script src="js/seb-visual-branding.js" id="seb-evalpro-visual-branding"></script>
+
+<script id="seb-ui-runtime-loader" src="js/seb-ui-runtime.js"></script>
+
+<style id="seb-tri-compact95">
+.wrapper{max-width:none!important;width:100%!important;padding:8px 12px!important;gap:8px!important;}
+.header{padding:8px 14px!important;}
+.main{gap:8px!important;}
+#left,#right{padding:8px!important;gap:8px!important;}
+#seb-evalpro-abandon-fixed{position:static!important;left:auto!important;right:auto!important;top:auto!important;bottom:auto!important;margin:8px auto 0!important;align-self:center!important;min-width:220px!important;}
+</style>
+<script src="js/tri-runtime-tail.js"></script>
 </body>
 </html>

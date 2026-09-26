@@ -141,25 +141,26 @@
       text-align: center;
     }
   </style>
+<link rel="stylesheet" href="css/seb-in-app-alert.css" id="seb-evalpro-in-app-alert-css">
 </head>
 
 <body>
-<button data-seb-bilan-action="autofill-bilan" 
+<button data-seb-handler-click="bilan-001" 
         style="padding:15px 25px; background:#1a73e8; color:white;">
     TEST autoRemplirBilan
 </button>
-<button data-seb-bilan-action="verify-data" 
+<button data-seb-handler-click="bilan-002" 
         style="padding:10px 20px; background:#444; color:white; border:none; border-radius:6px; margin-bottom:15px;">
     Vérifier les données récupérées
 </button>
 
 
-<button data-seb-bilan-action="test-alert" 
+<button data-seb-handler-click="bilan-003" 
         style="padding:15px 25px; background:red; color:white; font-size:20px; z-index:9999; position:relative;">
     TEST BOUTON
 </button>
 
-<button data-seb-bilan-action="autofill-bilan" 
+<button data-seb-handler-click="bilan-004" 
         style="padding:10px 20px; margin:10px 0; background:#1a73e8; color:white; border:none; border-radius:6px;">
     Compléter automatiquement le bilan
 </button>
@@ -205,7 +206,7 @@
               <option value="">Choisissez un élément.</option>
               <option value="Non évalué.">Non évalué.</option>
               <option value="I. La personne n'a pas besoin d'aide pour commencer l'exercice.">I. La personne n'a pas besoin d'aide pour commencer l'exercice.</option>
-              <option value="II. A besoin de consignes supplémentaires pour commercer l'exercice.">II. A besoin de consignes supplémentaires pour commercer l'exercice.</option>
+              <option value="II. A besoin de consignes supplémentaires pour commencer l'exercice.">II. A besoin de consignes supplémentaires pour commencer l'exercice.</option>
               <option value="III. A besoin qu'on lui montre un exemple ou d'utiliser un gabarit pour commencer l'exercice.">III. A besoin qu'on lui montre un exemple ou d'utiliser un gabarit pour commencer l'exercice.</option>
             </select>
             <p></p>
@@ -351,7 +352,7 @@
               <option value="">Choisissez un élément.</option>
               <option value="Non évalué.">Non évalué.</option>
               <option value="I. Assemble les pièces sans difficultés.">I. Assemble les pièces sans difficultés.</option>
-              <option value="II. Reconnait les pièces mais les assemble avec difficulté.">II. Reconnait les pièces mais les assemble avec difficulté.</option>
+              <option value="II. Reconnaît les pièces mais les assemble avec difficulté.">II. Reconnaît les pièces mais les assemble avec difficulté.</option>
               <option value="III. Ne présente pas la pièce dans sa bonne position ce qui rend long voire impossible l'assemblage.">III. Ne présente pas la pièce dans sa bonne position ce qui rend long voire impossible l'assemblage.</option>
             </select>
             <p><input type="number" min="0" style="width:50px;padding:2px;margin-right:4px;" placeholder="0"/> erreur(s)</p>
@@ -384,7 +385,7 @@
         <!-- Organisation -->
         <tr class="even-row">
           <td>
-            <p class="item-label">Organisation : "Ranger le stock produit"</p>
+            <p class="item-label">Organisation : "Ranger le stock de produits"</p>
             <p>Capacité à effectuer :</p>
             <p class="item-description">Une tâche d'organisation</p>
           </td>
@@ -684,7 +685,7 @@
     <button id="finalizeBtn" style="background: #28a745; color: #fff; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 12pt;">
       📋 Finaliser l'évaluation
     </button>
-	<button id="exportBtn" data-seb-bilan-action="export-word" style="background: #0070c0; color: #fff; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 12pt; margin-left: 10px;">
+	<button id="exportBtn" data-seb-handler-click="bilan-005" style="background: #0070c0; color: #fff; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 12pt; margin-left: 10px;">
   📄 Exporter vers Word
 </button>
 	 <p style="margin-top: 8px; color: #666; font-size: 10pt;">
@@ -694,11 +695,16 @@
       Finalisez d'abord l'évaluation, puis exportez-la vers Word
     </p>
   </div>
-  <script src="js/bilan-page.js"></script>
+  
 
 
 
   
 
+<script src="js/bilan-page.js"></script><script src="js/seb-in-app-alert.js" id="seb-evalpro-in-app-alert-script"></script>
+<script src="js/seb-visual-branding.js" id="seb-evalpro-visual-branding"></script>
+
+<script id="seb-ui-runtime-loader" src="js/seb-ui-runtime.js"></script>
+<script src="js/bilan-events.js"></script>
 </body>
 </html>

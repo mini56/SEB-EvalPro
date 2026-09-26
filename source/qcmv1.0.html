@@ -470,6 +470,162 @@ pre {
 
 
   </style>
+<link rel="stylesheet" href="css/seb-in-app-alert.css" id="seb-evalpro-in-app-alert-css">
+
+<style id="seb-page2-no-spinner">
+#page2 input[type="number"]::-webkit-inner-spin-button,
+#page2 input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+#page2 input[type="number"] {
+  -webkit-appearance: none;
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+</style>
+
+<style id="seb-calculator-button-style">
+button[data-seb-action="open-calculator"] {
+  background-color: #F9B233;
+  color: #1e293b;
+  border: none;
+  padding: 12px 25px;
+  font-size: 18px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+button[data-seb-action="open-calculator"]:hover {
+  background-color: #e9a11f;
+}
+</style>
+
+<style id="seb-floating-calculator-style">
+#calc-container {
+  position: fixed !important;
+  top: auto !important;
+  left: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  width: 258px !important;
+  box-sizing: border-box !important;
+  padding: 0 16px 14px !important;
+  border: 2px solid #d98200 !important;
+  border-radius: 16px !important;
+  background: linear-gradient(145deg, #ffd58a 0%, #f9ad32 52%, #ee9418 100%) !important;
+  box-shadow: 0 14px 32px rgba(74, 47, 10, .30), 0 4px 10px rgba(74, 47, 10, .18) !important;
+  z-index: 3500 !important;
+  user-select: none;
+}
+#calc-container .seb-calc-dragbar {
+  height: 38px;
+  margin: 0 -16px 12px;
+  padding: 0 12px 0 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-radius: 13px 13px 0 0;
+  background: linear-gradient(to bottom, #f7b84b, #e99215);
+  border-bottom: 1px solid rgba(139, 82, 0, .45);
+  color: #5f3800;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: .2px;
+  cursor: grab;
+  touch-action: none;
+  box-shadow: inset 0 1px rgba(255,255,255,.55);
+}
+#calc-container .seb-calc-dragbar:active { cursor: grabbing; }
+#calc-container .seb-calc-grip {
+  font-size: 18px;
+  letter-spacing: 2px;
+  color: rgba(95,56,0,.62);
+}
+#calc-display {
+  box-sizing: border-box !important;
+  width: 222px !important;
+  height: 50px !important;
+  margin: 0 0 12px !important;
+  padding: 8px 10px !important;
+  border: 2px solid #c67a0b !important;
+  border-radius: 9px !important;
+  background: #fff8e9 !important;
+  color: #3d2b11 !important;
+  font: 700 24px/30px Arial, sans-serif !important;
+  box-shadow: inset 0 2px 5px rgba(83,55,17,.16) !important;
+  overflow: hidden;
+}
+#calc-container #keypad { text-align: center; }
+#calc-container .calc-btn {
+  width: 46px !important;
+  height: 42px !important;
+  margin: 4px !important;
+  padding: 0 !important;
+  border: 1px solid #cb7d0d !important;
+  border-radius: 8px !important;
+  background: linear-gradient(to bottom, #fffaf0, #ffe8bf) !important;
+  color: #4f3510 !important;
+  font-size: 17px !important;
+  font-weight: 700 !important;
+  cursor: pointer !important;
+  box-shadow: 0 2px 3px rgba(96,57,4,.16), inset 0 1px #fff !important;
+}
+#calc-container .calc-btn:hover {
+  background: linear-gradient(to bottom, #ffffff, #ffdda0) !important;
+  transform: translateY(-1px);
+}
+#calc-container .calc-btn:active {
+  transform: translateY(1px);
+  box-shadow: inset 0 2px 4px rgba(96,57,4,.20) !important;
+}
+#calc-container .calc-btn-fermez {
+  height: 38px !important;
+  margin-top: 8px !important;
+  padding: 0 18px !important;
+  border: 0 !important;
+  border-radius: 8px !important;
+  background: #b96800 !important;
+  color: #fff !important;
+  font-size: 15px !important;
+  font-weight: 700 !important;
+  cursor: pointer !important;
+  box-shadow: 0 2px 4px rgba(94,50,0,.24) !important;
+}
+#calc-container .calc-btn-fermez:hover { background: #9f5900 !important; }
+#calc-container .seb-calc-brand {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(133,75,0,.28);
+  text-align: center;
+  color: #a45e09;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 1.8px;
+  text-transform: uppercase;
+  text-shadow: 0 1px 0 rgba(255,235,195,.85), 0 -1px 0 rgba(117,61,0,.32);
+}
+</style>
+
+<style id="seb-result-scroll-only-style">
+/* Build #161 : aucune scrollbar de page pendant le parcours candidat.
+   La page Résultats est l'unique page autorisée à défiler verticalement. */
+html.seb-candidate-no-page-scroll,
+html.seb-candidate-no-page-scroll body {
+  height: 100% !important;
+  overflow: hidden !important;
+}
+html.seb-results-page-scroll {
+  height: 100% !important;
+  overflow: hidden !important;
+}
+html.seb-results-page-scroll body {
+  height: 100% !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+}
+</style>
 </head>
 <body>
 <!-- === CALCULATRICE : structure unique, présente dans tout le SPA === -->
@@ -614,12 +770,19 @@ pre {
   <main>
     <section aria-labelledby="infos-candidat">
       <h2 id="infos-candidat">Informations du candidat</h2>
-      <form id="form-candidat" aria-describedby="desc-form">
+      <form id="form-candidat" aria-describedby="desc-form" data-seb-handler-submit="qcmv1-0-001">
         <div class="form-row">
           <label for="nom">Nom :</label>
           <input class="step" type="text" id="nom" name="nom" autocomplete="family-name" required>
           <label for="prénom">Prénom :</label>
           <input class="step" type="text" id="prénom" name="prénom" autocomplete="given-name" required>
+          <label for="civilite">Civilité :</label>
+          <select class="step" id="civilite" name="civilite" required style="min-width:115px;padding:4px">
+            <option value="">Choisissez</option>
+            <option value="M.">M.</option>
+            <option value="Mme">Mme</option>
+            <option value="Autre">Autre</option>
+          </select>
         </div>
 
         <div class="form-row" style="margin-top:10px;">
@@ -648,7 +811,7 @@ pre {
         </p>
 
         <p><strong style="color:#1a73e8;">Comment ça fonctionne ?</strong></p>
-  <p class="puce">Vous progressez étape par étape, en relevant des défis et exercices liés aux compétences de base indispensable dans le monde du travail.</p>
+  <p class="puce">Vous progressez étape par étape, en relevant des défis et exercices liés aux compétences de base indispensables dans le monde du travail.</p>
 	<p class="puce">Chaque étape du parcours permet de mieux cibler vos acquis et d'orienter votre progression.</p>
 
 
@@ -663,7 +826,7 @@ pre {
 
         <p>
           <strong>Testez le bouton 👉</strong>
-          <button type="button" data-seb-action="open-calculator" aria-label="Ouvrir la calculatrice">Ouvrir la calculatrice</button>
+          <button type="button" data-seb-handler-click="qcmv1-0-002" data-seb-action="open-calculator" aria-label="Ouvrir la calculatrice">Ouvrir la calculatrice</button>
           <span> Vous pouvez l'essayer.</span>
         </p>
 
@@ -680,7 +843,7 @@ pre {
         <button
           id="btn-suivant"
           class="primary-action"
-          style="background-color: #1a73e8; color: #fff; border: none; padding: 10px 10px; font-size: 18px; border-radius: 6px; cursor: pointer; transition: background-color 0.3s;" data-seb-action="start-evaluation"
+          style="background-color: #1a73e8; color: #fff; border: none; padding: 10px 10px; font-size: 18px; border-radius: 6px; cursor: pointer; transition: background-color 0.3s;" data-seb-handler-click="qcmv1-0-003"
           aria-label="Suivant – vérifier les informations et passer à l'étape suivante"
         >Suivant</button>
       </div>
@@ -715,7 +878,7 @@ pre {
   <p style="font-size: 18px; text-align: center; margin-bottom: 10px;">Bonne découverte et bon parcours !</p>
   <div style="text-align: center;">
   <br>
-    <button data-seb-action="page1-next" style="background-color: #1a73e8; color: #fff; border: none; padding: 12px 25px; font-size: 18px; border-radius: 6px; cursor: pointer; hover: #fff; transition: background-color 0.3s;">
+    <button data-seb-handler-click="qcmv1-0-004" style="background-color: #1a73e8; color: #fff; border: none; padding: 12px 25px; font-size: 18px; border-radius: 6px; cursor: pointer; hover: #fff; transition: background-color 0.3s;">
       Commencez l'évaluation
     </button>
   </div>
@@ -725,11 +888,11 @@ pre {
 
   <!-- PAGE 2 : Page type tableau -->
   <div id="page2" class="page">
-    <p><img src="imageqcm/scenario.png" alt="scenario.png" width="45" height="45" style="margin-right:8px;"><strong style="color:#1a73e8;">Scénario:</strong></p><p> Vous venez d'intégrer l'atelier de fabrication. Votre responsable vous confie la gestion de petites commandes.</p>
+    <p><img src="imageqcm/scenario.png" alt="scenario.png" width="45" height="45" style="margin-right:8px;"><strong style="color:#1a73e8;">Scénario :</strong></p><p> Vous venez d'intégrer l'atelier de fabrication. Votre responsable vous confie la gestion de petites commandes.</p>
 	<p>Vous devez calculer les quantités, les coûts et la durée de certaines tâches.</p>
 	<p><strong>Question :</strong></p>
 	<p><strong>1.</strong>
-    Un client commande <strong>12 boites</strong> de vis,
+    Un client commande <strong>12 boîtes</strong> de vis,
     chaque boîte contient <strong>85 vis</strong>.
     Combien de vis en tout devez-vous préparer&nbsp;?
 	</p>
@@ -738,10 +901,10 @@ pre {
     Combien de pièces seront produites en  <strong>5 jours</strong>&nbsp;?
 	</p>
 	<p><strong>3.</strong>
-    Vous avez <strong>420 vis </strong>à répartir également dans <strong>7 boites</strong>. Combien de vis y aurait-il par boite&nbsp;?
+    Vous avez <strong>420 vis </strong>à répartir également dans <strong>7 boîtes</strong>. Combien de vis y aurait-il par boîte&nbsp;?
 	</p>
 	<p><strong>4.</strong>
-    Une commande coûte<strong> 175 Euros</strong>. Si le client achète<strong> 3 commandes identiques</strong>, quel sera le montant total à payer&nbsp;?
+    Une commande coûte<strong> 175 euros</strong>. Si le client achète<strong> 3 commandes identiques</strong>, quel sera le montant total à payer&nbsp;?
 	</p>
 	<p><strong>5.</strong>
     Vous devez assembler <strong>48 produits</strong> et vous pouvez en monter<strong> 6 par heure</strong>.
@@ -762,7 +925,7 @@ pre {
       <tr><td class="bleu">Question N°4</td><td> <input class="step"  type="number" id="reponse2_4" title="Veuillez entrer uniquement des chiffres"></td><td><input class="step colonne-droite"  type="text" id="unite2_4"></td></tr>
       <tr><td class="bleu">Question N°5</td><td> <input class="step"  type="number" id="reponse2_5" title="Veuillez entrer uniquement des chiffres"></td><td><input class="step colonne-droite"  type="text" id="unite2_5"></td></tr>
     </table>
-<button data-seb-action="open-calculator">Ouvrir la calculatrice</button>
+<button data-seb-handler-click="qcmv1-0-005" data-seb-action="open-calculator">Ouvrir la calculatrice</button>
 
     <div class="tablecenter" style="margin-top:10px;">
       <button id="page2Pass" type="button" class="passez">Passez</button>	
@@ -774,11 +937,11 @@ pre {
 
   <!-- PAGE 2_1 -->
   <div id="page2_1" class="page">
-    <p><img src="imageqcm/scenario.png" alt="scenario.png" width="45" height="45" style="margin-right:8px;"><strong style="color:#1a73e8;">Scénario:</strong></p><p> Vous devez vérifier le poids et le volume des produits avant expédition :</p>
+    <p><img src="imageqcm/scenario.png" alt="scenario.png" width="45" height="45" style="margin-right:8px;"><strong style="color:#1a73e8;">Scénario :</strong></p><p> Vous devez vérifier le poids et le volume des produits avant expédition :</p>
 	<p><strong>Question :</strong></p>
 	<p><strong>6.</strong>
-    Une boite de clous pèse<strong> 2,5 kg</strong>
-	. Quel est le poids total de <strong>4 boites</strong>
+    Une boîte de clous pèse<strong> 2,5 kg</strong>
+	. Quel est le poids total de <strong>4 boîtes</strong>
     identiques&nbsp;?
 	</p>
 	<p><strong>7.</strong>
@@ -811,7 +974,7 @@ pre {
       <tr><td class="bleu">Question N°9</td><td> <input class="step"  type="text" id="reponse2_1_9"></td><td><input class="step colonne-droite"  type="text" id="unite2_1_9"></td></tr>
       <tr><td class="bleu">Question N°10</td><td> <input class="step"  type="text" id="reponse2_1_10"></td><td><input class="step colonne-droite"  type="text" id="unite2_1_10"></td></tr>
     </table>
-<button data-seb-action="open-calculator">Ouvrir la calculatrice</button>
+<button data-seb-handler-click="qcmv1-0-006" data-seb-action="open-calculator">Ouvrir la calculatrice</button>
 
     <div class="tablecenter" style="margin-top:10px;">
       <button id="page2_1Pass" type="button" class="passez">Passez</button>	
@@ -823,12 +986,12 @@ pre {
 
   <!-- PAGE 3 -->
   <div id="page3" class="page">
-	<p><img src="imageqcm/scenario.png" alt="scenario.png" width="45" height="45" style="margin-right:8px;"><strong style="color:#1a73e8;">Scénario:</strong></p><p> Tous les matins, vous devez passer par le <strong>service de reception et contrôle marchandises</strong> pour<strong> déballer</strong>
+	<p><img src="imageqcm/scenario.png" alt="scenario.png" width="45" height="45" style="margin-right:8px;"><strong style="color:#1a73e8;">Scénario :</strong></p><p> Tous les matins, vous devez passer par le <strong>service de réception et de contrôle des marchandises</strong> pour<strong> déballer</strong>
 	et<strong> contrôler</strong> les articles reçus la veille.</p>
-	<p>Votre responsable vous demande de <strong>noter chaque jour:</strong></p>
+	<p>Votre responsable vous demande de <strong>noter chaque jour :</strong></p>
 	<p class="puce">L'heure de prise de poste (<strong>toujours 8h00</strong>).</p>
 	<p class="puce">Le temps passé à cette tâche.</p>
-	<p class="puce">L'heure à la quelle vous quittez le poste.</p>
+	<p class="puce">L'heure à laquelle vous quittez le poste.</p>
 	<p>En fin de semaine, vous devez compléter les tableaux ci-dessous et calculer le <strong>total d'heures passées </strong>
 	<strong>sur chaque poste</strong> et la<strong> moyenne quotidienne.</strong></p>
 	
@@ -847,14 +1010,14 @@ pre {
       <tr><td class="bleu">Lundi</td><td>8h00</td><td>1h15</td><td> <input class="step"  type="text" id="reponse3_1"></td><td>0h30</td><td> <input class="step"  type="text" id="reponse3_7"></td></tr>
       <tr><td class="bleu">Mardi</td><td>8h00</td><td>0h50</td><td> <input class="step"  type="text" id="reponse3_2"></td><td>0h25</td><td> <input class="step"  type="text" id="reponse3_8"></td></tr>
       <tr><td class="bleu">Mercredi</td><td>8h00</td><td>1h05</td><td> <input class="step"  type="text" id="reponse3_3"></td><td>0h25</td><td> <input class="step"  type="text" id="reponse3_9"></td></tr>
-      <tr><td class="bleu">jeudi</td><td>8h00</td><td>1h20</td><td> <input class="step"  type="text" id="reponse3_4"></td><td>0h35</td><td> <input class="step"  type="text" id="reponse3_10"></td></tr>
+      <tr><td class="bleu">Jeudi</td><td>8h00</td><td>1h20</td><td> <input class="step"  type="text" id="reponse3_4"></td><td>0h35</td><td> <input class="step"  type="text" id="reponse3_10"></td></tr>
 	  <tr><td class="bleu">Vendredi</td><td>8h00</td><td>0h45</td><td> <input class="step"  type="text" id="reponse3_5"></td><td>0h40</td><td> <input class="step"  type="text" id="reponse3_11"></td></tr>
       <tr><td class="bleu">Total</td><td class="step"></td><td> <input class="step"  type="text" id="reponse3_6"></td><td class="step"></td><td> <input class="step"  type="text" id="reponse3_12"></td><td class="step"></td></tr>
 	</table>
 	</div>
 	
 	<div class="right">
-	<button data-seb-action="open-calculator">Ouvrir la calculatrice</button>
+	<button data-seb-handler-click="qcmv1-0-007" data-seb-action="open-calculator">Ouvrir la calculatrice</button>
 	<p><strong>Calculez la moyenne passée pour chaque tâche sur la semaine.</strong></p>
 	 <table border="1" cellpadding="5" cellspacing="0">
 	<tr><td style="background-color:#c5c8f0;">Moyenne de temps pour le rangement du stock de pièces :</td><td style="background-color:#c5c8f0;"> <input class="step"  type="text" id="reponse3_13"></td></tr>
@@ -874,7 +1037,7 @@ pre {
   <!-- PAGE TEXTE A TROUS -->
   <div id="pageTexteTrous" class="page">
   <br>
-	<p><img src="imageqcm/scenario.png" alt="scenario.png" width="45" height="45" style="margin-right:8px;"><strong style="color:#1a73e8;">Scénario:</strong></p><p> Votre stage dans l'entreprise est à mi-parcours.
+	<p><img src="imageqcm/scenario.png" alt="scenario.png" width="45" height="45" style="margin-right:8px;"><strong style="color:#1a73e8;">Scénario :</strong></p><p> Votre stage dans l'entreprise est à mi-parcours.
 	Vous allez échanger avec votre conseiller sur vos compétences acquises jusqu'à présent et sur vos qualités.
 	Vous rédigez un court texte pour vous y préparer.</p>
 	 <div style="display:flex; align-items:center; margin-bottom:10px;">
@@ -882,11 +1045,11 @@ pre {
       <p><strong style="color:#1a73e8;">Consigne :</strong></p>
 	  </div>
 	  <p>  Complétez le texte ci-dessous avec la liste de mots du tableau. Pour faire cet exercice, 
-	  vous devrez dans certain cas, réaliser les <strong>accords sujets/verbes et genre/pluriel.</strong></p>
+	  vous devrez, dans certains cas, réaliser les <strong>accords sujet/verbe et genre/nombre.</strong></p>
 	  <br>
     <div class="tablecenter">
 	<table border="1" cellpadding="5" cellspacing="0" style="border-collapse:collapse; width:50%; background-color:#c5c8f0;">
-      <tr style="background-color:#e8ebfc;"><td class="bleu" colspan="3" style="text-align:center;"><strong>Mots a utiliser pour compléter votre texte</strong></td></tr>
+      <tr style="background-color:#e8ebfc;"><td class="bleu" colspan="3" style="text-align:center;"><strong>Mots à utiliser pour compléter votre texte</strong></td></tr>
       <tr><td style="text-align:center;">conseiller</td><td style="text-align:center;">organiser</td><td style="text-align:center;">pouvoir</td></tr>
 	  <tr><td style="text-align:center;">préparateur de commandes</td><td style="text-align:center;">colis</td><td style="text-align:center;">logistique</td></tr>
       <tr><td style="text-align:center;">stage</td><td style="text-align:center;">conseil</td><td style="text-align:center;">expédition</td></tr>
@@ -933,11 +1096,11 @@ pre {
   <script src="js/qcm-texte-trous.js"></script>
 
   <div id="page4" class="page">
-  <p><img src="imageqcm/scenario.png" alt="scenario.png" width="45" height="45" style="margin-right:8px;"><strong style="color:#1a73e8;">Scénario:</strong></p><p> Vous êtes en train de préparer des lots de pieces dans l'atelier. Certaines pièce sont regroupées par type et doivent être
-   emballées selon des fraction précises.</p>
+  <p><img src="imageqcm/scenario.png" alt="scenario.png" width="45" height="45" style="margin-right:8px;"><strong style="color:#1a73e8;">Scénario :</strong></p><p> Vous êtes en train de préparer des lots de pièces dans l'atelier. Certaines pièces sont regroupées par type et doivent être
+   emballées selon des fractions précises.</p>
 	 <div style="display:flex; align-items:center; margin-bottom:10px;">
       <img src="imageqcm/avatar_transparant.png" alt="avatar" width="45" height="45" style="margin-right:8px;">
-		<p><strong style="color:#1a73e8;">Consigne :</strong>  Sélectionnez pour chaque fraction indiquée, le nombre d'images correspondante à celle-ci.</p>
+		<p><strong style="color:#1a73e8;">Consigne :</strong>  Sélectionnez pour chaque fraction indiquée, le nombre d'images correspondant à celle-ci.</p>
 </div>
 
 <div class="fractions">
@@ -992,7 +1155,7 @@ pre {
 
   <div id="page5" class="page">
   <!--h2>Page 5</h2-->
-  <p><img src="imageqcm/scenario.png" alt="scenario.png" width="45" height="45" style="margin-right:8px;"><strong style="color:#1a73e8;">Scénario:</strong></p><p> L'entreprise va ouvrir un deuxième atelier. Vous participez à l'équipe chargée de déménager une partie du stock de pièces 
+  <p><img src="imageqcm/scenario.png" alt="scenario.png" width="45" height="45" style="margin-right:8px;"><strong style="color:#1a73e8;">Scénario :</strong></p><p> L'entreprise va ouvrir un deuxième atelier. Vous participez à l'équipe chargée de déménager une partie du stock de pièces 
   et de machines et de préparer les nouveaux locaux. Pour que tout se déroule efficacement, il faut planifier l'ordre des étapes correctement.</p>
 	 <div style="display:flex; align-items:center; margin-bottom:10px;">
       <p><img src="imageqcm/avatar_transparant.png" alt="avatar" width="45" height="45" style="margin-right:8px;"></p>
@@ -1004,8 +1167,8 @@ pre {
 	  <p> <input class="step"  type="text" maxlength="1" style="width:30px;" id="reponse5_1">   Emballer les pièces et protéger les machines fragiles.</p>
 	  <p> <input class="step"  type="text" maxlength="1" style="width:30px;" id="reponse5_2">   Décharger le camion et positionner les machines.</p>
 	  <p> <input class="step"  type="text" maxlength="1" style="width:30px;" id="reponse5_3">   Charger le camion et les machines.</p>
-	  <p> <input class="step"  type="text" maxlength="1" style="width:30px;" id="reponse5_4">   vérifier l'inventaire du stock à transférer.</p>
-	  <p> <input class="step"  type="text" maxlength="1" style="width:30px;" id="reponse5_5">   Transporter le matériel jusqu'au nouvel atelier..</p>
+	  <p> <input class="step"  type="text" maxlength="1" style="width:30px;" id="reponse5_4">   Vérifier l'inventaire du stock à transférer.</p>
+	  <p> <input class="step"  type="text" maxlength="1" style="width:30px;" id="reponse5_5">   Transporter le matériel jusqu'au nouvel atelier.</p>
 	  <p> <input class="step"  type="text" maxlength="1" style="width:30px;" id="reponse5_6">   Installer les postes de travail et le mobilier.</p>
 	  <p> <input class="step"  type="text" maxlength="1" style="width:30px;" id="reponse5_7">   Préparer le planning des premières productions dans le nouvel atelier.</p>
 	  <p> <input class="step"  type="text" maxlength="1" style="width:30px;" id="reponse5_8">   Vérifier que tout le matériel est intact et fonctionnel.</p>
@@ -1021,14 +1184,14 @@ pre {
 <!--- Page 5--->
   <div id="page5_1" class="page">
 <br>
-<p><img src="imageqcm/scenario.png" alt="scenario.png" width="45" height="45" style="margin-right:8px;"><strong style="color:#1a73e8;">Scénario:</strong></p><p> Pour ce déménagement, vous avez été sensibilisé-e aux bons gestes professionnels. Vous devez les transmettre à un collègue qui n'était pas là .</p>
+<p><img src="imageqcm/scenario.png" alt="scenario.png" width="45" height="45" style="margin-right:8px;"><strong style="color:#1a73e8;">Scénario :</strong></p><p> Pour ce déménagement, vous avez été sensibilisé-e aux bons gestes professionnels. Vous devez les transmettre à un collègue qui n'était pas là.</p>
 	 <div style="display:flex; align-items:center; margin-bottom:10px;">
       <img src="imageqcm/avatar_transparant.png" alt="avatar" width="45" height="45" style="margin-right:8px;">
       <p><strong style="color:#1a73e8;">Consigne :</strong> Sélectionnez les trois bonnes postures parmi les six images proposées.</p>
 	  </div>
 	  <br>
 	  <div style="display:flex; justify-content:center; margin-bottom:10px;">
-      <img src="imageqcm/qcm_posture.PNG" alt="qcm_posture" width="567" height="375" style="margin-right:8px;">
+      <img src="imageqcm/qcm_posture.png" alt="qcm_posture" width="567" height="375" style="margin-right:8px;">
 	  </div>
 	  <br>
 	   <div style="display:flex; justify-content:center; margin-bottom:10px;">
@@ -1048,9 +1211,9 @@ pre {
   <script src="js/qcm-page5-1.js"></script>
 
   <div id="page6" class="page">
-  <p><img src="imageqcm/scenario.png" alt="scenario.png" width="45" height="45" style="margin-right:8px;"><strong style="color:#1a73e8;">Scénario:</strong></p><p> Vous travaillez dans un atelier d'expeditionde l'entreprise.Avant l'envois des commandes, vous devez verifier les 
-  <strong>poids,volumes et dimensions</strong> des produits.</p>
-  <p>Pour cela vous devez effectuer plusieurs conversion.</p>
+  <p><img src="imageqcm/scenario.png" alt="scenario.png" width="45" height="45" style="margin-right:8px;"><strong style="color:#1a73e8;">Scénario :</strong></p><p> Vous travaillez dans un atelier d'expédition de l'entreprise. Avant l'envoi des commandes, vous devez vérifier les 
+  <strong>poids, volumes et dimensions</strong> des produits.</p>
+  <p>Pour cela vous devez effectuer plusieurs conversions.</p>
 	 <div style="display:flex; align-items:center; margin-bottom:10px;">
       <img src="imageqcm/avatar_transparant.png" alt="avatar" width="45" height="45" style="margin-right:8px;">
       <p><strong style="color:#1a73e8;">Consigne :</strong> Notez <strong>vos réponses</strong> et <strong>l'opération</strong> effectuée dans le tableau.</p>
@@ -1059,21 +1222,21 @@ pre {
     <div class="left">
 	<br>
 	  <p><strong> 1.  </strong>Un sac de farine pèse <strong>2,3 kg</strong>. Convertissez ce poids en grammes.</p>
-	  <p><strong> 2.  </strong>Un bidon contient <strong>7,5 litres</strong> l'huile. Convertissez ce volume en millilitres.</p>
+	  <p><strong> 2.  </strong>Un bidon contient <strong>7,5 litres</strong> d'huile. Convertissez ce volume en millilitres.</p>
 	  <p><strong> 3.  </strong>Une planche mesure <strong>250 cm</strong>. Convertissez cette mesure en mètres.</p>
 	  <p><strong> 4.  </strong>Une caisse de boulons pèse <strong>8,4 kg</strong>. Convertissez cette mesure en grammes.</p>
 	  <p><strong> 5.  </strong>Un réservoir contient <strong>3,2 m3</strong> d'eau. Convertissez ce volume en litres.</p>
-	  <p><strong> 6.  </strong>Un tuyau mesure <strong>4,5 m</strong>. Convertissez cette longeur en centimetres.</p>
+	  <p><strong> 6.  </strong>Un tuyau mesure <strong>4,5 m</strong>. Convertissez cette longueur en centimètres.</p>
 	  <p><strong> 7.  </strong>Un pot de peinture contient <strong>0,75 litre</strong>. Convertissez ce volume en millilitres.</p>
-	  <p><strong> 8.  </strong>Un colis pèse <strong>5600 g</strong> Convertissez ce poids en kilogrammes.</p>
-	  <p><strong> 9.  </strong>Un bidon d'huile de <strong> 2,5 litres</strong> est rempli a <strong>50%</strong>. Conbien de millilitres contient-il.</p>
-	  <p><strong>10. </strong>une planche de <strong>3,2 m</strong> doit être coupée en morceaux de <strong>80 cm</strong>. Combien de morceaux peut-on obtenir?</p>
+	  <p><strong> 8.  </strong>Un colis pèse <strong>5600 g</strong>. Convertissez ce poids en kilogrammes.</p>
+	  <p><strong> 9.  </strong>Un bidon d'huile de <strong> 2,5 litres</strong> est rempli à <strong>50 %</strong>. Combien de millilitres contient-il ?</p>
+	  <p><strong>10. </strong>Une planche de <strong>3,2 m</strong> doit être coupée en morceaux de <strong>80 cm</strong>. Combien de morceaux peut-on obtenir ?</p>
 	  </div>
 	  
     <div class="right">
 	<table>
         <thead>
-          <tr><th>N°</th><th class="colonne-droite" >Réponses</th><th class="colonne-droite">Unités</th><th>Opération effectuées</th></tr>
+          <tr><th>N°</th><th class="colonne-droite" >Réponses</th><th class="colonne-droite">Unités</th><th>Opérations effectuées</th></tr>
         </thead>
         <tbody>
 	
@@ -1089,19 +1252,19 @@ pre {
 		  <tr><td class="bleu">10 </td><td> <input class="step colonne-droite"  type="text" id="reponse6_10"></td><td class="colonne-droite"><input class="step" type="text" id="unite6_10"></td><td> <input class="step"  type="text" id="reponse6_20"></td></tr>
         </tbody>
       </table>
-	  <button data-seb-action="open-calculator">Ouvrir la calculatrice</button>
+	  <button data-seb-handler-click="qcmv1-0-008" data-seb-action="open-calculator">Ouvrir la calculatrice</button>
     </div>
 	</div>
 	<div class="tablecenter">
 	
 	<button id="page6Pass" type="button" class="passez">Passez</button>
-    <button id="page6Next" type="button" class="suivant">suivant</button>
+    <button id="page6Next" type="button" class="suivant">Suivant</button>
 	</div>
   </div>
   <script src="js/qcm-page6.js"></script>
 
-  <div id="page9" class="page"><h2>Page 9</h2><p>Question factice ici...</p><button data-seb-action="page9-good"class="suivant">Suivant</button><button data-seb-action="page9-bad"class="passez">Passez</button></div>
-  <div id="page10" class="page"><h2>Page 10</h2><p>Question factice ici...</p><button data-seb-action="page10-good"class="suivant">Suivant</button><button data-seb-action="page10-bad"class="passez">Passez</button></div>
+  <div id="page9" class="page"><h2>Page 9</h2><p>Question factice ici...</p><button data-seb-handler-click="qcmv1-0-009"class="suivant">Suivant</button><button data-seb-handler-click="qcmv1-0-010"class="passez">Passez</button></div>
+  <div id="page10" class="page"><h2>Page 10</h2><p>Question factice ici...</p><button data-seb-handler-click="qcmv1-0-011"class="suivant">Suivant</button><button data-seb-handler-click="qcmv1-0-012"class="passez">Passez</button></div>
   <div id="page11" class="page">
   <h1></h1>
   <div style="display:flex; align-items:center;">
@@ -1115,9 +1278,9 @@ pre {
 	  <p>Nous vous souhaitons le meilleur pour la suite de vos projets et espérons que cette étape aura été enrichissante et motivante pour vous.</p>
 	  </div>
 	  <div style="display: flex; justify-content: center;">
-  <button style="cursor: pointer;" data-seb-action="page11-next"class="suivant">Suivant</button>
+  <button style="cursor: pointer;" data-seb-handler-click="qcmv1-0-013"class="suivant">Suivant</button>
 	  </div>	
-  <!--button data-seb-action="page11-bad-unused"class="passez">Passez</button-->
+  <!--button data-seb-handler-click="qcmv1-0-014"class="passez">Passez</button-->
   </div>
    <!-- PAGE FINALE -->
   <div id="pageFinale" class="page">
@@ -1127,12 +1290,12 @@ pre {
   <script src="js/qcm-final-page.js"></script>
   <div id="bilanPage" class="page">
   <h2>Bilan</h2>
-<!--button data-seb-action="verify-data" 
+<!--button data-seb-handler-click="qcmv1-0-015" 
         style="padding:10px 20px; background:#444; color:white; border:none; border-radius:6px; margin-bottom:15px;">
     Vérifier les données récupérées
 </button-->
 
-<button data-seb-action="autofill-bilan" 
+<button data-seb-handler-click="qcmv1-0-016" 
         style="padding:10px 20px; margin:10px 0; background:#1a73e8; color:white; border:none; border-radius:6px;">
     Compléter automatiquement le bilan
 </button>
@@ -1156,7 +1319,7 @@ pre {
     <tr class="even-row" data-module="fabrication-lire-plan">
       <td><p class="item-label">Fabrication d'un objet usuel 3D en carton</p><p>Capacités Visuo-constructives :</p><p class="item-description">Capacité à lire un plan</p></td>
       <td data-level="ne"></td><td data-level="i"></td><td data-level="ii"></td><td data-level="iii"></td>
-      <td class="comment-cell"><select class="eval-select" data-field="commentaire"><option value="">Choisissez un élément.</option><option value="Non évalué.">Non évalué.</option><option value="I. La personne n'a pas besoin d'aide pour commencer l'exercice.">I. La personne n'a pas besoin d'aide pour commencer l'exercice.</option><option value="II. A besoin de consignes supplémentaires pour commercer l'exercice.">II. A besoin de consignes supplémentaires pour commercer l'exercice.</option><option value="III. A besoin qu'on lui montre un exemple ou d'utiliser un gabarit pour commencer l'exercice.">III. A besoin qu'on lui montre un exemple ou d'utiliser un gabarit pour commencer l'exercice.</option></select><p></p></td>
+      <td class="comment-cell"><select class="eval-select" data-field="commentaire"><option value="">Choisissez un élément.</option><option value="Non évalué.">Non évalué.</option><option value="I. La personne n'a pas besoin d'aide pour commencer l'exercice.">I. La personne n'a pas besoin d'aide pour commencer l'exercice.</option><option value="II. A besoin de consignes supplémentaires pour commencer l'exercice.">II. A besoin de consignes supplémentaires pour commencer l'exercice.</option><option value="III. A besoin qu'on lui montre un exemple ou d'utiliser un gabarit pour commencer l'exercice.">III. A besoin qu'on lui montre un exemple ou d'utiliser un gabarit pour commencer l'exercice.</option></select><p></p></td>
     </tr>
     
     <tr class="even-row" data-module="fabrication-tracage">
@@ -1198,7 +1361,7 @@ pre {
     <tr class="even-row" data-module="lego-manipulation">
       <td><p class="item-description">Capacité à manipuler et assembler</p></td>
       <td data-level="ne"></td><td data-level="i"></td><td data-level="ii"></td><td data-level="iii"></td>
-      <td class="comment-cell"><select class="eval-select" data-field="commentaire"><option value="">Choisissez un élément.</option><option value="Non évalué.">Non évalué.</option><option value="I. Assemble les pièces sans difficultés.">I. Assemble les pièces sans difficultés.</option><option value="II. Reconnait les pièces mais les assemble avec difficulté.">II. Reconnait les pièces mais les assemble avec difficulté.</option><option value="III. Ne présente pas la pièce dans sa bonne position ce qui rend long voire impossible l'assemblage.">III. Ne présente pas la pièce dans sa bonne position ce qui rend long voire impossible l'assemblage.</option></select><p><input type="number" min="0" data-field="erreurs" style="width:50px;padding:2px;margin-right:4px;" placeholder="0"/> erreur(s)</p></td>
+      <td class="comment-cell"><select class="eval-select" data-field="commentaire"><option value="">Choisissez un élément.</option><option value="Non évalué.">Non évalué.</option><option value="I. Assemble les pièces sans difficultés.">I. Assemble les pièces sans difficultés.</option><option value="II. Reconnaît les pièces mais les assemble avec difficulté.">II. Reconnaît les pièces mais les assemble avec difficulté.</option><option value="III. Ne présente pas la pièce dans sa bonne position ce qui rend long voire impossible l'assemblage.">III. Ne présente pas la pièce dans sa bonne position ce qui rend long voire impossible l'assemblage.</option></select><p><input type="number" min="0" data-field="erreurs" style="width:50px;padding:2px;margin-right:4px;" placeholder="0"/> erreur(s)</p></td>
     </tr>
     
     <tr class="odd-row" data-module="carre-magique">
@@ -1208,7 +1371,7 @@ pre {
     </tr>
     
     <tr class="even-row" data-module="organisation">
-      <td><p class="item-label">Organisation : "Ranger le stock produit"</p><p>Capacité à effectuer :</p><p class="item-description">Une tâche d'organisation</p></td>
+      <td><p class="item-label">Organisation : "Ranger le stock de produits"</p><p>Capacité à effectuer :</p><p class="item-description">Une tâche d'organisation</p></td>
       <td data-level="ne"></td>
 	  <td data-level="i"></td>
 	  <td data-level="ii"></td>
@@ -1362,7 +1525,7 @@ pre {
     <!--button id="finalizeBtn" style="background: #28a745; color: #fff; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 12pt;">
       📋 Finaliser l'évaluation
     </button-->
-	<button id="exportBtn" data-seb-action="export-word" style="background: #0070c0; color: #fff; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 12pt; margin-left: 10px;">
+	<button id="exportBtn" data-seb-handler-click="qcmv1-0-017" style="background: #0070c0; color: #fff; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 12pt; margin-left: 10px;">
   📄 Exporter vers Word
 </button>
 	 <!--p style="margin-top: 8px; color: #666; font-size: 10pt;">
@@ -1376,7 +1539,7 @@ pre {
  
  
 
-<script src="js/qcm-runtime.js"></script>
+
 
  
 
@@ -1384,5 +1547,18 @@ pre {
   
 
 
+
+
+<script src="js/qcm-runtime.js"></script><script src="js/seb-in-app-alert.js" id="seb-evalpro-in-app-alert-script"></script>
+<script src="js/seb-visual-branding.js" id="seb-evalpro-visual-branding"></script>
+
+
+
+
+
+<script src="js/qcm-runtime-ui.js"></script><script id="seb-ui-runtime-loader" src="js/seb-ui-runtime.js"></script>
+
+<script src="js/qcm-runtime-tail.js"></script>
+<script src="js/qcmv1.0-events.js"></script>
 </body>
 </html>

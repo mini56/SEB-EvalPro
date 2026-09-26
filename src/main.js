@@ -1,4 +1,5 @@
-const { app, BrowserWindow, ipcMain, screen, dialog, Menu, safeStorage, powerMonitor } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, dialog, Menu, safeStorage, powerMonitor, shell, nativeImage } = require('electron');
+// SEB_PRIORITY_FIXES_MAIN
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
@@ -34,6 +35,62 @@ let candidateWindowsReturnGuardInstalled = false;
 // SEB_TEMP_WINDOWS_RECOVERY : temporaire pendant la phase de stabilisation.
 const TEMP_ALLOW_WINDOWS_RECOVERY = true;
 let stateWriteCounter = 0;
+
+// SEB_ADMIN_WINDOWS_SHELL_MODE
+const ADMIN_TASKBAR_OVERLAY_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAEZklEQVR4nLWXW3bbNhCGP4AgRYmS49hpmofuI4vok12voQ/JBrqEbsB+yBra5KmLyE7aJr5LFC8g0AfMxLQin8huO+fMASWC+P8Z3P4xjMyAsYBNrc3BOsgKsAXkk/Sc5eAc2Ez6B2CA6CH04DsYWhg66DsIHoYeQkgeAxAhArgxuBHw7D6wK5PnJbgJuAJcfkfABIgDxB5CB74Fn4Nv0nvfCYRPbRBwEyG6DXCbgckTuCvBTSGfJS9miUReJgLZFgJDk4D7OnnmoF+DNeCNBBshxpQN4xQ8S+A2BzsR4AqKORQLmMyTF1MoypSFzKWBTZT0d0JgDd0yuSugdWCt4IiFQbi4TfAS3EyA96Dcg3Jf2jlMqkTC5VsI9DCswa8SeHsDebGRLSExGMBDcDrnGvlMIn4G5XOYqj+D6UIIvInxPQ/YmTHHK+huhagsWs2AJqFv5cHJgrOFpH0u4AcwO4TZgfg+lG9j/PAQsJqSOzXmaJJ2S5ZJpmT+0/JXAi5Fn5XgqpT2yXOYHsLsBVSHUB3A9OcYf9OPPo5nc8NexzT82xg/vDPmJJPoBTzKNvzCw+zDtEyRF/tQHkL1EuYvoXoB819i/GMX4IeIAPxqzI+fYfk3rD7B8gLqG2hr6Fwh0c8g35j72QFMnwKu/ZXEAUyHtEhDB75PuyAC0fwA+xL99DuoXsHiFSy+h7nO+TbwcYSbwNv6nRpz9Bcs/4TbT7C6gHoJrZ2MMiD7frKAyVPAt73T79/G+GEhY8+hqNLBVrhCjlc98Sp5+SDCDtG+jnErcT3YVlA04D0Eq8euZCIvwelWemz02n/zO/39Jsb3JeRTwSnBWdmGSiQrRhfUY6L/1v9qeplpa7O720/9ccv9kbaBZfUyuue7DLTLVGwz0Rt6AxsrV+M9fwrorv2CuGLZId3lwd/5bihPtA2sYOUaDX2SUEMH/v8k0CaF5LW1AuzbJCb6BvyZMcewe8q/ZTrOmTHHTVJIvSgn7wQ8W4uMWkG3gu4/Qd4wESqdYqyhtxK5V/AltLfQnhpzNGb/VBvfBbcytpKoobOdpKIW8GtorqG5guadMSfjQXa9EbWffvfOmJMrGfcGmltolYDrYLDgRRW1ekqJ7LbjSD4aszOJceYuYH0J9SWsrxOBRgj0poKiGOmBsRr6N4pII7+A9TmsPoufQ32VCLRr8EaizUSQ5qqCn6oJ1U6NObqC5gLqC6jPpb2SKVgnYeqNnMmZquLqa1U8E1Vc7kE5S6r494eAz4z5qYbuRub88uv0t7WA9zAYleUP1QXPRr6AshrJ7QyyUW04dKO64FYIXI8W31IWXgODTx5cTB8HjcCkk9AgRaRouaGFoYa+gokScJAZ0tnt7xNol0JCtl5Xp8h9e6cJQ4DotFBUEr38VgJR7goVlA14LVJVckttGNr7W7pbpe3Wr1LUfZuq5GFIY4eAiA8lIQNBKp0iykTIBCHSiIKSDGhpNrTJ/TqB97Wcdk0q07+o4XGJ/g/1kYxVdSt3vwAAAABJRU5ErkJggg==';
+let adminTaskbarOverlayIcon = null;
+
+function getAdminTaskbarOverlayIcon() {
+  if (!adminTaskbarOverlayIcon || adminTaskbarOverlayIcon.isEmpty()) {
+    adminTaskbarOverlayIcon = nativeImage.createFromDataURL(ADMIN_TASKBAR_OVERLAY_DATA_URL);
+  }
+  return adminTaskbarOverlayIcon;
+}
+
+function applyAdminWindowMode(unlocked) {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  const isUnlocked = !!unlocked;
+
+  if (isUnlocked) {
+    try { stopCandidateKeyGuard(); } catch (_) {}
+    try { mainWindow.setAlwaysOnTop(false); } catch (_) {}
+    try { mainWindow.setSkipTaskbar(false); } catch (_) {}
+    try { mainWindow.setKiosk(false); } catch (_) {}
+    try { mainWindow.setFullScreen(false); } catch (_) {}
+    if (process.platform === 'win32') {
+      try { mainWindow.setOverlayIcon(getAdminTaskbarOverlayIcon(), 'Mode administrateur déverrouillé'); } catch (_) {}
+    }
+    setTimeout(() => {
+      if (!mainWindow || mainWindow.isDestroyed() || !adminSessionUnlocked) return;
+      try { mainWindow.maximize(); } catch (_) {}
+      try { applyAdaptiveZoom(); } catch (_) {}
+    }, 120);
+  } else {
+    const restoreCandidateShell = () => {
+      if (!mainWindow || mainWindow.isDestroyed() || adminSessionUnlocked) return;
+      try { startCandidateKeyGuard(); } catch (_) {}
+      try { mainWindow.setSkipTaskbar(true); } catch (_) {}
+      try { mainWindow.setAlwaysOnTop(true); } catch (_) {}
+      try { mainWindow.setFullScreen(true); } catch (_) {}
+      try { mainWindow.setKiosk(true); } catch (_) {}
+      try { mainWindow.moveTop(); } catch (_) {}
+      try { mainWindow.show(); } catch (_) {}
+      try { mainWindow.focus(); } catch (_) {}
+      try { mainWindow.webContents.focus(); } catch (_) {}
+      try { enforceCandidateWindowLock(true); } catch (_) {}
+      try { applyAdaptiveZoom(); } catch (_) {}
+    };
+    if (process.platform === 'win32') {
+      try { mainWindow.setOverlayIcon(null, ''); } catch (_) {}
+    }
+    restoreCandidateShell();
+    [40, 120, 300, 700].forEach((delay) => setTimeout(restoreCandidateShell, delay));
+  }
+
+  try { mainWindow.setMenuBarVisibility(false); } catch (_) {}
+  try { mainWindow.focus(); } catch (_) {}
+}
+
 
 function candidateKeyGuardExecutable() {
   return app.isPackaged
@@ -457,7 +514,8 @@ function finishStartup() {
   setTimeout(() => {
     if (!mainWindow || mainWindow.isDestroyed()) return;
     mainWindow.show();
-    enforceCandidateWindowLock(true);
+    applyAdminWindowMode(adminSessionUnlocked);
+    if (!adminSessionUnlocked) enforceCandidateWindowLock(true);
     applyAdaptiveZoom();
     if (splashWindow && !splashWindow.isDestroyed()) splashWindow.close();
     // La fermeture du splash peut brièvement rendre la barre des tâches Windows
@@ -485,6 +543,7 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
+      spellcheck: false,
       devTools: false,
       navigateOnDragDrop: false
     }
@@ -496,6 +555,7 @@ function createWindow() {
   mainWindow.loadFile(existingWebPage(state.lastEvaluationPage || state.lastPage));
 
   mainWindow.webContents.on('did-finish-load', () => {
+    applyAdminWindowMode(adminSessionUnlocked);
     applyAdaptiveZoom();
   });
 
@@ -729,13 +789,7 @@ ipcMain.handle('admin:verify', (_event, password) => {
   const ok = verifyAdminPassword(password);
   if (ok) {
     adminSessionUnlocked = true;
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.setAlwaysOnTop(false);
-      mainWindow.setSkipTaskbar(false);
-      mainWindow.setKiosk(false);
-      mainWindow.setFullScreen(false);
-      mainWindow.focus();
-    }
+    applyAdminWindowMode(true);
   }
   return ok;
 });
@@ -749,14 +803,18 @@ ipcMain.on('app:edition-sync', (event) => { event.returnValue = { ...editionCapa
 ipcMain.handle('app:edition', () => ({ ...editionCapabilities }));
 
 ipcMain.handle('admin:lock', () => {
+  // SEB_ADMIN_LOCK_RETURNS_TO_PRIVACY
   adminSessionUnlocked = false;
   adminExportCandidateDir = null;
+  adminCandidateResultsMode = false;
+  applyAdminWindowMode(false);
   if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.setSkipTaskbar(true);
-    mainWindow.setKiosk(true);
-    mainWindow.setFullScreen(true);
-    mainWindow.setAlwaysOnTop(true);
-    reinforceCandidateWindowLock();
+    const state = readState();
+    const target = existingWebPage(state.lastEvaluationPage || 'qcmv1.0.html');
+    setTimeout(() => {
+      if (!mainWindow || mainWindow.isDestroyed() || adminSessionUnlocked) return;
+      mainWindow.loadFile(target);
+    }, 90);
   }
   return true;
 });
@@ -931,12 +989,34 @@ ipcMain.handle('ai:rewrite-synthesis', async () => {
 
 ipcMain.handle('ai:cancel-current', () => ({ ok:true, cancelled:false, offline:true, integrated:true }));
 
+// SEB_CANDIDATE_REPLAY_PROTO_MAIN
+require('./replay-main')({
+  app,
+  ipcMain,
+  getAdminUnlocked: () => adminSessionUnlocked,
+  buildNumber: "6"
+});
+require('./bilan-history-main')({
+  app,
+  ipcMain,
+  getAdminUnlocked: () => adminSessionUnlocked,
+  buildNumber: "6"
+});
+
+require('./candidate-catalog-main')({
+  app,
+  ipcMain,
+  getAdminUnlocked: () => adminSessionUnlocked,
+  getActiveCandidate: () => getCandidateStore().getActiveCandidate(),
+  dataRoot: sebInternalRoot()
+});
+
 require('./session-close')({
   app,
   ipcMain,
   getMainWindow: () => mainWindow,
   getAdminUnlocked: () => adminSessionUnlocked,
-  setAdminUnlocked: (value) => { adminSessionUnlocked = !!value; }
+  setAdminUnlocked: (value) => { adminSessionUnlocked = !!value; applyAdminWindowMode(adminSessionUnlocked); }
 });
 
 app.whenReady().then(() => {

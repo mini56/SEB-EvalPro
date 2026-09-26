@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dictée professionnelle — Réclamation client</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; width: 100%; height: 100%;
+    font-family: Calibri, Arial, sans-serif;
+    font-weight: 600; font-size: 1.05rem;
+    background: url('imageqcm/biblio.jpg') center/cover no-repeat fixed;
+    color: #333;
+  }
+  body { overflow: auto; }
+  .page {
+    min-height: 100vh; padding: 24px 36px 20px;
+    display: flex; flex-direction: column; gap: 14px;
+  }
+  .card {
+    background: #ffffffdd;
+    border-radius: 12px;
+    box-shadow: 0 4px 14px rgba(0,0,0,.15);
+    backdrop-filter: blur(4px);
+  }
+  .instructions { padding: 14px 22px; }
+  .scenario-line, .instruction-line { display:flex; align-items:flex-start; gap:10px; }
+  .scenario-line img, .instruction-line img { width:55px; height:55px; flex:0 0 auto; }
+  .label { color:#1a73e8; font-weight:700; }
+  .scenario-text { margin: 7px 0 0; line-height:1.4; }
+  .consignes { margin: 5px 0 0; padding-left: 22px; line-height:1.35; }
+  .workspace {
+    flex: 1; min-height: 0; display:grid;
+    grid-template-columns: minmax(350px, 42%) minmax(500px, 58%);
+    gap:14px;
+  }
+  .player-card, .writing-card { padding: 18px; min-height: 0; }
+  .player-card { display:flex; flex-direction:column; gap:14px; }
+  h2 { color:#2c3e50; margin:0 0 4px; font-size:23px; }
+  .audio-info {
+    background:#eef4ff; border:1px solid #b8cce4; border-radius:8px;
+    padding:10px 12px; line-height:1.35;
+  }
+  .controls { display:flex; flex-wrap:wrap; gap:8px; }
+  button {
+    border:0; border-radius:7px; padding:11px 16px; font:inherit;
+    cursor:pointer; transition:background-color .18s, opacity .18s;
+  }
+  button.primary { background:#1a73e8; color:#fff; }
+  button.primary:hover:not(:disabled) { background:#0056b3; }
+  button.secondary { background:#eef2f7; color:#233345; border:1px solid #b8c2cf; }
+  button.danger { background:#c00000; color:#fff; }
+  button:disabled { opacity:.48; cursor:not-allowed; }
+  .progress-wrap { display:grid; grid-template-columns:1fr auto; gap:8px; align-items:center; }
+  #progress { width:100%; accent-color:#1a73e8; }
+  #audioTime { min-width:88px; text-align:right; font-variant-numeric:tabular-nums; }
+  .listen-count { font-size:.92rem; color:#555; }
+  .writing-card { display:flex; flex-direction:column; gap:10px; }
+  textarea {
+    flex:1; min-height:250px; width:100%; resize:none;
+    border:2px solid #aeb8c3; border-radius:8px; padding:14px;
+    font-family:Arial, sans-serif; font-size:18px; line-height:1.55;
+    background:#fff; color:#111;
+  }
+  textarea:focus { outline:none; border-color:#1a73e8; box-shadow:0 0 0 3px rgba(26,115,232,.12); }
+  textarea:disabled { background:#f7f7f7; color:#222; opacity:1; }
+  .counter { text-align:right; font-size:.9rem; color:#666; }
+  #feedback { display:none; padding:12px; border-radius:8px; border:1px solid #d0d6dc; background:#fff; max-height:210px; overflow:auto; }
+  #feedback.visible { display:block; }
+  .feedback-title { font-weight:700; color:#2c3e50; margin-bottom:6px; }
+  .word-ok { color:#16803b; }
+  .word-wrong { color:#c00000; font-weight:700; text-decoration:underline; }
+  .word-added { color:#7b2cbf; font-weight:700; text-decoration:line-through; }
+  .word-missing { color:#d97706; font-weight:700; }
+  .legend { font-size:.86rem; margin-top:8px; color:#555; }
+  .scoreline { margin-top:8px; font-weight:700; }
+  .footer {
+    display:flex; justify-content:space-between; align-items:center; gap:10px;
+    padding:10px 14px;
+  }
+  .footer-right { display:flex; gap:8px; margin-left:auto; }
+  #status { min-height:22px; color:#555; font-size:.9rem; }
+  @media (max-height: 800px) {
+    .page { padding:14px 24px 14px; gap:10px; }
+    .instructions { padding:10px 18px; }
+    .scenario-line img, .instruction-line img { width:45px; height:45px; }
+    .consignes { font-size:.92rem; }
+    .player-card, .writing-card { padding:12px; }
+    textarea { min-height:190px; font-size:17px; }
+    button { padding:9px 13px; }
+  }
+  @media (max-width: 980px) {
+    .workspace { grid-template-columns:1fr; }
+    textarea { min-height:260px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <section class="card instructions">
+    <div class="scenario-line">
+      <img src="imageqcm/scenario.png" alt="">
+      <div>
+        <span class="label">Scénario :</span>
+        <p class="scenario-text">Vous travaillez au service administratif et commercial. Un client téléphone pour signaler un problème concernant une livraison. Votre responsable vous demande de prendre en note fidèlement son message afin de transmettre la réclamation au service concerné.</p>
+      </div>
+    </div>
+    <div class="instruction-line">
+      <img src="imageqcm/avatar_transparant.png" alt="Consigne">
+      <div>
+        <span class="label">Consigne :</span>
+        <ul class="consignes">
+          <li>Écoutez l'enregistrement avec le haut-parleur ou un casque. Vous pouvez le mettre en pause, le reprendre, l'arrêter ou le recommencer autant de fois que nécessaire.</li>
+          <li>Saisissez exactement le texte entendu en respectant l'orthographe, les accents, les apostrophes, les majuscules et la ponctuation.</li>
+          <li>Relisez votre texte avant de cliquer sur <strong>Vérifier</strong>. Après vérification, votre réponse sera verrouillée et ne pourra plus être modifiée.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <div class="workspace">
+    <section class="card player-card" aria-label="Lecteur de dictée">
+      <h2>Écouter la dictée</h2>
+      <div class="audio-info">Le débit est fixé à la vitesse normale <strong>1,00</strong>. Il n'est pas possible d'accélérer l'enregistrement.</div>
+      <audio id="dicteeAudio" src="dictee-reclamation-client.wav" preload="auto"></audio>
+      <div class="controls">
+        <button type="button" id="playBtn" class="primary">▶ Lire / Reprendre</button>
+        <button type="button" id="pauseBtn" class="secondary">⏸ Pause</button>
+        <button type="button" id="stopBtn" class="secondary">⏹ Stop</button>
+        <button type="button" id="restartBtn" class="secondary">↺ Recommencer</button>
+      </div>
+      <div class="progress-wrap">
+        <input id="progress" type="range" min="0" max="1000" value="0" aria-label="Progression de l'enregistrement">
+        <span id="audioTime">00:00 / 00:00</span>
+      </div>
+      <div class="listen-count">Nombre de lectures depuis le début : <strong id="listenCount">0</strong></div>
+      <div id="status" aria-live="polite">Prêt.</div>
+    </section>
+
+    <section class="card writing-card">
+      <h2>Votre texte</h2>
+      <textarea id="candidateText" spellcheck="false" autocomplete="off" placeholder="Tapez ici le texte que vous entendez…"></textarea>
+      <div class="counter"><span id="wordCount">0</span> mot(s) saisi(s)</div>
+      <div id="feedback" aria-live="polite"></div>
+    </section>
+  </div>
+
+  <footer class="card footer">
+    <button type="button" id="abandonBtn" class="danger">Abandonner l'exercice</button>
+    <div class="footer-right">
+      <button type="button" id="verifyBtn" class="primary">Vérifier</button>
+      <button type="button" id="nextBtn" class="primary" disabled>Suivant →</button>
+    </div>
+  </footer>
+</div>
+
+<script id="seb-ui-runtime-loader" src="js/seb-ui-runtime.js"></script>
+
+<style id="seb-dictee-stable-style">
+#verifyBtn,#nextBtn,#feedback{display:none!important;visibility:hidden!important;}
+#seb-dictee-action{display:inline-flex!important;position:fixed!important;left:50%!important;right:auto!important;bottom:22px!important;transform:translateX(-50%)!important;z-index:1200!important;margin:0!important;align-self:auto!important;font-weight:700;}
+</style>
+<script src="js/seb-parcours.js"></script>
+<script src="js/dictee-page.js"></script>
+</body>
+</html>

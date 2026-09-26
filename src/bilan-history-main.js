@@ -331,4 +331,87 @@ module.exports = function registerBilanHistory({ app, ipcMain, getAdminUnlocked,
       return { ok:false, error:error && error.message ? error.message : String(error) };
     }
   });
+  function historicalWordDir() {
+    return path.join(app.getPath('documents'), 'SEB EvalPro');
+  }
+
+  function historicalWordArchiveDir(candidate) {
+    const normalized = normalizeCandidate(candidate);
+    const record = selectCandidate(listCandidateDirs(candidatesRoot, false), normalized);
+    if (!record) return null;
+    const directory = path.join(record.candidateDir, 'bilan', 'exports');
+    ensureDir(directory);
+    return directory;
+  }
+
+  function historicalWordPath(filename) {
+    const directory = historicalWordDir();
+    fs.mkdirSync(directory, { recursive: true });
+    return path.join(directory, filename);
+  }
+
+  function cleanupLegacyHistoricalWords(filename) {
+    const directory = historicalWordDir();
+    fs.mkdirSync(directory, { recursive: true });
+    const parsed = path.parse(filename);
+    const escapedBase = String(parsed.name).replace(/[.*+?^$(){}|[\]\\]/g, '\\$&');
+    const oldRevision = new RegExp('^' + escapedBase + '_R\\d+(?:_\\d+)?\\.doc$', 'i');
+    const oldDuplicate = new RegExp('^' + escapedBase + '_\\d+\\.doc$', 'i');
+    for (const entry of fs.readdirSync(directory)) {
+      if (entry.toLowerCase() === filename.toLowerCase()) continue;
+      if (!oldRevision.test(entry) && !oldDuplicate.test(entry)) continue;
+      try { fs.rmSync(path.join(directory, entry), { force: true }); } catch (_) {}
+    }
+  }
+
+  ipcMain.on('bilan-history:write-word-sync', (event, payload) => {
+    if (!getAdminUnlocked()) {
+      event.returnValue = { ok: false, error: 'Accès administrateur requis.' };
+      return;
+    }
+    try {
+      const filename = path.basename(String((payload && payload.filename) || ''));
+      if (!filename || !filename.toLowerCase().endsWith('.doc')) throw new Error('Nom du document Word invalide.');
+      const html = String((payload && payload.html) || '');
+      if (html.length < 100 || !html.includes('<table')) throw new Error('Contenu Word vide ou invalide.');
+      const candidate = normalizeCandidate(payload && payload.candidate);
+      cleanupLegacyHistoricalWords(filename);
+      const target = historicalWordPath(filename);
+      const temp = `${target}.tmp`;
+      fs.writeFileSync(temp, '\uFEFF' + html, 'utf8');
+      if (fs.existsSync(target)) fs.rmSync(target, { force: true });
+      fs.renameSync(temp, target);
+      if (!fs.existsSync(target)) throw new Error('Le document Word n’a pas été créé sur le disque.');
+      const size = fs.statSync(target).size;
+      if (size < 100) throw new Error('Le document Word créé est vide.');
+
+      const archiveDir = historicalWordArchiveDir(candidate);
+      if (archiveDir) {
+        fs.copyFileSync(target, path.join(archiveDir, path.basename(target)));
+      }
+
+      event.returnValue = { ok: true, filename: path.basename(target), path: target, size };
+    } catch (error) {
+      event.returnValue = { ok: false, error: error && error.message ? error.message : String(error) };
+    }
+  });
+
+  ipcMain.on('bilan-history:get-word-template-sync', (event) => {
+    if (!getAdminUnlocked()) {
+      event.returnValue = { ok: false, error: 'Accès administrateur requis.' };
+      return;
+    }
+    try {
+      const templatePath = path.join(__dirname, '..', 'app', 'web', 'admin-bilan.html');
+      if (!fs.existsSync(templatePath)) throw new Error('Modèle institutionnel du bilan introuvable.');
+      const html = fs.readFileSync(templatePath, 'utf8');
+      if (!html.includes('id="bilan"') || !html.includes('data-r="fabrication-plan"')) {
+        throw new Error('Modèle institutionnel du bilan invalide.');
+      }
+      event.returnValue = { ok: true, html };
+    } catch (error) {
+      event.returnValue = { ok: false, error: error && error.message ? error.message : String(error) };
+    }
+  });
+
 };

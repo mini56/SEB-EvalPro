@@ -1,4 +1,3 @@
-
 /*== touche enter et pavé <= => */
 document.addEventListener('DOMContentLoaded', () => {
   const fields = document.querySelectorAll('.step');
@@ -28,6 +27,12 @@ document.addEventListener('DOMContentLoaded', () => {
 function verifierNomLieu() {
   const nom = document.getElementById('nom')?.value.trim() || '';
   const prénom = document.getElementById('prénom')?.value.trim() || '';
+  const civilite = document.getElementById('civilite')?.value || '';
+  if (!civilite) {
+    alert('Veuillez sélectionner une civilité.');
+    document.getElementById('civilite')?.focus();
+    return false;
+  }
   const lieu = document.getElementById('lieu')?.value.trim() || '';
   const groupe = document.getElementById('groupe')?.value.trim() || '';
   const date = document.getElementById('dateTest')?.value || '';
@@ -39,7 +44,7 @@ function verifierNomLieu() {
   
   // SAUVEGARDE DANS sessionStorage
   try {
-    const candidatData = { nom, prénom, lieu, groupe, date };
+    const candidatData = { nom, prénom, civilite, lieu, groupe, date };
     sessionStorage.setItem('candidat_data', JSON.stringify(candidatData));
     console.log('✅ Données candidat sauvegardées:', candidatData);
   } catch(e) {
@@ -184,6 +189,12 @@ function saveAnswer(num, rep, pts){
 
 /* === Sauvegarde des réponses d'un tableau (MODIFIÉE pour inclure commentaires) === */
 function saveTableAnswers(pageNum) {
+  try {
+    const persistedResponses = JSON.parse(sessionStorage.getItem('reponses_data') || '{}') || {};
+    const persistedScores = JSON.parse(sessionStorage.getItem('scores_data') || '{}') || {};
+    reponses = { ...persistedResponses, ...reponses };
+    scores = { ...persistedScores, ...scores };
+  } catch (_) {}
   // Pont historique conservé pendant la migration progressive du QCM.
   if (pageNum == 6 && window.sebQcmPage6?.save) return window.sebQcmPage6.save();
   return;
@@ -229,6 +240,97 @@ function afficherResultat() {
     console.log('✅ Réponses / Scores récupérés');
   } catch (e) {
     console.warn('⚠️ Erreur récupération réponses/scores:', e);
+  }
+
+  // Récupération renforcée Page 3 — Réception & Rangement.
+  try {
+    const dedicated = JSON.parse(sessionStorage.getItem('page3_resultats') || 'null');
+    if (dedicated && dedicated.reponses) Object.assign(reponses, dedicated.reponses);
+    if (dedicated && dedicated.scores) Object.assign(scores, dedicated.scores);
+
+    let hasPage3 = Array.from({ length: 14 }, (_, index) => index + 1)
+      .some(i => String(reponses['page3_q' + i] || '').trim() !== '');
+
+    if (!hasPage3) {
+      const canonical = JSON.parse(sessionStorage.getItem('seb_evalpro_qcm_page3_state') || 'null');
+      if (canonical && canonical.values) {
+        for (let i = 1; i <= 14; i++) {
+          const value = String(canonical.values[i] == null ? '' : canonical.values[i]).trim();
+          reponses['page3_q' + i] = value;
+          scores['page3_q' + i] = (window.sebQcmPage3 && window.sebQcmPage3.sameTime(value, window.sebQcmPage3.answers[i])) ? 1 : 0;
+        }
+        hasPage3 = true;
+      }
+    }
+
+    if (!hasPage3) {
+      const drafts = JSON.parse(sessionStorage.getItem('seb_evalpro_qcm_drafts') || '{}') || {};
+      const draft = drafts.page3;
+      if (draft && Array.isArray(draft.values)) {
+        draft.values.forEach(saved => {
+          const match = String(saved && saved.id || '').match(/^reponse3_(\d+)$/);
+          if (!match) return;
+          const i = Number(match[1]);
+          if (i < 1 || i > 14) return;
+          const value = String(saved.value == null ? '' : saved.value).trim();
+          reponses['page3_q' + i] = value;
+          scores['page3_q' + i] = (window.sebQcmPage3 && window.sebQcmPage3.sameTime(value, window.sebQcmPage3.answers[i])) ? 1 : 0;
+        });
+      }
+    }
+  } catch (e) {
+    console.warn('⚠️ Récupération renforcée Page 3 impossible:', e);
+  }
+
+  // SEB_PAGE5_RESULTS_RECOVERY
+  try {
+    let organisation = JSON.parse(sessionStorage.getItem('page5_organisation_data') || 'null');
+
+    if (!organisation || typeof organisation !== 'object') {
+      const state = JSON.parse(sessionStorage.getItem('seb_evalpro_qcm_page5_state') || 'null');
+      if (state && state.values) {
+        organisation = {};
+        for (let i = 1; i <= 8; i++) {
+          const value = String(state.values[i] == null ? '' : state.values[i]).trim();
+          organisation[i] = {
+            reponse:value,
+            score:(window.sebQcmPage5 && value === String(window.sebQcmPage5.answers[i])) ? 1 : 0
+          };
+        }
+      }
+    }
+
+    if (!organisation || typeof organisation !== 'object') {
+      const drafts = JSON.parse(sessionStorage.getItem('seb_evalpro_qcm_drafts') || '{}') || {};
+      const draft = drafts.page5;
+      if (draft && Array.isArray(draft.values)) {
+        organisation = {};
+        for (let i = 1; i <= 8; i++) {
+          const wanted = 'reponse5_' + i;
+          const saved = draft.values.find(v => v && v.id === wanted);
+          if (!saved) continue;
+          const value = String(saved.value == null ? '' : saved.value).trim();
+          organisation[i] = {
+            reponse:value,
+            score:(window.sebQcmPage5 && value === String(window.sebQcmPage5.answers[i])) ? 1 : 0
+          };
+        }
+      }
+    }
+
+    if (organisation && typeof organisation === 'object') {
+      for (let i = 1; i <= 8; i++) {
+        const item = organisation[i] || organisation[String(i)];
+        if (!item) continue;
+        const key = 'page5_q' + i;
+        if (!Object.prototype.hasOwnProperty.call(reponses, key) || String(reponses[key] || '').trim() === '') {
+          reponses[key] = String(item.reponse == null ? '' : item.reponse);
+          scores[key] = Number(item.score || 0);
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('Récupération Page 5 impossible:', e);
   }
 
   // ===============================
@@ -318,9 +420,7 @@ function afficherResultat() {
                  <pre style="font-family: Arial; font-size:12px; white-space: pre-wrap;">${texteLibre.texte || ''}</pre>
                </div>
                <p><b>Score texte libre :</b> ${scoreTexte}/8</p>`;
-
-      total += scoreTexte;
-      totalQuestions += 8;
+      // Le traitement de texte est évalué séparément dans le bilan : il n'entre pas dans le score général.
     }
   } catch (e) {
     console.warn('⚠️ Erreur récupération page 7: texte libre', e);
@@ -388,12 +488,12 @@ function afficherResultat() {
 
   // Page 4 — Fractions
   html += `<hr><h3>Page 4 — Fractions</h3><p class="ligne">`;
-  const rep4 = reponses['page4'] || "0/0";
+  const rep4 = reponses['page4'] || "0/3";
   const sc4 = scores['page4'] || 0;
   let denom4 = 0;
   if (rep4.includes('/')) denom4 = parseInt(rep4.split('/')[1]) || 0;
   total += sc4;
-  totalQuestions += denom4 || 1;
+  totalQuestions += denom4 || 3;
   html += `<span class="${sc4 > 0 ? 'correct' : 'incorrect'}">Score fractions : ${rep4}</span>`;
   html += `</p>`;
 
@@ -423,12 +523,12 @@ function afficherResultat() {
   if (!Array.isArray(repTxt)) repTxt = [];
   const scTxt = scores['pageTexteTrous'] || 0;
   total += scTxt;
-  totalQuestions += repTxt.length || 1;
+  totalQuestions += repTxt.length || 15;
 
   const txtAnswers = repTxt.map(r =>
     `<span class="${(r && r.user === r.correct) ? 'correct' : 'incorrect'}">${r?.user || '...'}</span>`
   ).join(" ");
-  html += `${txtAnswers} (Score : ${scTxt}/${repTxt.length || 0})</p>`;
+  html += `${txtAnswers} (Score : ${scTxt}/${repTxt.length || 15})</p>`;
   
 // === EXERCICE GENRE ET NOMBRES ===
 const erreursGN = sessionStorage.getItem('erreurs_exercice');
@@ -536,14 +636,68 @@ try {
     console.error('❌ Erreur affichage paronymes:', e);
 }
 
+
+  // === DICTÉE PROFESSIONNELLE ===
+  try {
+    const dictee = JSON.parse(sessionStorage.getItem('dictee_data') || 'null');
+    if (dictee && (dictee.status === 'verified' || dictee.status === 'abandoned')) {
+      const dicteeScore = Math.max(0, Math.min(20, Number(dictee.scoreSur20) || 0));
+      const dicteeTotal = 20;
+      const dicteeCorrect = Number(dictee.motsCorrects) || 0;
+      const dicteeWordsTotal = Number(dictee.motsTotal) || 80;
+      const dicteeSub = Number(dictee.substitutions) || 0;
+      const dicteeOmissions = Number(dictee.omissions) || 0;
+      const dicteeAjouts = Number(dictee.ajouts) || 0;
+      const dicteePonct = Number(dictee.erreursPonctuation) || 0;
+      const dicteeMaj = Number(dictee.erreursMajuscules) || 0;
+      const dicteeEcoutes = Number(dictee.ecoutes) || 0;
+      const escapeDictee = (value) => String(value == null ? '' : value).replace(/[&<>"']/g, c => ({
+        '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+      }[c]));
+
+      let correction = '';
+      if (Array.isArray(dictee.alignment) && dictee.alignment.length) {
+        correction = dictee.alignment.map(item => {
+          if (!item) return '';
+          if (item.type === 'match') return '<span class="correct">' + escapeDictee(item.actual) + '</span>';
+          if (item.type === 'substitute') return '<span class="incorrect" title="Attendu : ' + escapeDictee(item.expected) + '">' + escapeDictee(item.actual || '…') + '</span>';
+          if (item.type === 'insert') return '<span style="color:#7b2cbf;font-weight:bold;text-decoration:line-through;" title="Mot ajouté">' + escapeDictee(item.actual) + '</span>';
+          if (item.type === 'delete') return '<span style="color:#d97706;font-weight:bold;" title="Mot oublié">[' + escapeDictee(item.expected) + ']</span>';
+          return '';
+        }).join(' ');
+      }
+
+      html += '<hr><div id="seb-dictee-results"><h3>Dictée professionnelle — Réclamation client</h3>';
+      if (dictee.status === 'abandoned') {
+        html += '<p class="incorrect"><b>Exercice abandonné — Score : 0/20</b></p>';
+      } else {
+        html += '<p><b>Score :</b> <span class="' + (dicteeScore >= 15 ? 'correct' : (dicteeScore >= 10 ? 'commentaire' : 'incorrect')) + '">' + dicteeScore + '/20</span>' +
+                ' — <b>Mots correctement alignés :</b> ' + dicteeCorrect + '/' + dicteeWordsTotal + '</p>';
+      }
+      html += '<p class="ligne"><span>Mots incorrects : ' + dicteeSub + '</span><span>Omissions : ' + dicteeOmissions + '</span><span>Ajouts : ' + dicteeAjouts + '</span>' +
+              '<span>Ponctuation : ' + dicteePonct + '</span><span>Majuscules : ' + dicteeMaj + '</span><span>Lectures depuis le début : ' + dicteeEcoutes + '</span></p>';
+      if (dictee.texte) {
+        html += '<div class="message-block"><b>Texte saisi :</b><pre style="font-family:Arial;font-size:12px;white-space:pre-wrap;">' + escapeDictee(dictee.texte) + '</pre></div>';
+      }
+      if (correction) {
+        html += '<div class="message-block"><b>Correction colorée :</b><div style="line-height:1.6;margin-top:4px;">' + correction + '</div>' +
+                '<div class="commentaire" style="margin-top:5px;">Vert : correct · Rouge : incorrect · Orange : oublié · Violet barré : ajouté.</div></div>';
+      }
+      html += '</div>';
+
+      total += dicteeScore;
+      totalQuestions += dicteeTotal;
+    }
+  } catch (e) {
+    console.warn('⚠️ Erreur affichage dictée:', e);
+  }
+
   // === Page 7 — Rédaction de texte ===
   if (reponses['page7_analyse']) {
     const analyse = reponses['page7_analyse'];
     const score7 = scores['page7'] || 0;
-    const scoreMax = 7;
-
-    total += score7;
-    totalQuestions += scoreMax;
+    const scoreMax = 8;
+    // Le traitement de texte est évalué séparément dans le bilan : il n'entre pas dans le score général.
 
     html += `<hr><h3>Page 7 — Rédaction de texte</h3>`;
     html += `<h4>📌 Titre</h4><p class="ligne">`;
@@ -565,6 +719,7 @@ try {
     html += `<span class="${analyse.score.texte_lignes ? 'correct' : 'incorrect'}">${analyse.score.texte_lignes ? '✓' : '✗'} Minimum 10 lignes (${analyse.lignes} lignes)</span>`;
     html += `<span class="${analyse.score.texte_police ? 'correct' : 'incorrect'}">${analyse.score.texte_police ? '✓' : '✗'} Police Arial (détecté: ${analyse.texte.police || 'inconnue'})</span>`;
     html += `<span class="${analyse.score.texte_taille ? 'correct' : 'incorrect'}">${analyse.score.texte_taille ? '✓' : '✗'} Taille 12px (détecté: ${analyse.texte.taille || 'inconnue'})</span>`;
+    html += '<span class="' + (analyse.score.enregistrement ? 'correct' : 'incorrect') + '">' + (analyse.score.enregistrement ? '✓' : '✗') + ' Enregistrement conforme</span>';
     html += `</p>`;
     html += `<p><strong>Score Page 7 :</strong> <span class="${score7 === scoreMax ? 'correct' : (score7 >= scoreMax / 2 ? 'commentaire' : 'incorrect')}">${score7}/${scoreMax}</span></p>`;
     html += `<div class="message-block" style="max-height: 200px; overflow-y: auto; margin-top: 10px;"><h4>📄 Contenu rédigé :</h4><div style="border: 1px solid #ddd; padding: 12px; background: #fafafa; border-radius: 4px;">${reponses['page7_contenu_html'] || '<i>Aucun contenu</i>'}</div></div>`;
@@ -700,7 +855,6 @@ try {
   <p class="ligne">
     <span><strong>⏱️ Temps :</strong> ${evalBrique.temps || "—"}</span>
     <span><strong>📊 Nombre d'erreur(s) :</strong> ${evalBrique.niveau || "—"}/10</span>
-    <span><strong>🔑 Code :</strong> ${evalBrique.code || "—"}</span>
   </p>
 `;
 
@@ -719,9 +873,7 @@ try {
       briqueHTML += `
   <div style="margin-top:10px;">
     <div style="font-weight:bold;color:#16a34a;">🟩 Autoévaluation personnelle :</div>
-    <div style="margin:5px 0 5px 20px;">
-      ${selections.length ? selections.join("<br>") : "<em>Aucune case cochée.</em>"}
-    </div>
+    <div style="margin:5px 0;">${selections.length ? selections.join("<br>") : "<em>Aucune case cochée.</em>"}</div>
     ${evalBriqueAuto.commentaire ? `
     <div style="font-weight:bold; margin-top:8px;">💬 Commentaire :</div>
     <div style="margin:3px 0;font-style:italic;color:#555;">${evalBriqueAuto.commentaire}</div>
@@ -784,7 +936,7 @@ try {
 
 // === CARRÉ MAGIQUE ===
 try {
-  const puzzleErrors = sessionStorage.getItem('puzzleErrors');
+  const puzzleErrors = sessionStorage.getItem('carre_magique_erreurs') ?? sessionStorage.getItem('puzzleErrors');
   
   if (puzzleErrors !== null && puzzleErrors !== undefined && puzzleErrors !== "") {
     const erreurs = parseInt(puzzleErrors) || 0;
@@ -1030,10 +1182,7 @@ document.addEventListener('DOMContentLoaded', function(){
   if (dt) dt.value = new Date().toISOString().slice(0,10);
 });
 
-
-
-/* ---- bloc inline historique suivant ---- */
-
+/* ---- migrated final runtime block ---- */
 
 document.addEventListener("DOMContentLoaded", () => {
   const target = sessionStorage.getItem("goto_page");
@@ -1043,9 +1192,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 
-
-/* ---- bloc inline historique suivant ---- */
-
+/* ---- migrated final runtime block ---- */
 
   <!-- page bilan-->
 function verifierDonnees() {
@@ -1100,9 +1247,7 @@ function verifierDonnees() {
     alert(messages.join("\n\n"));
 }
 
-
-/* ---- bloc inline historique suivant ---- */
-
+/* ---- migrated final runtime block ---- */
 
 /**
  * Script d'auto-remplissage du bilan basé sur les données de qcmv1.0.html
@@ -1211,6 +1356,15 @@ function autoRemplirBilan() {
     scoreExpressionTotale += scoreGN;
     totalExpressionTotale += 20;
     
+
+    // Dictée professionnelle — note sur 20 intégrée à la même moyenne.
+    const dicteeExpression = JSON.parse(sessionStorage.getItem('dictee_data') || 'null');
+    if (dicteeExpression && (dicteeExpression.status === 'verified' || dicteeExpression.status === 'abandoned')) {
+      const scoreDictee = Math.max(0, Math.min(20, Number(dicteeExpression.scoreSur20) || 0));
+      scoreExpressionTotale += scoreDictee;
+      totalExpressionTotale += 20;
+    }
+
     const pourcentExpression = totalExpressionTotale > 0 
       ? Math.round((scoreExpressionTotale / totalExpressionTotale) * 100) 
       : 0;
@@ -1219,6 +1373,7 @@ function autoRemplirBilan() {
       texteTrous: `${scoreTexteTrous}/${totalTexteTrous}`,
       paronymes: `${scoreParonymes}/${totalParonymes}`,
       genreNombre: `${scoreGN}/20`,
+      dictee: dicteeExpression && (dicteeExpression.status === 'verified' || dicteeExpression.status === 'abandoned') ? `${Number(dicteeExpression.scoreSur20) || 0}/20` : 'non réalisée',
       total: `${scoreExpressionTotale}/${totalExpressionTotale}`,
       pourcentage: pourcentExpression
     });
@@ -1701,9 +1856,7 @@ function verifierDonnees() {
   console.log('=== FIN VÉRIFICATION ===');
 }
 
-
-/* ---- bloc inline historique suivant ---- */
-
+/* ---- migrated final runtime block ---- */
 
     /**
      * Détermine le niveau d'évaluation en fonction du texte sélectionné
@@ -2544,6 +2697,97 @@ table table td {
 </head>
 <body>
 ${table.outerHTML}
+
+<script id="seb-dictee-complex-results-v3">
+(function(){
+  'use strict';
+  
+function sebClassifyAlignmentV3(alignment){
+  const core=t=>String(t||'').normalize('NFC').replace(/\s*[.,;:!?…]+$/u,'').replace(/’/g,"'").toLowerCase();
+  const dist=(a,b)=>{const l=Array.from(a||''),r=Array.from(b||'');let p=Array.from({length:r.length+1},(_,i)=>i);for(let i=1;i<=l.length;i++){const c=new Array(r.length+1);c[0]=i;for(let j=1;j<=r.length;j++)c[j]=Math.min(c[j-1]+1,p[j]+1,p[j-1]+(l[i-1]===r[j-1]?0:1));p=c}return p[r.length]};
+  const expected=[],actual=[],types={},assigned=new Map();
+  alignment.forEach((item,index)=>{
+    types[index]=item.type;
+    if(item.type==='substitute'||item.type==='delete')expected.push({index,token:item.expected,used:false});
+    if(item.type==='substitute'||item.type==='insert')actual.push({index,token:item.actual,used:false});
+  });
+
+  // 1) Déplacements exacts : on apparie d'abord les mêmes mots présents ailleurs.
+  //    Le tri global par distance évite qu'un doublon lointain vole le bon partenaire.
+  const movedCandidates=[];
+  actual.forEach(a=>expected.forEach(e=>{
+    const ac=core(a.token),ec=core(e.token),d=Math.abs(a.index-e.index);
+    if(ac.length>=4&&ac===ec&&a.index!==e.index&&d<=16)movedCandidates.push({a,e,d});
+  }));
+  movedCandidates.sort((x,y)=>(x.d-y.d)||(x.a.index-y.a.index)||(x.e.index-y.e.index));
+  movedCandidates.forEach(({a,e})=>{
+    if(a.used||e.used)return;
+    a.used=true;e.used=true;assigned.set(a.index,{type:'moved',expected:e.token});
+  });
+
+  // 2) Les substitutions qui restent à leur position d'origine restent des fautes.
+  actual.forEach(a=>{
+    if(a.used||types[a.index]!=='substitute')return;
+    const e=expected.find(x=>x.index===a.index&&!x.used);
+    if(!e)return;
+    a.used=true;e.used=true;assigned.set(a.index,{type:'substitute',expected:e.token});
+  });
+
+  // 3) Un mot inséré très proche orthographiquement d'un mot attendu est une faute
+  //    d'orthographe, pas un ajout + une omission artificiels (ex. envoie/envoi).
+  actual.forEach(a=>{
+    if(a.used)return;
+    const ac=core(a.token),c=[];
+    expected.forEach(e=>{
+      if(e.used||Math.abs(e.index-a.index)>8)return;
+      const ec=core(e.token),ratio=dist(ac,ec)/Math.max(ac.length,ec.length,1);
+      if(ac.length>=3&&ec.length>=3&&ratio<=0.35)c.push({e,ratio,d:Math.abs(e.index-a.index)});
+    });
+    c.sort((x,y)=>(x.ratio-y.ratio)||(x.d-y.d));
+    if(!c.length)return;
+    a.used=true;c[0].e.used=true;assigned.set(a.index,{type:'substitute',expected:c[0].e.token});
+  });
+
+  actual.forEach(a=>{if(!a.used){a.used=true;assigned.set(a.index,{type:'insert',expected:''})}});
+  const missing=new Map(expected.filter(e=>!e.used).map(e=>[e.index,e.token]));
+  const items=[];
+  alignment.forEach((item,index)=>{
+    if(missing.has(index))items.push({type:'delete',expected:missing.get(index),actual:''});
+    if(item.type==='match'){items.push({type:'match',expected:item.expected,actual:item.actual});return}
+    if(!item.actual)return;
+    const a=assigned.get(index)||{type:'insert',expected:''};
+    items.push({type:a.type,expected:a.expected||'',actual:item.actual});
+  });
+  return{
+    items,
+    substitutions:items.filter(i=>i.type==='substitute').length,
+    omissions:items.filter(i=>i.type==='delete').length,
+    additions:items.filter(i=>i.type==='insert').length,
+    moved:items.filter(i=>i.type==='moved').length
+  };
+}
+  function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c])}
+  function refresh(){
+    const root=document.getElementById('seb-dictee-results');if(!root)return;
+    let d=null;try{d=JSON.parse(sessionStorage.getItem('dictee_data')||'null')}catch(_){}
+    if(!d||d.status!=='verified')return;
+    const base=Array.isArray(d.alignmentOriginal)?d.alignmentOriginal:(Array.isArray(d.alignment)?d.alignment:null);if(!base)return;
+    if(d.classificationVersion!==3){const c=sebClassifyAlignmentV3(base);if(!d.alignmentOriginal)d.alignmentOriginal=base;d.alignment=c.items;d.substitutions=c.substitutions;d.omissions=c.omissions;d.ajouts=c.additions;d.deplacements=c.moved;d.classificationVersion=3;try{sessionStorage.setItem('dictee_data',JSON.stringify(d))}catch(_){}}
+    if(!Array.isArray(d.alignment))return;
+    const sig=[d.substitutions,d.omissions,d.ajouts,d.deplacements,d.erreursPonctuation,d.erreursMajuscules,d.ecoutes].join('|');
+    const lineNow=root.querySelector('p.ligne');
+    const correctionNow=Array.from(root.querySelectorAll('.message-block')).find(b=>String(b.textContent||'').toLowerCase().includes('correction colorée'));
+    const domV3=!!lineNow&&String(lineNow.textContent||'').includes('Déplacements : '+(d.deplacements||0))&&!!correctionNow&&String(correctionNow.textContent||'').includes('Bleu souligné : déplacé');
+    if(root.dataset.sebDictV3===sig&&domV3)return;root.dataset.sebDictV3=sig;
+    const line=root.querySelector('p.ligne');
+    if(line)line.innerHTML='<span>Mots incorrects : '+(d.substitutions||0)+'</span><span>Omissions : '+(d.omissions||0)+'</span><span>Ajouts : '+(d.ajouts||0)+'</span><span>Déplacements : '+(d.deplacements||0)+'</span><span>Ponctuation : '+(d.erreursPonctuation||0)+'</span><span>Majuscules : '+(d.erreursMajuscules||0)+'</span><span>Lectures depuis le début : '+(d.ecoutes||0)+'</span>';
+    const blocks=Array.from(root.querySelectorAll('.message-block'));const correction=blocks.find(b=>String(b.textContent||'').toLowerCase().includes('correction colorée'));
+    if(correction){const parts=d.alignment.map(item=>{if(item.type==='match')return '<span class="correct">'+esc(item.actual)+'</span>';if(item.type==='moved')return '<span style="color:#1565c0;font-weight:bold;text-decoration:underline;" title="Mot déplacé — attendu : '+esc(item.expected)+'">'+esc(item.actual)+'</span>';if(item.type==='substitute')return '<span class="incorrect" title="Attendu : '+esc(item.expected)+'">'+esc(item.actual||'…')+'</span>';if(item.type==='insert')return '<span style="color:#7b2cbf;font-weight:bold;text-decoration:line-through;" title="Mot ajouté">'+esc(item.actual)+'</span>';if(item.type==='delete')return '<span style="color:#d97706;font-weight:bold;" title="Mot oublié">['+esc(item.expected)+']</span>';return ''}).join(' ');correction.innerHTML='<b>Correction colorée :</b><div style="line-height:1.6;margin-top:4px;">'+parts+'</div><div class="commentaire" style="margin-top:5px;">Vert : correct · Rouge : incorrect · Orange : oublié · Bleu souligné : déplacé · Violet barré : ajouté.</div>'}
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(refresh,0),{once:true});else setTimeout(refresh,0);
+  new MutationObserver(()=>requestAnimationFrame(refresh)).observe(document.documentElement,{childList:true,subtree:true});
+})();
+
 </body>
 </html>`;
  // ============================================
@@ -2580,38 +2824,143 @@ document.body.removeChild(link);
 setTimeout(() => URL.revokeObjectURL(url), 100);
 }
   
-/* === Liaison externe des commandes HTML QCM === */
-(function () {
-  'use strict';
-  function runAction(action) {
-    switch (action) {
-      case 'open-calculator': if (typeof window.openCalculator === 'function') window.openCalculator(); return;
-      case 'start-evaluation': if (typeof window.verifierNomLieu === 'function') window.verifierNomLieu(); return;
-      case 'page1-next': if (typeof window.nextPage === 'function') window.nextPage('2'); return;
-      case 'page9-good': if (typeof window.saveAnswer === 'function') window.saveAnswer(9,'Bonne',0); if (typeof window.nextPage === 'function') window.nextPage(10); return;
-      case 'page9-bad': if (typeof window.saveAnswer === 'function') window.saveAnswer(9,'Mauvaise',0); if (typeof window.nextPage === 'function') window.nextPage(10); return;
-      case 'page10-good': if (typeof window.saveAnswer === 'function') window.saveAnswer(10,'Bonne',0); if (typeof window.nextPage === 'function') window.nextPage(11); return;
-      case 'page10-bad': if (typeof window.saveAnswer === 'function') window.saveAnswer(10,'Mauvaise',0); if (typeof window.nextPage === 'function') window.nextPage(11); return;
-      case 'page11-next': if (typeof window.nextPage === 'function') window.nextPage('finale'); return;
-      case 'verify-data': if (typeof window.verifierDonnees === 'function') window.verifierDonnees(); return;
-      case 'autofill-bilan': if (typeof window.autoRemplirBilan === 'function') window.autoRemplirBilan(); return;
-      case 'export-word': if (typeof window.exportToWord === 'function') window.exportToWord(); return;
-      default: return;
-    }
+
+/* ---- migrated final runtime block ---- */
+
+(function(){
+  const VIEW_KEY = 'seb_evalpro_qcm_view';
+  const DRAFT_KEY = 'seb_evalpro_qcm_drafts';
+  const EXERCISE_KEYS_TO_CLEAR = [
+    'eval_brique',
+    'eval_brique_auto',
+    'seb_evalpro_brique_checkpoint',
+    'tri_cheville_data',
+    'autoEvaltri_resultats'
+  ];
+  let saveTimer = null;
+  let viewTimer = null;
+
+  function visiblePage(){
+    return document.querySelector('.page.visible');
   }
-  function bind() {
-    const form = document.getElementById('form-candidat');
-    if (form && form.dataset.sebSubmitBound !== '1') {
-      form.dataset.sebSubmitBound = '1';
-      form.addEventListener('submit', function (event) { event.preventDefault(); });
-    }
-    document.querySelectorAll('[data-seb-action]').forEach(function (element) {
-      if (element.dataset.sebActionBound === '1') return;
-      element.dataset.sebActionBound = '1';
-      element.addEventListener('click', function (event) { event.preventDefault(); runAction(element.dataset.sebAction || ''); });
+
+  function readDrafts(){
+    try { return JSON.parse(sessionStorage.getItem(DRAFT_KEY) || '{}') || {}; }
+    catch (_) { return {}; }
+  }
+
+  function clearPreviousBriqueAndTriForNewEvaluation(){
+    // Une nouvelle évaluation doit partir d'un état totalement vierge.
+    sessionStorage.clear();
+    localStorage.clear();
+  }
+
+  function installNewEvaluationReset(){
+    const original = window.verifierNomLieu;
+    if (typeof original !== 'function') return;
+    window.verifierNomLieu = function(){
+      const nom = document.getElementById('nom')?.value.trim() || '';
+      const prenom = document.getElementById('prénom')?.value.trim() || '';
+      const lieu = document.getElementById('lieu')?.value.trim() || '';
+      const groupe = document.getElementById('groupe')?.value.trim() || '';
+      if (nom && prenom && lieu && groupe) {
+        clearPreviousBriqueAndTriForNewEvaluation();
+      }
+      const result = original.apply(this, arguments);
+      // Le candidat vient d'être recréé par verifierNomLieu : persister immédiatement l'état propre.
+      if (window.sebEvalPro?.save) window.sebEvalPro.save();
+      return result;
+    };
+  }
+
+  function saveCurrentDraft(){
+    const page = visiblePage();
+    if (!page || !page.id || page.id === 'bilanPage') return;
+    if (page.id === 'pageTexteTrous' && window.sebQcmTexteTrous) return;
+    if (page.id === 'page4' && window.sebQcmPage4) return;
+    if (page.id === 'page5' && window.sebQcmPage5) return;
+    if (page.id === 'page5_1' && window.sebQcmPage5_1) return;
+    if (page.id === 'page6' && window.sebQcmPage6) return;
+    const controls = Array.from(page.querySelectorAll('input, textarea, select'));
+    const values = controls.map((el, index) => ({
+      index,
+      id: el.id || '',
+      name: el.name || '',
+      type: (el.type || el.tagName || '').toLowerCase(),
+      checked: !!el.checked,
+      value: el.type === 'password' || el.type === 'file' ? '' : el.value
+    }));
+    const items = Array.from(page.querySelectorAll('.item')).map((el) => el.classList.contains('selected'));
+    const drafts = readDrafts();
+    drafts[page.id] = { values, items };
+    sessionStorage.setItem(DRAFT_KEY, JSON.stringify(drafts));
+    sessionStorage.setItem(VIEW_KEY, page.id);
+    if (window.sebEvalPro?.save) window.sebEvalPro.save();
+  }
+
+  function restoreDraft(page){
+    if (page && page.id === 'pageTexteTrous' && window.sebQcmTexteTrous) return;
+    if (page && page.id === 'page4' && window.sebQcmPage4) return;
+    if (page && page.id === 'page5' && window.sebQcmPage5) return;
+    if (page && page.id === 'page5_1' && window.sebQcmPage5_1) return;
+    if (page && page.id === 'page6' && window.sebQcmPage6) return;
+    const draft = readDrafts()[page.id];
+    if (!draft) return;
+    const controls = Array.from(page.querySelectorAll('input, textarea, select'));
+    (draft.values || []).forEach((saved) => {
+      let el = saved.id ? document.getElementById(saved.id) : null;
+      if (!el || !page.contains(el)) el = controls[saved.index];
+      if (!el || el.type === 'password' || el.type === 'file') return;
+      if (el.type === 'checkbox' || el.type === 'radio') el.checked = !!saved.checked;
+      else if (saved.value !== undefined) el.value = saved.value;
     });
+    if (Array.isArray(draft.items)) {
+      Array.from(page.querySelectorAll('.item')).forEach((el, index) => {
+        el.classList.toggle('selected', !!draft.items[index]);
+        el.setAttribute('aria-pressed', draft.items[index] ? 'true' : 'false');
+      });
+    }
   }
-  window.sebQcmHtmlActions = Object.freeze({ bind, runAction });
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind, { once:true });
-  else bind();
+
+  function scheduleDraftSave(){
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveCurrentDraft, 400);
+  }
+
+  function storeVisiblePage(){
+    const page = visiblePage();
+    if (!page || !page.id || page.id === 'bilanPage') return;
+    sessionStorage.setItem(VIEW_KEY, page.id);
+    if (window.sebEvalPro?.save) window.sebEvalPro.save();
+  }
+
+  function scheduleViewSave(){
+    clearTimeout(viewTimer);
+    viewTimer = setTimeout(storeVisiblePage, 50);
+  }
+
+  function restoreView(){
+    const id = sessionStorage.getItem(VIEW_KEY);
+    const target = id ? document.getElementById(id) : null;
+    if (!target || !target.classList.contains('page') || id === 'bilanPage') return;
+    document.querySelectorAll('.page').forEach((page) => page.classList.remove('visible'));
+    target.classList.add('visible');
+    if (id === 'pageFinale' && typeof afficherResultat === 'function') afficherResultat();
+    restoreDraft(target);
+    window.scrollTo(0, 0);
+  }
+
+  document.addEventListener('DOMContentLoaded', function(){
+    installNewEvaluationReset();
+    restoreView();
+    document.addEventListener('input', scheduleDraftSave, true);
+    document.addEventListener('change', scheduleDraftSave, true);
+    document.addEventListener('click', scheduleDraftSave, true);
+
+    const observer = new MutationObserver(function(mutations){
+      if (mutations.some((m) => m.type === 'attributes' && m.attributeName === 'class')) scheduleViewSave();
+    });
+    document.querySelectorAll('.page').forEach((page) => observer.observe(page, { attributes: true, attributeFilter: ['class'] }));
+    storeVisiblePage();
+  });
 })();

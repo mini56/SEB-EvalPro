@@ -14,7 +14,7 @@ function read(rel) {
   return fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n');
 }
 
-const qcm = read('app/web/qcmv1.0.html');
+const qcm = read('app/web/qcmv1.0.html') + '\n' + read('app/web/js/qcm-runtime.js') + '\n' + read('app/web/js/qcm-runtime-ui.js') + '\n' + read('app/web/js/qcm-runtime-tail.js');
 const page = read('app/web/js/qcm-page3.js');
 const parcours = read('app/web/js/seb-parcours.js');
 
