@@ -122,8 +122,21 @@ function write(file, text) { fs.writeFileSync(file, text, 'utf8'); }
 // Tri : le garde doit permettre 3 à 5 tris.
 {
   const tri = read(triPath);
-  if (!tri.includes('return completed >= 3;')) fail('minimum 3 tris non appliqué');
-  if (tri.includes('Terminez et validez les 5 tris')) fail('ancienne obligation de 5 tris encore présente');
+  if (tri.includes('js/tri-page.js')) {
+    const triModulePath = path.join(root, 'app', 'web', 'js', 'tri-page.js');
+    const triModule = read(triModulePath);
+    if (!triModule.includes('const MIN_TRIS = 3;') ||
+        !triModule.includes('const MAX_TRIS = 5;') ||
+        !triModule.includes('completedTriIndexes().length >= MIN_TRIS')) {
+      fail('minimum 3 tris modulaire non appliqué');
+    }
+    if (/obligation de 5 tris|Terminez et validez les 5 tris/i.test(triModule)) {
+      fail('ancienne obligation modulaire de 5 tris encore présente');
+    }
+  } else {
+    if (!tri.includes('return completed >= 3;')) fail('minimum 3 tris non appliqué');
+    if (tri.includes('Terminez et validez les 5 tris')) fail('ancienne obligation de 5 tris encore présente');
+  }
 }
 
 // Tests bloquants des barèmes validés.
