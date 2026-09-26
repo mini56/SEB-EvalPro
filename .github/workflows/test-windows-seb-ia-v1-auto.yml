@@ -1,9 +1,7 @@
 name: TEST Windows SEB-IA Full Setup AUTO CLEAN 0.3.9
 
 on:
-  push:
-    branches:
-      - tmp-windows-setup-039-clean
+  workflow_dispatch:
 
 permissions:
   contents: write
