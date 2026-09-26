@@ -127,6 +127,26 @@ function patchMailResume() {
 
 function patchGenreNombreResume() {
   const { file, html } = read('genrenombres.html');
+
+  if (html.includes('js/genrenombres-page.js')) {
+    const moduleFile = path.join(webDir, 'js', 'genrenombres-page.js');
+    if (!fs.existsSync(moduleFile)) throw new Error('SEB EvalPro audit: module genrenombres-page.js introuvable');
+    const moduleText = fs.readFileSync(moduleFile, 'utf8').replace(/\r\n/g, '\n');
+    for (const token of [
+      "const ANSWERS_KEY = 'user_genrenombres';",
+      "const ERRORS_KEY = 'erreurs_exercice';",
+      "const STATE_KEY = 'seb_evalpro_genrenombres_state';",
+      'function restoreState()',
+      "window.sebParcours.goNext('genrenombres')"
+    ]) {
+      if (!moduleText.includes(token)) throw new Error('SEB EvalPro audit: contrat Genre/Nombre modulaire absent: ' + token);
+    }
+    if (/removeItem\(['"]erreurs_exercice/.test(moduleText)) {
+      throw new Error('SEB EvalPro audit: effacement destructif Genre/Nombre réintroduit');
+    }
+    return;
+  }
+
   const out = mustReplace(
     html,
     "  // clear previous data for this page\n  try { sessionStorage.removeItem('erreurs_exercice'); } catch(e){}\n",
