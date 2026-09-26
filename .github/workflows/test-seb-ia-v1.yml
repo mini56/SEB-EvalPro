@@ -64,6 +64,9 @@ jobs:
       - name: Functional Stock smoke
         run: xvfb-run -a npm run test:stock-functional
 
+      - name: Functional Planning smoke
+        run: xvfb-run -a npm run test:planning-functional
+
       - name: Verify integrated SEB-IA output
         shell: bash
         run: |
