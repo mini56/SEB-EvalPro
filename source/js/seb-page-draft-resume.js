@@ -129,7 +129,8 @@
         if (typeof saved.style === 'string') {
           if (saved.style) el.setAttribute('style', saved.style); else el.removeAttribute('style');
         }
-        if (saved.text !== null && saved.text !== undefined &&
+        const structuralContainer = id === 'consigne' || id === 'autoEvalPart';
+        if (!structuralContainer && saved.text !== null && saved.text !== undefined &&
             !(el instanceof HTMLInputElement) && !(el instanceof HTMLTextAreaElement) && !(el instanceof HTMLSelectElement)) {
           el.textContent = saved.text;
         }
