@@ -86,6 +86,9 @@ jobs:
       - name: Functional QCM Page 3 smoke
         run: xvfb-run -a npm run test:qcm-page3-functional
 
+      - name: Functional QCM Texte à trous smoke
+        run: xvfb-run -a npm run test:qcm-texte-trous-functional
+
       - name: Verify integrated SEB-IA output
         shell: bash
         run: |
