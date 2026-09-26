@@ -55,6 +55,9 @@ jobs:
       - name: Functional Tri smoke
         run: xvfb-run -a npm run test:tri-functional
 
+      - name: Functional autoeval1 smoke
+        run: xvfb-run -a npm run test:autoeval1-functional
+
       - name: Verify integrated SEB-IA output
         shell: bash
         run: |

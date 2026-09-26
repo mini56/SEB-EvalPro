@@ -19,7 +19,13 @@
     Object.freeze({ id:'qcm-5_1', file:'qcmv1.0.html', page:'5_1' }),
     Object.freeze({ id:'qcm-6', file:'qcmv1.0.html', page:'6' }),
 
-    Object.freeze({ id:'autoeval1', file:'autoeval1.html' }),
+    Object.freeze({
+      id:'autoeval1',
+      file:'autoeval1.html',
+      results:Object.freeze({
+        storage:'autoEval1_resultats'
+      })
+    }),
     Object.freeze({ id:'introbrique', file:'introbrique.html' }),
     Object.freeze({ id:'brique', file:'brique.html' }),
     Object.freeze({ id:'stock', file:'stock.html' }),
