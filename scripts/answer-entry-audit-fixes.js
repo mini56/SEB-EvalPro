@@ -128,6 +128,24 @@ for (const spec of [
 {
   const { file, text } = read('app/web/genrenombres.html');
   let out = text;
+  const modularGenreNombre = out.includes('js/genrenombres-page.js');
+
+  if (modularGenreNombre) {
+    const modulePath = path.join(root, 'app', 'web', 'js', 'genrenombres-page.js');
+    if (!fs.existsSync(modulePath)) fail('Genre/Nombre: module genrenombres-page.js introuvable', 6);
+    const moduleText = fs.readFileSync(modulePath, 'utf8').replace(/\r\n/g, '\n');
+    for (const token of [
+      ".replace(/\\u00A0/g, ' ')",
+      ".replace(/[’‘]/g, \"'\")",
+      ".replace(/\\s+/g, ' ')",
+      ".toLocaleLowerCase('fr-FR')",
+      'possibleAnswers(input).some((answer) => user === norm(answer))'
+    ]) {
+      if (!moduleText.includes(token)) fail('Genre/Nombre: comparaison modulaire non normalisée: ' + token, 6);
+    }
+  } else {
+  const { file, text } = read('app/web/genrenombres.html');
+  let out = text;
   const normRegex = /function norm\(s\)\{[\s\S]*?\n  \}/;
   if (!normRegex.test(out)) fail('Genre/Nombre: fonction norm introuvable', 6);
   out = out.replace(normRegex, [
@@ -146,6 +164,10 @@ for (const spec of [
   out = replaceRequired(out, oldCompare, newCompare, 'Genre/Nombre comparaison normalisée');
   if (!out.includes(".replace(/[’‘]/g, \"'\")")) fail('Genre/Nombre: apostrophes non normalisées', 6);
   if (!out.includes('norm(userAnswer) === norm(answer)')) fail('Genre/Nombre: comparaison non normalisée', 6);
+  write(file, out);
+
+  }
+
   write(file, out);
 }
 
