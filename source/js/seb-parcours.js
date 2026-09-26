@@ -56,7 +56,16 @@
         validatedStorage:'seb_planning_validated'
       })
     }),
-    Object.freeze({ id:'genrenombres', file:'genrenombres.html' }),
+    Object.freeze({
+      id:'genrenombres',
+      file:'genrenombres.html',
+      results:Object.freeze({
+        answersStorage:'user_genrenombres',
+        errorStorage:'erreurs_exercice',
+        stateStorage:'seb_evalpro_genrenombres_state',
+        validatedStorage:'seb_genrenombres_validated'
+      })
+    }),
     Object.freeze({
       id:'tri-de-cheville',
       file:'tri_de_cheville.html',
