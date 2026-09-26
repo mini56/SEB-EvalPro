@@ -19,25 +19,6 @@ if (!fs.existsSync(target)) fail('qcmv1.0.html généré introuvable');
 let html = fs.readFileSync(target, 'utf8');
 
 const markerText = 'NOM DE FICHIER PERSONNALISÉ';
-const runtimeTarget = path.join(root, 'app', 'web', 'js', 'qcm-runtime.js');
-if (html.includes('js/qcm-runtime.js') && fs.existsSync(runtimeTarget)) {
-  const runtime = fs.readFileSync(runtimeTarget, 'utf8').replace(/\r\n/g, '\n');
-  if (!runtime.includes(markerText)) fail('bloc de nom de fichier Word introuvable dans qcm-runtime.js');
-  for (const required of [
-    'function exportToWord()',
-    "let filename = 'Evaluation_SEB'",
-    'filename = `Evaluation_${nomClean}_${prenomClean}`',
-    "filename += '_' + new Date().toISOString().split('T')[0] + '.doc'",
-    "const blob = new Blob(['\\ufeff', html]",
-    'link.download = filename',
-    'URL.revokeObjectURL(url)'
-  ]) {
-    if (!runtime.includes(required)) fail('export Word externe incomplet : ' + required);
-  }
-  console.log('SEB EvalPro QCM: code export Word externalisé et fonctionnel dans qcm-runtime.js.');
-  process.exit(0);
-}
-
 let marker = html.indexOf(markerText);
 if (marker < 0) fail('bloc de nom de fichier Word introuvable');
 

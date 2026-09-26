@@ -54,11 +54,11 @@ for (const token of [
 const qcmFile = path.join(web, 'qcmv1.0.html');
 if (!fs.existsSync(qcmFile)) fail('page qcmv1.0.html introuvable', 7);
 let qcm = fs.readFileSync(qcmFile, 'utf8').replace(/\r\n/g, '\n');
-if (!(qcm.includes('data-seb-action="open-calculator"') || qcm.includes('window.openCalculator()'))) fail('boutons calculatrice introuvables dans le QCM', 8);
+if (!qcm.includes('window.openCalculator()')) fail('boutons calculatrice introuvables dans le QCM', 8);
 if (!qcm.includes('id="seb-calculator-button-style"')) {
   const calcStyle = `
 <style id="seb-calculator-button-style">
-button[data-seb-action="open-calculator"] {
+button[onclick="window.openCalculator()"] {
   background-color: #F9B233;
   color: #1e293b;
   border: none;
@@ -68,7 +68,7 @@ button[data-seb-action="open-calculator"] {
   cursor: pointer;
   transition: background-color 0.3s;
 }
-button[data-seb-action="open-calculator"]:hover {
+button[onclick="window.openCalculator()"]:hover {
   background-color: #e9a11f;
 }
 </style>

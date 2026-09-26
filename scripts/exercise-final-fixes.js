@@ -165,9 +165,6 @@ function insertBeforeLast(text, marker, addition, label) {
 {
   const { target, text } = read('app/web/qcmv1.0.html');
   let out = text;
-  const runtimePath = path.join(root, 'app', 'web', 'js', 'qcm-runtime.js');
-  const externalRuntime = out.includes('js/qcm-runtime.js') && fs.existsSync(runtimePath);
-  let runtime = externalRuntime ? fs.readFileSync(runtimePath, 'utf8').replace(/\r\n/g, '\n') : out;
 
   const page2Inputs = (out.match(/id="reponse2_[1-5]"/g) || []).length;
   if (page2Inputs !== 5) fail(`Page 2: ${page2Inputs} champs réponse trouvés au lieu de 5`, 9);
@@ -195,8 +192,8 @@ function insertBeforeLast(text, marker, addition, label) {
     out = insertBeforeLast(out, '</body>', js, 'protection saisie page 2');
   }
 
-  runtime = replaceOnce(
-    runtime,
+  out = replaceOnce(
+    out,
     '<div style="margin:5px 0 5px 20px;">',
     '<div style="margin:5px 0;">',
     'alignement autoévaluation Brique dans les résultats'
@@ -210,15 +207,13 @@ function insertBeforeLast(text, marker, addition, label) {
   if (modularPage2 && safeScriptPos >= 0) {
     fail('Page 2: ancien runtime numérique inline encore présent', 10);
   }
-  if (runtime.includes('margin:5px 0 5px 20px;')) {
+  if (out.includes('margin:5px 0 5px 20px;')) {
     fail('Résultat Brique: décalage des réponses autoévaluation encore présent', 11);
   }
 
   // Vérifie aussi que le résultat général utilise bien le total réel de l'exercice Paronymes.
-  if (!runtime.includes('totalQuestions += totalQ;')) fail('résultat général: total Paronymes non repris dynamiquement', 10);
+  if (!out.includes('totalQuestions += totalQ;')) fail('résultat général: total Paronymes non repris dynamiquement', 10);
 
-  if (externalRuntime) fs.writeFileSync(runtimePath, runtime, 'utf8');
-  else out = runtime;
   write(target, out);
 }
 

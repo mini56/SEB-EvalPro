@@ -40,25 +40,22 @@ function checkInlineScripts(html, label) {
   if (!html.includes(firstRow)) fail('zone prénom page 1 introuvable');
   html = html.replace(firstRow, firstRow + `\n          <label for="civilite">Civilité :</label>\n          <select class="step" id="civilite" name="civilite" required style="min-width:115px;padding:4px">\n            <option value="">Choisissez</option>\n            <option value="M.">M.</option>\n            <option value="Mme">Mme</option>\n            <option value="Autre">Autre</option>\n          </select>`);
 
-  const runtimeFile = path.join(root, 'app', 'web', 'js', 'qcm-runtime.js');
-  const externalRuntime = html.includes('js/qcm-runtime.js') && fs.existsSync(runtimeFile);
-  let logic = externalRuntime ? read(runtimeFile) : html;
-
   const vars = `  const prénom = document.getElementById('prénom')?.value.trim() || '';\n  const lieu = document.getElementById('lieu')?.value.trim() || '';`;
-  if (!logic.includes(vars)) fail('variables candidat introuvables');
-  logic = logic.replace(vars, `  const prénom = document.getElementById('prénom')?.value.trim() || '';\n  const civilite = document.getElementById('civilite')?.value || '';\n  if (!civilite) {\n    alert('Veuillez sélectionner une civilité.');\n    document.getElementById('civilite')?.focus();\n    return false;\n  }\n  const lieu = document.getElementById('lieu')?.value.trim() || '';`);
+  if (!html.includes(vars)) fail('variables candidat introuvables');
+  html = html.replace(vars, `  const prénom = document.getElementById('prénom')?.value.trim() || '';\n  const civilite = document.getElementById('civilite')?.value || '';\n  if (!civilite) {\n    alert('Veuillez sélectionner une civilité.');\n    document.getElementById('civilite')?.focus();\n    return false;\n  }\n  const lieu = document.getElementById('lieu')?.value.trim() || '';`);
 
   const candidateSave = `    const candidatData = { nom, prénom, lieu, groupe, date };`;
-  if (!logic.includes(candidateSave)) fail('sauvegarde candidat_data introuvable');
-  logic = logic.replace(candidateSave, `    const candidatData = { nom, prénom, civilite, lieu, groupe, date };`);
+  if (!html.includes(candidateSave)) fail('sauvegarde candidat_data introuvable');
+  html = html.replace(candidateSave, `    const candidatData = { nom, prénom, civilite, lieu, groupe, date };`);
 
-  const restoreCivilite = `
+  const bodyEnd = html.toLowerCase().lastIndexOf('</body>');
+  if (bodyEnd < 0) fail('</body> QCM introuvable');
+  const restoreCivilite = String.raw`
+<script id="seb-165plus-civilite-restore">
 document.addEventListener('DOMContentLoaded',()=>{try{const c=JSON.parse(sessionStorage.getItem('candidat_data')||'{}');const s=document.getElementById('civilite');if(s&&['M.','Mme','Autre'].includes(String(c.civilite||'')))s.value=String(c.civilite)}catch(_){}});
+</script>
 `;
-  logic += restoreCivilite;
-
-  if (externalRuntime) write(runtimeFile, logic);
-  else html = logic;
+  html = html.slice(0, bodyEnd) + restoreCivilite + html.slice(bodyEnd);
   checkInlineScripts(html, 'qcmv1.0.html');
   write(qcmFile, html);
 }

@@ -34,10 +34,6 @@ function appendBeforeBody(text, block, label) {
   const modularPage2 = out.includes('js/qcm-page2.js');
   const modularPage2_1 = out.includes('js/qcm-page2-1.js');
   const modularPage3 = out.includes('js/qcm-page3.js');
-  const qcmRuntimePath = path.join(root, 'app', 'web', 'js', 'qcm-runtime.js');
-  const qcmRuntime = out.includes('js/qcm-runtime.js') && fs.existsSync(qcmRuntimePath)
-    ? fs.readFileSync(qcmRuntimePath, 'utf8').replace(/\r\n/g, '\n')
-    : out;
   const modularTexteTrous = out.includes('js/qcm-texte-trous.js');
   const modularPage6 = out.includes('js/qcm-page6.js');
   const needsLegacyHelpers = !modularPage2 || !modularPage2_1 || !modularTexteTrous || !modularPage6;
@@ -199,7 +195,7 @@ function appendBeforeBody(text, block, label) {
   }
 
   if (modularPage3) {
-    if (!qcmRuntime.includes('window.sebQcmPage3.sameTime(value, window.sebQcmPage3.answers[i])')) {
+    if (!out.includes('window.sebQcmPage3.sameTime(value, window.sebQcmPage3.answers[i])')) {
       fail('fallback Résultats Page 3 modulaire non tolérant', 4);
     }
   } else {
@@ -228,7 +224,7 @@ function appendBeforeBody(text, block, label) {
     fail('Texte à trous non normalisé', 4);
   }
   if (modularPage3) {
-    if (!qcmRuntime.includes('window.sebQcmPage3.sameTime(value, window.sebQcmPage3.answers[i])')) fail('fallback Page 3 modulaire non normalisé', 4);
+    if (!out.includes('window.sebQcmPage3.sameTime(value, window.sebQcmPage3.answers[i])')) fail('fallback Page 3 modulaire non normalisé', 4);
   } else if (!out.includes('normalizeSebTime(value) === normalizeSebTime(bonnesReponsesPage3[i])')) {
     fail('fallback Page 3 non normalisé', 4);
   }

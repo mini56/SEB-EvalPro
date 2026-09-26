@@ -11,15 +11,10 @@ function fail(message, code = 2) {
 
 if (!fs.existsSync(file)) fail('qcmv1.0.html généré introuvable');
 let html = fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n');
-const runtimeFile = path.join(root, 'app', 'web', 'js', 'qcm-runtime.js');
-const runtime = fs.existsSync(runtimeFile)
-  ? fs.readFileSync(runtimeFile, 'utf8').replace(/\r\n/g, '\n')
-  : '';
-const calculatorLogic = html.includes('js/qcm-runtime.js') ? runtime : html;
 
 if (!html.includes('id="calc-container"')) fail('conteneur de calculatrice introuvable', 3);
 if (!html.includes('id="calc-display"')) fail('afficheur de calculatrice introuvable', 4);
-if (!calculatorLogic.includes('window.openCalculator')) fail('fonction openCalculator introuvable', 5);
+if (!html.includes('window.openCalculator')) fail('fonction openCalculator introuvable', 5);
 
 const styleId = 'seb-floating-calculator-style';
 if (!html.includes(`id="${styleId}"`)) {

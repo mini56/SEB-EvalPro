@@ -13,9 +13,6 @@ function fail(message, code = 2) {
 if (!fs.existsSync(file)) fail('qcmv1.0.html généré introuvable');
 let html = fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n');
 const modularPage3 = html.includes('js/qcm-page3.js');
-const runtimeFile = path.join(root, 'app', 'web', 'js', 'qcm-runtime.js');
-const externalRuntime = html.includes('js/qcm-runtime.js') && fs.existsSync(runtimeFile);
-let logic = externalRuntime ? fs.readFileSync(runtimeFile, 'utf8').replace(/\r\n/g, '\n') : html;
 let moduleText = '';
 
 if (modularPage3) {
@@ -58,17 +55,17 @@ try {
   reponses = {};
   scores = {};
 }`;
-if (!logic.includes("reponses = JSON.parse(sessionStorage.getItem('reponses_data')")) {
-  if (!logic.includes(oldGlobals)) fail('initialisation globale réponses/scores introuvable', 4);
-  logic = logic.replace(oldGlobals, newGlobals);
+if (!html.includes("reponses = JSON.parse(sessionStorage.getItem('reponses_data')")) {
+  if (!html.includes(oldGlobals)) fail('initialisation globale réponses/scores introuvable', 4);
+  html = html.replace(oldGlobals, newGlobals);
 }
 
 const saveStarts = [
   'function saveTableAnswers(pageNum)  {',
   'function saveTableAnswers(pageNum) {'
 ];
-if (!logic.includes('const persistedResponses = JSON.parse')) {
-  const saveStart = saveStarts.find((candidate) => logic.includes(candidate));
+if (!html.includes('const persistedResponses = JSON.parse')) {
+  const saveStart = saveStarts.find((candidate) => html.includes(candidate));
   if (!saveStart) fail('début saveTableAnswers introuvable', 5);
   const mergeBlock = saveStart + `
   try {
@@ -77,7 +74,7 @@ if (!logic.includes('const persistedResponses = JSON.parse')) {
     reponses = { ...persistedResponses, ...reponses };
     scores = { ...persistedScores, ...scores };
   } catch (_) {}`;
-  logic = logic.replace(saveStart, mergeBlock);
+  html = html.replace(saveStart, mergeBlock);
 }
 
 if (!modularPage3) {
@@ -194,27 +191,25 @@ const legacyRecovery = `    console.log('✅ Réponses / Scores récupérés');
     console.warn('⚠️ Récupération renforcée Page 3 impossible:', e);
   }`;
 
-if (!logic.includes('Récupération renforcée Page 3')) {
-  if (!logic.includes(resultsLoadMarker)) fail('point de récupération Résultats stagiaire introuvable', 7);
-  logic = logic.replace(resultsLoadMarker, modularPage3 ? modularRecovery : legacyRecovery);
+if (!html.includes('Récupération renforcée Page 3')) {
+  if (!html.includes(resultsLoadMarker)) fail('point de récupération Résultats stagiaire introuvable', 7);
+  html = html.replace(resultsLoadMarker, modularPage3 ? modularRecovery : legacyRecovery);
 }
 
 const checks = [
-  [logic.includes("reponses = JSON.parse(sessionStorage.getItem('reponses_data')"), 'réhydratation globale'],
-  [logic.includes('const persistedResponses = JSON.parse'), 'fusion avant sauvegarde'],
-  [logic.includes('Récupération renforcée Page 3'), 'fallback Résultats stagiaire'],
-  [logic.includes("drafts.page3"), 'fallback brouillon Page 3']
+  [html.includes("reponses = JSON.parse(sessionStorage.getItem('reponses_data')"), 'réhydratation globale'],
+  [html.includes('const persistedResponses = JSON.parse'), 'fusion avant sauvegarde'],
+  [html.includes('Récupération renforcée Page 3'), 'fallback Résultats stagiaire'],
+  [html.includes("drafts.page3"), 'fallback brouillon Page 3']
 ];
 if (modularPage3) {
   checks.push([moduleText.includes("sessionStorage.setItem(DEDICATED_KEY"), 'sauvegarde dédiée Page 3 modulaire']);
-  checks.push([logic.includes('seb_evalpro_qcm_page3_state'), 'fallback état canonique Page 3']);
+  checks.push([html.includes('seb_evalpro_qcm_page3_state'), 'fallback état canonique Page 3']);
 } else {
   checks.push([html.includes("sessionStorage.setItem('page3_resultats'"), 'sauvegarde dédiée Page 3']);
 }
 const failed = checks.filter(([ok]) => !ok).map(([, label]) => label);
 if (failed.length) fail('contrôles finaux échoués : ' + failed.join(', '), 8);
 
-if (externalRuntime) fs.writeFileSync(runtimeFile, logic, 'utf8');
-else html = logic;
 fs.writeFileSync(file, html, 'utf8');
 console.log('SEB EvalPro TEST: Page 3 persistée/restaurée; grille verrouillée = 9h15, 8h50, 9h05, 9h20, 8h45, 5h15, 9h45, 9h15, 9h30, 9h55, 9h25, 2h35, 0h31, 1h03.');

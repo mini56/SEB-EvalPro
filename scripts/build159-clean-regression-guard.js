@@ -25,9 +25,6 @@ for (const forbidden of [
 
 const admin = read('app/web/admin-bilan.html');
 const qcm = read('app/web/qcmv1.0.html');
-const qcmRuntimePath = path.join(root, 'app', 'web', 'js', 'qcm-runtime.js');
-const qcmRuntime = fs.existsSync(qcmRuntimePath) ? read('app/web/js/qcm-runtime.js') : '';
-const qcmLogic = qcm.includes('js/qcm-runtime.js') ? qcmRuntime : qcm;
 const paronymes = read('app/web/paronymes.html');
 const replayMain = read('src/replay-main.js');
 const replayPreload = read('src/replay-preload.js');
@@ -39,8 +36,8 @@ const required = [
   [admin, "const bl=be<=2?'I':be<=4?'II':'III'", 'barème Briques'],
   [admin, "apply('mail',e<=1?'I':e<=3?'II':'III'", 'barème Messagerie'],
   [admin, 'Math.round(pr/27*100)', 'Maths /27'],
-  [qcmLogic, 'const scoreMax = 8;', 'traitement de texte /8'],
-  [qcmLogic, 'analyse.score.enregistrement', 'critère Enregistrement traitement de texte'],
+  [qcm, 'const scoreMax = 8;', 'traitement de texte /8'],
+  [qcm, 'analyse.score.enregistrement', 'critère Enregistrement traitement de texte'],
   [preload, 'showReadOnlyCandidateResults', 'Résultats candidat par dossier'],
   [preload, 'seb-admin-results-close', 'sortie de la page Résultats candidat'],
   [paronymes, 'data-correct="true">Aplanir</td>', 'Paronymes Raboter -> Aplanir'],

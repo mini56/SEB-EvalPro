@@ -103,28 +103,25 @@ function checkHtmlScripts(html, label) {
 {
   const { file, text } = read('app/web/qcmv1.0.html');
   let out = text;
-  const runtimeFile = path.join(root, 'app', 'web', 'js', 'qcm-runtime.js');
-  const externalRuntime = out.includes('js/qcm-runtime.js') && fs.existsSync(runtimeFile);
-  let logic = externalRuntime ? fs.readFileSync(runtimeFile, 'utf8').replace(/\r\n/g, '\n') : out;
 
-  if (!logic.includes('const scoreMax = 8;')) fail('Traitement de texte /8 absent avant contrôles #135', 10);
-  if (!/analyse\.score\.enregistrement/.test(logic)) fail('Critère Enregistrement traitement de texte absent avant contrôles #135', 10);
+  if (!out.includes('const scoreMax = 8;')) fail('Traitement de texte /8 absent avant contrôles #135', 10);
+  if (!/analyse\.score\.enregistrement/.test(out)) fail('Critère Enregistrement traitement de texte absent avant contrôles #135', 10);
 
-  if (logic.includes("const rep4 = reponses['page4'] || \"0/0\";")) {
-    logic = logic.replace("const rep4 = reponses['page4'] || \"0/0\";", "const rep4 = reponses['page4'] || \"0/3\";");
+  if (out.includes("const rep4 = reponses['page4'] || \"0/0\";")) {
+    out = out.replace("const rep4 = reponses['page4'] || \"0/0\";", "const rep4 = reponses['page4'] || \"0/3\";");
   }
-  logic = replaceOnce(logic, 'totalQuestions += denom4 || 1;', 'totalQuestions += denom4 || 3;', 'dénominateur Fractions absent = 3');
-  logic = replaceOnce(logic, 'totalQuestions += repTxt.length || 1;', 'totalQuestions += repTxt.length || 15;', 'dénominateur Texte à trous absent = 15');
-  logic = logic.replace('(Score : ${scTxt}/${repTxt.length || 0})', '(Score : ${scTxt}/${repTxt.length || 15})');
+  out = replaceOnce(out, 'totalQuestions += denom4 || 1;', 'totalQuestions += denom4 || 3;', 'dénominateur Fractions absent = 3');
+  out = replaceOnce(out, 'totalQuestions += repTxt.length || 1;', 'totalQuestions += repTxt.length || 15;', 'dénominateur Texte à trous absent = 15');
+  out = out.replace('(Score : ${scTxt}/${repTxt.length || 0})', '(Score : ${scTxt}/${repTxt.length || 15})');
 
-  if (logic.includes("const puzzleErrors = sessionStorage.getItem('puzzleErrors');")) {
-    logic = logic.replace(
+  if (out.includes("const puzzleErrors = sessionStorage.getItem('puzzleErrors');")) {
+    out = out.replace(
       "const puzzleErrors = sessionStorage.getItem('puzzleErrors');",
       "const puzzleErrors = sessionStorage.getItem('carre_magique_erreurs') ?? sessionStorage.getItem('puzzleErrors');"
     );
   }
 
-  logic = logic.replace(/\s*<span><strong>🔑 Code :<\/strong> \$\{evalBrique\.code \|\| ["']—["']\}<\/span>/g, '');
+  out = out.replace(/\s*<span><strong>🔑 Code :<\/strong> \$\{evalBrique\.code \|\| ["']—["']\}<\/span>/g, '');
 
   for (const required of [
     'const scoreMax = 8;',
@@ -132,14 +129,12 @@ function checkHtmlScripts(html, label) {
     'totalQuestions += repTxt.length || 15;',
     "sessionStorage.getItem('carre_magique_erreurs') ?? sessionStorage.getItem('puzzleErrors')"
   ]) {
-    if (!logic.includes(required)) fail('Résultats candidat incomplets : ' + required, 10);
+    if (!out.includes(required)) fail('Résultats candidat incomplets : ' + required, 10);
   }
-  if (!/analyse\.score\.enregistrement/.test(logic)) fail('critère Enregistrement traitement de texte perdu', 10);
-  if (/🔑 Code[\s\S]{0,100}evalBrique\.code/.test(logic)) fail('code Brique encore affiché dans les résultats', 10);
+  if (!/analyse\.score\.enregistrement/.test(out)) fail('critère Enregistrement traitement de texte perdu', 10);
+  if (/🔑 Code[\s\S]{0,100}evalBrique\.code/.test(out)) fail('code Brique encore affiché dans les résultats', 10);
 
   checkHtmlScripts(out, 'qcmv1.0.html');
-  if (externalRuntime) fs.writeFileSync(runtimeFile, logic, 'utf8');
-  else out = logic;
   write(file, out);
 }
 
