@@ -24,7 +24,7 @@ if (!api || !Array.isArray(api.steps)) fail('API sebParcours absente ou invalide
 
 const expectedIds = [
   'qcm-1','qcm-2','qcm-2_1','qcm-3','qcm-texte-trous','qcm-4','qcm-5','qcm-5_1','qcm-6',
-  'autoeval1','introbrique','brique','stock','planning','genrenombres','tri-de-cheville',
+  'autoeval1','introbrique','brique','stock','planning','genrenombres','dictee','tri-de-cheville',
   'nwtexte','nvmail','autoeval2','paronymes','carre','qcm-11','qcm-finale'
 ];
 
@@ -41,6 +41,12 @@ for (const step of api.steps) {
   const localFile = path.join(root, 'app', 'web', String(step.file).split(/[?#]/)[0]);
   if (!fs.existsSync(localFile)) fail('page de parcours absente: ' + step.file);
 }
+
+// Dictée obligatoire entre Genre/Nombre et Tri.
+if (api.nextFile('genrenombres') !== 'dictee.html') fail('genrenombres -> dictee modifié');
+if (api.nextFile('dictee') !== 'tri_de_cheville.html') fail('dictee -> tri modifié');
+const dicteeContract = api.resultContractFor('dictee');
+if (!dicteeContract || dicteeContract.storage !== 'dictee_data') fail('contrat Résultats dictée modifié');
 
 // Ordre actuellement validé autour du traitement de texte.
 if (api.nextFile('tri-de-cheville') !== 'nwtexte.html') fail('tri -> nwtexte modifié');
