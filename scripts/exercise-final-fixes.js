@@ -174,7 +174,20 @@ function insertBeforeLast(text, marker, addition, label) {
     out = replaceOnce(out, '</head>', css + '</head>', 'style sans curseur page 2');
   }
 
-  if (!out.includes('id="seb-page2-safe-number-inputs"')) {
+  const modularPage2 = out.includes('js/qcm-page2.js');
+  if (modularPage2) {
+    const modulePath = path.join(root, 'app', 'web', 'js', 'qcm-page2.js');
+    if (!fs.existsSync(modulePath)) fail('Page 2: module qcm-page2.js introuvable', 9);
+    const moduleText = fs.readFileSync(modulePath, 'utf8').replace(/\r\n/g, '\n');
+    for (const token of [
+      "input.addEventListener('wheel'",
+      "event.key === 'ArrowUp' || event.key === 'ArrowDown'",
+      'event.preventDefault();'
+    ]) {
+      if (!moduleText.includes(token)) fail('Page 2: protection numérique modulaire absente: ' + token, 9);
+    }
+    out = out.replace(/\s*<script\s+id=["']seb-page2-safe-number-inputs["'][^>]*>[\s\S]*?<\/script>\s*/i, '\n');
+  } else if (!out.includes('id="seb-page2-safe-number-inputs"')) {
     const js = `\n<script id="seb-page2-safe-number-inputs">\ndocument.addEventListener('DOMContentLoaded', function () {\n  document.querySelectorAll('#page2 input[type="number"]').forEach(function (input) {\n    input.addEventListener('wheel', function (event) {\n      event.preventDefault();\n    }, { passive: false });\n    input.addEventListener('keydown', function (event) {\n      if (event.key === 'ArrowUp' || event.key === 'ArrowDown') event.preventDefault();\n    });\n  });\n});\n</script>\n`;
     out = insertBeforeLast(out, '</body>', js, 'protection saisie page 2');
   }
@@ -188,8 +201,11 @@ function insertBeforeLast(text, marker, addition, label) {
 
   const safeScriptPos = out.indexOf('id="seb-page2-safe-number-inputs"');
   const exportMarkerPos = out.indexOf('NOM DE FICHIER PERSONNALISÉ');
-  if (safeScriptPos >= 0 && exportMarkerPos >= 0 && safeScriptPos < exportMarkerPos) {
+  if (!modularPage2 && safeScriptPos >= 0 && exportMarkerPos >= 0 && safeScriptPos < exportMarkerPos) {
     fail('Page 2: le script de protection a été injecté dans le modèle Word', 10);
+  }
+  if (modularPage2 && safeScriptPos >= 0) {
+    fail('Page 2: ancien runtime numérique inline encore présent', 10);
   }
   if (out.includes('margin:5px 0 5px 20px;')) {
     fail('Résultat Brique: décalage des réponses autoévaluation encore présent', 11);
