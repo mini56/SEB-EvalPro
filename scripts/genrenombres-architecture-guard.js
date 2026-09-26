@@ -86,8 +86,11 @@ if ((resume.match(/page === 'genrenombres\.html' && window\.sebGenreNombre/g) ||
 }
 
 const genrePos = parcours.indexOf("id:'genrenombres'");
+const dicteePos = parcours.indexOf("id:'dictee'");
 const triPos = parcours.indexOf("id:'tri-de-cheville'");
-if (genrePos < 0 || triPos <= genrePos) fail('ordre genrenombres -> tri-de-cheville absent du registre');
+if (genrePos < 0 || dicteePos <= genrePos || triPos <= dicteePos) {
+  fail('ordre genrenombres -> dictee -> tri-de-cheville absent du registre');
+}
 
 for (const token of [
   "answersStorage:'user_genrenombres'",
