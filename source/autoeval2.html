@@ -447,8 +447,8 @@ html, body {
   </div>
 <div class="footer">
     <div class="tablecenter" style="margin-top:20px;">
-      <button type="button" onclick="saveAutoEval2()" class="suivant">Valider mon autoévaluation</button>
-      <button type="button" onclick="passAutoEval2()" class="passez">Passer</button>
+      <button type="button" id="autoeval2-validate" class="suivant">Valider mon autoévaluation</button>
+      <button type="button" id="autoeval2-skip" class="passez">Passer</button>
 
     </div>
 </div>
@@ -457,48 +457,8 @@ html, body {
 	  
 </div>	
 </div>
-<script>
-function saveAutoEval2() {
-  // Récupère les cases cochées
-  const selections = [...document.querySelectorAll("#autoEvalForm input[type='checkbox']:checked")]
-    .map(c => c.value);
-
-  // Récupère le commentaire
-  const commentaire = (document.getElementById("autoCommentoutils")?.value || "").trim();
-
-  // Enregistre DANS sessionStorage, clé unique lue par qcmv1.0.html
-  const data = { selections, commentaire };
-  try {
-    sessionStorage.setItem("autoEval2_resultats", JSON.stringify(data));
-    console.log("✅ Autoévaluation enregistrée :", data);
-  } catch (e) {
-    console.error("❌ Erreur lors de la sauvegarde :", e);
-  }
-
-  // Feedback utilisateur (chaînes fermées !)
-  const resultDiv = document.getElementById("autoEvalResult");
-  if (selections.length === 0 && !commentaire) {
-    resultDiv.style.color = "red";
-    resultDiv.textContent = "Aucune sélection effectuée.";
-  } else {
-    resultDiv.style.color = "green";
-    resultDiv.textContent = "Autoévaluation enregistrée avec succès.";
-  }
-
-  // Redirection vers la page 11 des résultats
-  setTimeout(() => {
-   // sessionStorage.setItem("goto_page", "11"); // si tu l’utilises dans qcmv1
-  //  window.location.href = "qcmv1.0.html?page=11#page11";
-  window.location.href = "paronymes.html";
-  
-  });
-}
-
-// Le bouton "Passer" doit faire la même chose (enregistrer puis rediriger)
-function passAutoEval2() {
-  saveAutoEval2();
-}
-</script>
+<script src="js/seb-parcours.js"></script>
+<script src="js/autoeval2-page.js"></script>
 
 
 </body>

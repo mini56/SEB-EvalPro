@@ -43,6 +43,9 @@ jobs:
       - name: Functional nvmail smoke
         run: xvfb-run -a npm run test:nvmail-functional
 
+      - name: Functional autoeval2 smoke
+        run: xvfb-run -a npm run test:autoeval2-functional
+
       - name: Verify integrated SEB-IA output
         shell: bash
         run: |
