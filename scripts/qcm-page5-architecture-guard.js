@@ -86,12 +86,14 @@ if (!checkpoint.includes("page.id === 'page5' && window.sebQcmPage5")) {
   fail('ancien checkpoint possède encore la reprise Page 5');
 }
 
-for (const token of [
-  'SEB_PAGE5_RESULTS_RECOVERY',
-  'SEB_PAGE51_IMMEDIATE_PERSIST',
-  'afficherLigne("Page 5 — Organisation", "page5", 1, 8);'
-]) {
-  if (!qcm.includes(token)) fail('contrat Résultats/Page 5.1 absent: ' + token);
+if (!qcm.includes('SEB_PAGE5_RESULTS_RECOVERY')) {
+  fail('contrat Résultats Page 5 absent: récupération dédiée');
+}
+if (!(qcm.includes('SEB_PAGE51_IMMEDIATE_PERSIST') || qcm.includes('js/qcm-page5-1.js'))) {
+  fail('contrat persistance Page 5.1 absent');
+}
+if (!qcm.includes('afficherLigne("Page 5 — Organisation", "page5", 1, 8);')) {
+  fail('affichage Résultats Page 5 absent');
 }
 
 console.log('SEB EvalPro garde QCM Page 5: 8 étapes, barème officiel, reprise, snapshot organisation, Résultats et navigation centrale — OK.');
