@@ -108,7 +108,7 @@ app.whenReady().then(async () => {
     }
     if (initial.route !== 'qcmv1.0.html?page=5#page5') throw new Error('Route Page 4 -> Page 5 incorrecte.');
     if (initial.cloudCount !== 12 || !initial.cloudAbsolute || initial.cloudOverlap) {
-      throw new Error('Nuage initial Page 4 incorrect.');
+      throw new Error('Nuage initial Page 4 incorrect: ' + JSON.stringify(initial));
     }
 
     await win.webContents.executeJavaScript(`
