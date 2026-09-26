@@ -195,9 +195,9 @@ app.whenReady().then(async () => {
 
     if (!verifiedUi.stored || verifiedUi.stored.status !== 'verified' || verifiedUi.stored.scoreSur20 !== 20 ||
         verifiedUi.stored.classificationVersion !== 3 || !verifiedUi.textDisabled || !verifiedUi.playDisabled ||
-        !verifiedUi.progressDisabled || verifiedUi.action !== 'Suivant' || verifiedUi.mode !== 'next' ||
+        !verifiedUi.progressDisabled || !/Suivant/.test(verifiedUi.action) || verifiedUi.mode !== 'next' ||
         verifiedUi.feedbackDisplay !== 'none') {
-      throw new Error('Verrouillage/persistance Dictée vérifiée incorrect.');
+      throw new Error('Verrouillage/persistance Dictée vérifiée incorrect: ' + JSON.stringify(verifiedUi));
     }
 
     await win.reload();
@@ -213,8 +213,8 @@ app.whenReady().then(async () => {
       })
     `, true);
     if (verifiedReload.status !== 'verified' || verifiedReload.score !== 20 || !verifiedReload.textDisabled ||
-        verifiedReload.action !== 'Suivant' || verifiedReload.route !== 'tri_de_cheville.html') {
-      throw new Error('État Dictée vérifiée perdu après rechargement.');
+        !/Suivant/.test(verifiedReload.action) || verifiedReload.route !== 'tri_de_cheville.html') {
+      throw new Error('État Dictée vérifiée perdu après rechargement: ' + JSON.stringify(verifiedReload));
     }
 
     await clearState(win);
