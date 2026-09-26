@@ -114,24 +114,41 @@ function insertBefore(text, marker, addition, label) {
 
 // -----------------------------------------------------------------------------
 // Page 3 : comparaison tolérante des heures.
-// L'ancien DOCX automatique "Resultat_..." est retiré : la vraie page Résultats
-// est désormais disponible en lecture seule depuis le dossier candidat.
+// La logique validée vit dans qcm-page3.js lorsque la page est modularisée.
 // -----------------------------------------------------------------------------
 {
   const { target, text } = read('app/web/qcmv1.0.html');
   let out = text;
+  const modularPage3 = out.includes('js/qcm-page3.js');
 
-  if (!out.includes('function normalizeSebTime')) {
-    const helper = `\nfunction normalizeSebTime(value) {\n  let s = String(value || '').trim().toLowerCase();\n  if (!s) return '';\n  try { s = s.normalize('NFD').replace(/[\\u0300-\\u036f]/g, ''); } catch (_) {}\n  s = s.replace(/heures?/g, 'h').replace(/heurs?/g, 'h').replace(/hrs?/g, 'h');\n  s = s.replace(/minutes?/g, '').replace(/mins?/g, '').replace(/mn/g, '');\n  s = s.replace(/\\s+/g, ' ').trim();\n  let match = s.match(/^(\\d{1,2})\\s*(?:h|:)\\s*(\\d{1,2})\\s*$/);\n  if (!match) match = s.match(/^(\\d{1,2})\\s+(\\d{1,2})\\s*$/);\n  if (!match) return s.replace(/\\s+/g, '');\n  const h = Number(match[1]), m = Number(match[2]);\n  if (!Number.isInteger(h) || !Number.isInteger(m) || h < 0 || h > 23 || m < 0 || m > 59) return '';\n  return String(h) + 'h' + String(m).padStart(2, '0');\n}\n\n`;
-    out = insertBefore(out, 'function saveTableAnswers(pageNum)', helper, 'normalisation des heures');
+  if (modularPage3) {
+    const modulePath = path.join(root, 'app', 'web', 'js', 'qcm-page3.js');
+    if (!fs.existsSync(modulePath)) fail('Page 3: module qcm-page3.js introuvable', 4);
+    const moduleText = fs.readFileSync(modulePath, 'utf8').replace(/\r\n/g, '\n');
+    for (const token of [
+      'function parseTimeToMinutes(value)',
+      'function sameTime(left, right)',
+      "match = text.match(/^(\\d+)\\s*(?:h|:)\\s*(\\d{1,2})\\s*m?$/);",
+      "match = text.match(/^(\\d+)\\s*m$/);",
+      'minutes > 59',
+      "const answers = Object.freeze({"
+    ]) {
+      if (!moduleText.includes(token)) fail('Page 3: normalisation modulaire absente: ' + token, 4);
+    }
+    out = out.replace(/\nfunction normalizeSebTime\(value\) \{[\s\S]*?\n\}\n\n/, '\n');
+  } else {
+    if (!out.includes('function normalizeSebTime')) {
+      const helper = `\nfunction normalizeSebTime(value) {\n  let s = String(value || '').trim().toLowerCase();\n  if (!s) return '';\n  try { s = s.normalize('NFD').replace(/[\\u0300-\\u036f]/g, ''); } catch (_) {}\n  s = s.replace(/heures?/g, 'h').replace(/heurs?/g, 'h').replace(/hrs?/g, 'h');\n  s = s.replace(/minutes?/g, '').replace(/mins?/g, '').replace(/mn/g, '');\n  s = s.replace(/\\s+/g, ' ').trim();\n  let match = s.match(/^(\\d{1,2})\\s*(?:h|:)\\s*(\\d{1,2})\\s*$/);\n  if (!match) match = s.match(/^(\\d{1,2})\\s+(\\d{1,2})\\s*$/);\n  if (!match) return s.replace(/\\s+/g, '');\n  const h = Number(match[1]), m = Number(match[2]);\n  if (!Number.isInteger(h) || !Number.isInteger(m) || h < 0 || h > 23 || m < 0 || m > 59) return '';\n  return String(h) + 'h' + String(m).padStart(2, '0');\n}\n\n`;
+      out = insertBefore(out, 'function saveTableAnswers(pageNum)', helper, 'normalisation des heures');
+    }
+
+    out = replaceOnce(
+      out,
+      "    scores[`page${pageNum}_q${i}`] =\n      (bonnes && bonnes[i] && val.toString().toUpperCase() === bonnes[i].toString().toUpperCase())\n        ? 1 : 0;",
+      "    scores[`page${pageNum}_q${i}`] =\n      (bonnes && bonnes[i] && (pageNum == 3\n        ? normalizeSebTime(val) === normalizeSebTime(bonnes[i])\n        : val.toString().toUpperCase() === bonnes[i].toString().toUpperCase()))\n        ? 1 : 0;",
+      'comparaison heures page 3'
+    );
   }
-
-  out = replaceOnce(
-    out,
-    "    scores[`page${pageNum}_q${i}`] =\n      (bonnes && bonnes[i] && val.toString().toUpperCase() === bonnes[i].toString().toUpperCase())\n        ? 1 : 0;",
-    "    scores[`page${pageNum}_q${i}`] =\n      (bonnes && bonnes[i] && (pageNum == 3\n        ? normalizeSebTime(val) === normalizeSebTime(bonnes[i])\n        : val.toString().toUpperCase() === bonnes[i].toString().toUpperCase()))\n        ? 1 : 0;",
-    'comparaison heures page 3'
-  );
 
   write(target, out);
 }
@@ -231,7 +248,7 @@ function insertBefore(text, marker, addition, label) {
     [main.includes('spellcheck: false'), 'spellcheck Electron'],
     [main.includes("admin:open-candidate-results"), 'accès admin résultats candidat'],
     [preload.includes('adminCandidateResultsWorkspace') && preload.includes('showReadOnlyCandidateResults'), 'accès résultats candidat Admin'],
-    [qcm.includes('normalizeSebTime(val) === normalizeSebTime(bonnes[i])'), 'normalisation heures page 3'],
+    [(qcm.includes('js/qcm-page3.js') ? read('app/web/js/qcm-page3.js').text.includes('function parseTimeToMinutes(value)') : qcm.includes('normalizeSebTime(val) === normalizeSebTime(bonnes[i])')), 'normalisation heures page 3'],
     [(stock.includes('data-seb-example') || stock.includes('sebExample') || (fs.existsSync(path.join(root, 'app', 'web', 'js', 'stock-page.js')) && read('app/web/js/stock-page.js').text.includes("const EXAMPLE_ID = '8';"))), 'marquage exemple stock'],
     [(stock.includes('stockTotal", 33') || (fs.existsSync(path.join(root, 'app', 'web', 'js', 'stock-page.js')) && read('app/web/js/stock-page.js').text.includes('const TOTAL_EVALUATED = 33;'))), 'total stock 33'],
     [bilan.includes('mso-page-orientation:portrait'), 'Word portrait'],
