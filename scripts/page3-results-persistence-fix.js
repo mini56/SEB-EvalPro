@@ -60,16 +60,20 @@ if (!html.includes("reponses = JSON.parse(sessionStorage.getItem('reponses_data'
   html = html.replace(oldGlobals, newGlobals);
 }
 
-const saveStart = `function saveTableAnswers(pageNum)  {`;
-const mergeBlock = `function saveTableAnswers(pageNum)  {
+const saveStarts = [
+  'function saveTableAnswers(pageNum)  {',
+  'function saveTableAnswers(pageNum) {'
+];
+if (!html.includes('const persistedResponses = JSON.parse')) {
+  const saveStart = saveStarts.find((candidate) => html.includes(candidate));
+  if (!saveStart) fail('début saveTableAnswers introuvable', 5);
+  const mergeBlock = saveStart + `
   try {
     const persistedResponses = JSON.parse(sessionStorage.getItem('reponses_data') || '{}') || {};
     const persistedScores = JSON.parse(sessionStorage.getItem('scores_data') || '{}') || {};
     reponses = { ...persistedResponses, ...reponses };
     scores = { ...persistedScores, ...scores };
   } catch (_) {}`;
-if (!html.includes('const persistedResponses = JSON.parse')) {
-  if (!html.includes(saveStart)) fail('début saveTableAnswers introuvable', 5);
   html = html.replace(saveStart, mergeBlock);
 }
 
