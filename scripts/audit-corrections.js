@@ -183,45 +183,31 @@ function patchBriqueZeroErrorsAndCheckpoint() {
 }
 
 function patchWordScoring() {
-  const { file, html } = read('nwtexte.html');
-  let out = html;
+  // nwtexte est désormais propre en source : aucune réécriture fonctionnelle ici.
+  const { html } = read('nwtexte.html');
+  const enginePath = path.join(webDir, 'js', 'nwtexte-quill-engine.js');
+  const savePath = path.join(webDir, 'js', 'nwtexte-save-simulation.js');
+  if (!fs.existsSync(enginePath) || !fs.existsSync(savePath)) {
+    throw new Error('SEB EvalPro audit: moteur nwtexte généré introuvable');
+  }
+  const engine = fs.readFileSync(enginePath, 'utf8').replace(/\r\n/g, '\n');
+  const save = fs.readFileSync(savePath, 'utf8').replace(/\r\n/g, '\n');
 
-  out = mustReplace(
-    out,
-    "        texte_taille: 0,\n        total: 0",
-    "        texte_taille: 0,\n        enregistrement: 0,\n        total: 0",
-    'critère enregistrement traitement de texte'
-  );
-
-  out = mustReplace(
-    out,
-    "      analyse.titre.texte = titreTexte;\n      analyse.titre.present = titreTexte.length > 0;\n      \n      if (analyse.titre.present) {\n        analyse.score.titre_present = 1;",
-    `      analyse.titre.texte = titreTexte;\n      analyse.titre.present = titreTexte.length > 0;\n      const normaliserTitre = (value) => String(value || '')\n        .toLowerCase()\n        .replace(/[’']/g, "'")\n        .replace(/\\s+/g, ' ')\n        .replace(/\\s*\\?\\s*$/, '')\n        .trim();\n      const titresValides = [\n        'Quel est mon activité préférée et pourquoi?',\n        'Quel est mon expérience professionnel préférée et pourquoi?',\n        'Quel est mon métier préféré et pourquoi?'\n      ].map(normaliserTitre);\n      analyse.titre.valide = titresValides.includes(normaliserTitre(titreTexte));\n      \n      if (analyse.titre.valide) {\n        analyse.score.titre_present = 1;`,
-    'titre limité aux trois propositions'
-  );
-
-  out = mustReplace(
-    out,
-    "    analyse.score.total = analyse.score.titre_present +\n                         analyse.score.titre_gras +\n                         analyse.score.titre_police +\n                         analyse.score.titre_taille +\n                         analyse.score.texte_lignes +\n                         analyse.score.texte_police +\n                         analyse.score.texte_taille;",
-    "    analyse.score.enregistrement = (localStorage.getItem('seb_evalpro_texte_enregistre') === 'true' || localStorage.getItem('dernierEnregistrementSous') === 'true') ? 1 : 0;\n    analyse.score.total = analyse.score.titre_present +\n                         analyse.score.titre_gras +\n                         analyse.score.titre_police +\n                         analyse.score.titre_taille +\n                         analyse.score.texte_lignes +\n                         analyse.score.texte_police +\n                         analyse.score.texte_taille +\n                         analyse.score.enregistrement;",
-    'total traitement de texte avec enregistrement'
-  );
-
-  out = mustReplace(
-    out,
-    "      a.download = 'document.html'; \n      a.click();",
-    "      a.download = 'document.html'; \n      a.click();\n      localStorage.setItem('seb_evalpro_texte_enregistre', 'true');",
-    'enregistrement simple comptabilisé'
-  );
-
-  out = mustReplace(
-    out,
-    "      a.download = nomComplet; \n      a.click();",
-    "      a.download = nomComplet; \n      a.click();\n      localStorage.setItem('seb_evalpro_texte_enregistre', 'true');",
-    'enregistrement sous comptabilisé'
-  );
-
-  write(file, out);
+  if (/<script(?![^>]*\bsrc=)[^>]*>/i.test(html) || /\son[a-z]+\s*=/i.test(html)) {
+    throw new Error('SEB EvalPro audit: ancien code inline réintroduit dans nwtexte');
+  }
+  for (const token of [
+    'enregistrement: savedCorrectly ? 1 : 0',
+    'scores.page7 = analyse.score.total;',
+    'responses.page7_analyse = analyse;',
+    'window.sebNwtexteEditor = editorApi'
+  ]) {
+    if (!engine.includes(token)) throw new Error('SEB EvalPro audit: contrat nwtexte absent: ' + token);
+  }
+  if (!save.includes("const STORAGE_KEY = 'nwtexte_save_simulation'") ||
+      !save.includes('window.sebNwtexteSave = Object.freeze')) {
+    throw new Error('SEB EvalPro audit: simulation enregistrement nwtexte absente');
+  }
 }
 
 function patchTriLiveChrono() {
