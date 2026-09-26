@@ -32,6 +32,7 @@
   function saveDraft(){
     if (restoring) return;
     if (page === 'planning.html' && window.sebPlanning) return;
+    if (page === 'genrenombres.html' && window.sebGenreNombre) return;
     try {
       const state = {
         controls: controls().map(function(el,index){
@@ -96,6 +97,7 @@
 
   function restoreDraft(){
     if (page === 'planning.html' && window.sebPlanning) return;
+    if (page === 'genrenombres.html' && window.sebGenreNombre) return;
     let state = null;
     try { state = JSON.parse(sessionStorage.getItem(KEY) || 'null'); } catch (_) {}
     if (!state) return;
