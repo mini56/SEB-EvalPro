@@ -108,6 +108,11 @@ function stopCandidateKeyGuard() {
 }
 
 function startCandidateKeyGuard() {
+  // Le verrou clavier natif est strictement réservé à l'installation Candidat.
+  if (editionCapabilities.edition !== 'candidate') {
+    stopCandidateKeyGuard();
+    return;
+  }
   if (process.platform !== 'win32' || adminSessionUnlocked || allowApplicationExit) return;
   if (candidateKeyGuardProcess && candidateKeyGuardProcess.exitCode == null && !candidateKeyGuardProcess.killed) return;
   const executable = candidateKeyGuardExecutable();
