@@ -258,9 +258,16 @@
 
     if (canonical && canonical.selections) {
       applySelections(canonical.selections);
-      const hasPositions = applyCloudPositions(canonical.positions);
+      applyCloudPositions(canonical.positions);
       wrappers().filter(isCloud).forEach((wrapper) => {
-        if (!hasPositions || cloudHasOverlap(wrapper, 6)) randomizeCloud(wrapper);
+        const fraction = String(wrapper.dataset.fraction || '').trim();
+        const saved = canonical.positions && canonical.positions[fraction];
+        const itemCount = wrapper.querySelectorAll('.item').length;
+        // Au rechargement, on conserve strictement le nuage enregistré.
+        // Un contrôle de chevauchement à cet instant peut être faux pendant
+        // la stabilisation de la mise en page Electron et remélanger le nuage.
+        // Le vrai redimensionnement reste traité par relayoutClouds().
+        if (!Array.isArray(saved) || saved.length !== itemCount) randomizeCloud(wrapper);
       });
       persistState(false);
       return { source:'canonical', restored:true };
