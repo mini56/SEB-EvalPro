@@ -1183,6 +1183,15 @@ function injectAdminBar() {
       return;
     }
 
+    // Le Replay doit exister avant la clôture du candidat.
+    if (replayPrototype && typeof replayPrototype.ensureFinalArchive === 'function') {
+      const replayArchive = await replayPrototype.ensureFinalArchive();
+      if (!replayArchive || replayArchive.ok !== true) {
+        scheduleHideBar();
+        return;
+      }
+    }
+
     const closed = await ipcRenderer.invoke('admin:close-session').catch(() => false);
     if (!closed) {
       await showTransferMessage(
@@ -1192,15 +1201,6 @@ function injectAdminBar() {
       );
       scheduleHideBar();
       return;
-    }
-
-    // SEB_BUILD135_REPLAY_CLOSE_GUARD
-    if (replayPrototype && typeof replayPrototype.ensureFinalArchive === 'function') {
-      const replayArchive = await replayPrototype.ensureFinalArchive();
-      if (!replayArchive || replayArchive.ok !== true) {
-        scheduleHideBar();
-        return;
-      }
     }
 
     closingSession = true;
@@ -1295,6 +1295,14 @@ async function completeCandidateFromFinalPage() {
   try {
     const saved = saveNow(true);
     if (saved && saved.ok === false) return;
+
+    // Replay d'abord, clôture ensuite : le dossier actif reste disponible
+    // pendant tout l'archivage et aucun doublon ne peut être créé entre les deux.
+    if (replayPrototype && typeof replayPrototype.ensureFinalArchive === 'function') {
+      const replayArchive = await replayPrototype.ensureFinalArchive();
+      if (!replayArchive || replayArchive.ok !== true) return;
+    }
+
     const result = await ipcRenderer.invoke('candidate:complete-active', 'candidate-final-page');
     if (result && result.ok) {
       candidateJourneyCompleted = true;
