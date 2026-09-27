@@ -45,26 +45,29 @@ try {
   const store = createCandidateStore({ documentsPath:sourceDocuments, userDataPath:sourceUserData, now });
   const c1 = { nom:'XXLOSS1', 'prénom':'YYLOSS1', lieu:'Lorient', groupe:'A', date:'2026-09-24' };
   const first = finish(store, c1, 'ONE');
-
-  const transfer = createCandidateTransfer({ documentsPath:sourceDocuments, userDataPath:sourceUserData, now });
-
-  // Un dossier terminé incomplet doit bloquer AVANT le premier fichier .seb.
-  const missingScores = path.join(first.candidateDir, 'resultats', 'scores.json');
-  fs.rmSync(missingScores, { force:true });
-  assert.throws(
-    () => transfer.exportAll(usbRoot, password),
-    /terminé incomplet|Fichier candidat illisible/i
-  );
-  assert.strictEqual(fs.readdirSync(usbRoot).filter((name) => name.endsWith('.seb')).length, 0, 'Aucun export partiel ne doit être créé si un dossier terminé est incomplet.');
-
-  // Réparer le fichier puis ajouter un second candidat pour tester le rollback import.
-  writeJsonFile(missingScores, { marker:'ONE', page2:5 });
   const c2 = { nom:'XXLOSS2', 'prénom':'YYLOSS2', lieu:'Vannes', groupe:'B', date:'2026-09-24' };
   const second = finish(store, c2, 'TWO');
 
+  const transfer = createCandidateTransfer({ documentsPath:sourceDocuments, userDataPath:sourceUserData, now });
+
+  // Un dossier terminé incomplet ne doit plus bloquer les autres candidats valides.
+  const missingScores = path.join(first.candidateDir, 'resultats', 'scores.json');
+  fs.rmSync(missingScores, { force:true });
+
+  const partialExport = transfer.exportAll(usbRoot, password);
+  assert.strictEqual(partialExport.total, 1, 'Le candidat valide doit rester exportable.');
+  assert.strictEqual(partialExport.added, 1);
+  assert.strictEqual(partialExport.invalidSkipped, 1, 'Le dossier incomplet doit être ignoré et signalé.');
+  assert.strictEqual(fs.readdirSync(usbRoot).filter((name) => name.endsWith('.seb')).length, 1, 'Le candidat valide doit être exporté malgré le dossier incomplet.');
+
+  // Réparer le premier dossier : il doit pouvoir être exporté ensuite sans écraser le précédent.
+  writeJsonFile(missingScores, { marker:'ONE', page2:5 });
   const exported = transfer.exportAll(usbRoot, password);
   assert.strictEqual(exported.total, 2);
-  assert.strictEqual(exported.added, 2);
+  assert.strictEqual(exported.added, 1);
+  assert.strictEqual(exported.skipped, 1);
+  assert.strictEqual(exported.invalidSkipped, 0);
+  assert.strictEqual(fs.readdirSync(usbRoot).filter((name) => name.endsWith('.seb')).length, 2);
 
   configureLocalKey(Buffer.alloc(32, 72));
   const targetTransfer = createCandidateTransfer({ documentsPath:targetDocuments, userDataPath:targetUserData, now });
@@ -97,7 +100,7 @@ try {
   assert.strictEqual(imported.added, 2, 'Après disparition de la panne, les deux candidats doivent être importés.');
   assert.strictEqual(targetTransfer.listCandidateRecords(targetTransfer.paths.candidatesRoot, false).length, 2);
 
-  console.log('EXPORT_INCOMPLETE_CANDIDATE_FAILS_BEFORE_COPY=OK');
+  console.log('EXPORT_INCOMPLETE_CANDIDATE_SKIPPED_VALID_EXPORTED=OK');
   console.log('IMPORT_MULTI_CANDIDATE_ROLLBACK=OK');
   console.log('Candidate Loss Prevention Test: OK');
 } finally {
