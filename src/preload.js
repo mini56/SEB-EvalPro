@@ -767,6 +767,19 @@ function injectAdminBar() {
     }
     /* La barre Admin reste volontairement plus légère que les boutons de dialogue. */
     #seb-evalpro-topbar button{font-weight:400!important}
+    /* Fenêtres Export / Import : même style léger que la barre Admin. */
+    #seb-evalpro-export-destination-dialog button,
+    #seb-evalpro-transfer-password-dialog button,
+    #seb-evalpro-transfer-dialog button{
+      font-family:Arial,sans-serif!important;font-size:14px!important;font-weight:400!important;
+      padding:6px 12px!important;border:1px solid #0070c0!important;border-radius:4px!important;
+      background:#fff!important;color:#0070c0!important;box-shadow:none!important;transform:none!important;
+    }
+    #seb-evalpro-export-destination-dialog button:hover,
+    #seb-evalpro-transfer-password-dialog button:hover,
+    #seb-evalpro-transfer-dialog button:hover{
+      background:#f2f2f2!important;box-shadow:none!important;transform:none!important;
+    }
     #seb-evalpro-topbar button:hover,
     #seb-evalpro-admin-dialog button:hover,
     #seb-evalpro-session-close-dialog button:hover,
