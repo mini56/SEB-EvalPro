@@ -1001,11 +1001,11 @@ ipcMain.handle('ai:rewrite-synthesis', async () => {
 ipcMain.handle('ai:cancel-current', () => ({ ok:true, cancelled:false, offline:true, integrated:true }));
 
 // SEB_CANDIDATE_REPLAY_PROTO_MAIN
-ipcMain.__sebActiveCandidateProvider = () => getCandidateStore().getActiveCandidate();
 require('./replay-main')({
   app,
   ipcMain,
   getAdminUnlocked: () => adminSessionUnlocked,
+  getActiveCandidate: () => getCandidateStore().getActiveCandidate(),
   buildNumber: APP_BUILD_NUMBER
 });
 require('./bilan-history-main')({
