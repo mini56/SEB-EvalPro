@@ -5,6 +5,8 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const { getEditionCapabilities } = require('./edition');
+const appPackage = require('../package.json');
+const APP_BUILD_NUMBER = String(appPackage.sebBuildNumber || '').trim() || 'DEV';
 const { createCandidateStore } = require('./candidate-store-main');
 const { createCandidateTransfer } = require('./candidate-transfer-main');
 const { configureLocalKey, readJsonFile, encodeJson, migrateJsonFile, migrateJsonTree } = require('./candidate-data-crypto');
@@ -996,13 +998,13 @@ require('./replay-main')({
   app,
   ipcMain,
   getAdminUnlocked: () => adminSessionUnlocked,
-  buildNumber: "6"
+  buildNumber: APP_BUILD_NUMBER
 });
 require('./bilan-history-main')({
   app,
   ipcMain,
   getAdminUnlocked: () => adminSessionUnlocked,
-  buildNumber: "6"
+  buildNumber: APP_BUILD_NUMBER
 });
 
 require('./candidate-catalog-main')({

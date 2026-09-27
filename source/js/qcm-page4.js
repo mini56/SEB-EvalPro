@@ -365,7 +365,16 @@
   }
 
   function relayoutClouds() {
-    wrappers().filter(isCloud).forEach(randomizeCloud);
+    let canonical = null;
+    try { canonical = JSON.parse(sessionStorage.getItem(STATE_KEY) || 'null'); } catch (_) {}
+
+    const hasPositions = !!(canonical && canonical.positions && applyCloudPositions(canonical.positions));
+    wrappers().filter(isCloud).forEach((wrapper) => {
+      // Un resize Electron peut être émis pendant un simple rechargement.
+      // On conserve donc les positions enregistrées tant qu'elles restent valides,
+      // et on ne remélange que si la nouvelle géométrie crée un chevauchement.
+      if (!hasPositions || cloudHasOverlap(wrapper, 6)) randomizeCloud(wrapper);
+    });
     persistState();
   }
 
