@@ -154,30 +154,9 @@ function candidateLabel(candidate) {
 }
 
 function ensureAdminButton() {
-  const bar = document.getElementById('seb-evalpro-topbar');
-  if (!bar) return false;
-  let button = document.getElementById('seb-evalpro-old-bilan');
-  if (!button) {
-    button = document.createElement('button');
-    button.id = 'seb-evalpro-old-bilan';
-    button.type = 'button';
-    button.textContent = 'Ouvrir un ancien bilan';
-    button.hidden = true;
-    button.addEventListener('click', openChooser);
-  }
-  const left = bar.querySelector('.seb-admin-left-actions');
-  const replay = document.getElementById('seb-evalpro-replay');
-  const bilan = document.getElementById('seb-evalpro-bilan');
-  if (left && button.parentElement !== left) {
-    if (replay && replay.parentElement === left) replay.insertAdjacentElement('afterend', button);
-    else if (bilan && bilan.parentElement === left) left.insertBefore(button, bilan);
-    else left.appendChild(button);
-  } else if (!left && !button.isConnected) {
-    const admin = document.getElementById('seb-evalpro-admin');
-    if (admin) bar.insertBefore(button, admin);
-  }
-  refreshAdminButton(button);
-  return true;
+  // Accès historique retiré des interfaces Candidat et Administrateur.
+  document.getElementById('seb-evalpro-old-bilan')?.remove();
+  return false;
 }
 
 async function refreshAdminButton(button = document.getElementById('seb-evalpro-old-bilan')) {
