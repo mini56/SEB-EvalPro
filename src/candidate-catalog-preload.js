@@ -117,6 +117,36 @@ function bilanLabel(item) {
 }
 
 
+function confirmCandidateDelete(item) {
+  return new Promise((resolve) => {
+    document.getElementById('seb-candidate-delete-confirm')?.remove();
+    const overlay = document.createElement('div');
+    overlay.id = 'seb-candidate-delete-confirm';
+    overlay.innerHTML = `
+      <div class="seb-delete-card" role="dialog" aria-modal="true" aria-label="Supprimer le candidat">
+        <div class="seb-delete-head">Supprimer ce candidat ?</div>
+        <div class="seb-delete-body">
+          <p><strong>${escapeHtml(item.nom)} ${escapeHtml(item.prenom)}</strong></p>
+          <p>Le dossier candidat et ses fichiers associés seront supprimés définitivement de ce PC.</p>
+          <p>Cette action est réservée à l’administrateur et ne peut pas être annulée.</p>
+        </div>
+        <div class="seb-delete-actions">
+          <button type="button" id="seb-delete-cancel">Annuler</button>
+          <button type="button" id="seb-delete-confirm" class="danger">Supprimer</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    const finish = (value) => { overlay.remove(); resolve(value); };
+    overlay.querySelector('#seb-delete-cancel').addEventListener('click', () => finish(false));
+    overlay.querySelector('#seb-delete-confirm').addEventListener('click', () => finish(true));
+    overlay.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') finish(false);
+      if (event.key === 'Enter') finish(true);
+    });
+    overlay.querySelector('#seb-delete-cancel').focus();
+  });
+}
+
 async function openCandidateDetail(candidateId, onChanged) {
   const old = document.getElementById('seb-candidate-detail');
   if (old) old.remove();
@@ -336,6 +366,28 @@ function openCatalog(initialCandidateId = '') {
         open.type='button'; open.className='primary'; open.textContent='Ouvrir';
         open.addEventListener('click', () => openCandidateDetail(item.candidateId, reload));
         actions.append(open);
+
+        const remove = document.createElement('button');
+        remove.type='button';
+        remove.className='danger';
+        remove.textContent='Supprimer';
+        remove.addEventListener('click', async () => {
+          if (!(await confirmCandidateDelete(item))) return;
+          remove.disabled = true;
+          open.disabled = true;
+          const result = await ipcRenderer.invoke('candidate-catalog:delete', item.candidateId).catch((error) => ({
+            ok:false,
+            error:String(error && error.message ? error.message : error)
+          }));
+          if (!result || result.ok !== true) {
+            remove.disabled = false;
+            open.disabled = false;
+            window.alert((result && result.error) || 'Suppression impossible.');
+            return;
+          }
+          await reload();
+        });
+        actions.append(remove);
         list.appendChild(row);
       });
     };
