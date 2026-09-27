@@ -4,6 +4,9 @@ const replayPrototype = require('./replay-preload');
 const replayNavigationCapture = require('./replay-navigation-capture');
 const bilanHistory = require('./bilan-history-preload');
 const candidateCatalog = require('./candidate-catalog-preload');
+const appPackage = require('../package.json');
+const APP_BUILD_NUMBER = String(appPackage.sebBuildNumber || '').trim() || 'DEV';
+const APP_BUILD_LABEL = `Build #${APP_BUILD_NUMBER}`;
 // SEB_CANDIDATE_REPLAY_PROTO_PRELOAD
 const editionCapabilities = ipcRenderer.sendSync('app:edition-sync') || {
   edition:'admin', canBilan:true, canAi:true, canImport:true, canExport:true
@@ -675,7 +678,7 @@ function injectAdminBar() {
   bar.id = 'seb-evalpro-topbar';
   bar.innerHTML = `
     <div class="seb-evalpro-name">SEB EvalPro</div>
-    <div id="seb-evalpro-build" class="seb-evalpro-build">Build #6</div>
+    <div id="seb-evalpro-build" class="seb-evalpro-build">${APP_BUILD_LABEL}</div>
     <div id="seb-evalpro-candidate-badge" class="seb-evalpro-candidate-badge" hidden></div>
     <div class="seb-evalpro-spacer"></div>
     <button id="seb-evalpro-return" type="button" hidden>Retour à l'évaluation</button>
