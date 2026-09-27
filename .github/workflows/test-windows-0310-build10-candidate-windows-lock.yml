@@ -120,7 +120,7 @@ jobs:
           $package = Get-Content package.json -Raw | ConvertFrom-Json
           if ([string]$package.sebBuildNumber -ne '10') { throw "Branding lancé avec un build inattendu : $($package.sebBuildNumber)" }
           $installerSource = Get-Content 'build\installer.nsh' -Raw
-          if ($installerSource -notmatch '!define\s+SEB_BUILD_NUMBER\s+"9"') { throw 'SEB_BUILD_NUMBER #10 absent de installer.nsh.' }
+          if ($installerSource -notmatch '!define\s+SEB_BUILD_NUMBER\s+"10"') { throw 'SEB_BUILD_NUMBER #10 absent de installer.nsh.' }
           if ($installerSource -notmatch 'SEB_BUILD_LABEL') { throw 'SEB_BUILD_LABEL absent du texte installateur.' }
           Write-Host 'INSTALLER_VISIBLE_BUILD=Build #10'
           foreach ($path in @('build/app-icon.ico','build/installerHeader.bmp','build/installerBranding.bmp')) {
@@ -201,7 +201,7 @@ jobs:
           $setup = (Resolve-Path 'dist\SEB-eval-PRO-0.3.10-Windows-Setup.exe').Path
 
           $installer = Get-Content 'build\installer.nsh' -Raw
-          foreach ($required in @('Version Candidat','Version Administrateur','SEB-IA est intégrée','edition-candidate.flag','edition-admin.flag','SEB_BUILD_LABEL','SEB_BUILD_NUMBER "9"')) {
+          foreach ($required in @('Version Candidat','Version Administrateur','SEB-IA est intégrée','edition-candidate.flag','edition-admin.flag','SEB_BUILD_LABEL','SEB_BUILD_NUMBER "10"')) {
             if (-not $installer.Contains($required)) { throw "Fonction installateur absente : $required" }
           }
           if ($installer -match 'Ministral-3-8B-Instruct|SEB-EvalPro-IA-Pack-Setup|vc_redist\.x64\.exe') {
