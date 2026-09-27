@@ -1283,14 +1283,8 @@ function injectAdminBar() {
       return;
     }
 
-    // S'il existe un parcours actif, son Replay doit être finalisé avant sa clôture.
-    if (active && replayPrototype && typeof replayPrototype.ensureFinalArchive === 'function') {
-      const replayArchive = await replayPrototype.ensureFinalArchive();
-      if (!replayArchive || replayArchive.ok !== true) {
-        scheduleHideBar();
-        return;
-      }
-    }
+    // Le Replay est sauvegardé indépendamment, directement dans le dossier candidat.
+    // Il ne conditionne jamais la fermeture de la session active.
 
     // À partir d'ici, aucun autosave tardif ne doit pouvoir remettre la dernière
     // page du candidat comme page de reprise après la clôture.
@@ -1425,12 +1419,8 @@ async function completeCandidateFromFinalPage() {
     const saved = saveNow(true);
     if (saved && saved.ok === false) return;
 
-    // Replay d'abord, clôture ensuite : le dossier actif reste disponible
-    // pendant tout l'archivage et aucun doublon ne peut être créé entre les deux.
-    if (replayPrototype && typeof replayPrototype.ensureFinalArchive === 'function') {
-      const replayArchive = await replayPrototype.ensureFinalArchive();
-      if (!replayArchive || replayArchive.ok !== true) return;
-    }
+    // Le Replay est déjà enregistré au fil du parcours dans le dossier candidat.
+    // Une éventuelle mise à jour de son manifeste ne doit jamais bloquer la fin du parcours.
 
     // Geler immédiatement les sauvegardes de ce parcours pendant la clôture.
     // Si la clôture échoue, on déverrouille pour permettre une nouvelle tentative.
