@@ -69,8 +69,10 @@ function addStyle() {
 }
 
 function hideLegacyAdminEntryPoints() {
-  // Les anciens accès Admin restent visibles : ils servent à retrouver les bilans
-  // historiques qui ne sont pas encore rattachés à un dossier candidat autonome.
+  // Les anciens bilans seront archivés hors du parcours courant :
+  // ne plus proposer cet accès dans aucune édition.
+  document.getElementById('seb-evalpro-old-bilan')?.remove();
+  document.getElementById('seb-bilan-history-chooser')?.remove();
 }
 
 function enhanceChooser(dialogId, listId, rowSelector) {
