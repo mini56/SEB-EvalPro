@@ -160,7 +160,7 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $utf8Bom = New-Object System.Text.UTF8Encoding($true)
-          foreach ($relativePath in @('build\installer.nsh','build\standalone-uninstaller.nsi')) {
+          foreach ($relativePath in @('build\installer.nsh')) {
             $path = (Resolve-Path $relativePath).Path
             $text = [System.IO.File]::ReadAllText($path)
             [System.IO.File]::WriteAllText($path, $text, $utf8Bom)
@@ -187,7 +187,6 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $setup = (Resolve-Path 'dist\SEB-eval-PRO-0.3.10-Windows-Setup.exe').Path
-          $uninstaller = (Resolve-Path 'dist\SEB-eval-PRO-0.3.10-Windows-Desinstallation.exe').Path
 
           $installer = Get-Content 'build\installer.nsh' -Raw
           foreach ($required in @('Version Candidat','Version Administrateur','SEB-IA est intégrée','edition-candidate.flag','edition-admin.flag','SEB_BUILD_LABEL','SEB_BUILD_NUMBER "9"')) {
@@ -207,7 +206,6 @@ jobs:
           Add-Type -AssemblyName System.Drawing
 
           $setup = (Resolve-Path 'dist\SEB-eval-PRO-0.3.10-Windows-Setup.exe').Path
-          $uninstaller = (Resolve-Path 'dist\SEB-eval-PRO-0.3.10-Windows-Desinstallation.exe').Path
           $installDir = 'C:\SEBEvalPro-038-CI'
           $documents = [Environment]::GetFolderPath('MyDocuments')
           $sebDocuments = Join-Path $documents 'SEB EvalPro'
@@ -322,7 +320,6 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $setup = (Resolve-Path 'dist\SEB-eval-PRO-0.3.10-Windows-Setup.exe').Path
-          $uninstaller = (Resolve-Path 'dist\SEB-eval-PRO-0.3.10-Windows-Desinstallation.exe').Path
           $documents = [Environment]::GetFolderPath('MyDocuments')
           $sebDocuments = Join-Path $documents 'SEB EvalPro'
           $upgradeRecovery = Join-Path $env:LOCALAPPDATA 'SEB EvalPro Recovery'
@@ -492,7 +489,6 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $setup = (Resolve-Path 'dist\SEB-eval-PRO-0.3.10-Windows-Setup.exe').Path
-          $uninstaller = (Resolve-Path 'dist\SEB-eval-PRO-0.3.10-Windows-Desinstallation.exe').Path
           $installDir = 'C:\SEBEvalPro-Admin-0310-Final-CI'
 
           Remove-Item -Recurse -Force $installDir -ErrorAction SilentlyContinue
@@ -561,7 +557,6 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $tag = "seb-evalpro-0310-build9-export-progress-${{ github.run_number }}"
           $setup = 'dist\SEB-eval-PRO-0.3.10-Windows-Setup.exe'
-          $uninstaller = 'dist\SEB-eval-PRO-0.3.10-Windows-Desinstallation.exe'
           $title = "SEB EvalPro 0.3.10 - Build #9 - Export USB"
           $notes = "SEB-éval-PRO 0.3.10 — Build #9. Fenêtre interne avec visuel installateur et barre animée continue pendant la copie USB réelle. Désinstallateur autonome séparé retiré; désinstallateur intégré au Setup testé."
           gh release create $tag $setup --target "${{ github.sha }}" --title $title --notes $notes --prerelease --repo "${{ github.repository }}"
