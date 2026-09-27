@@ -706,7 +706,7 @@ try {
     if (analyse.titre.present) {
       html += `<span class="${analyse.score.titre_gras ? 'correct' : 'incorrect'}">${analyse.score.titre_gras ? '✓' : '✗'} Gras</span>`;
       html += `<span class="${analyse.score.titre_police ? 'correct' : 'incorrect'}">${analyse.score.titre_police ? '✓' : '✗'} Police Arial (détecté: ${analyse.titre.police || 'inconnue'})</span>`;
-      html += `<span class="${analyse.score.titre_taille ? 'correct' : 'incorrect'}">${analyse.score.titre_taille ? '✓' : '✗'} Taille 16px (détecté: ${analyse.titre.taille || 'inconnue'})</span>`;
+      html += `<span class="${analyse.score.titre_taille ? 'correct' : 'incorrect'}">${analyse.score.titre_taille ? '✓' : '✗'} Taille 16 pt (détecté: ${analyse.titre.taille || 'inconnue'})</span>`;
     }
 
     html += `</p>`;
@@ -718,7 +718,7 @@ try {
     html += `<h4>📝 Corps de texte</h4><p class="ligne">`;
     html += `<span class="${analyse.score.texte_lignes ? 'correct' : 'incorrect'}">${analyse.score.texte_lignes ? '✓' : '✗'} Minimum 10 lignes (${analyse.lignes} lignes)</span>`;
     html += `<span class="${analyse.score.texte_police ? 'correct' : 'incorrect'}">${analyse.score.texte_police ? '✓' : '✗'} Police Arial (détecté: ${analyse.texte.police || 'inconnue'})</span>`;
-    html += `<span class="${analyse.score.texte_taille ? 'correct' : 'incorrect'}">${analyse.score.texte_taille ? '✓' : '✗'} Taille 12px (détecté: ${analyse.texte.taille || 'inconnue'})</span>`;
+    html += `<span class="${analyse.score.texte_taille ? 'correct' : 'incorrect'}">${analyse.score.texte_taille ? '✓' : '✗'} Taille 12 pt (détecté: ${analyse.texte.taille || 'inconnue'})</span>`;
     html += '<span class="' + (analyse.score.enregistrement ? 'correct' : 'incorrect') + '">' + (analyse.score.enregistrement ? '✓' : '✗') + ' Enregistrement conforme</span>';
     html += `</p>`;
     html += `<p><strong>Score Page 7 :</strong> <span class="${score7 === scoreMax ? 'correct' : (score7 >= scoreMax / 2 ? 'commentaire' : 'incorrect')}">${score7}/${scoreMax}</span></p>`;
