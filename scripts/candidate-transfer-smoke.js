@@ -71,12 +71,20 @@ try {
 
   configureLocalKey(Buffer.alloc(32, 11));
   migrateJsonTree(pc1.paths.candidatesRoot);
+
+  // Un dossier local illisible ne doit pas bloquer l'export des candidats valides.
+  const corruptDir = path.join(pc1.paths.candidatesRoot, 'CAND-CORROMPU-TEST');
+  fs.mkdirSync(corruptDir, { recursive:true });
+  fs.writeFileSync(path.join(corruptDir, 'manifest.json'), 'ILLISIBLE', 'utf8');
+
   fs.mkdirSync(usbRoot, { recursive:true });
   const firstExport = pc1.exportAll(usbRoot, password);
   assert.strictEqual(firstExport.total, 2, 'Seules les sessions fermées doivent être exportées.');
   assert.strictEqual(firstExport.added, 2);
   assert.strictEqual(firstExport.skipped, 0);
   assert.strictEqual(firstExport.passwordProtected, true);
+  assert.strictEqual(firstExport.invalidSkipped, 1, 'Un dossier illisible doit être ignoré sans bloquer les autres exports.');
+  assert.strictEqual(firstExport.invalidFolders.length, 1);
 
   const usbEntries = fs.readdirSync(usbRoot, { withFileTypes:true });
   assert.strictEqual(usbEntries.filter((entry) => entry.isFile() && entry.name.endsWith('.seb')).length, 2);

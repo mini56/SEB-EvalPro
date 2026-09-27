@@ -181,10 +181,15 @@ app.whenReady().then(async () => {
     const verifiedUi = await win.webContents.executeJavaScript(`
       (function(){
         const d=JSON.parse(sessionStorage.getItem('dictee_data')||'null');
+        const text=document.getElementById('candidateText');
         return {
           stored:d,
-          textDisabled:document.getElementById('candidateText').disabled,
+          textDisabled:text.disabled,
+          textFocused:document.activeElement===text,
           playDisabled:document.getElementById('playBtn').disabled,
+          pauseDisabled:document.getElementById('pauseBtn').disabled,
+          stopDisabled:document.getElementById('stopBtn').disabled,
+          restartDisabled:document.getElementById('restartBtn').disabled,
           progressDisabled:document.getElementById('progress').disabled,
           action:document.getElementById('seb-dictee-action').textContent,
           mode:document.getElementById('seb-dictee-action').dataset.mode,
@@ -194,10 +199,11 @@ app.whenReady().then(async () => {
     `, true);
 
     if (!verifiedUi.stored || verifiedUi.stored.status !== 'verified' || verifiedUi.stored.scoreSur20 !== 20 ||
-        verifiedUi.stored.classificationVersion !== 3 || !verifiedUi.textDisabled || !verifiedUi.playDisabled ||
-        !verifiedUi.progressDisabled || !/Suivant/.test(verifiedUi.action) || verifiedUi.mode !== 'next' ||
+        verifiedUi.stored.classificationVersion !== 3 || verifiedUi.textDisabled || !verifiedUi.textFocused ||
+        verifiedUi.playDisabled || verifiedUi.pauseDisabled || verifiedUi.stopDisabled || verifiedUi.restartDisabled ||
+        verifiedUi.progressDisabled || !/Suivant/.test(verifiedUi.action) || verifiedUi.mode !== 'next' ||
         verifiedUi.feedbackDisplay !== 'none') {
-      throw new Error('Verrouillage/persistance Dictée vérifiée incorrect: ' + JSON.stringify(verifiedUi));
+      throw new Error('État éditable après Dictée terminée incorrect: ' + JSON.stringify(verifiedUi));
     }
 
     await win.reload();
@@ -208,13 +214,27 @@ app.whenReady().then(async () => {
         status:window.sebDictee.getState().status,
         score:window.sebDictee.getState().scoreSur20,
         textDisabled:document.getElementById('candidateText').disabled,
+        playDisabled:document.getElementById('playBtn').disabled,
         action:document.getElementById('seb-dictee-action').textContent,
         route:window.sebParcours.nextFile('dictee')
       })
     `, true);
-    if (verifiedReload.status !== 'verified' || verifiedReload.score !== 20 || !verifiedReload.textDisabled ||
-        !/Suivant/.test(verifiedReload.action) || verifiedReload.route !== 'tri_de_cheville.html') {
-      throw new Error('État Dictée vérifiée perdu après rechargement: ' + JSON.stringify(verifiedReload));
+    if (verifiedReload.status !== 'verified' || verifiedReload.score !== 20 || verifiedReload.textDisabled ||
+        verifiedReload.playDisabled || !/Suivant/.test(verifiedReload.action) ||
+        verifiedReload.route !== 'tri_de_cheville.html') {
+      throw new Error('État éditable Dictée perdu après rechargement: ' + JSON.stringify(verifiedReload));
+    }
+
+    const finalRecalc = await win.webContents.executeJavaScript(`
+      (function(){
+        const text=document.getElementById('candidateText');
+        text.value=window.sebDictee.reference.replace('Madame', 'Monsieur');
+        text.dispatchEvent(new Event('input',{bubbles:true}));
+        return window.sebDictee.finalizeVerified();
+      })()
+    `, true);
+    if (!finalRecalc || finalRecalc.status !== 'verified' || finalRecalc.scoreSur20 >= 20) {
+      throw new Error('Recalcul final Dictée avant Suivant incorrect: ' + JSON.stringify(finalRecalc));
     }
 
     await clearState(win);
@@ -245,6 +265,8 @@ app.whenReady().then(async () => {
     console.log('DICTEE_REAL_CASE=65/80_SCORE_16.25');
     console.log('DICTEE_COMPLEX_MOVE_V3=1_SUB_1_OMISSION_0_ADD_3_MOVED');
     console.log('DICTEE_PERFECT=80/80_SCORE_20');
+    console.log('DICTEE_EDITABLE_UNTIL_NEXT=OK');
+    console.log('DICTEE_FINAL_RECALC_BEFORE_NEXT=OK');
     console.log('DICTEE_EXTERNAL_ABANDON_PRESERVED=OK');
     console.log('DICTEE_ROUTE=tri_de_cheville.html');
     win.destroy();

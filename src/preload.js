@@ -1018,7 +1018,7 @@ function injectAdminBar() {
       }
       await showTransferMessage(
         'Export terminé',
-        `Copie des fichiers terminée.\nVous pouvez retirer la clé USB en toute sécurité.\n\n${result.added} fichier(s) candidat chiffré(s) créé(s), ${result.skipped || 0} déjà présent(s) et ignoré(s).\n${result.verifiedFiles || 0} fichier(s) vérifié(s).\n\nClé : ${result.destinationRoot}`
+        `Copie des fichiers terminée.\nVous pouvez retirer la clé USB en toute sécurité.\n\n${result.added} fichier(s) candidat chiffré(s) créé(s), ${result.skipped || 0} déjà présent(s) et ignoré(s).\n${result.verifiedFiles || 0} fichier(s) vérifié(s).${result.invalidSkipped ? `\n${result.invalidSkipped} dossier(s) candidat local(aux) illisible(s) ignoré(s) sans bloquer l’export.` : ''}\n\nClé : ${result.destinationRoot}`
       );
     } catch (error) {
       await showTransferMessage('Export impossible', String(error && error.message ? error.message : error), true);
