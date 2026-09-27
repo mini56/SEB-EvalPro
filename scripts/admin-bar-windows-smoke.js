@@ -1,0 +1,16 @@
+const { app, BrowserWindow, ipcMain } = require('electron');
+const path = require('path');
+
+function fail(message, details) { console.error('ADMIN_BAR_WINDOWS_SMOKE: FAIL - ' + message); if (details) console.error(JSON.stringify(details,null,2)); app.exit(2); }
+let state={version:1,sessionStorage:{},localStorage:{},lastPage:'qcmv1.0.html',lastEvaluationPage:'qcmv1.0.html'};
+ipcMain.on('app:edition-sync',(event)=>{event.returnValue={edition:'admin',canBilan:true,canAi:true,canImport:true,canExport:true};});
+ipcMain.on('state:load-sync',(event)=>{event.returnValue=state;});
+ipcMain.on('state:save-sync',(event,payload)=>{state={...state,...(payload||{})};event.returnValue={ok:true,state};});
+ipcMain.on('candidate-catalog:workspace-load-sync',(event)=>{event.returnValue={ok:false};});
+ipcMain.on('candidate-catalog:results-workspace-load-sync',(event)=>{event.returnValue={ok:false};});
+ipcMain.on('candidate-catalog:workspace-save-sync',(event)=>{event.returnValue={ok:true};});
+ipcMain.handle('state:save',(_event,payload)=>{state={...state,...(payload||{})};return {ok:true,state};});
+ipcMain.handle('admin:status',()=>true); ipcMain.handle('admin:verify',()=>true); ipcMain.handle('admin:verify-password',()=>false); ipcMain.handle('admin:lock',()=>true); ipcMain.handle('candidate:active',()=>null); ipcMain.handle('ai:status',()=>({available:false,offline:true}));
+app.commandLine.appendSwitch('disable-gpu');
+app.whenReady().then(async()=>{const win=new BrowserWindow({show:false,width:1280,height:720,webPreferences:{preload:path.join(__dirname,'..','src','preload.js'),contextIsolation:true,nodeIntegration:false,sandbox:false}});try{await win.loadFile(path.join(__dirname,'..','app','web','qcmv1.0.html'));await new Promise(r=>setTimeout(r,900));const result=await win.webContents.executeJavaScript("(()=>{const visible=id=>{const e=document.getElementById(id);if(!e)return false;const s=getComputedStyle(e);return !e.hidden&&s.display!=='none'&&s.visibility!=='hidden'};const admin=document.getElementById('seb-evalpro-admin');const build=document.getElementById('seb-evalpro-build');return {buildText:build?String(build.textContent||'').trim():'',adminText:admin?String(admin.textContent||'').trim():'',openCandidate:visible('seb-evalpro-open-candidate'),exportCandidates:visible('seb-evalpro-export-candidates'),importCandidates:visible('seb-evalpro-import-candidates'),closeSession:visible('seb-evalpro-close-session'),globalBilan:visible('seb-evalpro-bilan'),globalReplay:visible('seb-evalpro-replay')}})()",true);if(result.buildText!=='Build #8'){fail('numéro barre Admin incorrect',result);return;}if(result.adminText!=='Verrouiller'||!result.openCandidate||!result.exportCandidates||!result.importCandidates||!result.closeSession||result.globalBilan||result.globalReplay){fail('barre Admin incorrecte',result);return;}console.log('ADMIN_BAR_BUILD=Build #8');console.log('ADMIN_BAR_WINDOWS_SMOKE: OK');win.destroy();app.exit(0);}catch(error){fail(String(error&&error.stack||error));}});
+setTimeout(()=>fail('timeout'),60000).unref();
