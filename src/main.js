@@ -849,10 +849,10 @@ ipcMain.handle('candidate:active', () => {
 
 ipcMain.handle('candidate:complete-active', (_event, mode) => {
   const completionMode = String(mode || '');
-  if (!['admin-manual', 'admin-export', 'candidate-final-page'].includes(completionMode)) {
+  if (!['admin-manual', 'admin-export', 'admin-session-close', 'candidate-final-page'].includes(completionMode)) {
     return { ok:false, error:'Mode de fin de parcours invalide.' };
   }
-  if (['admin-manual', 'admin-export'].includes(completionMode) && !adminSessionUnlocked) {
+  if (['admin-manual', 'admin-export', 'admin-session-close'].includes(completionMode) && !adminSessionUnlocked) {
     return { ok:false, error:'Accès administrateur requis.' };
   }
   try {
