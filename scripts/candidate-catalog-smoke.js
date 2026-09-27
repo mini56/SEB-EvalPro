@@ -82,11 +82,12 @@ try {
     }
   };
 
+  let activeCandidateForDelete = null;
   registerCandidateCatalog({
     app,
     ipcMain,
     getAdminUnlocked:() => true,
-    getActiveCandidate:() => null,
+    getActiveCandidate:() => activeCandidateForDelete,
     dataRoot:sebRoot
   });
   registerBilanHistory({
@@ -325,18 +326,24 @@ try {
     localStorage:{}
   });
 
-  const deleted = deleteCandidate(null, 'candidate-xx');
-  assert(deleted && deleted.ok === false, 'La suppression administrateur d’un candidat doit être refusée.');
-  assert(/désactivée|perte de données/i.test(String(deleted.error || '')), 'Le refus de suppression doit être explicite.');
-  assert.strictEqual(fs.existsSync(newDir), true, 'Le dossier candidat doit rester intact.');
-  assert.strictEqual(fs.existsSync(legacyDir), true, 'La copie historique Admin doit rester intacte.');
-  assert.strictEqual(fs.existsSync(path.join(replayRoot, replayName)), true, 'Le replay historique doit rester intact.');
-  assert.strictEqual(fs.existsSync(path.join(bilanRoot, bilanName)), true, 'Le bilan historique global doit rester intact.');
-  assert.strictEqual(fs.existsSync(path.join(sebRoot, 'Bilans', legacyWordName)), true, 'Le Word historique global doit rester intact.');
-  assert.strictEqual(fs.existsSync(path.join(userDataPath, 'evaluation-state.json')), true, 'L’état local ne doit pas être supprimé.');
-  assert.strictEqual(list().length, 1, 'Le candidat doit rester disponible après une tentative de suppression.');
+  activeCandidateForDelete = { candidateId:'candidate-xx' };
+  const refusedActiveDelete = deleteCandidate(null, 'candidate-xx');
+  assert(refusedActiveDelete && refusedActiveDelete.ok === false, 'Le candidat actif ne doit jamais pouvoir être supprimé.');
+  assert(/actif/i.test(String(refusedActiveDelete.error || '')), 'Le refus doit indiquer que le parcours est actif.');
+  assert.strictEqual(fs.existsSync(newDir), true, 'Le dossier actif doit rester intact après refus de suppression.');
 
-  console.log('Candidate Catalog Separate Evaluations + No Erasure Test: OK');
+  activeCandidateForDelete = null;
+  const deleted = deleteCandidate(null, 'candidate-xx');
+  assert(deleted && deleted.ok === true, 'La suppression administrateur d’un candidat fermé doit réussir.');
+  assert.strictEqual(fs.existsSync(newDir), false, 'Le dossier candidat doit être supprimé.');
+  assert.strictEqual(fs.existsSync(legacyDir), false, 'La copie historique Admin associée doit être supprimée.');
+  assert.strictEqual(fs.existsSync(path.join(replayRoot, replayName)), false, 'Le replay historique associé doit être supprimé.');
+  assert.strictEqual(fs.existsSync(path.join(bilanRoot, bilanName)), false, 'Le bilan historique global associé doit être supprimé.');
+  assert.strictEqual(fs.existsSync(path.join(sebRoot, 'Bilans', legacyWordName)), false, 'Le Word historique associé doit être supprimé.');
+  assert.strictEqual(fs.existsSync(path.join(userDataPath, 'evaluation-state.json')), false, 'L’état local associé doit être nettoyé.');
+  assert.strictEqual(list().length, 0, 'Le candidat supprimé ne doit plus apparaître dans le catalogue.');
+
+  console.log('Candidate Catalog Separate Evaluations + Safe Admin Delete Test: OK');
 } finally {
   fs.rmSync(root, { recursive:true, force:true });
 }
