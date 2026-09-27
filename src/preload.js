@@ -1303,11 +1303,16 @@ async function completeCandidateFromFinalPage() {
       if (!replayArchive || replayArchive.ok !== true) return;
     }
 
+    // Geler immédiatement les sauvegardes de ce parcours pendant la clôture.
+    // Si la clôture échoue, on déverrouille pour permettre une nouvelle tentative.
+    candidateJourneyCompleted = true;
+    clearTimeout(saveTimer);
+    if (periodicSaveTimer) clearInterval(periodicSaveTimer);
+
     const result = await ipcRenderer.invoke('candidate:complete-active', 'candidate-final-page');
-    if (result && result.ok) {
-      candidateJourneyCompleted = true;
-      clearTimeout(saveTimer);
-      if (periodicSaveTimer) clearInterval(periodicSaveTimer);
+    if (!result || !result.ok) {
+      candidateJourneyCompleted = false;
+      scheduleSave();
     }
   } catch (_) {
   } finally {
