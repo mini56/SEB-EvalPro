@@ -18,6 +18,7 @@ function createCandidateStore(options = {}) {
   const systemRoot = path.join(sebRoot, 'System');
   const activePointerPath = path.join(userDataPath, 'active-candidate.json');
   const activePointerBackupPath = path.join(systemRoot, 'active-candidate.json');
+  let recentlyCompleted = null;
   let atomicWriteCounter = 0;
 
   function ensureDirectory(directory) {
@@ -359,6 +360,26 @@ function createCandidateStore(options = {}) {
       return active;
     }
 
+    // Protection contre une sauvegarde tardive déclenchée juste après la fin
+    // du parcours : réutiliser le dossier qui vient d'être clôturé au lieu
+    // d'allouer un deuxième candidat avec la même identité.
+    if (
+      recentlyCompleted &&
+      recentlyCompleted.identityKey === identity.identityKey &&
+      Date.now() <= recentlyCompleted.guardUntil &&
+      fs.existsSync(recentlyCompleted.candidateDir)
+    ) {
+      return {
+        schemaVersion:1,
+        candidateId:recentlyCompleted.candidateId,
+        shortId:recentlyCompleted.shortId,
+        folderName:recentlyCompleted.folderName,
+        candidateDir:recentlyCompleted.candidateDir,
+        identityKey:recentlyCompleted.identityKey,
+        createdAt:recentlyCompleted.createdAt
+      };
+    }
+
     const existing = existingCandidateForIdentity(identity);
     if (existing) {
       return activateExistingCandidate(existing, identity);
@@ -462,6 +483,17 @@ function createCandidateStore(options = {}) {
       completionReason: String(completionReason || 'admin-manual'),
       closedAt: manifest.closedAt || completedAt
     });
+
+    const completedIdentity = candidateIdentityFromState(state);
+    recentlyCompleted = {
+      candidateId: active.candidateId,
+      shortId: active.shortId,
+      folderName: active.folderName,
+      candidateDir: active.candidateDir,
+      identityKey: completedIdentity ? completedIdentity.identityKey : String(active.identityKey || ''),
+      createdAt: active.createdAt,
+      guardUntil: Date.now() + 30000
+    };
 
     removeActivePointer();
 
