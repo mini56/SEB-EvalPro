@@ -265,10 +265,9 @@ function createSessionCloseDialog() {
       <div class="seb-session-close-card" role="dialog" aria-modal="true" aria-label="Fermer cette session">
         <div class="seb-session-close-title">Fermer cette session ?</div>
         <div class="seb-session-close-text">
-          SEB EvalPro va quitter proprement après vérification des sauvegardes en cours.
-          Si un parcours candidat n'est pas terminé, il restera reprenable au prochain démarrage.
+          SEB EvalPro va sauvegarder les données, finaliser le Replay, terminer définitivement le parcours candidat en cours, puis quitter.
         </div>
-        <div class="seb-session-close-warning">Cette action ne termine pas le parcours du candidat.</div>
+        <div class="seb-session-close-warning">Le parcours en cours ne pourra plus être repris. Son dossier et ses données restent conservés pour le bilan et l’export.</div>
         <div class="seb-session-close-actions">
           <button type="button" id="seb-session-close-cancel">Annuler</button>
           <button type="button" id="seb-session-close-ok" class="danger">Fermer cette session</button>
@@ -1172,6 +1171,8 @@ function injectAdminBar() {
 
     await ipcRenderer.invoke('ai:cancel-current').catch(() => false);
 
+    const active = await ipcRenderer.invoke('candidate:active').catch(() => null);
+
     const saved = saveNow(true);
     if (saved && saved.ok === false) {
       await showTransferMessage(
@@ -1183,10 +1184,43 @@ function injectAdminBar() {
       return;
     }
 
-    // Le Replay doit exister avant la clôture du candidat.
-    if (replayPrototype && typeof replayPrototype.ensureFinalArchive === 'function') {
+    // S'il existe un parcours actif, son Replay doit être finalisé avant sa clôture.
+    if (active && replayPrototype && typeof replayPrototype.ensureFinalArchive === 'function') {
       const replayArchive = await replayPrototype.ensureFinalArchive();
       if (!replayArchive || replayArchive.ok !== true) {
+        scheduleHideBar();
+        return;
+      }
+    }
+
+    // À partir d'ici, aucun autosave tardif ne doit pouvoir remettre la dernière
+    // page du candidat comme page de reprise après la clôture.
+    closingSession = true;
+    candidateJourneyCompleted = true;
+    clearTimeout(saveTimer);
+    saveTimer = null;
+    if (periodicSaveTimer) {
+      clearInterval(periodicSaveTimer);
+      periodicSaveTimer = null;
+    }
+
+    if (active) {
+      const completed = await ipcRenderer.invoke('candidate:complete-active', 'admin-session-close').catch((error) => ({
+        ok:false,
+        error:String(error && error.message ? error.message : error)
+      }));
+      if (!completed || !completed.ok) {
+        closingSession = false;
+        candidateJourneyCompleted = false;
+        if (!isAdminBilanPage() && !isAdminCandidatesPage() && !adminCandidateResultsWorkspace) {
+          periodicSaveTimer = setInterval(() => saveNow(false), SAVE_CHECKPOINT_MS);
+        }
+        scheduleSave();
+        await showTransferMessage(
+          'Fermeture impossible',
+          completed && completed.error ? completed.error : 'Le parcours candidat n’a pas pu être terminé.',
+          true
+        );
         scheduleHideBar();
         return;
       }
@@ -1196,16 +1230,12 @@ function injectAdminBar() {
     if (!closed) {
       await showTransferMessage(
         'Fermeture impossible',
-        'Le dossier candidat n’a pas pu être finalisé. La session reste ouverte et les données affichées sont conservées.',
+        active
+          ? 'Le parcours candidat est terminé, mais SEB EvalPro n’a pas pu quitter automatiquement.'
+          : 'SEB EvalPro n’a pas pu quitter automatiquement.',
         true
       );
-      scheduleHideBar();
-      return;
     }
-
-    closingSession = true;
-    clearTimeout(saveTimer);
-    if (periodicSaveTimer) clearInterval(periodicSaveTimer);
   });
 
   updateAdminButtons();
