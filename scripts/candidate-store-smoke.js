@@ -91,6 +91,20 @@ try {
   const candidateFolders = fs.readdirSync(store.paths.candidatesRoot, { withFileTypes:true }).filter((entry) => entry.isDirectory());
   assert.strictEqual(candidateFolders.length, 1, 'La fin de parcours ne doit pas créer de dossier supplémentaire.');
 
+  // Régression Build #11 : une sauvegarde tardive après TERMINE ne doit jamais
+  // créer un second dossier pour la même identité.
+  const late = store.saveSnapshot({
+    ...state,
+    lastPage:'qcmv1.0.html',
+    lastEvaluationPage:'qcmv1.0.html'
+  });
+  assert(late && late.candidateId === first.candidateId, 'Une sauvegarde tardive doit rester attachée au candidat terminé.');
+  const afterLateFolders = fs.readdirSync(store.paths.candidatesRoot, { withFileTypes:true }).filter((entry) => entry.isDirectory());
+  assert.strictEqual(afterLateFolders.length, 1, 'Une sauvegarde tardive après fin de parcours ne doit créer aucun doublon candidat.');
+  const lateManifest = readJsonFile(path.join(first.candidateDir, 'manifest.json'));
+  assert.strictEqual(lateManifest.status, 'TERMINE', 'La sauvegarde tardive ne doit pas rouvrir le candidat terminé.');
+
+  console.log('CANDIDATE_LATE_SAVE_NO_DUPLICATE: OK');
   console.log('Candidate Store Test #1: OK');
   console.log(first.folderName);
 } finally {
