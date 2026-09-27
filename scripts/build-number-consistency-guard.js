@@ -6,6 +6,7 @@ const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'))
 const preload = fs.readFileSync(path.join(root, 'src', 'preload.js'), 'utf8');
 const main = fs.readFileSync(path.join(root, 'src', 'main.js'), 'utf8');
 const branding = fs.readFileSync(path.join(root, 'scripts', 'generate-installer-branding.ps1'), 'utf8');
+const installer = fs.readFileSync(path.join(root, 'build', 'installer.nsh'), 'utf8');
 
 function fail(message) {
   console.error('SEB EvalPro garde numéro de build: ' + message);
@@ -28,4 +29,8 @@ if (/GITHUB_RUN_NUMBER|SEB_BUILD_NUMBER/.test(branding)) {
 if (!branding.includes('$buildNumber = [string]$packageInfo.sebBuildNumber')) {
   fail('le branding installateur ne lit pas sebBuildNumber depuis package.json.');
 }
+const installerNumber = installer.match(/!define\s+SEB_BUILD_NUMBER\s+"(\d+)"/);
+if (!installerNumber) fail('SEB_BUILD_NUMBER absent de build/installer.nsh.');
+if (installerNumber[1] !== buildNumber) fail('numéro installateur ' + installerNumber[1] + ' différent du Build #' + buildNumber + '.');
+if (!installer.includes('${SEB_BUILD_LABEL}')) fail('le Setup n’affiche pas SEB_BUILD_LABEL pendant l’installation.');
 console.log('SEB EvalPro garde numéro de build: Build #' + buildNumber + ' unique pour barre et installateur — OK.');

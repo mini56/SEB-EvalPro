@@ -2,6 +2,9 @@
 !include "LogicLib.nsh"
 !include "WinMessages.nsh"
 
+!define SEB_BUILD_NUMBER "8"
+!define SEB_BUILD_LABEL "Build #${SEB_BUILD_NUMBER}"
+
 # Désinstallation/mise à jour sûre.
 # Les dossiers candidats et les données techniques nécessaires à leur déchiffrement
 # et à la reprise d'un parcours ne sont jamais supprimés automatiquement.
@@ -148,7 +151,7 @@ Function SebEditionCreate
     Abort
   ${EndIf}
 
-  ${NSD_CreateLabel} 0 0 100% 28u "Choisissez la version de SEB EvalPro à installer :"
+  ${NSD_CreateLabel} 0 0 100% 28u "Choisissez la version de SEB EvalPro à installer — ${SEB_BUILD_LABEL} :"
   Pop $0
   ${NSD_CreateRadioButton} 8u 42u 92% 18u "Version Candidat — parcours + espace Admin local, sans bilan"
   Pop $SebEditionCandidateRadio
