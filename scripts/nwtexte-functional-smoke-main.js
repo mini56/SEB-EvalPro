@@ -58,25 +58,25 @@ async function runFunctionalScenario(win) {
       font.value = 'Arial';
       font.dispatchEvent(new Event('change', { bubbles:true }));
       const size = document.getElementById('nw-size');
-      size.value = '16px';
+      size.value = '16pt';
       size.dispatchEvent(new Event('change', { bubbles:true }));
 
       let titleFormat = q.getFormat(0, title.length);
       assert(titleFormat.bold === true, 'Bouton Gras non fonctionnel.');
       assert(titleFormat.font === 'Arial', 'Police Arial du titre non appliquée.');
-      assert(titleFormat.size === '16px', 'Taille 16px du titre non appliquée.');
+      assert(titleFormat.size === '16pt', 'Taille 16pt du titre non appliquée.');
 
       // Corps du texte : Arial 12 via les mêmes listes.
       const bodyStart = title.length + 1;
       q.setSelection(bodyStart, body.length, 'user');
       font.value = 'Arial';
       font.dispatchEvent(new Event('change', { bubbles:true }));
-      size.value = '12px';
+      size.value = '12pt';
       size.dispatchEvent(new Event('change', { bubbles:true }));
 
       const bodyFormat = q.getFormat(bodyStart, Math.min(20, body.length));
       assert(bodyFormat.font === 'Arial', 'Police Arial du corps non appliquée.');
-      assert(bodyFormat.size === '12px', 'Taille 12px du corps non appliquée.');
+      assert(bodyFormat.size === '12pt', 'Taille 12pt du corps non appliquée.');
 
       // Italique et souligné : activation/désactivation sans polluer le document final.
       q.setSelection(bodyStart, 5, 'user');
