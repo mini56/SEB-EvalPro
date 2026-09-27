@@ -385,13 +385,30 @@
     persistState();
   }
 
+  function restoreWhenLayoutReady(attempt) {
+    const count = Number(attempt || 0);
+    wrappers().forEach(prepareCloud);
+    const clouds = wrappers().filter(isCloud);
+    const minimumWidth = itemSize() * 2;
+    const ready = clouds.every((wrapper) => wrapper.clientWidth >= minimumWidth);
+
+    if (ready || count >= 80) {
+      restoreState();
+      return;
+    }
+
+    setTimeout(function () {
+      restoreWhenLayoutReady(count + 1);
+    }, 25);
+  }
+
   function install() {
     syncStoredMapsIntoLegacyGlobals();
     wrappers().forEach((wrapper) => {
       wrapper.querySelectorAll('.item').forEach(attachToggle);
     });
 
-    restoreState();
+    restoreWhenLayoutReady(0);
 
     document.getElementById('page4Pass')?.addEventListener('click', function () { goNext('pass'); });
     document.getElementById('page4Next')?.addEventListener('click', function () { goNext('next'); });
@@ -403,7 +420,6 @@
 
     setTimeout(function () {
       syncStoredMapsIntoLegacyGlobals();
-      restoreState();
     }, 0);
   }
 
