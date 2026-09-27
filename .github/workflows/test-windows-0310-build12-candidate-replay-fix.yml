@@ -146,6 +146,7 @@ jobs:
           $preload = Get-Content 'src\\preload.js' -Raw -Encoding UTF8
           $replay = Get-Content 'src\\replay-main.js' -Raw -Encoding UTF8
           $store = Get-Content 'src\\candidate-store-main.js' -Raw -Encoding UTF8
+          $main = Get-Content 'src\\main.js' -Raw -Encoding UTF8
           $storeSmoke = Get-Content 'scripts\\candidate-store-smoke.js' -Raw -Encoding UTF8
           foreach ($required in @(
             'Replay d''abord, clôture ensuite',
@@ -155,7 +156,7 @@ jobs:
             'recentlyCompleted',
             'CANDIDATE_LATE_SAVE_NO_DUPLICATE: OK'
           )) {
-            if (-not ($preload.Contains($required) -or $replay.Contains($required) -or $store.Contains($required) -or $storeSmoke.Contains($required))) {
+            if (-not ($preload.Contains($required) -or $replay.Contains($required) -or $store.Contains($required) -or $main.Contains($required) -or $storeSmoke.Contains($required))) {
               throw "Correctif Replay/doublon incomplet : $required"
             }
           }
