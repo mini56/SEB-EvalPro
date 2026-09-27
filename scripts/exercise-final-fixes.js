@@ -56,6 +56,24 @@ function insertBeforeLast(text, marker, addition, label) {
   const { target, text } = read('app/web/brique.html');
   let out = text;
 
+  if (out.includes('js/brique-page.js')) {
+    const modulePath = path.join(root, 'app', 'web', 'js', 'brique-page.js');
+    if (!fs.existsSync(modulePath)) fail('Brique: module brique-page.js introuvable', 4);
+    const moduleText = fs.readFileSync(modulePath, 'utf8').replace(/\r\n/g, '\n');
+
+    if (out.includes('id="resetBtn"')) fail('la remise à zéro Brique est encore active', 4);
+    if (!out.includes('type="password" id="secretCode"')) fail('le code Brique n’est pas masqué', 5);
+    if (!/<input\s+id="nivDiff"[^>]*\bmin="0"\s+max="10"/.test(out)) fail('Brique: zéro erreur non autorisé', 5);
+    for (const token of [
+      "rawCode.toLowerCase() === 'svg56'",
+      "msgDiv.textContent = 'Code correct — renseignez le nombre d’erreurs.'",
+      "msgDiv.textContent = 'Renseignez le nombre d’erreurs avant de valider.'",
+      'function validateMainEvaluation()'
+    ]) {
+      if (!moduleText.includes(token)) fail('Brique: validation modulaire absente: ' + token, 5);
+    }
+  } else {
+
   out = replaceOnce(
     out,
     '            <button id="resetBtn" type="button">Remise à zéro</button>\n',
@@ -102,6 +120,8 @@ function insertBeforeLast(text, marker, addition, label) {
   if (!out.includes('type="password" id="secretCode"')) fail('le code Brique n’est pas masqué', 5);
   if (!out.includes('Code correct — renseignez le nombre d’erreurs.')) fail('retour de validation du code Brique absent', 5);
 
+  }
+
   write(target, out);
 }
 
@@ -123,7 +143,14 @@ function insertBeforeLast(text, marker, addition, label) {
     if (correctCount !== 1) fail(`Paronymes: ligne ${index + 1} contient ${correctCount} bonne(s) réponse(s)`, 7);
   });
 
-  if (!out.includes('score++;') || !out.includes('total++;')) {
+  if (out.includes('js/paronymes-page.js')) {
+    const modulePath = path.join(root, 'app', 'web', 'js', 'paronymes-page.js');
+    if (!fs.existsSync(modulePath)) fail('Paronymes: module paronymes-page.js introuvable', 8);
+    const moduleText = fs.readFileSync(modulePath, 'utf8').replace(/\\r\\n/g, '\\n');
+    if (!moduleText.includes('score += 1;') || !moduleText.includes('total += 1;')) {
+      fail('Paronymes: logique modulaire 1 point par ligne introuvable', 8);
+    }
+  } else if (!out.includes('score++;') || !out.includes('total++;')) {
     fail('Paronymes: logique 1 point par ligne introuvable', 8);
   }
 
@@ -147,7 +174,20 @@ function insertBeforeLast(text, marker, addition, label) {
     out = replaceOnce(out, '</head>', css + '</head>', 'style sans curseur page 2');
   }
 
-  if (!out.includes('id="seb-page2-safe-number-inputs"')) {
+  const modularPage2 = out.includes('js/qcm-page2.js');
+  if (modularPage2) {
+    const modulePath = path.join(root, 'app', 'web', 'js', 'qcm-page2.js');
+    if (!fs.existsSync(modulePath)) fail('Page 2: module qcm-page2.js introuvable', 9);
+    const moduleText = fs.readFileSync(modulePath, 'utf8').replace(/\r\n/g, '\n');
+    for (const token of [
+      "input.addEventListener('wheel'",
+      "event.key === 'ArrowUp' || event.key === 'ArrowDown'",
+      'event.preventDefault();'
+    ]) {
+      if (!moduleText.includes(token)) fail('Page 2: protection numérique modulaire absente: ' + token, 9);
+    }
+    out = out.replace(/\s*<script\s+id=["']seb-page2-safe-number-inputs["'][^>]*>[\s\S]*?<\/script>\s*/i, '\n');
+  } else if (!out.includes('id="seb-page2-safe-number-inputs"')) {
     const js = `\n<script id="seb-page2-safe-number-inputs">\ndocument.addEventListener('DOMContentLoaded', function () {\n  document.querySelectorAll('#page2 input[type="number"]').forEach(function (input) {\n    input.addEventListener('wheel', function (event) {\n      event.preventDefault();\n    }, { passive: false });\n    input.addEventListener('keydown', function (event) {\n      if (event.key === 'ArrowUp' || event.key === 'ArrowDown') event.preventDefault();\n    });\n  });\n});\n</script>\n`;
     out = insertBeforeLast(out, '</body>', js, 'protection saisie page 2');
   }
@@ -161,8 +201,11 @@ function insertBeforeLast(text, marker, addition, label) {
 
   const safeScriptPos = out.indexOf('id="seb-page2-safe-number-inputs"');
   const exportMarkerPos = out.indexOf('NOM DE FICHIER PERSONNALISÉ');
-  if (safeScriptPos >= 0 && exportMarkerPos >= 0 && safeScriptPos < exportMarkerPos) {
+  if (!modularPage2 && safeScriptPos >= 0 && exportMarkerPos >= 0 && safeScriptPos < exportMarkerPos) {
     fail('Page 2: le script de protection a été injecté dans le modèle Word', 10);
+  }
+  if (modularPage2 && safeScriptPos >= 0) {
+    fail('Page 2: ancien runtime numérique inline encore présent', 10);
   }
   if (out.includes('margin:5px 0 5px 20px;')) {
     fail('Résultat Brique: décalage des réponses autoévaluation encore présent', 11);

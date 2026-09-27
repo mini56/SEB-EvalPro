@@ -44,7 +44,8 @@ function parseJs(text, label) {
   app,
   ipcMain,
   getAdminUnlocked: () => adminSessionUnlocked,
-  getActiveCandidate: () => getCandidateStore().getActiveCandidate()
+  getActiveCandidate: () => getCandidateStore().getActiveCandidate(),
+  dataRoot: sebInternalRoot()
 });
 
 ` + marker);
@@ -82,9 +83,9 @@ function parseJs(text, label) {
   out = out.replace(/\s*const groupName = await createTransferNameDialog\(\);[\s\S]*?if \(!groupName\) \{[\s\S]*?return;\s*\}\s*/m, '\n');
   out = out.replace("ipcRenderer.invoke('admin:import-candidates', groupName)", "ipcRenderer.invoke('admin:import-candidates')");
   // SEB_BUILD94_ADMIN_HOME_EXPORT
-  const exportGuardMarker = '// SEB_ADMIN_EXPORT_REQUIRES_CLOSED_CANDIDATE';
+  const exportGuardMarker = '// SEB_ADMIN_EXPORT_FINALIZES_ACTIVE_CANDIDATE';
   if (!out.includes(exportGuardMarker)) {
-    const exportAnchor = "  exportCandidatesButton.addEventListener('click', async () => {\n    showBar();\n    saveNow(true);";
+    const exportAnchor = "  exportCandidatesButton.addEventListener('click', async () => {\n    showBar();\n    saveNow(true);\n    exportCandidatesButton.disabled = true;\n    importCandidatesButton.disabled = true;\n    try {\n      const password = await createTransferPasswordDialog('export');";
     if (!out.includes(exportAnchor)) fail('ancre export dossiers candidats absente', 3);
     const exportReplacement = [
       "  exportCandidatesButton.addEventListener('click', async () => {",
@@ -100,7 +101,29 @@ function parseJs(text, label) {
       "      scheduleHideBar();",
       "      return;",
       "    }",
-      "    saveNow(true);"
+      "",
+      "    saveNow(true);",
+      "    exportCandidatesButton.disabled = true;",
+      "    importCandidatesButton.disabled = true;",
+      "    try {",
+      "      // SEB_ADMIN_EXPORT_FINALIZES_ACTIVE_CANDIDATE",
+      "      const activeCandidate = await ipcRenderer.invoke('candidate:active').catch(() => null);",
+      "      if (activeCandidate && String(activeCandidate.status || '') === 'EN_COURS') {",
+      "        const confirmed = await createExportCandidateFinishDialog(activeCandidate);",
+      "        if (!confirmed) return;",
+      "        const completed = await ipcRenderer.invoke('candidate:complete-active', 'admin-export').catch((error) => ({",
+      "          ok:false,",
+      "          error:String(error && error.message ? error.message : error)",
+      "        }));",
+      "        if (!completed || !completed.ok) {",
+      "          await showTransferMessage('Fin de parcours impossible', completed && completed.error ? completed.error : 'Le parcours n’a pas pu être terminé avant l’export.', true);",
+      "          return;",
+      "        }",
+      "        finishCandidateButton.hidden = true;",
+      "        await refreshCandidateBadge();",
+      "      }",
+      "",
+      "      const password = await createTransferPasswordDialog('export');"
     ].join('\n');
     out = out.replace(exportAnchor, exportReplacement);
   }
@@ -162,45 +185,31 @@ function parseJs(text, label) {
 }
 
 // -----------------------------------------------------------------------------
-// WORD : conserver le modèle institutionnel historique, mais écrire le Word
-// courant dans le dossier exact du candidat, jamais dans le vieux Bilans global.
+// WORD 0.3.8 : le document visible est uniquement dans Documents\\SEB EvalPro.
+// L'archive interne du candidat conserve sa propre copie.
 // -----------------------------------------------------------------------------
 {
   const { file, text } = read('src/bilan-history-main.js');
   let out = text;
 
-  if (out.includes("function historicalWordDir() {\n    return path.join(app.getPath('documents'), 'SEB EvalPro', 'Bilans');\n  }")) {
-    out = out.replace(
-      "function historicalWordDir() {\n    return path.join(app.getPath('documents'), 'SEB EvalPro', 'Bilans');\n  }",
-      `function historicalWordDir(candidate) {
-    const candidateDir = findCandidateDir(app.getPath('documents'), normalizeCandidate(candidate));
-    if (!candidateDir) throw new Error('Dossier candidat introuvable pour le document Word.');
-    const directory = path.join(candidateDir, 'bilan', 'exports');
-    fs.mkdirSync(directory, { recursive: true });
-    return directory;
-  }`
-    );
-  }
-
+  // Compatibilité si un ancien script a encore injecté le dossier Bilans visible.
   out = out.replace(
-    'function historicalWordPath(filename) {\n    const directory = historicalWordDir();',
-    'function historicalWordPath(filename, candidate) {\n    const directory = historicalWordDir(candidate);'
-  );
-  out = out.replace(
-    'function cleanupLegacyHistoricalWords(filename) {\n    const directory = historicalWordDir();',
-    'function cleanupLegacyHistoricalWords(filename, candidate) {\n    const directory = historicalWordDir(candidate);'
-  );
-  out = out.replace(
-    'cleanupLegacyHistoricalWords(filename);\n      const target = historicalWordPath(filename);',
-    'const candidate = normalizeCandidate(payload && payload.candidate);\n      cleanupLegacyHistoricalWords(filename, candidate);\n      const target = historicalWordPath(filename, candidate);'
+    "function historicalWordDir() {\n    return path.join(app.getPath('documents'), 'SEB EvalPro', 'Bilans');\n  }",
+    "function historicalWordDir() {\n    return path.join(app.getPath('documents'), 'SEB EvalPro');\n  }"
   );
 
-  if (out.includes("return path.join(app.getPath('documents'), 'SEB EvalPro', 'Bilans');")) {
-    fail('writer Word global encore actif après correctif final', 5);
+  if (out.includes("bilan-history:write-word-sync")) {
+    if (!out.includes("return path.join(app.getPath('documents'), 'SEB EvalPro');")) {
+      fail('writer Word visible 0.3.8 absent de Documents\\SEB EvalPro', 5);
+    }
+    if (!out.includes('historicalWordArchiveDir(candidate)')) {
+      fail('archive Word interne du candidat absente', 5);
+    }
+    if (!out.includes("path.join(record.candidateDir, 'bilan', 'exports')")) {
+      fail('archive Word non rattachée au dossier candidat interne', 5);
+    }
   }
-  if (out.includes("bilan-history:write-word-sync") && !out.includes("historicalWordDir(candidate)")) {
-    fail('writer Word présent mais non rattaché au candidat', 5);
-  }
+
   parseJs(out, 'src/bilan-history-main.js');
   write(file, out);
 }
@@ -253,6 +262,7 @@ function parseJs(text, label) {
   const main = read('src/main.js').text;
   const preload = read('src/preload.js').text;
   const qcm = read('source/qcmv1.0.html').text;
+  const qcmPage3 = fs.existsSync(path.join(root, 'source', 'js', 'qcm-page3.js')) ? read('source/js/qcm-page3.js').text : '';
   const carre = read('source/carre.html').text;
   const localAi = read('src/local-ai.js').text;
   const installer = read('build/installer.nsh').text;
@@ -275,7 +285,11 @@ function parseJs(text, label) {
     'skipped',
     'updated:0',
     'sameCandidate',
-    'candidateShapeValid'
+    'candidateShapeValid',
+    'SEB-EVALPRO-USB-1',
+    'aes-256-gcm',
+    'scryptSync',
+    'Mot de passe incorrect ou fichier de transfert endommagé'
   ]) if (!transfer.includes(token)) fail('transfert USB sécurisé incomplet: ' + token, 7);
 
   for (const forbidden of [
@@ -285,12 +299,14 @@ function parseJs(text, label) {
   ]) if (transfer.includes(forbidden)) fail('ancien comportement de fusion/écrasement encore présent: ' + forbidden, 7);
 
   for (const token of [
-    "sanitizeSegment(identity.groupe)",
-    "const baseFolderName = buildFolderName(identity)",
+    "function buildFolderName(candidateId, shortId = '')",
+    "const baseFolderName = buildFolderName(candidateId, shortId)",
     "function candidateIdentityKey(candidate)",
     "function existingCandidateForIdentity(identity)",
-    "return activateExistingCandidate(existing, identity)"
-  ]) if (!store.includes(token)) fail('unicité dossier candidat incomplète: ' + token, 7);
+    "return activateExistingCandidate(existing, identity)",
+    "function migrateCandidateFolderNames()",
+    "codedFolderName"
+  ]) if (!store.includes(token)) fail('unicité/confidentialité dossier candidat incomplète: ' + token, 7);
 
   for (const token of [
     "candidate-catalog:list",
@@ -312,16 +328,15 @@ function parseJs(text, label) {
   ]) if (!catalogMain.includes(token)) fail('catalogue backend incomplet: ' + token, 7);
 
   for (const token of [
-    'removeLegacyCandidateCopies',
-    'removeCandidateRuntimeState',
-    "candidate-catalog:delete"
-  ]) if (!catalogMain.includes(token)) fail('effacement candidat Admin incomplet: ' + token, 7);
-  for (const token of [
+    "candidate-catalog:delete",
+    "La suppression d’un dossier candidat est désactivée"
+  ]) if (!catalogMain.includes(token)) fail('protection anti-suppression candidat incomplète: ' + token, 7);
+  for (const forbidden of [
     'confirmCandidateDeletion',
     'seb-cc-detail-delete',
     'Supprimer définitivement',
     "ipcRenderer.invoke('candidate-catalog:delete'"
-  ]) if (!catalogPreload.includes(token)) fail('interface effacement candidat incomplète: ' + token, 7);
+  ]) if (catalogPreload.includes(forbidden)) fail('suppression candidat encore exposée dans l’interface: ' + forbidden, 7);
   if (catalogPreload.includes('function statusLabel') || catalogPreload.includes('Session fermée') || catalogPreload.includes('>En cours<')) {
     fail('statut technique candidat encore affiché dans le catalogue', 7);
   }
@@ -392,14 +407,18 @@ function parseJs(text, label) {
     'devTools: false',
     'SEB_CANDIDATE_CLOSE_GUARD',
     'candidate:set-admin-export-context',
-    'isCurrentCandidateWord',
+    'const visibleDirectory = bilanDocumentsDir();',
+    'Archivage interne du Word impossible',
     'cleanupNumberedCandidateWordCopies',
     'admin:open-candidate-results',
     'adminCandidateResultsMode',
     'admin:open-candidate-browser',
     'admin:return-candidate-browser',
     'admin-candidats.html',
-    'isAdminNavigationPage(page)'
+    'isAdminNavigationPage(page)',
+    'initializeCandidateSecurity',
+    'safeStorage',
+    'createCandidateLocalProtection'
   ]) if (!main.includes(token)) fail('confinement/navigation Admin incomplet: ' + token, 7);
 
   for (const token of [
@@ -418,20 +437,37 @@ function parseJs(text, label) {
     'candidateCatalog.install({ beforeNavigate: () => saveNow(true) });',
     'SEB_ADMIN_EXPORT_REQUIRES_CLOSED_CANDIDATE',
     'Fermez le dossier candidat avant de lancer l’export.',
-    'SEB_ADMIN_HOME_PRIVACY_BUTTON_IN_BAR'
+    'SEB_ADMIN_EXPORT_FINALIZES_ACTIVE_CANDIDATE',
+    'createExportCandidateFinishDialog',
+    'Terminer le parcours et exporter',
+    "candidate:complete-active', 'admin-export'",
+    'SEB_ADMIN_HOME_PRIVACY_BUTTON_IN_BAR',
+    'createTransferPasswordDialog',
+    'Afficher le mot de passe'
   ]) if (!preload.includes(token)) fail('interface/navigation Admin candidat incomplète: ' + token, 7);
 
-  for (const token of [
-    'Microsoft Visual C++ x64',
-    '3221225781',
-    "serverProcess.on('error'"
-  ]) if (!localAi.includes(token)) fail('diagnostic runtime IA incomplet: ' + token, 7);
+  const sebIaIntegrated = packageText.includes('build165plus-seb-ia-v1.js');
+  if (sebIaIntegrated) {
+    for (const forbidden of [
+      'Ministral-3-8B-Instruct',
+      'SEB-EvalPro-IA-Pack-Setup.exe',
+      'vc_redist.x64.exe',
+      'ExecShellWait "runas"'
+    ]) if (installer.includes(forbidden)) fail('ancien prérequis Pack IA encore présent dans le Setup SEB-IA: ' + forbidden, 7);
+    if (packageText.includes('build165plus-local-ai-prototype.js')) fail('ancien moteur Mistral encore exécuté après SEB-IA', 7);
+  } else {
+    for (const token of [
+      'Microsoft Visual C++ x64',
+      '3221225781',
+      "serverProcess.on('error'"
+    ]) if (!localAi.includes(token)) fail('diagnostic runtime IA incomplet: ' + token, 7);
 
-  for (const token of [
-    'vc_redist.x64.exe',
-    'ExecShellWait "runas"',
-    'VC\\Runtimes\\x64'
-  ]) if (!installer.includes(token)) fail('prérequis Visual C++ absent du Setup: ' + token, 7);
+    for (const token of [
+      'vc_redist.x64.exe',
+      'ExecShellWait "runas"',
+      'VC\\Runtimes\\x64'
+    ]) if (!installer.includes(token)) fail('prérequis Visual C++ absent du Setup: ' + token, 7);
+  }
 
   for (const forbidden of [
     'admin:list-results',
@@ -485,18 +521,32 @@ function parseJs(text, label) {
   if (!dicteeGenerated.includes('position:fixed!important;left:50%!important;right:auto!important;bottom:22px!important;transform:translateX(-50%)!important')) {
     fail('Dictée: le bouton final « Dictée terminée / Suivant » n’est pas centré dans le rendu final', 7);
   }
+  const page3Source = qcm.includes('js/qcm-page3.js') ? qcmPage3 : qcm;
   for (const token of [
-    "1:\"9h15\", 2:'8h50', 3:'9h05', 4:'9h20', 5:'8h45', 6:'5h15'",
+    qcm.includes('js/qcm-page3.js')
+      ? "1:'9h15', 2:'8h50', 3:'9h05', 4:'9h20', 5:'8h45', 6:'5h15'"
+      : "1:\"9h15\", 2:'8h50', 3:'9h05', 4:'9h20', 5:'8h45', 6:'5h15'",
     "7:'9h45', 8:'9h15', 9:'9h30', 10:'9h55', 11:'9h25', 12:'2h35'",
     "13:'0h31', 14:'1h03'"
   ]) {
-    if (!qcm.includes(token)) fail('Page 3: grille horaire finale incorrecte: ' + token, 7);
+    if (!page3Source.includes(token)) fail('Page 3: grille horaire finale incorrecte: ' + token, 7);
   }
-  if (qcm.includes("9:'9h25', 10:'9h55', 11:'9h25', 12:'2h30'")) {
+  if (page3Source.includes("9:'9h25', 10:'9h55', 11:'9h25', 12:'2h30'")) {
     fail('Page 3: anciennes réponses erronées réintroduites', 7);
   }
   if (!main.includes('SEB_TEMP_WINDOWS_RECOVERY') || !main.includes('TEMP_ALLOW_WINDOWS_RECOVERY = true')) {
     fail('sortie Windows temporaire de récupération absente', 7);
+  }
+  for (const token of [
+    'SEB_WINDOWS_RETURN_KIOSK_GUARD',
+    'forceCandidateWindowLockAfterWindowsReturn',
+    'installCandidateWindowsReturnGuard',
+    "['resume', 'unlock-screen', 'user-did-become-active']",
+    'win.setKiosk(false)',
+    'win.setKiosk(true)',
+    'mainWindow.setSkipTaskbar(true)'
+  ]) {
+    if (!main.includes(token)) fail('réaffirmation kiosk après reprise Windows absente: ' + token, 7);
   }
   if (nativeKeyguard.includes('if (vk == VK_LWIN || vk == VK_RWIN) return 1;') || !nativeKeyguard.includes('winHeld')) {
     fail('touche Windows temporaire encore bloquée', 7);
@@ -520,4 +570,4 @@ function parseJs(text, label) {
   ]) parseJs(source, label);
 }
 
-console.log('SEB EvalPro candidats autonomes final: dossier candidat source unique, USB vérifié sans écrasement, replay exact, bilans/Word candidats, corruption contrôlée et runtime hors ligne — OK.');
+console.log('SEB EvalPro candidats autonomes final: stockage candidat interne source unique, Word visible dans Documents, USB vérifié sans écrasement, replay exact, corruption contrôlée et runtime hors ligne — OK.');

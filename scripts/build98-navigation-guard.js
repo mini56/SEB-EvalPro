@@ -32,6 +32,8 @@ function appendBeforeBody(text, addition, label) {
 {
   const { file, text } = read('app/web/tri_de_cheville.html');
   let out = text;
+  const modularTri = out.includes('js/tri-page.js');
+  const triModule = modularTri ? read('app/web/js/tri-page.js').text : '';
 
   if (!out.includes('id="seb-tri-next"')) {
     const nextRegex = /<button\s+type="button"\s+onclick="[^"]*passerEtapeSuivante\(\)[^"]*">\s*Étape suivante\s*(?:➜|→|-&gt;|->)?\s*<\/button>/i;
@@ -43,12 +45,15 @@ function appendBeforeBody(text, addition, label) {
 
   const oldAuto = '<button type="button" onclick="saveAutoEval(); saveTriResultsToQCM(); passerEtapeSuivante()">Valider mon autoévaluation</button>';
   const newAuto = '<button type="button" id="seb-tri-auto-validate" onclick="sebEvalProValidateTriAutoEvaluation(event)">Valider mon autoévaluation</button>';
-  if (!out.includes(newAuto)) {
+  if (!modularTri && !out.includes(newAuto)) {
     if (!out.includes(oldAuto)) fail('bouton de validation autoévaluation du tri introuvable', 5);
     out = out.replace(oldAuto, newAuto);
   }
+  if (modularTri && !out.includes('id="seb-tri-auto-validate"')) {
+    fail('bouton de validation autoévaluation modulaire du tri introuvable', 5);
+  }
 
-  if (!out.includes('id="seb-tri-navigation-guard98"')) {
+  if (!modularTri && !out.includes('id="seb-tri-navigation-guard98"')) {
     const guard = `
 <script id="seb-tri-navigation-guard98">
 (function(){
@@ -148,8 +153,17 @@ function appendBeforeBody(text, addition, label) {
     out = appendBeforeBody(out, guard, 'garde navigation Tri');
   }
 
-  if (!out.includes('seb-tri-next') || !out.includes('sebEvalProValidateTriAutoEvaluation')) {
-    fail('garde Tri incomplet après correction', 6);
+  if (!out.includes('seb-tri-next')) fail('bouton Suivant Tri incomplet après correction', 6);
+  if (modularTri) {
+    for (const token of [
+      'window.sebEvalProTriNavigationReady = navigationReady;',
+      'window.sebEvalProValidateTriAutoEvaluation = validateAutoEvaluation;',
+      "window.sebParcours.goNext('tri-de-cheville')"
+    ]) {
+      if (!triModule.includes(token)) fail('garde Tri modulaire incomplet: ' + token, 6);
+    }
+  } else if (!out.includes('sebEvalProValidateTriAutoEvaluation')) {
+    fail('garde Tri historique incomplet après correction', 6);
   }
   if (out.includes('onclick="saveAutoEval(); saveTriResultsToQCM(); passerEtapeSuivante()"')) {
     fail('ancienne navigation directe du Tri encore présente', 7);
@@ -354,7 +368,7 @@ function appendBeforeBody(text, addition, label) {
     event.stopPropagation();
     if (event.stopImmediatePropagation) event.stopImmediatePropagation();
     window.alert(ctx.file === 'tri_de_cheville.html'
-      ? 'Terminez les 5 tris puis validez l’autoévaluation avant de passer à l’étape suivante.'
+      ? 'Terminez au moins 3 tris puis validez l’autoévaluation avant de passer à l’étape suivante.'
       : 'Vous devez réaliser l’exercice avant de passer à l’étape suivante. Si vous souhaitez arrêter cet exercice, utilisez « Abandonner l’exercice ».');
   }, true);
 
@@ -390,11 +404,14 @@ function appendBeforeBody(text, addition, label) {
 // Contrôles bloquants de fin de build.
 {
   const tri = read('app/web/tri_de_cheville.html').text;
+  const triModule = fs.existsSync(path.join(root, 'app', 'web', 'js', 'tri-page.js'))
+    ? read('app/web/js/tri-page.js').text
+    : '';
   const runtime = read('app/web/js/seb-ui-runtime.js').text;
   const checks = [
     [tri.includes('id="seb-tri-next"'), 'Tri: bouton Suivant identifié'],
-    [tri.includes('seb_tri_navigation_ready'), 'Tri: marqueur validation autoévaluation'],
-    [tri.includes('sebEvalProValidateTriAutoEvaluation'), 'Tri: validation autoévaluation sans sortie immédiate'],
+    [(tri.includes('seb_tri_navigation_ready') || triModule.includes("const READY_KEY = 'seb_tri_navigation_ready'")), 'Tri: marqueur validation autoévaluation'],
+    [(tri.includes('sebEvalProValidateTriAutoEvaluation') || triModule.includes('window.sebEvalProValidateTriAutoEvaluation')), 'Tri: validation autoévaluation sans sortie immédiate'],
     [runtime.includes('SEB_EXERCISE_NAVIGATION_GUARD98'), 'garde global navigation'],
     [runtime.includes("storageExists('page8_data')"), 'nvmail après Envoyer'],
     [runtime.includes("storageExists('planningScore')"), 'Planning après validation'],
@@ -405,4 +422,4 @@ function appendBeforeBody(text, addition, label) {
   if (failed.length) fail('contrôles finaux échoués: ' + failed.join(', '), 12);
 }
 
-console.log('SEB EvalPro #98: navigation bloquée sur exercice vierge; Tri Suivant uniquement après 5 tris + erreurs + autoévaluation validée.');
+console.log('SEB EvalPro #98: navigation bloquée sur exercice vierge; Tri Suivant après au moins 3 tris complets + autoévaluation validée.');

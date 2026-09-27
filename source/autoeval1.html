@@ -52,6 +52,7 @@ html, body {
   background: #0d5bb8;
 }
   </style>
+<link rel="stylesheet" href="css/seb-in-app-alert.css" id="seb-evalpro-in-app-alert-css">
 </head>
 <body>
 <!-- PAGE D’AUTOÉVALUATION -->
@@ -114,44 +115,20 @@ html, body {
       </div>
 
       <div class="footer">
-        <button type="button" onclick="saveAutoEval1(); passerEtapeSuivante()">Valider mon autoévaluation</button>
-        <button type="button" onclick="passerEtapeSuivante()">Étape suivante ➜</button>
+        <button type="button" id="autoeval1-validate">Valider mon autoévaluation</button>
+        <button type="button" id="autoeval1-next">Étape suivante ➜</button>
       </div>
     </div>
   </div>
 </div>
 
 <!-- Script principal -->
-<script>
+<script src="js/seb-parcours.js"></script>
+<script src="js/autoeval1-page.js"></script>
+<script src="js/seb-in-app-alert.js" id="seb-evalpro-in-app-alert-script"></script>
+<script src="js/seb-page-draft-resume.js" id="seb-evalpro-page-draft-resume"></script>
+<script src="js/seb-visual-branding.js" id="seb-evalpro-visual-branding"></script>
 
-function saveAutoEval1() {
-  // Récupération des cases cochées
-  const selections = [];
-  document.querySelectorAll('#autoEvalForm input[type="checkbox"]:checked')
-    .forEach(cb => selections.push(cb.value));
-
-  // Récupération du commentaire
-  const commentaire = document.getElementById('autoComment')?.value.trim() || "";
-
-  // Enregistrement dans sessionStorage
-  sessionStorage.setItem("autoEval1_resultats", JSON.stringify({
-    selections: selections,
-    commentaire: commentaire
-  }));
-
-  console.log("✅ Données autoévaluation 1 enregistrées :", selections, commentaire);
-
-  // Redirection vers la page suivante
-  window.location.href = "introbrique.html";
-}
-
-function passerEtapeSuivante() {
-  if (confirm("Souhaitez-vous passer à l'étape suivante ?")) {
-    // Même comportement que le bouton principal : enregistre avant de passer
-    saveAutoEval1();
-  }
-}
-
-</script>
+<script id="seb-ui-runtime-loader" src="js/seb-ui-runtime.js"></script>
 </body>
 </html>

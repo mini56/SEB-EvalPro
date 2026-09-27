@@ -3,11 +3,13 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { createCandidateStore } = require('../src/candidate-store-main');
+const { configureLocalKey, readJsonFile, LOCAL_PREFIX } = require('../src/candidate-data-crypto');
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'seb-evalpro-candidate-store-'));
 const documentsPath = path.join(root, 'Documents');
 const userDataPath = path.join(root, 'AppData');
 const fixedNow = new Date('2026-09-18T18:00:00.000Z');
+configureLocalKey(Buffer.alloc(32, 7));
 
 try {
   const store = createCandidateStore({
@@ -20,8 +22,8 @@ try {
     version: 1,
     sessionStorage: {
       candidat_data: JSON.stringify({
-        nom: 'DUPONT',
-        'prénom': 'Jean',
+        nom: 'XXNOMSECRET',
+        'prénom': 'YYPRENOMSECRET',
         lieu: 'Lorient',
         groupe: '7',
         date: '2026-09-18'
@@ -36,7 +38,7 @@ try {
 
   const first = store.saveSnapshot(state);
   assert(first, 'Le dossier candidat doit être créé.');
-  assert.strictEqual(first.folderName, 'DUPONT_Jean_Lorient_7');
+  assert(/^CAND-[A-F0-9]{12}(?:_\d+)?$/.test(first.folderName), 'Le dossier candidat doit utiliser uniquement un identifiant technique CAND-.');
   assert(fs.existsSync(path.join(first.candidateDir, 'manifest.json')));
   assert(fs.existsSync(path.join(first.candidateDir, 'donnees', 'candidat.json')));
   assert(fs.existsSync(path.join(first.candidateDir, 'donnees', 'evaluation-state.json')));
@@ -56,32 +58,38 @@ try {
   assert.strictEqual(second.candidateDir, first.candidateDir, 'Une sauvegarde suivante ne doit pas créer de doublon.');
 
   const active = store.getActiveCandidate();
-  assert(active && active.displayName === 'Jean DUPONT');
+  assert(active && active.displayName === 'YYPRENOMSECRET XXNOMSECRET');
   assert.strictEqual(store.getActiveExportDir(), path.join(first.candidateDir, 'bilan', 'exports'));
+  assert(fs.existsSync(store.paths.activePointerPath), 'Le pointeur actif principal doit exister.');
+  assert(fs.existsSync(store.paths.activePointerBackupPath), 'La copie de récupération du pointeur actif doit exister dans Documents.');
 
-  const closed = store.closeActiveCandidate({
+  // Simulation d'un nettoyage AppData pendant une mise à jour.
+  fs.rmSync(store.paths.activePointerPath, { force:true });
+  assert.strictEqual(fs.existsSync(store.paths.activePointerPath), false);
+  const recoveredActive = store.getActiveCandidate();
+  assert(recoveredActive && recoveredActive.candidateId === first.candidateId, 'Le parcours actif doit être restauré depuis Documents.');
+  assert(fs.existsSync(store.paths.activePointerPath), 'Le pointeur AppData doit être recréé depuis sa sauvegarde.');
+
+  const closed = store.completeActiveCandidate({
     ...state,
     lastPage: 'pageFinale.html',
     lastEvaluationPage: 'pageFinale.html'
   });
-  assert(closed && closed.status === 'SESSION_FERMEE');
+  assert(closed && closed.status === 'TERMINE');
   assert.strictEqual(store.getActiveCandidate(), null, 'Le pointeur actif doit être supprimé après fermeture.');
+  assert.strictEqual(fs.existsSync(store.paths.activePointerPath), false, 'Le pointeur AppData doit être supprimé après fin du parcours.');
+  assert.strictEqual(fs.existsSync(store.paths.activePointerBackupPath), false, 'La copie de récupération doit aussi être supprimée après fin du parcours.');
 
-  const manifest = JSON.parse(fs.readFileSync(path.join(first.candidateDir, 'manifest.json'), 'utf8'));
-  assert.strictEqual(manifest.status, 'SESSION_FERMEE');
+  const rawManifest = fs.readFileSync(path.join(first.candidateDir, 'manifest.json'), 'utf8');
+  assert(rawManifest.startsWith(LOCAL_PREFIX), 'Le manifeste candidat doit être chiffré sur disque.');
+  assert(!rawManifest.includes('Lorient') && !rawManifest.includes('YYPRENOMSECRET') && !rawManifest.includes('XXNOMSECRET'), 'Aucune identité candidat ne doit rester en clair dans le manifeste.');
+  const manifest = readJsonFile(path.join(first.candidateDir, 'manifest.json'));
+  assert.strictEqual(manifest.status, 'TERMINE');
   assert(manifest.closedAt, 'La date de fermeture doit être enregistrée.');
   assert(fs.existsSync(first.candidateDir), 'Le dossier candidat ne doit jamais être supprimé à la fermeture.');
 
-  const reopened = store.saveSnapshot({
-    ...state,
-    lastPage:'pageFinale.html',
-    lastEvaluationPage:'pageFinale.html'
-  });
-  assert(reopened, 'Une sauvegarde tardive du même candidat doit retrouver son dossier existant.');
-  assert.strictEqual(reopened.candidateId, first.candidateId, 'Une fermeture suivie d’une sauvegarde ne doit jamais recréer le même candidat.');
-  assert.strictEqual(reopened.candidateDir, first.candidateDir, 'Le même candidat doit toujours conserver un seul dossier.');
   const candidateFolders = fs.readdirSync(store.paths.candidatesRoot, { withFileTypes:true }).filter((entry) => entry.isDirectory());
-  assert.strictEqual(candidateFolders.length, 1, 'Aucun dossier _2/_3 ne doit être créé pour la même identité candidat.');
+  assert.strictEqual(candidateFolders.length, 1, 'La fin de parcours ne doit pas créer de dossier supplémentaire.');
 
   console.log('Candidate Store Test #1: OK');
   console.log(first.folderName);

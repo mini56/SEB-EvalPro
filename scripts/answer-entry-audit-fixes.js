@@ -31,7 +31,14 @@ function appendBeforeBody(text, block, label) {
   const { file, text } = read('app/web/qcmv1.0.html');
   let out = text;
 
-  if (!out.includes('function sameSebNumeric')) {
+  const modularPage2 = out.includes('js/qcm-page2.js');
+  const modularPage2_1 = out.includes('js/qcm-page2-1.js');
+  const modularPage3 = out.includes('js/qcm-page3.js');
+  const modularTexteTrous = out.includes('js/qcm-texte-trous.js');
+  const modularPage6 = out.includes('js/qcm-page6.js');
+  const needsLegacyHelpers = !modularPage2 || !modularPage2_1 || !modularTexteTrous || !modularPage6;
+
+  if (needsLegacyHelpers && !out.includes('function sameSebNumeric')) {
     const marker = 'function saveTableAnswers(pageNum)';
     const pos = out.indexOf(marker);
     if (pos < 0) fail('saveTableAnswers introuvable', 4);
@@ -65,30 +72,162 @@ function appendBeforeBody(text, block, label) {
     out = out.slice(0, pos) + helper + out.slice(pos);
   }
 
-  const page6Candidates = [
-    "      scores[`page6_q${i}`] =\n         (bonnes[i] && val.replace(',', '.') === bonnes[i].toString()) ? 1 : 0;",
-    "      scores[`page6_q${i}`] =\n         (bonnes[i] && val.replace(',', '.') === bonnes[i].toString().replace(',', '.')) ? 1 : 0;"
-  ];
-  const page6Old = page6Candidates.find(candidate => out.includes(candidate));
-  if (!page6Old) fail('cible introuvable: comparaison numérique Page 6', 3);
-  out = out.replace(page6Old, "      scores[`page6_q${i}`] =\n         (bonnes[i] && sameSebNumeric(val, bonnes[i])) ? 1 : 0;");
+  if (modularPage6) {
+    const modulePath = path.join(root, 'app', 'web', 'js', 'qcm-page6.js');
+    if (!fs.existsSync(modulePath)) fail('Page 6: module qcm-page6.js introuvable', 4);
+    const moduleText = fs.readFileSync(modulePath, 'utf8').replace(/\r\n/g, '\n');
+    for (const token of [
+      'function normalizeNumeric(value)',
+      ".replace(/\\s+/g, '')",
+      ".replace(',', '.')",
+      'function sameNumeric(left, right)',
+      "1:'2300', 2:'7500', 3:'2.5', 4:'8400', 5:'3200'",
+      "6:'450', 7:'750', 8:'5.6', 9:'1250', 10:'4'"
+    ]) {
+      if (!moduleText.includes(token)) fail('Page 6: normalisation numérique modulaire absente: ' + token, 4);
+    }
+  } else {
+    const page6Candidates = [
+      "      scores[`page6_q${i}`] =\n         (bonnes[i] && val.replace(',', '.') === bonnes[i].toString()) ? 1 : 0;",
+      "      scores[`page6_q${i}`] =\n         (bonnes[i] && val.replace(',', '.') === bonnes[i].toString().replace(',', '.')) ? 1 : 0;"
+    ];
+    const page6Old = page6Candidates.find(candidate => out.includes(candidate));
+    if (!page6Old) fail('cible introuvable: comparaison numérique Page 6', 3);
+    out = out.replace(page6Old, "      scores[`page6_q${i}`] =\n         (bonnes[i] && sameSebNumeric(val, bonnes[i])) ? 1 : 0;");
+  }
 
-  const oldStandard = "    scores[`page${pageNum}_q${i}`] =\n      (bonnes && bonnes[i] && (pageNum == 3\n        ? normalizeSebTime(val) === normalizeSebTime(bonnes[i])\n        : val.toString().toUpperCase() === bonnes[i].toString().toUpperCase()))\n        ? 1 : 0;";
-  const newStandard = "    scores[`page${pageNum}_q${i}`] =\n      (bonnes && bonnes[i] && (pageNum == 3\n        ? normalizeSebTime(val) === normalizeSebTime(bonnes[i])\n        : (pageNum == 2 || pageNum === '2_1')\n          ? sameSebNumeric(val, bonnes[i])\n          : val.toString().toUpperCase() === bonnes[i].toString().toUpperCase()))\n        ? 1 : 0;";
-  out = replaceRequired(out, oldStandard, newStandard, 'comparaison numérique Pages 2 et 2_1');
+  if (modularPage2) {
+    const modulePath = path.join(root, 'app', 'web', 'js', 'qcm-page2.js');
+    if (!fs.existsSync(modulePath)) fail('Page 2: module qcm-page2.js introuvable', 4);
+    const moduleText = fs.readFileSync(modulePath, 'utf8').replace(/\r\n/g, '\n');
+    for (const token of [
+      'function normalizeNumeric(value)',
+      ".replace(/\\s+/g, '')",
+      ".replace(',', '.')",
+      'function sameNumeric(left, right)',
+      "const answers = Object.freeze({ 1:'1020', 2:'1250', 3:'60', 4:'525', 5:'8' });"
+    ]) {
+      if (!moduleText.includes(token)) fail('Page 2: normalisation numérique modulaire absente: ' + token, 4);
+    }
+  }
 
-  const oldTextTrous = "    const userAnswer = (input.value || '').trim().toLowerCase();\n    const correct    = (input.dataset && input.dataset.answer)\n                        ? input.dataset.answer.toLowerCase() : '';";
-  const newTextTrous = "    const userAnswer = normalizeSebAnswerText(input.value);\n    const correct    = (input.dataset && input.dataset.answer)\n                        ? normalizeSebAnswerText(input.dataset.answer) : '';";
-  out = replaceRequired(out, oldTextTrous, newTextTrous, 'normalisation Texte à trous');
+  if (modularPage2_1) {
+    const modulePath = path.join(root, 'app', 'web', 'js', 'qcm-page2-1.js');
+    if (!fs.existsSync(modulePath)) fail('Page 2_1: module qcm-page2-1.js introuvable', 4);
+    const moduleText = fs.readFileSync(modulePath, 'utf8').replace(/\r\n/g, '\n');
+    for (const token of [
+      'function normalizeNumeric(value)',
+      ".replace(/\\s+/g, '')",
+      ".replace(',', '.')",
+      'function sameNumeric(left, right)',
+      "const answers = Object.freeze({ 6:'10', 7:'75', 8:'12', 9:'24', 10:'165' });",
+      "this.value.replace(/[^0-9.,]/g, '')"
+    ]) {
+      if (!moduleText.includes(token)) fail('Page 2_1: normalisation/filtrage modulaire absent: ' + token, 4);
+    }
+  }
 
-  const oldFallback = "          scores['page3_q' + i] = (bonnesReponsesPage3[i] && value.toUpperCase() === String(bonnesReponsesPage3[i]).toUpperCase()) ? 1 : 0;";
-  const newFallback = "          scores['page3_q' + i] = (bonnesReponsesPage3[i] && normalizeSebTime(value) === normalizeSebTime(bonnesReponsesPage3[i])) ? 1 : 0;";
-  out = replaceRequired(out, oldFallback, newFallback, 'fallback Page 3 tolérant');
+  if (modularPage3) {
+    const modulePath = path.join(root, 'app', 'web', 'js', 'qcm-page3.js');
+    if (!fs.existsSync(modulePath)) fail('Page 3: module qcm-page3.js introuvable', 4);
+    const moduleText = fs.readFileSync(modulePath, 'utf8').replace(/\r\n/g, '\n');
+    for (const token of [
+      'function parseTimeToMinutes(value)',
+      'function sameTime(left, right)',
+      "match = text.match(/^(\\d+)\\s*m$/);",
+      "match = text.match(/^(\\d+)\\s*(?:h|:)\\s*(\\d{1,2})\\s*m?$/);",
+      'minutes > 59',
+      "13:'0h31', 14:'1h03'"
+    ]) {
+      if (!moduleText.includes(token)) fail('Page 3: normalisation horaire modulaire absente: ' + token, 4);
+    }
+  }
 
-  if (!out.includes("pageNum == 2 || pageNum === '2_1'")) fail('Pages 2/2_1 non numériques après patch', 4);
-  if (!out.includes('sameSebNumeric(val, bonnes[i])')) fail('Page 6 non numérique après patch', 4);
-  if (!out.includes('normalizeSebAnswerText(input.value)')) fail('Texte à trous non normalisé', 4);
-  if (!out.includes('normalizeSebTime(value) === normalizeSebTime(bonnesReponsesPage3[i])')) fail('fallback Page 3 non normalisé', 4);
+  if (modularTexteTrous) {
+    const modulePath = path.join(root, 'app', 'web', 'js', 'qcm-texte-trous.js');
+    if (!fs.existsSync(modulePath)) fail('Texte à trous: module qcm-texte-trous.js introuvable', 4);
+    const moduleText = fs.readFileSync(modulePath, 'utf8').replace(/\r\n/g, '\n');
+    for (const token of [
+      'function normalizeAnswer(value)',
+      ".replace(/\\u00A0/g, ' ')",
+      ".replace(/\\s+/g, ' ')",
+      ".toLocaleLowerCase('fr-FR')",
+      "const PAGE_KEY = 'pageTexteTrous';",
+      'storedResponses[PAGE_KEY] = result.responses;',
+      'storedScores[PAGE_KEY] = result.score;'
+    ]) {
+      if (!moduleText.includes(token)) fail('Texte à trous: contrat modulaire absent: ' + token, 4);
+    }
+  }
+
+  const plainStandard = "    scores[`page${pageNum}_q${i}`] =\n      (bonnes && bonnes[i] && val.toString().toUpperCase() === bonnes[i].toString().toUpperCase())\n        ? 1 : 0;";
+  const timeStandard = "    scores[`page${pageNum}_q${i}`] =\n      (bonnes && bonnes[i] && (pageNum == 3\n        ? normalizeSebTime(val) === normalizeSebTime(bonnes[i])\n        : val.toString().toUpperCase() === bonnes[i].toString().toUpperCase()))\n        ? 1 : 0;";
+  const oldStandard = modularPage3 ? plainStandard : timeStandard;
+  let newStandard;
+  let numericLabel;
+
+  if (modularPage2 && modularPage2_1) {
+    newStandard = modularPage3 ? plainStandard : timeStandard;
+    numericLabel = modularPage3
+      ? 'comparaisons modularisées Pages 2, 2_1 et 3'
+      : 'comparaisons numériques modularisées Pages 2 et 2_1';
+  } else if (modularPage2) {
+    const tail = "pageNum === '2_1'\n          ? sameSebNumeric(val, bonnes[i])\n          : val.toString().toUpperCase() === bonnes[i].toString().toUpperCase()";
+    newStandard = modularPage3
+      ? "    scores[`page${pageNum}_q${i}`] =\n      (bonnes && bonnes[i] && (" + tail + "))\n        ? 1 : 0;"
+      : "    scores[`page${pageNum}_q${i}`] =\n      (bonnes && bonnes[i] && (pageNum == 3\n        ? normalizeSebTime(val) === normalizeSebTime(bonnes[i])\n        : " + tail + "))\n        ? 1 : 0;";
+    numericLabel = 'comparaison numérique Page 2_1 + module Page 2';
+  } else {
+    const tail = "(pageNum == 2 || pageNum === '2_1')\n          ? sameSebNumeric(val, bonnes[i])\n          : val.toString().toUpperCase() === bonnes[i].toString().toUpperCase()";
+    newStandard = modularPage3
+      ? "    scores[`page${pageNum}_q${i}`] =\n      (bonnes && bonnes[i] && (" + tail + "))\n        ? 1 : 0;"
+      : "    scores[`page${pageNum}_q${i}`] =\n      (bonnes && bonnes[i] && (pageNum == 3\n        ? normalizeSebTime(val) === normalizeSebTime(bonnes[i])\n        : " + tail + "))\n        ? 1 : 0;";
+    numericLabel = 'comparaison numérique Pages 2 et 2_1';
+  }
+  if (!(modularPage2 && modularPage2_1 && modularPage3 && modularPage6)) {
+    out = replaceRequired(out, oldStandard, newStandard, numericLabel);
+  }
+
+  if (!modularTexteTrous) {
+    const oldTextTrous = "    const userAnswer = (input.value || '').trim().toLowerCase();\n    const correct    = (input.dataset && input.dataset.answer)\n                        ? input.dataset.answer.toLowerCase() : '';";
+    const newTextTrous = "    const userAnswer = normalizeSebAnswerText(input.value);\n    const correct    = (input.dataset && input.dataset.answer)\n                        ? normalizeSebAnswerText(input.dataset.answer) : '';";
+    out = replaceRequired(out, oldTextTrous, newTextTrous, 'normalisation Texte à trous');
+  }
+
+  if (modularPage3) {
+    if (!out.includes('window.sebQcmPage3.sameTime(value, window.sebQcmPage3.answers[i])')) {
+      fail('fallback Résultats Page 3 modulaire non tolérant', 4);
+    }
+  } else {
+    const oldFallback = "          scores['page3_q' + i] = (bonnesReponsesPage3[i] && value.toUpperCase() === String(bonnesReponsesPage3[i]).toUpperCase()) ? 1 : 0;";
+    const newFallback = "          scores['page3_q' + i] = (bonnesReponsesPage3[i] && normalizeSebTime(value) === normalizeSebTime(bonnesReponsesPage3[i])) ? 1 : 0;";
+    out = replaceRequired(out, oldFallback, newFallback, 'fallback Page 3 tolérant');
+  }
+
+  if (modularPage2 && modularPage2_1) {
+    if (out.includes("pageNum === '2_1'") || out.includes("pageNum == 2 || pageNum === '2_1'")) {
+      fail('ancienne comparaison Pages 2/2_1 encore présente après modularisation', 4);
+    }
+  } else if (modularPage2) {
+    if (!out.includes("pageNum === '2_1'")) fail('Page 2_1 non numérique après patch modulaire', 4);
+  } else if (!out.includes("pageNum == 2 || pageNum === '2_1'")) {
+    fail('Pages 2/2_1 non numériques après patch', 4);
+  }
+  if (modularPage6) {
+    if (!out.includes('js/qcm-page6.js')) fail('Page 6 modulaire absente après patch', 4);
+  } else if (!out.includes('sameSebNumeric(val, bonnes[i])')) {
+    fail('Page 6 non numérique après patch', 4);
+  }
+  if (modularTexteTrous) {
+    if (!out.includes('js/qcm-texte-trous.js')) fail('Texte à trous modulaire absent', 4);
+  } else if (!out.includes('normalizeSebAnswerText(input.value)')) {
+    fail('Texte à trous non normalisé', 4);
+  }
+  if (modularPage3) {
+    if (!out.includes('window.sebQcmPage3.sameTime(value, window.sebQcmPage3.answers[i])')) fail('fallback Page 3 modulaire non normalisé', 4);
+  } else if (!out.includes('normalizeSebTime(value) === normalizeSebTime(bonnesReponsesPage3[i])')) {
+    fail('fallback Page 3 non normalisé', 4);
+  }
   write(file, out);
 }
 
@@ -128,6 +267,24 @@ for (const spec of [
 {
   const { file, text } = read('app/web/genrenombres.html');
   let out = text;
+  const modularGenreNombre = out.includes('js/genrenombres-page.js');
+
+  if (modularGenreNombre) {
+    const modulePath = path.join(root, 'app', 'web', 'js', 'genrenombres-page.js');
+    if (!fs.existsSync(modulePath)) fail('Genre/Nombre: module genrenombres-page.js introuvable', 6);
+    const moduleText = fs.readFileSync(modulePath, 'utf8').replace(/\r\n/g, '\n');
+    for (const token of [
+      ".replace(/\\u00A0/g, ' ')",
+      ".replace(/[’‘]/g, \"'\")",
+      ".replace(/\\s+/g, ' ')",
+      ".toLocaleLowerCase('fr-FR')",
+      'possibleAnswers(input).some((answer) => user === norm(answer))'
+    ]) {
+      if (!moduleText.includes(token)) fail('Genre/Nombre: comparaison modulaire non normalisée: ' + token, 6);
+    }
+  } else {
+  const { file, text } = read('app/web/genrenombres.html');
+  let out = text;
   const normRegex = /function norm\(s\)\{[\s\S]*?\n  \}/;
   if (!normRegex.test(out)) fail('Genre/Nombre: fonction norm introuvable', 6);
   out = out.replace(normRegex, [
@@ -147,6 +304,10 @@ for (const spec of [
   if (!out.includes(".replace(/[’‘]/g, \"'\")")) fail('Genre/Nombre: apostrophes non normalisées', 6);
   if (!out.includes('norm(userAnswer) === norm(answer)')) fail('Genre/Nombre: comparaison non normalisée', 6);
   write(file, out);
+
+  }
+
+  write(file, out);
 }
 
 // -----------------------------------------------------------------------------
@@ -156,9 +317,15 @@ for (const spec of [
 {
   const { file, text } = read('app/web/paronymes.html');
   let out = text;
-  const rowRegex = /<tr><td class="paronyme">Apitoiement<\/td><td(?: data-correct="true")?>Pitié<\/td><td>Appétence<\/td><td(?: data-correct="true")?>Attendrissement<\/td><td>Capiteux<\/td><td>Piété<\/td><\/tr>/;
-  if (!rowRegex.test(out)) fail('Paronymes: ligne Apitoiement introuvable', 7);
-  out = out.replace(rowRegex, '<tr><td class="paronyme">Apitoiement</td><td data-correct="true">Pitié</td><td>Appétence</td><td>Indifférence</td><td>Capiteux</td><td>Piété</td></tr>');
+  const finalRow = '<tr><td class="paronyme">Apitoiement</td><td data-correct="true">Pitié</td><td>Appétence</td><td>Indifférence</td><td>Capiteux</td><td>Piété</td></tr>';
+  const legacyRowRegex = /<tr><td class="paronyme">Apitoiement<\/td><td(?: data-correct="true")?>Pitié<\/td><td>Appétence<\/td><td(?: data-correct="true")?>Attendrissement<\/td><td>Capiteux<\/td><td>Piété<\/td><\/tr>/;
+  if (out.includes(finalRow)) {
+    // Source déjà alignée sur la correction validée.
+  } else if (legacyRowRegex.test(out)) {
+    out = out.replace(legacyRowRegex, finalRow);
+  } else {
+    fail('Paronymes: ligne Apitoiement introuvable', 7);
+  }
   const rows = (out.match(/<tr>[\s\S]*?<\/tr>/g) || []).filter((row) => row.includes('class="paronyme"'));
   if (rows.length !== 20) fail('Paronymes: ' + rows.length + ' lignes au lieu de 20', 7);
   rows.forEach((row, index) => {
@@ -171,96 +338,47 @@ for (const spec of [
 }
 
 // -----------------------------------------------------------------------------
-// 5. Messagerie : objet exactement de la forme Prénom + Mail-SEB, comparaison
-//    tolérante à la casse/accents/espaces ; téléphone = 10 chiffres commençant
-//    par 0, avec séparateurs usuels optionnels.
+// 5. Messagerie : la source fonctionnelle est désormais js/nvmail-page.js.
+//    Le build vérifie la logique validée mais ne la réécrit plus.
 // -----------------------------------------------------------------------------
 {
-  const { file, text } = read('app/web/nvmail.html');
-  let out = text;
-  if (!out.includes('function objetMailCandidatValide')) {
-    const marker = 'function evaluerFormulaire(event) {';
-    const pos = out.indexOf(marker);
-    if (pos < 0) fail('Messagerie: evaluerFormulaire introuvable', 8);
-    const helpers = [
-      'function objetMailCandidatValide(subject, prenomCandidat) {',
-      '  const objet = normaliserIdentiteMail(subject);',
-      '  const prenom = normaliserIdentiteMail(prenomCandidat);',
-      '  if (!objet || !prenom) return false;',
-      "  return objet === (prenom + ' mail seb').trim();",
-      '}',
-      '',
-      'function telephoneMailValide(message) {',
-      "  const texte = String(message || '');",
-      "  return /(^|[^\\d])0\\d(?:[\\s.,\\/-]?\\d{2}){4}(?!\\d)/.test(texte);",
-      '}',
-      '',
-      ''
-    ].join('\n');
-    out = out.slice(0, pos) + helpers + out.slice(pos);
+  const { text } = read('app/web/js/nvmail-page.js');
+  for (const required of [
+    'function objetMailCandidatValide',
+    "return objet === (prenom + ' mail seb').trim();",
+    'function telephoneMailValide',
+    'function signatureCandidatValide',
+    "String(to || '').trim() === 'conseil.perso@sauvegarde56.org'",
+    "String(cc || '').trim() === 'stage-pro@sauvegarde56.org'",
+    'const score_subject = objetMailCandidatValide(subject, prenomCandidat) ? 1 : 0;',
+    'const score_signature = signatureCandidatValide(message, prenomCandidat, nomCandidat) ? 1 : 0;',
+    'const score_telephone = telephoneMailValide(message) ? 1 : 0;',
+    "sessionStorage.setItem(STORAGE_KEY, JSON.stringify(data));"
+  ]) {
+    if (!text.includes(required)) fail('Messagerie: contrat externalisé absent: ' + required, 8);
   }
-
-  const subjectEvalRegex = /  \/\/ CRITÈRE 3 : Objet \(format : Prénom Mail-SEB\)[\s\S]*?  if \(objetOK\) \{/;
-  if (!subjectEvalRegex.test(out)) fail('Messagerie: bloc objet formulaire introuvable', 8);
-  out = out.replace(subjectEvalRegex,
-    "  // CRITÈRE 3 : Objet (format : Prénom Mail-SEB)\n  const objetOK = objetMailCandidatValide(objet, prenomCandidat);\n\n  if (objetOK) {");
-
-  const phoneEvalRegex = /  \/\/ ============================================\n  \/\/ CRITÈRE 6 : Numéro de téléphone \(10 chiffres\)\n  \/\/ ============================================[\s\S]*?  if \(hasTelephone\) \{/;
-  if (!phoneEvalRegex.test(out)) fail('Messagerie: bloc téléphone formulaire introuvable', 8);
-  out = out.replace(phoneEvalRegex,
-    "  // ============================================\n  // CRITÈRE 6 : Numéro de téléphone (10 chiffres commençant par 0)\n  // ============================================\n  const hasTelephone = telephoneMailValide(message);\n\n  if (hasTelephone) {");
-
-  const subjectSaveRegex = /  \/\/ Validation de l'objet :[\s\S]*?  const score_file =/;
-  if (!subjectSaveRegex.test(out)) fail('Messagerie: bloc objet sauvegarde introuvable', 8);
-  out = out.replace(subjectSaveRegex,
-    "  // Validation de l'objet : Prénom Mail-SEB, casse et accents tolérés.\n  const score_subject = objetMailCandidatValide(subject, prenomCandidat) ? 1 : 0;\n\n  const score_file =");
-
-  const phoneSaveRegex = /  \/\/ Validation du numéro de téléphone \(10 chiffres avec différents séparateurs\)[\s\S]*?  \/\/ CALCUL DU SCORE TOTAL/;
-  if (!phoneSaveRegex.test(out)) fail('Messagerie: bloc téléphone sauvegarde introuvable', 8);
-  out = out.replace(phoneSaveRegex,
-    "  // Validation du numéro de téléphone : 10 chiffres commençant par 0.\n  const score_telephone = telephoneMailValide(message) ? 1 : 0;\n\n  // CALCUL DU SCORE TOTAL");
-
-  if ((out.match(/objetMailCandidatValide\(/g) || []).length < 3) fail('Messagerie: objet non centralisé', 8);
-  if ((out.match(/telephoneMailValide\(/g) || []).length < 3) fail('Messagerie: téléphone non centralisé', 8);
-  if (/const regexPoints = \/\\d\{2\}/.test(out)) fail('Messagerie: ancien contrôle téléphone encore présent', 8);
-  write(file, out);
+  if (/const regexPoints = \/\\d\{2\}/.test(text)) fail('Messagerie: ancien contrôle téléphone réintroduit', 8);
+  if (/sessionStorage\.removeItem\(['"]page8_data['"]\)/.test(text)) fail('Messagerie: effacement de reprise réintroduit', 8);
 }
 
 // -----------------------------------------------------------------------------
-// 6. Traitement de texte : restauration du comportement stable antérieur au
-//    correctif Dictée #23. Aucune suggestion/correction pendant la rédaction.
+// 6. Traitement de texte : le moteur externe est la seule source fonctionnelle.
+//    Aucun script inline n'est injecté dans la page.
 // -----------------------------------------------------------------------------
 {
-  const { file, text } = read('app/web/nwtexte.html');
-  let out = text.replace(/spellcheck="true"/g, 'spellcheck="false"');
-  if (!out.includes('id="seb-no-live-text-correction"')) {
-    const patch = [
-      '<script id="seb-no-live-text-correction">',
-      '(function(){',
-      "  'use strict';",
-      '  function disableLiveCorrection(){',
-      "    document.querySelectorAll('#editor,.ql-editor,[contenteditable=\"true\"]').forEach(function(editor){",
-      "      editor.setAttribute('spellcheck', 'false');",
-      "      editor.setAttribute('autocorrect', 'off');",
-      "      editor.setAttribute('autocapitalize', 'off');",
-      '      editor.spellcheck = false;',
-      '    });',
-      '  }',
-      "  document.addEventListener('DOMContentLoaded', function(){",
-      '    disableLiveCorrection();',
-      '    setTimeout(disableLiveCorrection, 0);',
-      '    setTimeout(disableLiveCorrection, 250);',
-      '  });',
-      '})();',
-      '</script>'
-    ].join('\n');
-    out = appendBeforeBody(out, patch, 'Traitement de texte sans correction en direct');
-  }
-  if (/spellcheck="true"/.test(out)) fail('Traitement de texte: correcteur natif encore actif', 9);
-  if (!out.includes('seb-no-live-text-correction')) fail('Traitement de texte: garde anti-correction absente', 9);
+  const { text } = read('app/web/nwtexte.html');
   const engine = read('app/web/js/nwtexte-quill-engine.js').text;
-  if (!engine.includes('scores.page7 = analyse.score.total;') || !engine.includes("sessionStorage.setItem('scores_data'")) fail('Traitement de texte: notation Page 7 absente du moteur Quill', 9);
-  write(file, out);
+  if (/spellcheck="true"/.test(text)) fail('Traitement de texte: correcteur natif encore actif', 9);
+  if (/<script(?![^>]*\bsrc=)[^>]*>/i.test(text)) fail('Traitement de texte: script inline réintroduit', 9);
+  if (!engine.includes("quill.root.setAttribute('spellcheck', 'false')")) fail('Traitement de texte: correcteur Quill encore actif', 9);
+  const hasPage7Score = engine.includes('scores.page7 = analyse.score.total;');
+  const hasScoresWrite = engine.includes("sessionStorage.setItem('scores_data'");
+  if (!hasPage7Score || !hasScoresWrite) {
+    console.error('NWTEXTE_ENGINE_DIAG page7Score=' + hasPage7Score + ' scoresWrite=' + hasScoresWrite + ' length=' + engine.length);
+    const savePos = engine.indexOf('function saveEvaluation');
+    console.error(engine.slice(Math.max(0, savePos - 500), savePos >= 0 ? savePos + 4500 : 4500));
+    fail('Traitement de texte: notation Page 7 absente du moteur Quill', 9);
+  }
 }
 
 // -----------------------------------------------------------------------------

@@ -21,7 +21,19 @@ if (!planning.includes('Spaghettis') || /\bSpaghetti\b/.test(planning) || /\bspa
   console.error('SEB EvalPro orthographe: singularité Spaghetti encore présente dans le Planning.');
   process.exit(12);
 }
-if (!/q7[^,\r\n]*Spaghettis/.test(planning)) {
+const planningModulePath = path.join(root, 'app', 'web', 'js', 'planning-page.js');
+const modularPlanning = planning.includes('js/planning-page.js');
+if (modularPlanning) {
+  if (!fs.existsSync(planningModulePath)) {
+    console.error('SEB EvalPro orthographe: module Planning introuvable.');
+    process.exit(12);
+  }
+  const planningModule = fs.readFileSync(planningModulePath, 'utf8');
+  if (!planningModule.includes("q7:'Spaghettis'")) {
+    console.error('SEB EvalPro orthographe: réponse modulaire q7 non synchronisée avec le pluriel.');
+    process.exit(12);
+  }
+} else if (!/q7[^,\r\n]*Spaghettis/.test(planning)) {
   console.error('SEB EvalPro orthographe: réponse attendue q7 non synchronisée avec le pluriel.');
   process.exit(12);
 }

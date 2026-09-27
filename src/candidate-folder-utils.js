@@ -1,9 +1,9 @@
 const fs = require('fs');
 const path = require('path');
+const { readJsonFile } = require('./candidate-data-crypto');
 
 function readJson(target) {
-  try { return JSON.parse(fs.readFileSync(target, 'utf8')); }
-  catch (_) { return null; }
+  return readJsonFile(target);
 }
 
 function ensureDir(target) {
@@ -50,6 +50,17 @@ function standardFolderName(candidate) {
     sanitize(c.lieu, 'VILLE'),
     sanitize(c.groupe, 'GROUPE')
   ].join('_');
+}
+
+function codedFolderName(candidateId, shortId = '') {
+  const raw = String(candidateId || shortId || '').replace(/[^A-Za-z0-9]+/g, '').toUpperCase();
+  const token = raw.slice(0, 12) || cryptoFallbackToken(shortId);
+  return 'CAND-' + token;
+}
+
+function cryptoFallbackToken(value) {
+  const raw = sanitize(value || 'LOCAL', 'LOCAL').replace(/[^A-Za-z0-9]+/g, '').toUpperCase();
+  return raw.slice(0, 12) || 'LOCAL';
 }
 
 function uniqueFolderPath(parent, baseName) {
@@ -217,6 +228,7 @@ module.exports = {
   candidateObject,
   candidateFromManifest,
   standardFolderName,
+  codedFolderName,
   uniqueFolderPath,
   listCandidateDirs,
   selectCandidate,

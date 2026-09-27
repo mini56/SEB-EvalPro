@@ -82,40 +82,47 @@ let qcm = patch('app/web/qcmv1.0.html', [
 qcm = qcm.replace(/Scénario:/g, 'Scénario :');
 save(path.join(root, 'app/web/qcmv1.0.html'), qcm);
 
-// Traitement de texte : correction du texte affiché.
-let nw = patch('app/web/nwtexte.html', [
-  ["Répondez a l'une des trois questions suivantes", "Répondez à l'une des trois questions suivantes", 'nwtexte à'],
-  ["Quel est mon activité préférée et pourquoi?", "Quelle est mon activité préférée et pourquoi ?", 'nwtexte activité'],
-  ["Quel est mon expérience professionnel préférée et pourquoi?", "Quelle est mon expérience professionnelle préférée et pourquoi ?", 'nwtexte expérience'],
-  ["Quel est mon métier préféré et pourquoi?", "Quel est mon métier préféré et pourquoi ?", 'nwtexte métier'],
-  ["Préparer votre texte a la main si besoin, puis quand vous êtes prêt utiliser l'éditeur dans la fenetre de droite.", "Préparez votre texte à la main si besoin, puis, quand vous êtes prêt, utilisez l'éditeur dans la fenêtre de droite.", 'nwtexte préparer'],
-  ["Dans l'éditeur, mettre en forme votre texte", "Dans l'éditeur, mettez en forme votre texte", 'nwtexte mettez'],
-  ["<strong>Titre :</strong> Notez la question choisie, mettre en <strong>gras</strong>", "<strong>Titre :</strong> Notez la question choisie, puis mettez-la en <strong>gras</strong>", 'nwtexte titre'],
-  ["sous l'intitulé:</p>", "sous l'intitulé :</p>", 'nwtexte intitulé'],
-  ["Ensuite passez a l'étape suivante...", "Ensuite, passez à l'étape suivante...", 'nwtexte ensuite']
-]);
-nw = nw.replace(/Scénario:/g, 'Scénario :');
-save(path.join(root, 'app/web/nwtexte.html'), nw);
+// Traitement de texte : la source nwtexte est désormais la référence validée.
+// Aucun texte de cette page ne doit être réécrit silencieusement pendant le build.
+{
+  const { text: nw } = load('app/web/nwtexte.html');
+  const { text: nwEngine } = load('app/web/js/nwtexte-quill-engine.js');
+  const required = [
+    "Répondez à l'une des trois questions suivantes",
+    'Quelle est mon activité préférée et pourquoi ?',
+    'Quelle est mon expérience professionnelle préférée et pourquoi ?',
+    'Quel est mon métier préféré et pourquoi ?',
+    "Préparez votre texte à la main si besoin, puis, quand vous êtes prêt, utilisez l'éditeur dans la fenêtre de droite.",
+    "Dans l'éditeur, mettez en forme votre texte",
+    '<strong>Titre :</strong> Notez la question choisie, puis mettez-la en <strong>gras</strong>',
+    "sous l'intitulé :</p>",
+    "Ensuite, passez à l'étape suivante...",
+    'Scénario :'
+  ];
+  for (const token of required) if (!nw.includes(token)) fail('nwtexte validé altéré: ' + token, 13);
+  for (const token of [
+    'Quelle est mon activité préférée et pourquoi ?',
+    'Quelle est mon expérience professionnelle préférée et pourquoi ?',
+    'Quel est mon métier préféré et pourquoi ?'
+  ]) if (!nwEngine.includes(token)) fail('moteur nwtexte désynchronisé: ' + token, 13);
+}
 
-// Le moteur de notation doit reconnaître exactement les trois titres corrigés.
-patch('app/web/js/nwtexte-quill-engine.js', [
-  ["'Quel est mon activité préférée et pourquoi?'", "'Quelle est mon activité préférée et pourquoi ?'", 'moteur nwtexte activité'],
-  ["'Quel est mon expérience professionnel préférée et pourquoi?'", "'Quelle est mon expérience professionnelle préférée et pourquoi ?'", 'moteur nwtexte expérience'],
-  ["'Quel est mon métier préféré et pourquoi?'", "'Quel est mon métier préféré et pourquoi ?'", 'moteur nwtexte métier']
-]);
-
-// Messagerie.
-let mail = patch('app/web/nvmail.html', [
-  ['les adresses email\n\t</strong> suivante:', 'les adresses e-mail\n\t</strong> suivantes :', 'mail adresses'],
-  ['A votre conseiller:', 'À votre conseiller :', 'mail conseiller'],
-  ['En copie a votre responsable de stage:', 'En copie à votre responsable de stage :', 'mail copie'],
-  ['Mettre en objet:', 'Mettez en objet :', 'mail objet'],
-  ['en piece jointe.', 'en pièce jointe.', 'mail pièce jointe'],
-  ['sur le modèle si dessous:', 'sur le modèle ci-dessous :', 'mail ci-dessous'],
-  ["Ensuite passez a l'étape suivante...", "Ensuite, passez à l'étape suivante...", 'mail ensuite']
-]);
-mail = mail.replace(/Scénario:/g, 'Scénario :');
-save(path.join(root, 'app/web/nvmail.html'), mail);
+// Messagerie : les formulations validées sont désormais directement dans source/nvmail.html.
+// Ce contrôle empêche une ancienne source ou une ancienne rustine de les réintroduire.
+const mail = load('app/web/nvmail.html').text;
+for (const token of [
+  'les adresses e-mail',
+  'suivantes :',
+  'À votre conseiller :',
+  'En copie à votre responsable de stage :',
+  'Mettez en objet :',
+  'en pièce jointe.',
+  'sur le modèle ci-dessous :',
+  "Ensuite, passez à l'étape suivante...",
+  'Scénario :'
+]) {
+  if (!mail.includes(token)) fail('messagerie désynchronisée: ' + token, 14);
+}
 
 // Construction à base de briques.
 let brique = patch('app/web/brique.html', [
@@ -209,7 +216,14 @@ patchBilan('app/web/bilan.html');
 }
 {
   const { text } = load('app/web/planning.html');
-  if (!text.includes('q7:"Spaghettis"')) fail('Planning: solution q7 non synchronisée avec Spaghettis', 12);
+  const modulePath = path.join(root, 'app', 'web', 'js', 'planning-page.js');
+  if (text.includes('js/planning-page.js')) {
+    if (!fs.existsSync(modulePath)) fail('Planning: module planning-page.js introuvable', 12);
+    const moduleText = fs.readFileSync(modulePath, 'utf8').replace(/\r\n/g, '\n');
+    if (!moduleText.includes("q7:'Spaghettis'")) fail('Planning: solution q7 modulaire non synchronisée avec Spaghettis', 12);
+  } else if (!text.includes('q7:"Spaghettis"')) {
+    fail('Planning: solution q7 non synchronisée avec Spaghettis', 12);
+  }
 }
 {
   const { text } = load('app/web/js/nwtexte-quill-engine.js');

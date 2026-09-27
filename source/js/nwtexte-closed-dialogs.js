@@ -253,12 +253,10 @@
     } catch (_) {}
   }
 
-  window.ouvrirFichierFictif = function () { openDialog('open'); };
-  window.ouvrirImageFictive = function () { openDialog('image'); };
-
-  // Garde-fous : même un ancien appel résiduel ne peut plus ouvrir Windows.
-  window.ouvrirFichier = function () { openDialog('open'); };
-  window.insererImage = function () { openDialog('image'); };
+  window.sebNwtexteDialogs = Object.freeze({
+    openDocument: function () { openDialog('open'); },
+    openImage: function () { openDialog('image'); }
+  });
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', blockNativeFileAccess, { once: true });

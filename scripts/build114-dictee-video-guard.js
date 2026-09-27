@@ -12,25 +12,46 @@ function fail(message) {
 // 1) Parcours obligatoire : Genre/Nombres -> Dictée -> Tri de chevilles.
 const genrePath = path.join(webRoot, 'genrenombres.html');
 const dicteePath = path.join(webRoot, 'dictee.html');
+const parcoursPath = path.join(webRoot, 'js', 'seb-parcours.js');
+const genreModulePath = path.join(webRoot, 'js', 'genrenombres-page.js');
 if (!fs.existsSync(genrePath)) fail('genrenombres.html généré introuvable');
 if (!fs.existsSync(dicteePath)) fail('dictee.html généré introuvable');
 
 let genre = fs.readFileSync(genrePath, 'utf8');
-if (!/dictee\.html/i.test(genre)) {
-  let replacements = 0;
-  genre = genre.replace(/window\.location\.href\s*=\s*(['"])tri_de_cheville\.html\1\s*;/gi, (match) => {
-    replacements += 1;
-    return "window.location.href = 'dictee.html';";
-  });
-  if (replacements !== 1) {
-    fail(`redirection Genre/Nombres -> Tri inattendue (${replacements} occurrence(s) remplacée(s))`);
-  }
-  fs.writeFileSync(genrePath, genre, 'utf8');
-}
+const modularGenre = genre.includes('js/genrenombres-page.js');
 
-const genreCheck = fs.readFileSync(genrePath, 'utf8');
-if (!/window\.location\.href\s*=\s*['"]dictee\.html['"]/i.test(genreCheck)) {
-  fail('Genre/Nombres ne redirige pas vers dictee.html après correction');
+if (modularGenre) {
+  if (!fs.existsSync(parcoursPath)) fail('registre central seb-parcours.js introuvable');
+  if (!fs.existsSync(genreModulePath)) fail('module genrenombres-page.js introuvable');
+  const parcours = fs.readFileSync(parcoursPath, 'utf8');
+  const moduleText = fs.readFileSync(genreModulePath, 'utf8');
+
+  const genrePos = parcours.indexOf("id:'genrenombres'");
+  const dicteePos = parcours.indexOf("id:'dictee'");
+  const triPos = parcours.indexOf("id:'tri-de-cheville'");
+  if (genrePos < 0 || dicteePos <= genrePos || triPos <= dicteePos) {
+    fail('ordre central Genre/Nombres -> Dictée -> Tri absent');
+  }
+  if (!moduleText.includes("window.sebParcours.goNext('genrenombres')")) {
+    fail('Genre/Nombres modulaire ne passe pas par le registre central');
+  }
+} else {
+  if (!/dictee\.html/i.test(genre)) {
+    let replacements = 0;
+    genre = genre.replace(/window\.location\.href\s*=\s*(['"])tri_de_cheville\.html\1\s*;/gi, (match) => {
+      replacements += 1;
+      return "window.location.href = 'dictee.html';";
+    });
+    if (replacements !== 1) {
+      fail(`redirection Genre/Nombres -> Tri inattendue (${replacements} occurrence(s) remplacée(s))`);
+    }
+    fs.writeFileSync(genrePath, genre, 'utf8');
+  }
+
+  const genreCheck = fs.readFileSync(genrePath, 'utf8');
+  if (!/window\.location\.href\s*=\s*['"]dictee\.html['"]/i.test(genreCheck)) {
+    fail('Genre/Nombres ne redirige pas vers dictee.html après correction');
+  }
 }
 
 const dictee = fs.readFileSync(dicteePath, 'utf8');

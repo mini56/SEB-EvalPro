@@ -3,26 +3,13 @@ module.exports = function registerSessionClose({
   ipcMain,
   getMainWindow,
   getAdminUnlocked,
-  setAdminUnlocked,
-  readState,
-  writeState,
-  defaultState,
-  finalizeCandidateSession
+  setAdminUnlocked
 }) {
   ipcMain.handle('admin:close-session', async () => {
     if (!getAdminUnlocked()) return false;
 
-    const currentState = typeof readState === 'function' ? readState() : defaultState();
-
-    try {
-      if (typeof finalizeCandidateSession === 'function') {
-        finalizeCandidateSession(currentState);
-      }
-    } catch (error) {
-      console.error('Fermeture du dossier candidat impossible:', error && error.message ? error.message : error);
-      return false;
-    }
-
+    // Fermer la session sert uniquement à quitter proprement SEB EvalPro.
+    // Le parcours candidat actif reste intact et reprenable.
     setAdminUnlocked(false);
 
     const mainWindow = getMainWindow();
@@ -30,10 +17,6 @@ module.exports = function registerSessionClose({
       if (mainWindow && !mainWindow.isDestroyed()) {
         await mainWindow.webContents.session.clearStorageData({ storages: ['localstorage'] });
       }
-    } catch (_) {}
-
-    try {
-      writeState(defaultState());
     } catch (_) {}
 
     setTimeout(() => app.quit(), 80);

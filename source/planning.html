@@ -223,6 +223,7 @@
         .btn { font-size: 16px; width: 200px; }
     }
 </style>
+<link rel="stylesheet" href="css/seb-in-app-alert.css" id="seb-evalpro-in-app-alert-css">
 </head>
 <body>
 <div class="container">
@@ -243,7 +244,7 @@
                 <p style="margin: 0;"><strong style="color:#1a73e8;">Consigne :</strong></p>
             </div>
             <ul class="consigne-content">
-                <li>Renseigner les menus pour chaque jour et chaque catégorie (serveuse, plats, desserts) en utilisant les listes déroulantes dans le tableau ci-dessous.</li>
+                <li>Renseignez les menus pour chaque jour et chaque catégorie (serveuse, plats, desserts) en utilisant les listes déroulantes dans le tableau ci-dessous.</li>
                 <li>La colonne de droite vous guide pour remplir correctement le tableau.</li>
             </ul>
             
@@ -269,26 +270,26 @@
                     </tr>
                     <tr>
                         <th>Plats</th>
-                        <td><select id="q6"><option>_</option><option>Profiteroles</option><option>Spaghetti</option><option>Pavé de saumon</option><option>Crumble aux fruits rouges</option><option>Kouign-Amann</option><option>Galettes au blé noir</option><option>Assiette de fruits de mer</option><option>Tarte au citron</option><option>Kig-Ha-Farz</option><option>Crème brûlée</option></select></td>
-                        <td><select id="q7"><option>_</option><option>Galettes au blé noir</option><option>Crumble aux fruits rouges</option><option>Kig-Ha-Farz</option><option>Pavé de saumon</option><option>Tarte au citron</option><option>Assiette de fruits de mer</option><option>Kouign-Amann</option><option>Profiteroles</option><option>Spaghetti</option><option>Crème brûlée</option></select></td>
-                        <td><select id="q8"><option>_</option><option>Kig-Ha-Farz</option><option>Assiette de fruits de mer</option><option>Crème brûlée</option><option>Kouign-Amann</option><option>Spaghetti</option><option>Tarte au citron</option><option>Profiteroles</option><option>Pavé de saumon</option><option>Crumble aux fruits rouges</option><option>Galettes au blé noir</option></select></td>
-                        <td><select id="q9"><option>_</option><option>Pavé de saumon</option><option>Crème brûlée</option><option>Kig-Ha-Farz</option><option>Galettes au blé noir</option><option>Tarte au citron</option><option>Kouign-Amann</option><option>Assiette de fruits de mer</option><option>Spaghetti</option><option>Crumble aux fruits rouges</option><option>Profiteroles</option></select></td>
-                        <td><select id="q10"><option>_</option><option>Crumble aux fruits rouges</option><option>Profiteroles</option><option>Assiette de fruits de mer</option><option>Kig-Ha-Farz</option><option>Pavé de saumon</option><option>Spaghetti</option><option>Tarte au citron</option><option>Kouign-Amann</option><option>Crème brûlée</option><option>Galettes au blé noir</option></select></td>
+                        <td><select id="q6"><option>_</option><option>Profiteroles</option><option>Spaghettis</option><option>Pavé de saumon</option><option>Crumble aux fruits rouges</option><option>Kouign-Amann</option><option>Galettes au blé noir</option><option>Assiette de fruits de mer</option><option>Tarte au citron</option><option>Kig-Ha-Farz</option><option>Crème brûlée</option></select></td>
+                        <td><select id="q7"><option>_</option><option>Galettes au blé noir</option><option>Crumble aux fruits rouges</option><option>Kig-Ha-Farz</option><option>Pavé de saumon</option><option>Tarte au citron</option><option>Assiette de fruits de mer</option><option>Kouign-Amann</option><option>Profiteroles</option><option>Spaghettis</option><option>Crème brûlée</option></select></td>
+                        <td><select id="q8"><option>_</option><option>Kig-Ha-Farz</option><option>Assiette de fruits de mer</option><option>Crème brûlée</option><option>Kouign-Amann</option><option>Spaghettis</option><option>Tarte au citron</option><option>Profiteroles</option><option>Pavé de saumon</option><option>Crumble aux fruits rouges</option><option>Galettes au blé noir</option></select></td>
+                        <td><select id="q9"><option>_</option><option>Pavé de saumon</option><option>Crème brûlée</option><option>Kig-Ha-Farz</option><option>Galettes au blé noir</option><option>Tarte au citron</option><option>Kouign-Amann</option><option>Assiette de fruits de mer</option><option>Spaghettis</option><option>Crumble aux fruits rouges</option><option>Profiteroles</option></select></td>
+                        <td><select id="q10"><option>_</option><option>Crumble aux fruits rouges</option><option>Profiteroles</option><option>Assiette de fruits de mer</option><option>Kig-Ha-Farz</option><option>Pavé de saumon</option><option>Spaghettis</option><option>Tarte au citron</option><option>Kouign-Amann</option><option>Crème brûlée</option><option>Galettes au blé noir</option></select></td>
                     </tr>
                     <tr>
                         <th>Desserts</th>
-                        <td><select id="q11"><option>_</option><option>Galettes au blé noir</option><option>Spaghetti</option><option>Kouign-Amann</option><option>Crème brûlée</option><option>Kig-Ha-Farz</option><option>Assiette de fruits de mer</option><option>Profiteroles</option><option>Pavé de saumon</option><option>Tarte au citron</option><option>Crumble aux fruits rouges</option></select></td>
-                        <td><select id="q12"><option>_</option><option>Spaghetti</option><option>Kouign-Amann</option><option>Assiette de fruits de mer</option><option>Crumble aux fruits rouges</option><option>Pavé de saumon</option><option>Kig-Ha-Farz</option><option>Profiteroles</option><option>Galettes au blé noir</option><option>Crème brûlée</option><option>Tarte au citron</option></select></td>
-                        <td><select id="q13"><option>_</option><option>Tarte au citron</option><option>Profiteroles</option><option>Kig-Ha-Farz</option><option>Pavé de saumon</option><option>Galettes au blé noir</option><option>Crème brûlée</option><option>Assiette de fruits de mer</option><option>Crumble aux fruits rouges</option><option>Kouign-Amann</option><option>Spaghetti</option></select></td>
-                        <td><select id="q14"><option>_</option><option>Profiteroles</option><option>Assiette de fruits de mer</option><option>Tarte au citron</option><option>Kig-Ha-Farz</option><option>Crème brûlée</option><option>Spaghetti</option><option>Kouign-Amann</option><option>Pavé de saumon</option><option>Crumble aux fruits rouges</option><option>Galettes au blé noir</option></select></td>
-                        <td><select id="q15"><option>_</option><option>Kig-Ha-Farz</option><option>Crumble aux fruits rouges</option><option>Pavé de saumon</option><option>Crème brûlée</option><option>Galettes au blé noir</option><option>Tarte au citron</option><option>Kouign-Amann</option><option>Assiette de fruits de mer</option><option>Spaghetti</option><option>Profiteroles</option></select></td>
+                        <td><select id="q11"><option>_</option><option>Galettes au blé noir</option><option>Spaghettis</option><option>Kouign-Amann</option><option>Crème brûlée</option><option>Kig-Ha-Farz</option><option>Assiette de fruits de mer</option><option>Profiteroles</option><option>Pavé de saumon</option><option>Tarte au citron</option><option>Crumble aux fruits rouges</option></select></td>
+                        <td><select id="q12"><option>_</option><option>Spaghettis</option><option>Kouign-Amann</option><option>Assiette de fruits de mer</option><option>Crumble aux fruits rouges</option><option>Pavé de saumon</option><option>Kig-Ha-Farz</option><option>Profiteroles</option><option>Galettes au blé noir</option><option>Crème brûlée</option><option>Tarte au citron</option></select></td>
+                        <td><select id="q13"><option>_</option><option>Tarte au citron</option><option>Profiteroles</option><option>Kig-Ha-Farz</option><option>Pavé de saumon</option><option>Galettes au blé noir</option><option>Crème brûlée</option><option>Assiette de fruits de mer</option><option>Crumble aux fruits rouges</option><option>Kouign-Amann</option><option>Spaghettis</option></select></td>
+                        <td><select id="q14"><option>_</option><option>Profiteroles</option><option>Assiette de fruits de mer</option><option>Tarte au citron</option><option>Kig-Ha-Farz</option><option>Crème brûlée</option><option>Spaghettis</option><option>Kouign-Amann</option><option>Pavé de saumon</option><option>Crumble aux fruits rouges</option><option>Galettes au blé noir</option></select></td>
+                        <td><select id="q15"><option>_</option><option>Kig-Ha-Farz</option><option>Crumble aux fruits rouges</option><option>Pavé de saumon</option><option>Crème brûlée</option><option>Galettes au blé noir</option><option>Tarte au citron</option><option>Kouign-Amann</option><option>Assiette de fruits de mer</option><option>Spaghettis</option><option>Profiteroles</option></select></td>
                     </tr>
                 </tbody>
             </table>
             
             <div class="plats-box">
                 <span style="color:#1a73e8; font-weight: bold;">Liste des plats :</span><br>
-                <span class="puce" style="margin-left:20px;">Galettes au blé noir, Spaghetti, Assiette de fruits de mer, Pavé de saumon, Kig-Ha-Farz.</span><br><br>
+                <span class="puce" style="margin-left:20px;">Galettes au blé noir, Spaghettis, Assiette de fruits de mer, Pavé de saumon, Kig-Ha-Farz.</span><br><br>
                 <span style="color:#1a73e8; font-weight: bold;">Liste des desserts :</span><br>
                 <span class="puce" style="margin-left:20px;">Profiteroles, Kouign-Amann, Tarte au citron, Crumble aux fruits rouges, Crème brûlée.</span>
             </div>
@@ -305,92 +306,26 @@
             <p>À vous de déterminer quelle cuisinière réalisera les préparations suivantes :</p>
             <h2>🔎 Indications :</h2>
             <ol>
-                <li>L'équipe de maintenance viendra déguster un plat de spaghetti et des profiteroles au chocolat.</li>
+                <li>L'équipe de maintenance viendra déguster un plat de spaghettis et des profiteroles au chocolat.</li>
                 <li>Lizig travaille deux matinées dont le lundi.</li>
                 <li>Katell ne travaille pas le mercredi.</li>
                 <li>C'est Lizig qui préparera le pavé de saumon et la tarte au citron.</li>
                 <li>C'est Katell qui préparera le Kig-Ha-Farz.</li>
                 <li>Katell fera les galettes au blé noir le jeudi.</li>
                 <li>Jean le livreur veut un Kouign-Amann vendredi.</li>
-                <li>Jacqueline la comptable veut une assiette de fruits de mer et une crème brulée comme tous les lundis.</li>
+                <li>Jacqueline la comptable veut une assiette de fruits de mer et une crème brûlée comme tous les lundis.</li>
             </ol>
             <!--p>N'oubliez pas de valider votre planning en bas du tableau après avoir fait vos sélections.</p-->
         </div>
     </div>
 </div>
 
-<script>
-window.addEventListener("load", () => {
-  localStorage.removeItem("planningReponses");
-  localStorage.removeItem("planningCorrection");
-  localStorage.removeItem("planningScore");
-});
+<script src="js/seb-parcours.js"></script>
+<script src="js/planning-page.js"></script>
+<script src="js/seb-in-app-alert.js" id="seb-evalpro-in-app-alert-script"></script>
+<script src="js/seb-page-draft-resume.js" id="seb-evalpro-page-draft-resume"></script>
+<script src="js/seb-visual-branding.js" id="seb-evalpro-visual-branding"></script>
 
-const solutions = {
-  q1:"Lizig👱🏼‍♀️", q2:"Katell👩🏻‍🦱", q3:"Lizig👱🏼‍♀️", q4:"Katell👩🏻‍🦱", q5:"Katell👩🏻‍🦱",
-  q6:"Assiette de fruits de mer", q7:"Spaghetti", q8:"Pavé de saumon",
-  q9:"Galettes au blé noir", q10:"Kig-Ha-Farz",
-  q11:"Crème brûlée", q12:"Profiteroles", q13:"Tarte au citron",
-  q14:"Crumble aux fruits rouges", q15:"Kouign-Amann"
-};
-
-function getUser() {
-  let t={}; 
-  for(let i=1;i<=15;i++){ 
-    let id="q"+i; 
-    t[id]=document.getElementById(id).value; 
-  }
-  return t;
-}
-
-function correct(user){
-  let c={}; 
-  for(let k in user){ 
-    c[k]={
-      reponse:user[k],
-      attendu:solutions[k],
-      correct:user[k]===solutions[k]
-    }; 
-  }
-  return c;
-}
-
-function afficherCorrection(correction) {
-  for(let k in correction) {
-    let selectElement = document.getElementById(k);
-    let tdParent = selectElement.parentElement;
-    
-    if(correction[k].correct) {
-      tdParent.style.boxShadow = "0 0 0 3px #22c55e inset";
-    } else {
-      tdParent.style.boxShadow = "0 0 0 3px #ef4444 inset";
-    }
-  }
-}
-
-btnValider.onclick = () => {
-  let u = getUser(); 
-  let corr = correct(u);
-  
-  let nbCorrect = 0;
-  for(let k in corr) {
-    if(corr[k].correct) nbCorrect++;
-  }
-  
-  // ✅ SAUVEGARDE
-  sessionStorage.setItem("planningScore", nbCorrect.toString());
-  sessionStorage.setItem("planningCorrection", JSON.stringify(corr));
-  
-  console.log("✅ Planning sauvegardé - Score:", nbCorrect);
-  
-  afficherCorrection(corr);
-  
-  btnSuivant.style.display = "inline-block";
-  btnValider.style.display = "none";
-  alert("Planning validé ! Score : " + nbCorrect + "/15");
-};
-
-btnSuivant.onclick = () => location.href="genrenombres.html";
-</script>
+<script id="seb-ui-runtime-loader" src="js/seb-ui-runtime.js"></script>
 </body>
 </html>

@@ -42,9 +42,11 @@ function checkJs(source, label) {
       }
     );
 
-    const anchor = out.includes("const localAi = editionCapabilities.canAi ? createLocalAiService({ app }) : null;")
-      ? "const localAi = editionCapabilities.canAi ? createLocalAiService({ app }) : null;"
-      : "const localAi = createLocalAiService({ app });";
+    const anchor = out.includes("let stateWriteCounter = 0;")
+      ? "let stateWriteCounter = 0;"
+      : (out.includes("const localAi = editionCapabilities.canAi ? createLocalAiService({ app }) : null;")
+        ? "const localAi = editionCapabilities.canAi ? createLocalAiService({ app }) : null;"
+        : "const localAi = createLocalAiService({ app });");
     const helper = `
 
 ${marker}
@@ -132,12 +134,14 @@ function applyAdminWindowMode(unlocked) {
       'reverrouillage Admin manuel'
     );
 
-    out = replaceRequired(
-      out,
-      "  setAdminUnlocked: (value) => { adminSessionUnlocked = !!value; },",
-      "  setAdminUnlocked: (value) => { adminSessionUnlocked = !!value; applyAdminWindowMode(adminSessionUnlocked); },",
-      'synchronisation fermeture session'
-    );
+    if (!out.includes("setAdminUnlocked: (value) => { adminSessionUnlocked = !!value; applyAdminWindowMode(adminSessionUnlocked); }")) {
+      const beforeSessionSync = out;
+      out = out.replace(
+        /setAdminUnlocked:\s*\(value\)\s*=>\s*\{\s*adminSessionUnlocked\s*=\s*!!value;\s*\}/,
+        "setAdminUnlocked: (value) => { adminSessionUnlocked = !!value; applyAdminWindowMode(adminSessionUnlocked); }"
+      );
+      if (out === beforeSessionSync) fail('motif introuvable: synchronisation fermeture session');
+    }
   }
 
   const lockReturnMarker = '// SEB_ADMIN_LOCK_RETURNS_TO_PRIVACY';

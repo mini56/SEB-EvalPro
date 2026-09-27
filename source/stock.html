@@ -364,11 +364,12 @@ ul.puce li::before {
             transform: scale(0.98);
         }
     </style>
+<link rel="stylesheet" href="css/seb-in-app-alert.css" id="seb-evalpro-in-app-alert-css">
 </head>
 <body>
     <div class="container">
 	<div>
-        <p><img class="imageqcm/scenario.png" src="imageqcm/scenario.png" alt="scenario.png" width="45" height="45" style="margin-right:8px;"><strong style="color:#1a73e8;">Scénario:</strong>
+        <p><img class="imageqcm/scenario.png" src="imageqcm/scenario.png" alt="scenario.png" width="45" height="45" style="margin-right:8px;"><strong style="color:#1a73e8;">Scénario :</strong>
 		<span>  </span>
 		<strong>Vous êtes chargé de mettre de l'ordre dans le stock des divers produits de l'entreprise. À vous de ranger, suivant les critères,
 		les produits à leur bonne place.</strong></p>
@@ -376,16 +377,16 @@ ul.puce li::before {
 	
         <div class="info-panel">
 		 
-		 <p style="margin-left:10px;">Ranger les flacons , un par emplacement, selon les consignes suivantes:</p>
+		 <p style="margin-left:10px;">Rangez les flacons, un par emplacement, selon les consignes suivantes :</p>
 		 </br>
-		 <p><strong style="color:#1a73e8;">Consignes:</strong></p>
+		 <p><strong style="color:#1a73e8;">Consignes :</strong></p>
 		 
          <p class="puce" style="margin-left:20px;">Sur chaque étagère, les flacons seront placés en ordre alphabétique puis, le cas échéant, selon le dosage en ordre décroissant.</p>
-	     <p class="puce" style="margin-left:20px;">Les flacons en double ou ne convenant pas aux casiers 1 et 2 seront palcés en 3, selon les mémé critères.</p>
+	     <p class="puce" style="margin-left:20px;">Les flacons en double ou ne convenant pas aux casiers 1 et 2 seront placés dans le casier 3, selon les mêmes critères.</p>
          <div style="display:flex; align-items:center; margin-bottom:10px;">
           <img src="imageqcm/avatar_transparant.png" alt="avatar" width="45" height="45" style="margin-right:8px;">
           <p><strong style="color:#1a73e8;">Comment ça fonctionne ?</strong> Glissez-déposez les pots dans les bonnes étagères selon les règles affichées. Vous disposez d'une zone de tri pour vous aider si vous en avez besoin.</p>
-		  <button class="verify-btn" onclick="verifyPlacements()">🔍 Vérifier</button>
+		  <button class="verify-btn" id="stockActionBtn" type="button">🔍 Vérifier</button>
             </div>  
         </div>
         <div class="game-area">
@@ -407,7 +408,7 @@ ul.puce li::before {
                 <div class="row-etageres">
                     <!-- Étagère 1 -->
                     <div class="etagere">
-                        <div class="pancarte">Casier1️⃣  Ranger ici les flacons de A à K, sauf E et G</div>
+                        <div class="pancarte">Casier 1️⃣  Ranger ici les flacons de A à K, sauf E et G</div>
                         <div class="etagere-content">
                             <div class="niveau" data-etagere="1" data-niveau="3">
                                 <div class="niveau-label">26% et moins</div>
@@ -441,7 +442,7 @@ ul.puce li::before {
 
                     <!-- Étagère 2 -->
                     <div class="etagere">
-                        <div class="pancarte">Casier2️⃣  Ranger ici les flacons de L à U, sauf M, O, P</div>
+                        <div class="pancarte">Casier 2️⃣  Ranger ici les flacons de L à U, sauf M, O, P</div>
                         <div class="etagere-content">
                             <div class="niveau" data-etagere="2" data-niveau="3">
                                 <div class="niveau-label">29% et moins</div>
@@ -476,7 +477,7 @@ ul.puce li::before {
 
                 <!-- Étagère Large -->
                 <div class="etagere etagere-large">
-                    <div class="pancarte">Casier3️⃣  Ranger ici les flacons en double ou ne convenant pas aux étagères 1 et 2</div>
+                    <div class="pancarte">Casier 3️⃣  Ranger ici les flacons en double ou ne convenant pas aux étagères 1 et 2</div>
                     <div class="niveau-large" data-etagere="3" data-niveau="1">
                         <div class="case" data-case="1"></div>
                         <div class="case" data-case="2"></div>
@@ -495,421 +496,12 @@ ul.puce li::before {
         </div>
     </div>
 
-    <script>
-       // Réinitialiser le localStorage à l'ouverture de la page
-        // localStorage.removeItem('gameErrors');
+    <script src="js/seb-parcours.js"></script>
+    <script src="js/stock-page.js"></script>
+<script src="js/seb-in-app-alert.js" id="seb-evalpro-in-app-alert-script"></script>
+<script src="js/seb-page-draft-resume.js" id="seb-evalpro-page-draft-resume"></script>
+<script src="js/seb-visual-branding.js" id="seb-evalpro-visual-branding"></script>
 
-        // CONFIGURATION DES POTS
-        const pots = [
-            { id: 1, code: 'Ow', percentage: 37 },
-            { id: 2, code: 'To', percentage: 87 },
-            { id: 3, code: 'Ba', percentage: 28 },
-            { id: 4, code: 'Sa', percentage: 21 },
-            { id: 5, code: 'Lu', percentage: 28 },
-            { id: 6, code: 'Ba', percentage: 28 },
-            { id: 7, code: 'Uv', percentage: 31 },
-            { id: 8, code: 'Ab', percentage: 62 },
-            { id: 9, code: 'Lu', percentage: 28 },
-            { id: 10, code: 'Ma', percentage: 52 },
-            { id: 11, code: 'Ab', percentage: 22 },
-            { id: 12, code: 'Ab', percentage: 50 },
-            { id: 13, code: 'Ac', percentage: 30 },
-            { id: 14, code: 'Du', percentage: 70 },
-            { id: 15, code: 'Kr', percentage: 60 },
-            { id: 16, code: 'Qa', percentage: 89 },
-            { id: 17, code: 'Ma', percentage: 29 },
-            { id: 18, code: 'Ni', percentage: 55 },
-            { id: 19, code: 'Pa', percentage: 47 },
-            { id: 20, code: 'Qa', percentage: 12 },
-            { id: 21, code: 'Gi', percentage: 55 },
-            { id: 22, code: 'Lu', percentage: 28 },
-            { id: 23, code: 'Ju', percentage: 27 },
-            { id: 24, code: 'Gi', percentage: 12 },
-            { id: 25, code: 'Ux', percentage: 31 },
-            { id: 26, code: 'Lu', percentage: 18 },
-            { id: 27, code: 'Fa', percentage: 90 },
-            { id: 28, code: 'Lu', percentage: 53 },
-            { id: 29, code: 'Ju', percentage: 20 },
-            { id: 30, code: 'Et', percentage: 12 },
-            { id: 31, code: 'Ju', percentage: 26 },
-            { id: 32, code: 'Ma', percentage: 11 },
-            { id: 33, code: 'Ne', percentage: 31 },
-            { id: 34, code: 'Ni', percentage: 62 }
-        ];
-
-        // Attribution fixe des couleurs pour chaque pot (mélange varié sans couleurs identiques côte à côte)
-         const potColors = [
-            'rouge', 'bleu', 'orange', 'vert', 'violet', 'jaune',       // pots 1-6
-            'rouge', 'orange', 'jaune', 'violet', 'vert', 'jaune',       // pots 7-12
-            'rouge', 'vert', 'orange', 'rouge', 'bleu', 'jaune',       // pots 13-18
-            'orange', 'vert', 'rouge', 'jaune', 'bleu', 'violet',       // pots 19-24
-            'orange', 'rouge', 'bleu', 'jaune', 'vert', 'violet',       // pots 25-30
-            'orange', 'bleu', 'jaune', 'rouge'                          // pots 31-34
-        ];
-        
-        // Affichage des pots dans la zone source
-        const potsSource = document.getElementById('pots-source');
-        
-        pots.forEach((pot, index) => {
-            const potElement = document.createElement('div');
-            potElement.className = 'pot';
-            potElement.draggable = true;
-            potElement.dataset.potId = pot.id;
-            potElement.dataset.code = pot.code;
-            potElement.dataset.percentage = pot.percentage;
-            
-            // Utiliser la couleur fixe assignée
-            const color = potColors[index];
-            potElement.style.backgroundImage = `url("flacon/flacon_${color}.png")`;
-            
-            // Debug : afficher dans la console quelle image est chargée
-            console.log(`Pot ${pot.id}: flacon/flacon_${color}.png`);
-            
-            potElement.innerHTML = `
-                <div class="pot-code">${pot.code}</div>
-                <div class="pot-percent">${pot.percentage}%</div>
-            `;
-            potsSource.appendChild(potElement);
-        });
-
-        // Placer automatiquement Ab-62 (pot id 8) dans étagère 1, niveau 1, case 1 comme exemple
-        setTimeout(() => {
-            const examplePot = document.querySelector('[data-pot-id="8"]'); // Ab-62
-            const targetCase = document.querySelector('[data-etagere="1"][data-niveau="1"] .case[data-case="1"]');
-            
-            if (examplePot && targetCase) {
-                targetCase.appendChild(examplePot);
-                targetCase.classList.add('occupied');
-            }
-        }, 100);
-
-        // Fonction pour déterminer la position correcte d'un pot
-        function getCorrectPosition(code, percentage, potId) {
-            // PLACEMENT EXACT PRÉDÉFINI
-            const exactPlacements = {
-                // ÉTAGÈRE 1 - Niveau 1 (≥60%)
-                'Ab-62': { etagere: 1, niveau: 1, case: 1 },
-                'Du-70': { etagere: 1, niveau: 1, case: 2 },
-                'Fa-90': { etagere: 1, niveau: 1, case: 3 },
-                'Kr-60': { etagere: 1, niveau: 1, case: 4 },
-                
-                // ÉTAGÈRE 1 - Niveau 2 (27-59%)
-                'Ab-50': { etagere: 1, niveau: 2, case: 1 },
-                'Ac-30': { etagere: 1, niveau: 2, case: 2 },
-				 // BA-28 = 2 emplacements possibles
-				'Ba-28': [{ etagere: 1, niveau: 2, case: 3 },
-						  { etagere: 3, niveau: 1, case: 1 }
-						 ],
-                'Ju-27': { etagere: 1, niveau: 2, case: 4 },
-                
-                // ÉTAGÈRE 1 - Niveau 3 (≤26%)
-                'Ab-22': { etagere: 1, niveau: 3, case: 1 },
-                'Ju-26': { etagere: 1, niveau: 3, case: 2 },
-                'Ju-20': { etagere: 1, niveau: 3, case: 3 },
-                // case 4 = VIDE
-                
-                // ÉTAGÈRE 2 - Niveau 1 (≥55%)
-                'Ni-62': { etagere: 2, niveau: 1, case: 1 },
-                'Ni-55': { etagere: 2, niveau: 1, case: 2 },
-                'Qa-89': { etagere: 2, niveau: 1, case: 3 },
-                'To-87': { etagere: 2, niveau: 1, case: 4 },
-                
-                // ÉTAGÈRE 2 - Niveau 2 (30-54%)
-                'Lu-53': { etagere: 2, niveau: 2, case: 1 },
-                'Ne-31': { etagere: 2, niveau: 2, case: 2 },
-                'Uv-31': { etagere: 2, niveau: 2, case: 3 },
-                'Ux-31': { etagere: 2, niveau: 2, case: 4 },
-                
-                // ÉTAGÈRE 2 - Niveau 3 (≤29%)
-                 // LU-28 = 3 emplacements possibles
-				'Lu-28': [
-						{ etagere: 2, niveau: 3, case: 1 },
-						{ etagere: 3, niveau: 1, case: 5 },
-						{ etagere: 3, niveau: 1, case: 6 }
-						 ],
-                'Lu-18': { etagere: 2, niveau: 3, case: 2 },
-                'Qa-12': { etagere: 2, niveau: 3, case: 3 },
-                'Sa-21': { etagere: 2, niveau: 3, case: 4 },
-                
-                // ÉTAGÈRE 3 - 11 places
-                //'Ba-28': { etagere: 3, niveau: 1, case: 1 }, // 2ème Ba-28
-                'Et-12': { etagere: 3, niveau: 1, case: 2 },
-                'Gi-55': { etagere: 3, niveau: 1, case: 3 },
-                'Gi-12': { etagere: 3, niveau: 1, case: 4 },
-               //lu28
-               //lu28
-                'Ma-52': { etagere: 3, niveau: 1, case: 7 },
-                'Ma-29': { etagere: 3, niveau: 1, case: 8 },
-                'Ma-11': { etagere: 3, niveau: 1, case: 9 },
-                'Ow-37': { etagere: 3, niveau: 1, case: 10 },
-                'Pa-47': { etagere: 3, niveau: 1, case: 11 }
-            };
-            
-            const key = `${code}-${percentage}`;
-            
-            // Si c'est un placement simple (pas de doublon)
-            if (exactPlacements[key]) {
-                return exactPlacements[key];
-            }
-        return null;
-        }
-
-        // Fonction de vérification
-function verifyPlacements() {
-    let correctCount = 0;
-    let errorCount = 0;
-
-    document.querySelectorAll('.pot').forEach(pot => {
-        pot.classList.remove('correct', 'incorrect');
-
-        const parent = pot.parentElement;
-        if (!parent.classList.contains('case')) return;
-
-        const niveau = parent.closest('.niveau, .niveau-large');
-        if (!niveau) return;
-
-        const etagere = parseInt(niveau.dataset.etagere);
-        const niveauNum = parseInt(niveau.dataset.niveau);
-        const caseNum = parseInt(parent.dataset.case);
-        const code = pot.dataset.code;
-        const percentage = parseInt(pot.dataset.percentage);
-
-        let correctPos = getCorrectPosition(code, percentage);
-
-        if (correctPos && !Array.isArray(correctPos)) {
-            correctPos = [correctPos];
-        }
-
-        if (correctPos && correctPos.some(pos =>
-            pos.etagere === etagere &&
-            pos.niveau === niveauNum &&
-            pos.case === caseNum
-        )) {
-            pot.classList.add('correct');
-            correctCount++;
-        } else {
-            pot.classList.add('incorrect');
-            errorCount++;
-        }
-    });
-
-    alert(`✅ Flacons correctement placés : ${correctCount} / 34\n❌ Erreurs : ${errorCount}`);
-    
-    // ✅ SAUVEGARDE dans sessionStorage
-    sessionStorage.setItem("stockCorrect", correctCount);
-    sessionStorage.setItem("stockErrors", errorCount);
-    sessionStorage.setItem("stockTotal", 34);
-    
-    console.log("✅ Stock sauvegardé - Bonnes réponses:", correctCount, "Erreurs:", errorCount);
-    
-    // 🔄 Modifier le bouton Vérifier en bouton Suivant
-    const btn = document.querySelector('.verify-btn');
-    btn.innerHTML = "➡️ Suivant";
-    btn.onclick = () => {
-        window.location.href = "planning.html";
-    };
-}
-
-
-        // Gestion du drag & drop
-        let draggedElement = null;
-        let draggedPlaceholder = null;
-        let sourceParent = null;
-
-        document.addEventListener('dragstart', (e) => {
-            if (e.target.classList.contains('pot')) {
-                draggedElement = e.target;
-                sourceParent = e.target.parentElement;
-                e.target.classList.add('dragging');
-                
-                // Si on drag depuis la zone de tri, créer un placeholder à sa place
-                if (sourceParent.id === 'zone-tri') {
-                    draggedPlaceholder = document.createElement('div');
-                    draggedPlaceholder.className = 'pot-placeholder';
-                    sourceParent.insertBefore(draggedPlaceholder, e.target.nextSibling);
-                }
-                
-                // Améliorer l'affichage du drag
-                e.dataTransfer.effectAllowed = 'move';
-            }
-        });
-
-        document.addEventListener('dragend', (e) => {
-            if (e.target.classList.contains('pot')) {
-                e.target.classList.remove('dragging');
-                
-                // Nettoyer tous les placeholders
-                if (draggedPlaceholder) {
-                    draggedPlaceholder.remove();
-                    draggedPlaceholder = null;
-                }
-                if (insertPlaceholder && insertPlaceholder.parentElement) {
-                    insertPlaceholder.remove();
-                    insertPlaceholder = null;
-                }
-                
-                draggedElement = null;
-                sourceParent = null;
-            }
-        });
-
-        // Drop sur les cases
-        document.querySelectorAll('.case').forEach(caseElement => {
-            caseElement.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                if (!caseElement.classList.contains('occupied')) {
-                    caseElement.classList.add('drag-over');
-                }
-            });
-
-            caseElement.addEventListener('dragleave', (e) => {
-                caseElement.classList.remove('drag-over');
-            });
-
-            caseElement.addEventListener('drop', (e) => {
-                e.preventDefault();
-                caseElement.classList.remove('drag-over');
-                
-                if (draggedElement && !caseElement.classList.contains('occupied')) {
-                    const oldParent = draggedElement.parentElement;
-                    
-                    if (oldParent.classList.contains('case')) {
-                        oldParent.classList.remove('occupied');
-                    }
-                    
-                    // Retirer le placeholder de la zone de tri si présent
-                    if (draggedPlaceholder) {
-                        draggedPlaceholder.remove();
-                        draggedPlaceholder = null;
-                    }
-                    
-                    // Retirer le placeholder d'insertion s'il existe
-                    if (insertPlaceholder && insertPlaceholder.parentElement) {
-                        insertPlaceholder.remove();
-                        insertPlaceholder = null;
-                    }
-                    
-                    draggedElement.classList.remove('correct', 'incorrect');
-                    caseElement.appendChild(draggedElement);
-                    caseElement.classList.add('occupied');
-                }
-            });
-        });
-
-        // Drop sur zone source
-        potsSource.addEventListener('dragover', (e) => {
-            e.preventDefault();
-        });
-
-        potsSource.addEventListener('drop', (e) => {
-            e.preventDefault();
-            if (draggedElement) {
-                const parentCase = draggedElement.parentElement;
-                if (parentCase.classList.contains('case')) {
-                    parentCase.classList.remove('occupied');
-                }
-                
-                // Retirer les placeholders
-                if (draggedPlaceholder) {
-                    draggedPlaceholder.remove();
-                    draggedPlaceholder = null;
-                }
-                if (insertPlaceholder && insertPlaceholder.parentElement) {
-                    insertPlaceholder.remove();
-                    insertPlaceholder = null;
-                }
-                
-                draggedElement.classList.remove('correct', 'incorrect');
-                potsSource.appendChild(draggedElement);
-            }
-        });
-
-        // Gestion avancée de la zone de tri avec insertion
-        const zoneTri = document.getElementById('zone-tri');
-        let insertPlaceholder = null;
-        
-        zoneTri.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            e.dataTransfer.dropEffect = 'move';
-            
-            if (!draggedElement) return;
-            
-            // Ne pas traiter si c'est le placeholder de l'élément draggé
-            if (draggedPlaceholder && e.target === draggedPlaceholder) return;
-            
-            // Créer un placeholder d'insertion si nécessaire
-            if (!insertPlaceholder) {
-                insertPlaceholder = document.createElement('div');
-                insertPlaceholder.style.width = '55px';
-                insertPlaceholder.style.height = '70px';
-                insertPlaceholder.style.display = 'inline-block';
-                insertPlaceholder.style.backgroundColor = '#e8f5e9';
-                insertPlaceholder.style.border = '2px dashed #4caf50';
-                insertPlaceholder.style.borderRadius = '6px';
-                insertPlaceholder.style.flexShrink = '0';
-                insertPlaceholder.className = 'insert-placeholder';
-            }
-            
-            const afterElement = getDragAfterElement(zoneTri, e.clientX);
-            
-            if (afterElement == null) {
-                zoneTri.appendChild(insertPlaceholder);
-            } else {
-                zoneTri.insertBefore(insertPlaceholder, afterElement);
-            }
-        });
-
-        zoneTri.addEventListener('drop', (e) => {
-            e.preventDefault();
-            if (draggedElement) {
-                const oldParent = draggedElement.parentElement;
-                if (oldParent.classList.contains('case')) {
-                    oldParent.classList.remove('occupied');
-                }
-                draggedElement.classList.remove('correct', 'incorrect');
-                
-                // Retirer l'ancien placeholder si présent
-                if (draggedPlaceholder) {
-                    draggedPlaceholder.remove();
-                    draggedPlaceholder = null;
-                }
-                
-                // Insérer à la place du placeholder d'insertion
-                if (insertPlaceholder && insertPlaceholder.parentElement === zoneTri) {
-                    zoneTri.insertBefore(draggedElement, insertPlaceholder);
-                    insertPlaceholder.remove();
-                } else {
-                    zoneTri.appendChild(draggedElement);
-                }
-                insertPlaceholder = null;
-            }
-        });
-
-        zoneTri.addEventListener('dragleave', (e) => {
-            // Ne retirer le placeholder que si on sort vraiment de la zone
-            if (e.target === zoneTri && !zoneTri.contains(e.relatedTarget)) {
-                if (insertPlaceholder && insertPlaceholder.parentElement === zoneTri) {
-                    insertPlaceholder.remove();
-                }
-                insertPlaceholder = null;
-            }
-        });
-
-        // Fonction pour déterminer l'élément après lequel insérer
-        function getDragAfterElement(container, x) {
-            const draggableElements = [...container.querySelectorAll('.pot:not(.dragging), .pot-placeholder')].filter(el => !el.classList.contains('insert-placeholder'));
-            
-            return draggableElements.reduce((closest, child) => {
-                const box = child.getBoundingClientRect();
-                const offset = x - box.left - box.width / 2;
-                
-                if (offset < 0 && offset > closest.offset) {
-                    return { offset: offset, element: child };
-                } else {
-                    return closest;
-                }
-            }, { offset: Number.NEGATIVE_INFINITY }).element;
-        }
-    </script>
+<script id="seb-ui-runtime-loader" src="js/seb-ui-runtime.js"></script>
 </body>
 </html>

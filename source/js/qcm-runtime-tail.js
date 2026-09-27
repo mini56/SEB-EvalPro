@@ -1,0 +1,1 @@
+document.addEventListener('DOMContentLoaded',()=>{try{const c=JSON.parse(sessionStorage.getItem('candidat_data')||'{}');const s=document.getElementById('civilite');if(s&&['M.','Mme','Autre'].includes(String(c.civilite||'')))s.value=String(c.civilite)}catch(_){}});

@@ -67,10 +67,8 @@ function checkHtmlScripts(html, label) {
     'barème Messagerie 0-1 / 2-3 / 4+'
   );
 
-  if (out.includes("'- '+v+' / 8 point(s)'")) {
-    out = out.replace("'- '+v+' / 8 point(s)'", "'- '+v+' / 7 point(s)'");
-  }
-
+  // Le traitement de texte est désormais validé sur 8 points.
+  // Ne jamais réintroduire l'ancien /7.
   out = replaceCount(out, 'Math.round(pr/28*100)', 'Math.round(pr/27*100)', 1, 'dénominateur Maths /27');
   out = replaceCount(out, "'- '+pr+' / 28 réponses correctes ('+p+' %)'", "'- '+pr+' / 27 réponses correctes ('+p+' %)'", 1, 'affichage Maths /27');
 
@@ -98,16 +96,16 @@ function checkHtmlScripts(html, label) {
 }
 
 // -----------------------------------------------------------------------------
-// 2. Résultats candidat : traitement de texte /7, dénominateurs cohérents,
-//    carré résilient et code Brique masqué. La page Résultats est désormais
-//    consultée directement depuis le dossier candidat, sans DOCX automatique.
+// 2. Résultats candidat : traitement de texte /8 validé (avec enregistrement),
+//    dénominateurs cohérents, carré résilient et code Brique masqué.
+//    La page Résultats est consultée directement depuis le dossier candidat.
 // -----------------------------------------------------------------------------
 {
   const { file, text } = read('app/web/qcmv1.0.html');
   let out = text;
 
-  if (out.includes('const scoreMax = 8;')) out = out.replace('const scoreMax = 8;', 'const scoreMax = 7;');
-  out = out.replace(/^.*analyse\.score\.enregistrement.*Enregistrement via le menu Fichier.*\n?/m, '');
+  if (!out.includes('const scoreMax = 8;')) fail('Traitement de texte /8 absent avant contrôles #135', 10);
+  if (!/analyse\.score\.enregistrement/.test(out)) fail('Critère Enregistrement traitement de texte absent avant contrôles #135', 10);
 
   if (out.includes("const rep4 = reponses['page4'] || \"0/0\";")) {
     out = out.replace("const rep4 = reponses['page4'] || \"0/0\";", "const rep4 = reponses['page4'] || \"0/3\";");
@@ -126,14 +124,14 @@ function checkHtmlScripts(html, label) {
   out = out.replace(/\s*<span><strong>🔑 Code :<\/strong> \$\{evalBrique\.code \|\| ["']—["']\}<\/span>/g, '');
 
   for (const required of [
-    'const scoreMax = 7;',
+    'const scoreMax = 8;',
     'totalQuestions += denom4 || 3;',
     'totalQuestions += repTxt.length || 15;',
     "sessionStorage.getItem('carre_magique_erreurs') ?? sessionStorage.getItem('puzzleErrors')"
   ]) {
     if (!out.includes(required)) fail('Résultats candidat incomplets : ' + required, 10);
   }
-  if (out.includes('Enregistrement via le menu Fichier</span>')) fail('critère fantôme enregistrement encore affiché', 10);
+  if (!/analyse\.score\.enregistrement/.test(out)) fail('critère Enregistrement traitement de texte perdu', 10);
   if (/🔑 Code[\s\S]{0,100}evalBrique\.code/.test(out)) fail('code Brique encore affiché dans les résultats', 10);
 
   checkHtmlScripts(out, 'qcmv1.0.html');
@@ -184,9 +182,9 @@ function checkHtmlScripts(html, label) {
   const { file, text } = read('src/main.js');
   const out = text;
   for (const required of [
-    "const candidateExportDir = getCandidateStore().getActiveExportDir();",
-    "const targetDirectory = adminExportCandidateDir || candidateExportDir || bilanDocumentsDir();",
-    "const isCurrentCandidateWord = !!adminExportCandidateDir && /^Evaluation_.+\\.docx?$/i.test(filename);"
+    "const candidateExportDir = adminExportCandidateDir || getCandidateStore().getActiveExportDir();",
+    "const visibleDirectory = bilanDocumentsDir();",
+    "fs.copyFileSync(visibleTarget, archiveTarget);"
   ]) {
     if (!out.includes(required)) fail('routage Word bilan candidat absent : ' + required, 13);
   }
@@ -297,4 +295,4 @@ function checkHtmlScripts(html, label) {
   if (full.value !== 75 || full.total !== 75) fail('Expression complète doit rester sur 75', 17);
 }
 
-console.log('SEB EvalPro Build #135 : audit corrigé — Maths /27, traitement de texte /7, Briques/Messagerie, Expression sans points fantômes, résultats robustes, Carré repris, Paronymes corrigé, Word bilan routé par candidat, replay pleine page et fermeture protégée.');
+console.log('SEB EvalPro Build #135 : audit corrigé — Maths /27, traitement de texte /8 avec enregistrement, Briques/Messagerie, Expression sans points fantômes, résultats robustes, Carré repris, Paronymes corrigé, Word bilan routé par candidat, replay pleine page et fermeture protégée.');

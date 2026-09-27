@@ -3,11 +3,13 @@ const path = require('path');
 const crypto = require('crypto');
 const { shell } = require('electron');
 const { getEditionCapabilities } = require('./edition');
+const { encodeJson } = require('./candidate-data-crypto');
 const {
   readJson,
   ensureDir,
   normalize,
   standardFolderName,
+  codedFolderName,
   uniqueFolderPath,
   listCandidateDirs,
   selectCandidate,
@@ -17,10 +19,10 @@ const {
   copyDirectoryAtomically
 } = require('./candidate-folder-utils');
 
-module.exports = function registerCandidateCatalog({ app, ipcMain, getAdminUnlocked, getActiveCandidate }) {
+module.exports = function registerCandidateCatalog({ app, ipcMain, getAdminUnlocked, getActiveCandidate, dataRoot = null }) {
   const editionCapabilities = getEditionCapabilities();
   const documentsPath = app.getPath('documents');
-  const root = path.join(documentsPath, 'SEB EvalPro');
+  const root = dataRoot || path.join(documentsPath, 'SEB EvalPro');
   const candidatesRoot = path.join(root, 'Candidats');
   const legacyAdminRoot = path.join(root, 'Admin');
   const globalReplayRoot = path.join(root, 'parcours');
@@ -33,7 +35,7 @@ module.exports = function registerCandidateCatalog({ app, ipcMain, getAdminUnloc
   function writeJson(target, value) {
     ensureDir(path.dirname(target));
     const temp = target + '.tmp';
-    fs.writeFileSync(temp, JSON.stringify(value, null, 2), 'utf8');
+    fs.writeFileSync(temp, encodeJson(value), 'utf8');
     fs.renameSync(temp, target);
   }
 
@@ -145,7 +147,7 @@ module.exports = function registerCandidateCatalog({ app, ipcMain, getAdminUnloc
       const current = records.find((record) => String(record.candidateId) === String(active.candidateId));
       if (current) return current;
     }
-    const canonical = standardFolderName(records[0] && records[0].candidate);
+    const canonical = codedFolderName(records[0] && records[0].candidateId, records[0] && records[0].manifest && records[0].manifest.shortId);
     const exact = records.find((record) => record.folderName === canonical);
     if (exact) return exact;
     return records.slice().sort((a,b) =>
@@ -158,7 +160,10 @@ module.exports = function registerCandidateCatalog({ app, ipcMain, getAdminUnloc
     const records = listCandidateDirs(candidatesRoot, false);
     const groups = new Map();
     for (const record of records) {
-      const key = candidateIdentityKey(record.candidate);
+      // Deux évaluations distinctes ne doivent jamais être fusionnées sur la seule
+      // identité humaine. Seules deux copies techniques du MEME candidateId
+      // peuvent être consolidées.
+      const key = String(record.candidateId || '').trim();
       if (!key) continue;
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key).push(record);
@@ -225,7 +230,7 @@ module.exports = function registerCandidateCatalog({ app, ipcMain, getAdminUnloc
         }
 
         ensureDir(duplicateArchiveRoot);
-        const archiveBase = duplicate.folderName + '__' + suffix;
+        const archiveBase = codedFolderName(duplicate.candidateId, duplicate.manifest && duplicate.manifest.shortId) + '__DUP-' + suffix;
         const archiveTarget = uniqueFolderPath(duplicateArchiveRoot, archiveBase);
         fs.renameSync(duplicate.candidateDir, archiveTarget);
         consolidatedFrom.push({
@@ -282,7 +287,7 @@ module.exports = function registerCandidateCatalog({ app, ipcMain, getAdminUnloc
     for (const legacy of listCandidateDirs(legacyAdminRoot, true)) {
       if (current.some((r) => String(r.candidateId) === String(legacy.candidateId))) continue;
       if (selectCandidate(current, legacy.candidate)) continue;
-      const base = standardFolderName(legacy.candidate);
+      const base = codedFolderName(legacy.candidateId, legacy.manifest && legacy.manifest.shortId);
       const target = fs.existsSync(path.join(candidatesRoot, base))
         ? uniqueFolderPath(candidatesRoot, base)
         : path.join(candidatesRoot, base);
@@ -703,22 +708,13 @@ module.exports = function registerCandidateCatalog({ app, ipcMain, getAdminUnloc
       .sort((a,b) => [a.nom,a.prenom,a.date].join('|').localeCompare([b.nom,b.prenom,b.date].join('|'), 'fr', { sensitivity:'base' }));
   });
 
-  ipcMain.handle('candidate-catalog:delete', (_event, candidateId) => {
-    if (!getAdminUnlocked()) return { ok:false, error:'Accès administrateur requis.' };
-    synchronize();
-    const records = listCandidateDirs(candidatesRoot, false);
-    const record = records.find((item) => String(item.candidateId) === String(candidateId || ''));
-    if (!record) return { ok:false, error:'Candidat introuvable.' };
-    if ((adminBilanWorkspace && String(adminBilanWorkspace.candidateId) === String(record.candidateId))
-      || (adminResultsWorkspace && String(adminResultsWorkspace.candidateId) === String(record.candidateId))) {
-      return { ok:false, error:'Fermez le bilan ou les résultats de ce candidat avant de le supprimer.' };
-    }
-
-    const candidate = clone(record.candidate || {});
-    const legacy = removeLegacyCandidateCopies(candidate, record, records);
-    removeCandidateRuntimeState(candidate);
-    fs.rmSync(record.candidateDir, { recursive:true, force:true });
-    return { ok:true, candidateId:record.candidateId, ...legacy };
+  ipcMain.handle('candidate-catalog:delete', () => {
+    // Protection volontaire : SEB EvalPro ne supprime jamais un dossier candidat.
+    // Les éventuels nettoyages historiques restent une action manuelle hors application.
+    return {
+      ok:false,
+      error:'La suppression d’un dossier candidat est désactivée afin d’éviter toute perte de données.'
+    };
   });
 
   ipcMain.handle('candidate-catalog:detail', (_event, candidateId) => {

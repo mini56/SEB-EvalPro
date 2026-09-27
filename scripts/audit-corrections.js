@@ -31,12 +31,27 @@ function patchQcm() {
   const { file, html } = read('qcmv1.0.html');
   let out = html;
 
-  out = mustReplace(
-    out,
-    "(bonnes[i] && val.replace(',', '.') === bonnes[i].toString())",
-    "(bonnes[i] && val.replace(',', '.') === bonnes[i].toString().replace(',', '.'))",
-    'conversion page 6 avec virgule ou point'
-  );
+  if (out.includes('js/qcm-page6.js')) {
+    const { html: page6 } = read('js/qcm-page6.js');
+    for (const token of [
+      'function normalizeNumeric(value)',
+      ".replace(',', '.')",
+      'function sameNumeric(left, right)',
+      "3:'2.5'",
+      "8:'5.6'"
+    ]) {
+      if (!page6.includes(token)) {
+        throw new Error('SEB EvalPro audit: contrat numérique Page 6 modulaire absent : ' + token);
+      }
+    }
+  } else {
+    out = mustReplace(
+      out,
+      "(bonnes[i] && val.replace(',', '.') === bonnes[i].toString())",
+      "(bonnes[i] && val.replace(',', '.') === bonnes[i].toString().replace(',', '.'))",
+      'conversion page 6 avec virgule ou point'
+    );
+  }
 
   out = mustReplace(
     out,
@@ -81,19 +96,72 @@ function patchAdminBilan() {
 }
 
 function patchMailResume() {
-  const { file, html } = read('nvmail.html');
-  const destructive = /document\.addEventListener\('DOMContentLoaded', function\(\) \{\s*\/\/ NETTOYAGE des données page 8[\s\S]*?document\.getElementById\('fichierSelectionne'\)\.textContent = 'Aucun fichier sélectionné';\s*\}\);/;
-  const out = mustReplace(
-    html,
-    destructive,
-    "// Les champs et page8_data sont conservés pour permettre une reprise exacte après fermeture de l'application.",
-    'suppression nettoyage destructif messagerie'
-  );
-  write(file, out);
+  const { html } = read('nvmail.html');
+  const { html: controller } = read('js/nvmail-page.js');
+
+  for (const expected of [
+    'conseil.perso@sauvegarde56.org',
+    'stage-pro@sauvegarde56.org'
+  ]) {
+    if (!html.includes('>' + expected + '<')) {
+      throw new Error('SEB EvalPro audit: adresse visible nvmail incorrecte ou absente : ' + expected);
+    }
+  }
+  if (/@(Sauvegarde56\.org)/.test(html)) {
+    throw new Error('SEB EvalPro audit: nvmail affiche encore Sauvegarde56.org avec un S majuscule');
+  }
+
+  for (const forbidden of [
+    "toLowerCase() === 'conseil.perso@sauvegarde56.org'",
+    "toLowerCase() === 'stage-pro@sauvegarde56.org'",
+    "sessionStorage.removeItem('page8_data')"
+  ]) {
+    if (controller.includes(forbidden)) {
+      throw new Error('SEB EvalPro audit: logique nvmail interdite : ' + forbidden);
+    }
+  }
+
+  for (const required of [
+    "String(to || '').trim() === 'conseil.perso@sauvegarde56.org'",
+    "String(cc || '').trim() === 'stage-pro@sauvegarde56.org'",
+    'function signatureCandidatValide',
+    'function objetMailCandidatValide',
+    'function telephoneMailValide',
+    "sessionStorage.setItem(STORAGE_KEY, JSON.stringify(data))",
+    "window.sebParcours.goNext('nvmail')"
+  ]) {
+    if (!controller.includes(required)) {
+      throw new Error('SEB EvalPro audit: contrat nvmail absent : ' + required);
+    }
+  }
+
+  if (!html.includes('js/nvmail-page.js') || /function\s+evaluerFormulaire\s*\(/.test(html)) {
+    throw new Error('SEB EvalPro audit: logique nvmail non externalisée');
+  }
 }
 
 function patchGenreNombreResume() {
   const { file, html } = read('genrenombres.html');
+
+  if (html.includes('js/genrenombres-page.js')) {
+    const moduleFile = path.join(webDir, 'js', 'genrenombres-page.js');
+    if (!fs.existsSync(moduleFile)) throw new Error('SEB EvalPro audit: module genrenombres-page.js introuvable');
+    const moduleText = fs.readFileSync(moduleFile, 'utf8').replace(/\r\n/g, '\n');
+    for (const token of [
+      "const ANSWERS_KEY = 'user_genrenombres';",
+      "const ERRORS_KEY = 'erreurs_exercice';",
+      "const STATE_KEY = 'seb_evalpro_genrenombres_state';",
+      'function restoreState()',
+      "window.sebParcours.goNext('genrenombres')"
+    ]) {
+      if (!moduleText.includes(token)) throw new Error('SEB EvalPro audit: contrat Genre/Nombre modulaire absent: ' + token);
+    }
+    if (/removeItem\(['"]erreurs_exercice/.test(moduleText)) {
+      throw new Error('SEB EvalPro audit: effacement destructif Genre/Nombre réintroduit');
+    }
+    return;
+  }
+
   const out = mustReplace(
     html,
     "  // clear previous data for this page\n  try { sessionStorage.removeItem('erreurs_exercice'); } catch(e){}\n",
@@ -105,6 +173,23 @@ function patchGenreNombreResume() {
 
 function patchStockScoring() {
   const { file, html } = read('stock.html');
+
+  if (html.includes('js/stock-page.js')) {
+    const moduleFile = path.join(webDir, 'js', 'stock-page.js');
+    if (!fs.existsSync(moduleFile)) throw new Error('SEB EvalPro audit: module stock-page.js introuvable');
+    const moduleText = fs.readFileSync(moduleFile, 'utf8').replace(/\r\n/g, '\n');
+    for (const token of [
+      "const TOTAL_EVALUATED = 33;",
+      "const EXAMPLE_ID = '8';",
+      "document.querySelectorAll('.pot:not([data-seb-example=\"true\"])')",
+      'function computeScore(mark)',
+      "sessionStorage.setItem(ERROR_KEY, String(score.errors));"
+    ]) {
+      if (!moduleText.includes(token)) throw new Error('SEB EvalPro audit: contrat Stock modulaire absent: ' + token);
+    }
+    return;
+  }
+
   let out = html;
   out = mustReplace(
     out,
@@ -124,6 +209,23 @@ function patchStockScoring() {
 function patchAutoEval1() {
   const { file, html } = read('autoeval1.html');
   let out = html;
+
+  // Version modulaire : les deux anciennes corrections inline sont désormais
+  // intégrées dans le contrôleur source et ne doivent plus être réinjectées.
+  if (out.includes('js/autoeval1-page.js')) {
+    const moduleFile = path.join(webDir, 'js', 'autoeval1-page.js');
+    if (!fs.existsSync(moduleFile)) throw new Error('SEB EvalPro audit: module autoeval1 introuvable');
+    const moduleText = fs.readFileSync(moduleFile, 'utf8').replace(/\r\n/g, '\n');
+    for (const token of [
+      "sessionStorage.setItem(STORAGE_KEY, JSON.stringify(data));",
+      "window.sebParcours.goNext('autoeval1')",
+      'function validateAndNext()'
+    ]) {
+      if (!moduleText.includes(token)) throw new Error('SEB EvalPro audit: contrat autoeval1 modulaire absent: ' + token);
+    }
+    return;
+  }
+
   out = mustReplace(
     out,
     'onclick="saveAutoEval1(); passerEtapeSuivante()"',
@@ -141,6 +243,28 @@ function patchAutoEval1() {
 
 function patchBriqueZeroErrorsAndCheckpoint() {
   const { file, html } = read('brique.html');
+
+  if (html.includes('js/brique-page.js')) {
+    if (!/<input\s+id="nivDiff"[^>]*\bmin="0"\s+max="10"/.test(html)) {
+      throw new Error('SEB EvalPro audit: zéro erreur Brique non autorisé');
+    }
+    const moduleFile = path.join(webDir, 'js', 'brique-page.js');
+    if (!fs.existsSync(moduleFile)) throw new Error('SEB EvalPro audit: module brique-page.js introuvable');
+    const moduleText = fs.readFileSync(moduleFile, 'utf8').replace(/\r\n/g, '\n');
+    for (const token of [
+      "const DATA_KEY = 'eval_brique';",
+      "const AUTO_KEY = 'eval_brique_auto';",
+      "const CHECKPOINT_KEY = 'seb_evalpro_brique_checkpoint';",
+      'const PERIOD_SECONDS = 1;',
+      'function persistCheckpoint(force)',
+      'function restoreCheckpoint()',
+      "window.sebParcours.goNext('brique')"
+    ]) {
+      if (!moduleText.includes(token)) throw new Error('SEB EvalPro audit: contrat Brique modulaire absent: ' + token);
+    }
+    return;
+  }
+
   let out = html;
   out = mustReplace(out, 'type="number" min="1" max="10"', 'type="number" min="0" max="10"', 'zéro erreur briques');
   out = mustReplace(out, 'const PERIOD_SECONDS = 10 * 60;', 'const PERIOD_SECONDS = 1;', 'checkpoint briques chaque seconde');
@@ -148,50 +272,52 @@ function patchBriqueZeroErrorsAndCheckpoint() {
 }
 
 function patchWordScoring() {
-  const { file, html } = read('nwtexte.html');
-  let out = html;
+  // nwtexte est désormais propre en source : aucune réécriture fonctionnelle ici.
+  const { html } = read('nwtexte.html');
+  const enginePath = path.join(webDir, 'js', 'nwtexte-quill-engine.js');
+  const savePath = path.join(webDir, 'js', 'nwtexte-save-simulation.js');
+  if (!fs.existsSync(enginePath) || !fs.existsSync(savePath)) {
+    throw new Error('SEB EvalPro audit: moteur nwtexte généré introuvable');
+  }
+  const engine = fs.readFileSync(enginePath, 'utf8').replace(/\r\n/g, '\n');
+  const save = fs.readFileSync(savePath, 'utf8').replace(/\r\n/g, '\n');
 
-  out = mustReplace(
-    out,
-    "        texte_taille: 0,\n        total: 0",
-    "        texte_taille: 0,\n        enregistrement: 0,\n        total: 0",
-    'critère enregistrement traitement de texte'
-  );
-
-  out = mustReplace(
-    out,
-    "      analyse.titre.texte = titreTexte;\n      analyse.titre.present = titreTexte.length > 0;\n      \n      if (analyse.titre.present) {\n        analyse.score.titre_present = 1;",
-    `      analyse.titre.texte = titreTexte;\n      analyse.titre.present = titreTexte.length > 0;\n      const normaliserTitre = (value) => String(value || '')\n        .toLowerCase()\n        .replace(/[’']/g, "'")\n        .replace(/\\s+/g, ' ')\n        .replace(/\\s*\\?\\s*$/, '')\n        .trim();\n      const titresValides = [\n        'Quel est mon activité préférée et pourquoi?',\n        'Quel est mon expérience professionnel préférée et pourquoi?',\n        'Quel est mon métier préféré et pourquoi?'\n      ].map(normaliserTitre);\n      analyse.titre.valide = titresValides.includes(normaliserTitre(titreTexte));\n      \n      if (analyse.titre.valide) {\n        analyse.score.titre_present = 1;`,
-    'titre limité aux trois propositions'
-  );
-
-  out = mustReplace(
-    out,
-    "    analyse.score.total = analyse.score.titre_present +\n                         analyse.score.titre_gras +\n                         analyse.score.titre_police +\n                         analyse.score.titre_taille +\n                         analyse.score.texte_lignes +\n                         analyse.score.texte_police +\n                         analyse.score.texte_taille;",
-    "    analyse.score.enregistrement = (localStorage.getItem('seb_evalpro_texte_enregistre') === 'true' || localStorage.getItem('dernierEnregistrementSous') === 'true') ? 1 : 0;\n    analyse.score.total = analyse.score.titre_present +\n                         analyse.score.titre_gras +\n                         analyse.score.titre_police +\n                         analyse.score.titre_taille +\n                         analyse.score.texte_lignes +\n                         analyse.score.texte_police +\n                         analyse.score.texte_taille +\n                         analyse.score.enregistrement;",
-    'total traitement de texte avec enregistrement'
-  );
-
-  out = mustReplace(
-    out,
-    "      a.download = 'document.html'; \n      a.click();",
-    "      a.download = 'document.html'; \n      a.click();\n      localStorage.setItem('seb_evalpro_texte_enregistre', 'true');",
-    'enregistrement simple comptabilisé'
-  );
-
-  out = mustReplace(
-    out,
-    "      a.download = nomComplet; \n      a.click();",
-    "      a.download = nomComplet; \n      a.click();\n      localStorage.setItem('seb_evalpro_texte_enregistre', 'true');",
-    'enregistrement sous comptabilisé'
-  );
-
-  write(file, out);
+  if (/<script(?![^>]*\bsrc=)[^>]*>/i.test(html) || /\son[a-z]+\s*=/i.test(html)) {
+    throw new Error('SEB EvalPro audit: ancien code inline réintroduit dans nwtexte');
+  }
+  for (const token of [
+    'enregistrement: savedCorrectly ? 1 : 0',
+    'scores.page7 = analyse.score.total;',
+    'responses.page7_analyse = analyse;',
+    'window.sebNwtexteEditor = editorApi'
+  ]) {
+    if (!engine.includes(token)) throw new Error('SEB EvalPro audit: contrat nwtexte absent: ' + token);
+  }
+  if (!save.includes("const STORAGE_KEY = 'nwtexte_save_simulation'") ||
+      !save.includes('window.sebNwtexteSave = Object.freeze')) {
+    throw new Error('SEB EvalPro audit: simulation enregistrement nwtexte absente');
+  }
 }
 
 function patchTriLiveChrono() {
   const { file, html } = read('tri_de_cheville.html');
   let out = html;
+
+  if (html.includes('js/tri-page.js')) {
+    const moduleFile = path.join(webDir, 'js', 'tri-page.js');
+    if (!fs.existsSync(moduleFile)) throw new Error('SEB EvalPro audit: module tri-page.js absent');
+    const moduleText = fs.readFileSync(moduleFile, 'utf8');
+    for (const token of [
+      "const LIVE_KEY = 'seb_evalpro_tri_live_chrono';",
+      'persistLiveChrono();',
+      'function restoreTri()',
+      'function startChrono()',
+      'function stopChrono()'
+    ]) {
+      if (!moduleText.includes(token)) throw new Error('SEB EvalPro audit: reprise Tri modulaire absente: ' + token);
+    }
+    return;
+  }
   out = mustReplace(
     out,
     'let triStarted = false;',
@@ -232,167 +358,25 @@ function patchTriLiveChrono() {
 }
 
 function installGenericResume() {
+  // nwtexte est volontairement exclu : Quill possède son propre moteur
+  // transactionnel de sauvegarde/restauration. Deux moteurs concurrents
+  // provoquaient des restaurations de DOM incohérentes.
   const pages = [
     'autoeval1.html', 'autoeval2.html', 'brique.html', 'carre.html', 'genrenombres.html',
-    'nvmail.html', 'nwtexte.html', 'paronymes.html', 'planning.html', 'stock.html', 'tri_de_cheville.html'
+    'nvmail.html', 'paronymes.html', 'planning.html', 'stock.html', 'tri_de_cheville.html'
   ];
-
-  const runtime = `
-<script id="seb-evalpro-page-draft-resume">
-(function(){
-  const page = decodeURIComponent((location.pathname.split('/').pop() || '').toLowerCase());
-  const KEY = 'seb_evalpro_page_draft_' + page;
-  let restoring = false;
-  let timer = null;
-
-  function controls(){ return Array.from(document.querySelectorAll('input,textarea,select')); }
-  function editables(){ return Array.from(document.querySelectorAll('[contenteditable="true"]')); }
-
-  function stockPositions(){
-    if (page !== 'stock.html') return null;
-    return Array.from(document.querySelectorAll('.pot')).map((pot) => {
-      const id = pot.dataset.potId || '';
-      const parent = pot.parentElement;
-      if (!parent) return { id, type: 'source' };
-      if (parent.classList.contains('case')) {
-        const level = parent.closest('[data-etagere][data-niveau]');
-        return {
-          id,
-          type: 'case',
-          etagere: level?.dataset.etagere || '',
-          niveau: level?.dataset.niveau || '',
-          caseNum: parent.dataset.case || ''
-        };
-      }
-      if (parent.id === 'zone-tri') return { id, type: 'tri' };
-      return { id, type: 'source' };
-    });
-  }
-
-  function saveDraft(){
-    if (restoring) return;
-    try {
-      const state = {
-        controls: controls().map((el, index) => ({
-          index,
-          id: el.id || '',
-          type: (el.type || el.tagName || '').toLowerCase(),
-          value: (el.type === 'password' || el.type === 'file') ? '' : el.value,
-          checked: !!el.checked,
-          disabled: !!el.disabled
-        })),
-        editables: editables().map((el, index) => ({ index, id: el.id || '', html: el.innerHTML })),
-        selectedCells: Array.from(document.querySelectorAll('td')).map((td, index) => td.classList.contains('selected') ? index : -1).filter((x) => x >= 0),
-        ui: {},
-        stock: stockPositions(),
-        stockValidated: page === 'stock.html' && sessionStorage.getItem('stockCorrect') !== null
-      };
-      ['consigne','autoEvalPart','btnValider','btnSuivant','validBtn','autoEvalBtn','startBtn','stopBtn','resetBtn','resMS','resErr','indicator','fichierSelectionne','resultatScore','autoEvalResult'].forEach((id) => {
-        const el = document.getElementById(id);
-        if (!el) return;
-        state.ui[id] = {
-          text: (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement) ? null : el.textContent,
-          className: el.className || '',
-          style: el.getAttribute('style') || '',
-          disabled: 'disabled' in el ? !!el.disabled : null
-        };
-      });
-      sessionStorage.setItem(KEY, JSON.stringify(state));
-      if (window.sebEvalPro?.save) window.sebEvalPro.save();
-    } catch (_) {}
-  }
-
-  function restoreStock(items){
-    if (page !== 'stock.html' || !Array.isArray(items)) return;
-    setTimeout(() => {
-      document.querySelectorAll('.case').forEach((c) => c.classList.remove('occupied'));
-      items.forEach((saved) => {
-        const pot = document.querySelector('.pot[data-pot-id="' + saved.id + '"]');
-        if (!pot) return;
-        let target = null;
-        if (saved.type === 'case') {
-          target = document.querySelector('[data-etagere="' + saved.etagere + '"][data-niveau="' + saved.niveau + '"] .case[data-case="' + saved.caseNum + '"]');
-        } else if (saved.type === 'tri') {
-          target = document.getElementById('zone-tri');
-        } else {
-          target = document.getElementById('pots-source');
-        }
-        if (target) {
-          target.appendChild(pot);
-          if (target.classList?.contains('case')) target.classList.add('occupied');
-        }
-      });
-    }, 180);
-  }
-
-  function restoreDraft(){
-    let state = null;
-    try { state = JSON.parse(sessionStorage.getItem(KEY) || 'null'); } catch (_) {}
-    if (!state) return;
-    restoring = true;
-    try {
-      const list = controls();
-      (state.controls || []).forEach((saved) => {
-        let el = saved.id ? document.getElementById(saved.id) : null;
-        if (!el) el = list[saved.index];
-        if (!el || el.type === 'password' || el.type === 'file') return;
-        if (el.type === 'checkbox' || el.type === 'radio') el.checked = !!saved.checked;
-        else if (saved.value !== undefined) el.value = saved.value;
-        if (saved.disabled !== undefined) el.disabled = !!saved.disabled;
-      });
-      const eds = editables();
-      (state.editables || []).forEach((saved) => {
-        let el = saved.id ? document.getElementById(saved.id) : null;
-        if (!el) el = eds[saved.index];
-        if (el && typeof saved.html === 'string') el.innerHTML = saved.html;
-      });
-      const tds = Array.from(document.querySelectorAll('td'));
-      (state.selectedCells || []).forEach((index) => { if (tds[index]) tds[index].classList.add('selected'); });
-      Object.entries(state.ui || {}).forEach(([id, saved]) => {
-        const el = document.getElementById(id);
-        if (!el) return;
-        if (typeof saved.className === 'string') el.className = saved.className;
-        if (typeof saved.style === 'string') {
-          if (saved.style) el.setAttribute('style', saved.style); else el.removeAttribute('style');
-        }
-        if (saved.text !== null && saved.text !== undefined && !(el instanceof HTMLInputElement) && !(el instanceof HTMLTextAreaElement) && !(el instanceof HTMLSelectElement)) el.textContent = saved.text;
-        if (saved.disabled !== null && saved.disabled !== undefined && 'disabled' in el) el.disabled = !!saved.disabled;
-      });
-      restoreStock(state.stock);
-      if (page === 'stock.html' && state.stockValidated) {
-        const btn = document.querySelector('.verify-btn');
-        if (btn) {
-          btn.innerHTML = '➡️ Suivant';
-          btn.onclick = () => { window.location.href = 'planning.html'; };
-        }
-      }
-    } finally {
-      restoring = false;
-    }
-  }
-
-  function schedule(){
-    clearTimeout(timer);
-    timer = setTimeout(saveDraft, 80);
-  }
-
-  document.addEventListener('DOMContentLoaded', function(){
-    restoreDraft();
-    document.addEventListener('input', schedule, true);
-    document.addEventListener('change', schedule, true);
-    document.addEventListener('click', schedule, true);
-    document.addEventListener('drop', () => setTimeout(schedule, 30), true);
-    document.addEventListener('dragend', () => setTimeout(schedule, 30), true);
-    setInterval(saveDraft, 1000);
-  });
-})();
-</script>`;
+  const runtimeRef = '<script src="js/seb-page-draft-resume.js" id="seb-evalpro-page-draft-resume"></script>';
 
   pages.forEach((name) => {
     const { file, html } = read(name);
     if (html.includes('seb-evalpro-page-draft-resume')) return;
-    write(file, injectBeforeBodyEnd(html, runtime));
+    write(file, injectBeforeBodyEnd(html, runtimeRef));
   });
+
+  const nwtexte = read('nwtexte.html').html;
+  if (nwtexte.includes('seb-evalpro-page-draft-resume')) {
+    throw new Error('SEB EvalPro audit: reprise générique interdite dans nwtexte');
+  }
 }
 
 patchQcm();

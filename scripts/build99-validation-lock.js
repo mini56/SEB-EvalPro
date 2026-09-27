@@ -32,6 +32,26 @@ function appendBeforeBody(text, addition, label) {
 {
   const { file, text } = read('app/web/planning.html');
   let out = text;
+  const modularPlanning = out.includes('js/planning-page.js');
+
+  if (modularPlanning) {
+    const modulePath = path.join(root, 'app', 'web', 'js', 'planning-page.js');
+    if (!fs.existsSync(modulePath)) fail('module planning-page.js introuvable', 4);
+    const moduleText = fs.readFileSync(modulePath, 'utf8').replace(/\r\n/g, '\n');
+    for (const token of [
+      "const DONE_KEY = 'seb_planning_validated';",
+      'function anyPlanningEntry(answers)',
+      'function lockPlanning()',
+      'function validatePlanning()',
+      "sessionStorage.setItem(SCORE_KEY, String(score));",
+      "sessionStorage.setItem(CORRECTION_KEY, JSON.stringify(correction));",
+      "window.sebParcours.goNext('planning')"
+    ]) {
+      if (!moduleText.includes(token)) fail('verrouillage Planning modulaire incomplet: ' + token, 4);
+    }
+  } else {
+  const { file, text } = read('app/web/planning.html');
+  let out = text;
 
   if (!out.includes('id="seb-planning-lock99"')) {
     const patch = `
@@ -112,6 +132,18 @@ function appendBeforeBody(text, addition, label) {
     fail('verrouillage Planning incomplet', 4);
   }
   write(file, out);
+
+  }
+
+  if (modularPlanning) {
+    const moduleText = fs.readFileSync(path.join(root, 'app', 'web', 'js', 'planning-page.js'), 'utf8');
+    if (!moduleText.includes("validate.style.setProperty('display', 'none', 'important')")) {
+      fail('verrouillage Planning modulaire incomplet', 4);
+    }
+  } else if (!out.includes('seb-planning-lock99') || !out.includes("validate.style.setProperty('display', 'none', 'important')")) {
+    fail('verrouillage Planning incomplet', 4);
+  }
+  write(file, out);
 }
 
 // -----------------------------------------------------------------------------
@@ -120,6 +152,26 @@ function appendBeforeBody(text, addition, label) {
 // et un vrai bouton Suivant apparaît. Aucune deuxième vérification possible.
 // -----------------------------------------------------------------------------
 {
+  const { file, text } = read('app/web/genrenombres.html');
+  let out = text;
+  const modularGenreNombre = out.includes('js/genrenombres-page.js');
+
+  if (modularGenreNombre) {
+    const modulePath = path.join(root, 'app', 'web', 'js', 'genrenombres-page.js');
+    if (!fs.existsSync(modulePath)) fail('module genrenombres-page.js introuvable', 5);
+    const moduleText = fs.readFileSync(modulePath, 'utf8').replace(/\r\n/g, '\n');
+    for (const token of [
+      "const DONE_KEY = 'seb_genrenombres_validated';",
+      'function anyEntry(values)',
+      'function lockAfterCheck()',
+      'function verify()',
+      "sessionStorage.setItem(ERRORS_KEY, String(result.errors));",
+      "window.sebParcours.goNext('genrenombres')"
+    ]) {
+      if (!moduleText.includes(token)) fail('verrouillage Genre/Nombre modulaire incomplet: ' + token, 5);
+    }
+    if (!out.includes('id="btnNextGenreNombre"')) fail('bouton Suivant Genre/Nombre modulaire absent', 5);
+  } else {
   const { file, text } = read('app/web/genrenombres.html');
   let out = text;
 
@@ -214,6 +266,20 @@ function appendBeforeBody(text, addition, label) {
   if (!out.includes('seb-genrenombres-lock99') || !out.includes('btnNextGenreNombre')) {
     fail('verrouillage Singulier/Pluriel incomplet', 5);
   }
+  write(file, out);
+
+  }
+
+  if (modularGenreNombre) {
+    const moduleText = fs.readFileSync(path.join(root, 'app', 'web', 'js', 'genrenombres-page.js'), 'utf8');
+    if (!moduleText.includes("check.style.setProperty('display', 'none', 'important')") ||
+        !moduleText.includes("next.style.setProperty('display', 'inline-flex', 'important')")) {
+      fail('verrouillage Genre/Nombre modulaire incomplet', 5);
+    }
+  } else if (!out.includes('seb-genrenombres-lock99') || !out.includes('btnNextGenreNombre')) {
+    fail('verrouillage Singulier/Pluriel incomplet', 5);
+  }
+
   write(file, out);
 }
 

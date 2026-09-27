@@ -12,6 +12,25 @@ function fail(message, code = 2) {
 if (!fs.existsSync(file)) fail('page paronymes.html introuvable');
 let html = fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n');
 
+const modularFile = path.join(root, 'app', 'web', 'js', 'paronymes-page.js');
+if (html.includes('js/paronymes-page.js')) {
+  if (!fs.existsSync(modularFile)) fail('module paronymes-page.js introuvable', 3);
+  const moduleText = fs.readFileSync(modularFile, 'utf8').replace(/\r\n/g, '\n');
+  for (const required of [
+    'window.sebParonymes = api',
+    "const DONE_KEY = 'seb_paronymes_validated'",
+    "const ACTIVITY_KEY = 'seb_exercise_activity:paronymes.html'",
+    "sessionStorage.setItem(DONE_KEY, '1')",
+    "cell.style.pointerEvents = 'none'",
+    "next.id = 'btnNextParonymes'",
+    "window.sebParcours.goNext('paronymes')"
+  ]) {
+    if (!moduleText.includes(required)) fail('contrôle modulaire absent: ' + required, 4);
+  }
+  console.log('SEB EvalPro #101: Paronymes modulaire vérifié, réponses figées et bouton Suivant garanti après vérification.');
+  process.exit(0);
+}
+
 if (!html.includes('id="seb-paronymes-lock101"')) {
   const patch = `
 <script id="seb-paronymes-lock101">

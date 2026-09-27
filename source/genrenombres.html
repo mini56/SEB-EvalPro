@@ -157,6 +157,7 @@
         .btn { font-size:16px; width:220px }
     }
 </style>
+<link rel="stylesheet" href="css/seb-in-app-alert.css" id="seb-evalpro-in-app-alert-css">
 </head>
 <body>
 <div class="container">
@@ -218,7 +219,8 @@
             </ul>
         
     
-    <button id="btnCheck" class="btn">Vérifier</button>
+    <button id="btnCheck" class="btn" type="button">Vérifier</button>
+    <button id="btnNextGenreNombre" class="btn" type="button" style="display:none;">Suivant →</button>
 </div>
         <!--div class="meta">Astuce : respectez les accents et les traits d'union.</br>
 		 Lettre œ : Alt + 0156 (en maintenant Alt et en tapant 0156 sur le pavé numérique)</div>
@@ -226,75 +228,12 @@
     </div-->
 </div>
 
-<script>
-(function(){
-  // clear previous data for this page
-  try { sessionStorage.removeItem('erreurs_exercice'); } catch(e){}
+<script src="js/seb-parcours.js"></script>
+<script src="js/genrenombres-page.js"></script>
+<script src="js/seb-in-app-alert.js" id="seb-evalpro-in-app-alert-script"></script>
+<script src="js/seb-page-draft-resume.js" id="seb-evalpro-page-draft-resume"></script>
+<script src="js/seb-visual-branding.js" id="seb-evalpro-visual-branding"></script>
 
-  const btn = document.getElementById('btnCheck');
-  let checked = false;
-  const inputs = Array.from(document.querySelectorAll('input[data-answer]'));
-
-  // normalize function: remove extra spaces, normalize œ and œ variants, lower-case
-  function norm(s){
-    if (!s) return '';
-    return s.trim().toLowerCase().replace(/œ/g,'œ').replace(/œ/g,'œ');
-  }
-
-btn.addEventListener('click', function(){
-  if (!checked){
-    let errors = 0;
-    inputs.forEach(i => {
-      const userAnswer = i.value.trim();
-      const possibleAnswers = i.dataset.answer.split('|');
-      const isCorrect = possibleAnswers.some(answer =>
-        userAnswer.toLowerCase() === answer.toLowerCase().trim()
-      );
-
-      if (isCorrect){
-        i.style.background = '#d4f7d4';
-        i.style.borderColor = '#57b657';
-      } else {
-        i.style.background = '#f7d4d4';
-        i.style.borderColor = '#d15b5b';
-        errors += 1;
-      }
-
-      // Désactive le champ après vérification
-      i.disabled = true;
-    });
-
-    // Récupère toutes les réponses utilisateur (dans le même ordre que inputs)
-    const userAnswers = inputs.map(i => i.value.trim());
-
-    // Sauvegarde dans sessionStorage : d'abord les réponses, puis le nombre d'erreurs
-    try {
-      sessionStorage.setItem("user_genrenombres", JSON.stringify(userAnswers));
-      sessionStorage.setItem('erreurs_exercice', String(errors));
-    } catch(e) {
-      console.warn('Storage failed', e);
-    }
-
-    checked = true;
-    btn.textContent = 'Page suivante';
-  } else {
-    // page suivante (garde ta redirection actuelle)
-    window.location.href = 'tri_de_cheville.html';
-  }
-});
-
-
-  // allow Enter to move to next input and on last to trigger check
-  inputs.forEach((inp, idx) => {
-    inp.addEventListener('keydown', function(e){
-      if (e.key === 'Enter'){
-        e.preventDefault();
-        const next = inputs[idx+1];
-        if (next) next.focus(); else btn.click();
-      }
-    });
-  });
-})();
-</script>
+<script id="seb-ui-runtime-loader" src="js/seb-ui-runtime.js"></script>
 </body>
 </html>

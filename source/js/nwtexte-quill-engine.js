@@ -5,9 +5,9 @@
   const FONT_VALUES = ['Arial', 'Calibri', 'Times New Roman', 'Courier New', 'Georgia'];
   const SIZE_VALUES = ['10px', '12px', '14px', '16px', '18px', '24px', '32px', '48px'];
   const TITLE_QUESTIONS = [
-    'Quel est mon activité préférée et pourquoi?',
-    'Quel est mon expérience professionnel préférée et pourquoi?',
-    'Quel est mon métier préféré et pourquoi?'
+    'Quelle est mon activité préférée et pourquoi ?',
+    'Quelle est mon expérience professionnelle préférée et pourquoi ?',
+    'Quel est mon métier préféré et pourquoi ?'
   ];
 
   let quill = null;
@@ -201,20 +201,6 @@
       if (indicator) indicator.style.background = color;
     }
     closeColorPickers();
-  }
-
-  function insertImage(files) {
-    if (!quill || !files || !files.length) return;
-    const reader = new FileReader();
-    reader.onload = function (event) {
-      const range = restoreSelection() || { index: quill.getLength() - 1, length: 0 };
-      if (range.length) quill.deleteText(range.index, range.length, 'user');
-      quill.insertEmbed(range.index, 'image', event.target.result, 'user');
-      quill.setSelection(range.index + 1, 0, 'silent');
-      savedRange = { index: range.index + 1, length: 0 };
-      scheduleAutosave();
-    };
-    reader.readAsDataURL(files[0]);
   }
 
   function selectedText(range) {
@@ -528,54 +514,6 @@
     return editorHtml();
   }
 
-  function downloadHtml(filename, fullDocument) {
-    const body = fileBodyHtml();
-    const payload = fullDocument
-      ? '<!DOCTYPE html>\n<html><head><meta charset="utf-8"><title>' + filename.replace(/\.html$/i, '') + '</title></head><body>' + body + '</body></html>'
-      : body;
-    const blob = new Blob([payload], { type: 'text/html;charset=utf-8' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-  }
-
-  function openFile(files) {
-    if (!quill || !files || !files.length) return;
-    const file = files[0];
-    const reader = new FileReader();
-    reader.onload = function (event) {
-      const data = String(event.target.result || '');
-      if (/\.txt$/i.test(file.name)) {
-        quill.setText(data, 'user');
-      } else {
-        let html = data;
-        try {
-          const doc = new DOMParser().parseFromString(data, 'text/html');
-          if (doc.body) html = doc.body.innerHTML;
-        } catch (_) {}
-        quill.setText('', 'silent');
-        quill.clipboard.dangerouslyPasteHTML(cleanLegacyHtml(html), 'user');
-      }
-      const index = Math.max(0, quill.getLength() - 1);
-      quill.setSelection(index, 0, 'silent');
-      savedRange = { index, length: 0 };
-      scheduleAutosave();
-      updateToolbarFromSelection();
-    };
-    reader.readAsText(file);
-  }
-
-  function toggleMenu(force) {
-    const menu = document.getElementById('menu-fichier');
-    if (!menu) return;
-    if (force === false) menu.style.display = 'none';
-    else menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
-  }
-
   function initialize() {
     const container = document.getElementById(EDITOR_ID);
     if (!container || !window.Quill) {
@@ -608,7 +546,7 @@
       formats: ['bold', 'italic', 'underline', 'list', 'align', 'font', 'size', 'color', 'background', 'image', 'lineHeight']
     });
 
-    quill.root.setAttribute('spellcheck', 'true');
+    quill.root.setAttribute('spellcheck', 'false');
     quill.root.setAttribute('aria-label', 'Traitement de texte');
     restoreSavedContent();
 
@@ -637,62 +575,49 @@
     document.addEventListener('click', function (event) {
       const textMenu = document.getElementById('text-color-menu');
       const highlightMenu = document.getElementById('highlight-color-menu');
-      const textButton = document.querySelector('.color-picker-btn[onclick*="text"]');
-      const highlightButton = document.querySelector('.color-picker-btn[onclick*="highlight"]');
+      const textButton = document.getElementById('nw-text-color-button');
+      const highlightButton = document.getElementById('nw-highlight-color-button');
       if (textMenu && !textMenu.contains(event.target) && textButton && !textButton.contains(event.target)) textMenu.classList.remove('show');
       if (highlightMenu && !highlightMenu.contains(event.target) && highlightButton && !highlightButton.contains(event.target)) highlightMenu.classList.remove('show');
       const fileMenu = document.getElementById('menu-fichier');
-      const fileButton = document.querySelector('.menu-container > button');
+      const fileButton = document.getElementById('nw-file-menu-button');
       if (fileMenu && fileButton && !fileMenu.contains(event.target) && !fileButton.contains(event.target)) fileMenu.style.display = 'none';
     });
 
     updateToolbarFromSelection();
-    console.log('SEB EvalPro nwtexte : moteur Quill 2 actif, interface historique conservée.');
+    console.log('SEB EvalPro nwtexte : moteur Quill 2 unique actif.');
   }
 
-  window.saveSelection = saveSelection;
-  window.restoreSelection = restoreSelection;
-  window.updateStateFromCursor = updateToolbarFromSelection;
-  window.format = function (command, value) {
-    if (!quill) return;
-    if (command === 'bold') return toggleInline('bold');
-    if (command === 'italic') return toggleInline('italic');
-    if (command === 'underline') return toggleInline('underline');
-    if (command === 'insertUnorderedList') return toggleList('bullet');
-    if (command === 'insertOrderedList') return toggleList('ordered');
-    if (command === 'justifyLeft') return setBlockFormat('align', false);
-    if (command === 'justifyCenter') return setBlockFormat('align', 'center');
-    if (command === 'justifyRight') return setBlockFormat('align', 'right');
-    if (command === 'fontName') return setInlineFormat('font', value);
-    if (command === 'fontSize') return setInlineFormat('size', value);
-    if (command === 'foreColor') return setInlineFormat('color', value);
-    if (command === 'hiliteColor') return setInlineFormat('background', value);
-  };
-  window.setFontSize = function (value) { setInlineFormat('size', value); };
-  window.changerInterligne = function (value) { setBlockFormat('lineHeight', value); };
-  window.toggleColorPicker = toggleColorPicker;
-  window.selectColor = selectColor;
-  window.insererImage = insertImage;
-  window.copier = copySelection;
-  window.couper = cutSelection;
-  window.coller = pasteFromClipboard;
-  window.toggleMenu = toggleMenu;
-  window.ouvrirFichier = openFile;
-  window.enregistrerFichier = function () {
-    downloadHtml('document.html', false);
-    localStorage.setItem('dernierEnregistrement', 'true');
-  };
-  window.enregistrerSousFichier = function () {
-    let name = prompt('Nom du fichier (sans extension) :', 'document');
-    if (!name) return;
-    name = name.replace(/\.(html|htm|docx|doc)$/i, '').trim();
-    if (!name) return;
-    localStorage.setItem('dernierFichierTexte', name);
-    localStorage.setItem('dernierEnregistrementSous', 'true');
-    downloadHtml(name + '.html', true);
-    alert('Fichier enregistré : ' + name + '.html');
-  };
-  window.sauvegarderContenuEditeur = saveEvaluation;
+  const editorApi = Object.freeze({
+    saveSelection,
+    restoreSelection,
+    format(command, value) {
+      if (!quill) return;
+      if (command === 'bold') return toggleInline('bold');
+      if (command === 'italic') return toggleInline('italic');
+      if (command === 'underline') return toggleInline('underline');
+      if (command === 'insertUnorderedList') return toggleList('bullet');
+      if (command === 'insertOrderedList') return toggleList('ordered');
+      if (command === 'justifyLeft') return setBlockFormat('align', false);
+      if (command === 'justifyCenter') return setBlockFormat('align', 'center');
+      if (command === 'justifyRight') return setBlockFormat('align', 'right');
+      if (command === 'fontName') return setInlineFormat('font', value);
+      if (command === 'fontSize') return setInlineFormat('size', value);
+      if (command === 'foreColor') return setInlineFormat('color', value);
+      if (command === 'hiliteColor') return setInlineFormat('background', value);
+    },
+    setFontSize(value) { return setInlineFormat('size', value); },
+    setLineHeight(value) { return setBlockFormat('lineHeight', value); },
+    toggleColorPicker,
+    selectColor,
+    copySelection,
+    cutSelection,
+    pasteFromClipboard,
+    saveEvaluation,
+    editorHtml,
+    editorText
+  });
+  window.sebNwtexteEditor = editorApi;
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initialize);
   else initialize();

@@ -61,36 +61,20 @@ function replaceOnce(text, search, replacement, label) {
   write(file, out);
 }
 
-// 3) Paronymes : Boisé est bien la réponse attendue pour Arboré. On durcit le
-// test : la bonne réponse est reconnue par appartenance aux cellules marquées
-// data-correct=true, et non uniquement par lecture dataset de la cellule.
+// 3) Paronymes : la logique validée vit désormais dans le module source.
 {
-  const { file, text } = read('app/web/paronymes.html');
-  let out = text;
-  const arborRow = out.match(/<tr><td class="paronyme">Arboré<\/td>[\s\S]*?<\/tr>/i);
+  const paronymes = read('app/web/paronymes.html').text;
+  const moduleText = read('app/web/js/paronymes-page.js').text;
+  const arborRow = paronymes.match(/<tr><td class="paronyme">Arboré<\/td>[\s\S]*?<\/tr>/i);
   if (!arborRow || !/data-correct="true">Boisé<\/td>/i.test(arborRow[0])) {
     fail('invariant Paronymes invalide : Arboré -> Boisé non marqué correct', 4);
   }
-  if (out.includes('if (selected.dataset.correct === "true")')) {
-    out = out.replace(
-      'if (selected.dataset.correct === "true")',
-      'if (Array.from(corrects).includes(selected))'
-    );
+  if (!moduleText.includes('isCorrect = corrects.includes(selected)')) {
+    fail('durcissement score Paronymes absent du module', 5);
   }
-  if (!out.includes('if (Array.from(corrects).includes(selected))')) {
-    fail('durcissement score Paronymes absent', 5);
+  if (!moduleText.includes("sessionStorage.setItem(ERRORS_KEY, JSON.stringify(responses.filter((response) => !response.correct)))")) {
+    fail('diagnostic Paronymes absent du module', 5);
   }
-
-  // Conserver la ligne fautive exacte pour les prochains tests sans changer
-  // l'affichage candidat ni les règles de notation.
-  const marker = "sessionStorage.setItem('paronymes_reponses', JSON.stringify(reponsesParonymes));";
-  if (out.includes(marker) && !out.includes("sessionStorage.setItem('paronymes_erreurs_detail'")) {
-    out = out.replace(
-      marker,
-      `${marker}\n        sessionStorage.setItem('paronymes_erreurs_detail', JSON.stringify(reponsesParonymes.filter(r => !r.correct)));`
-    );
-  }
-  write(file, out);
 }
 
 // 4) Contrôles bloquants sur ce correctif de test.
@@ -98,6 +82,7 @@ function replaceOnce(text, search, replacement, label) {
   const preload = read('src/preload.js').text;
   const replay = read('src/replay-preload.js').text;
   const paronymes = read('app/web/paronymes.html').text;
+  const paronymesModule = read('app/web/js/paronymes-page.js').text;
   const navModule = read('src/replay-navigation-capture.js').text;
   const checks = [
     [preload.includes("require('./replay-navigation-capture')") && preload.includes('replayNavigationCapture.install();'), 'capteur navigation non branché'],
@@ -105,8 +90,8 @@ function replaceOnce(text, search, replacement, label) {
     [navModule.includes("captureNow('navigation-before-guaranteed')"), 'capture garantie avant navigation absente'],
     [navModule.includes("document.addEventListener('focusout'"), 'capture de sortie de champ absente'],
     [/data-correct="true">Boisé<\/td>/i.test(paronymes), 'Boisé non marqué correct'],
-    [paronymes.includes('Array.from(corrects).includes(selected)'), 'score Paronymes non durci'],
-    [paronymes.includes("paronymes_erreurs_detail"), 'diagnostic Paronymes absent']
+    [paronymesModule.includes('isCorrect = corrects.includes(selected)'), 'score Paronymes non durci'],
+    [paronymesModule.includes("const ERRORS_KEY = 'paronymes_erreurs_detail'"), 'diagnostic Paronymes absent']
   ];
   const failed = checks.filter((x) => !x[0]).map((x) => x[1]);
   if (failed.length) fail('contrôles finaux échoués : ' + failed.join(', '), 6);

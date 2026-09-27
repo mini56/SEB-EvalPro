@@ -2,7 +2,7 @@ const assert = require('assert');
 const { createLocalAiService } = require('../src/local-ai');
 
 const source = [
-  "Monsieur GARCIA José a participé aux mises en situation proposées au cours du plateau technique.",
+  "Monsieur XX YY a participé aux mises en situation proposées au cours du plateau technique.",
   "Dans les activités de fabrication, la lecture du plan et le traçage sont réalisés sans besoin d'aide et conformément aux consignes. Les opérations de finition sont conformes et le travail est minutieux. La découpe reste toutefois irrégulière ou incomplète, et l'assemblage nécessite des consignes supplémentaires. La construction à base de briques est réalisée sans difficulté, tant pour la lecture du schéma que pour l'assemblage.",
   "Les exercices de raisonnement montrent une capacité à identifier les contraintes d'un problème structuré, à analyser leurs relations et à en déduire une solution. Le rangement du stock comporte de nombreuses erreurs nécessitant un accompagnement. À l'inverse, l'organisation des tâches dans l'exercice de planification est réalisée de manière adaptée. Le rythme et la fiabilité du tri de chevilles sont satisfaisants.",
   "L'utilisation du traitement de texte et de la messagerie est maîtrisée dans les situations proposées. L'expression écrite présente des phrases grammaticalement correctes, un lexique approprié et des textes cohérents. En mathématiques, les consignes simples sont comprises et les problèmes de pourcentages et d'échelles sont traités."
@@ -25,7 +25,7 @@ const unsupportedConcepts = [
     console.log(text);
     console.log('MINISTRAL_ADMIN_REWRITE_OUTPUT_END');
 
-    assert(text.startsWith("Monsieur GARCIA José a participé aux mises en situation proposées au cours du plateau technique."),
+    assert(text.startsWith("Monsieur XX YY a participé aux mises en situation proposées au cours du plateau technique."),
       'La première phrase institutionnelle doit rester exactement identique');
         assert(text.length>700,'Synthèse anormalement courte');
     assert(text.split(/\n\s*\n/).filter(Boolean).length>=3,'La synthèse doit rester structurée en paragraphes');
@@ -68,7 +68,7 @@ const unsupportedConcepts = [
     assert(/expression ecrite/.test(norm),'L’expression écrite doit être couverte');
     assert(/mathem/.test(norm),'Les mathématiques doivent être couvertes');
 
-    console.log('MINISTRAL_ADMIN_REWRITE_GARCIA: OK');
+    console.log('MINISTRAL_ADMIN_REWRITE_XX: OK');
   } finally {
     service.stop();
   }

@@ -36,23 +36,34 @@ function replaceOnce(text, search, replacement, label) {
   write(file, out);
 }
 
-// 2) Paronymes : Vérifier restait visuellement actif à cause du même !important
-//    et recréait un nouveau bouton Suivant à chaque clic.
+// 2) Paronymes : la logique validée est désormais portée par le module source.
 {
   const { file, text } = read('app/web/paronymes.html');
   let out = text;
-  out = replaceOnce(
-    out,
-    "        btnCheck.style.display = 'none';",
-    "        btnCheck.style.setProperty('display', 'none', 'important');\n        btnCheck.disabled = true;",
-    'masquage définitif Vérifier paronymes'
-  );
 
-  const oldNext = `        const btnNext = document.createElement('button');\n        btnNext.className = 'btn';\n        btnNext.textContent = 'Suivant →';\n        btnNext.onclick = () => window.location.href = 'carre.html';\n        \n        btnCheck.parentElement.appendChild(btnNext);`;
-  const newNext = `        let btnNext = document.getElementById('btnNextParonymes');\n        if (!btnNext) {\n            btnNext = document.createElement('button');\n            btnNext.id = 'btnNextParonymes';\n            btnNext.className = 'btn';\n            btnNext.textContent = 'Suivant →';\n            btnNext.onclick = () => window.location.href = 'carre.html';\n            btnCheck.parentElement.appendChild(btnNext);\n        }`;
-  out = replaceOnce(out, oldNext, newNext, 'bouton Suivant unique paronymes');
-  if (!out.includes("id = 'btnNextParonymes'") && !out.includes("btnNext.id = 'btnNextParonymes'")) fail('identifiant bouton Suivant paronymes absent', 5);
-  write(file, out);
+  if (out.includes('js/paronymes-page.js')) {
+    const moduleText = read('app/web/js/paronymes-page.js').text;
+    for (const required of [
+      "check.style.setProperty('display', 'none', 'important')",
+      "next.id = 'btnNextParonymes'",
+      "window.sebParcours.goNext('paronymes')"
+    ]) {
+      if (!moduleText.includes(required)) fail('contrôle Paronymes modulaire absent: ' + required, 5);
+    }
+  } else {
+    out = replaceOnce(
+      out,
+      "        btnCheck.style.display = 'none';",
+      "        btnCheck.style.setProperty('display', 'none', 'important');\n        btnCheck.disabled = true;",
+      'masquage définitif Vérifier paronymes'
+    );
+
+    const oldNext = `        const btnNext = document.createElement('button');\n        btnNext.className = 'btn';\n        btnNext.textContent = 'Suivant →';\n        btnNext.onclick = () => window.location.href = 'carre.html';\n        \n        btnCheck.parentElement.appendChild(btnNext);`;
+    const newNext = `        let btnNext = document.getElementById('btnNextParonymes');\n        if (!btnNext) {\n            btnNext = document.createElement('button');\n            btnNext.id = 'btnNextParonymes';\n            btnNext.className = 'btn';\n            btnNext.textContent = 'Suivant →';\n            btnNext.onclick = () => window.location.href = 'carre.html';\n            btnCheck.parentElement.appendChild(btnNext);\n        }`;
+    out = replaceOnce(out, oldNext, newNext, 'bouton Suivant unique paronymes');
+    if (!out.includes("id = 'btnNextParonymes'") && !out.includes("btnNext.id = 'btnNextParonymes'")) fail('identifiant bouton Suivant paronymes absent', 5);
+    write(file, out);
+  }
 }
 
 // 3) Afficher le numéro du build dans la barre Administrateur.

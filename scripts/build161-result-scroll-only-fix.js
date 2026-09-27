@@ -56,53 +56,35 @@ html.seb-results-page-scroll body {
   html = html.slice(0, headEnd) + style + html.slice(headEnd);
 }
 
-const policyScriptId = 'seb-result-scroll-only-script';
-if (!html.includes(`id="${policyScriptId}"`)) {
-  const policyCode = `(function(){
-  const root = document.documentElement;
-  let observer = null;
+const modulePath = path.join(root, 'app', 'web', 'js', 'qcm-final-page.js');
+if (!fs.existsSync(modulePath)) fail('module qcm-final-page.js introuvable', 5);
+const moduleText = fs.readFileSync(modulePath, 'utf8').replace(/\r\n/g, '\n');
 
-  function syncPageScrollPolicy() {
-    const finalPage = document.getElementById('pageFinale');
-    const resultsVisible = !!(finalPage && finalPage.classList.contains('visible'));
-    root.classList.toggle('seb-results-page-scroll', resultsVisible);
-    root.classList.toggle('seb-candidate-no-page-scroll', !resultsVisible);
-  }
+// Nettoyage d'un ancien runtime inline si un artefact historique est repris.
+html = html.replace(
+  /\s*<script\s+id=["']seb-result-scroll-only-script["'][^>]*>[\s\S]*?<\/script>\s*/i,
+  '\n'
+);
 
-  function installPageScrollPolicy() {
-    const finalPage = document.getElementById('pageFinale');
-    syncPageScrollPolicy();
-    if (!finalPage || observer) return;
-    observer = new MutationObserver(syncPageScrollPolicy);
-    observer.observe(finalPage, { attributes: true, attributeFilter: ['class'] });
-  }
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', installPageScrollPolicy, { once: true });
-  } else {
-    installPageScrollPolicy();
-  }
-})();`;
-
-  try { new vm.Script(policyCode); }
-  catch (error) { fail('script de politique de scroll invalide: ' + error.message, 5); }
-
-  const script = `\n<script id="${policyScriptId}">\n${policyCode}\n</script>\n`;
-  const bodyEnd = html.toLowerCase().lastIndexOf('</body>');
-  if (bodyEnd < 0) fail('balise </body> introuvable', 6);
-  html = html.slice(0, bodyEnd) + script + html.slice(bodyEnd);
+for (const token of [
+  'function syncPageScrollPolicy()',
+  "root.classList.toggle('seb-results-page-scroll', resultsVisible);",
+  "root.classList.toggle('seb-candidate-no-page-scroll', !resultsVisible);",
+  "pageObserver.observe(page, { attributes:true, attributeFilter:['class'] });"
+]) {
+  if (!moduleText.includes(token)) fail('politique de scroll modulaire absente: ' + token, 5);
 }
 
 for (const required of [
   'seb-candidate-no-page-scroll',
   'seb-results-page-scroll',
-  "finalPage.classList.contains('visible')",
-  "observer.observe(finalPage, { attributes: true, attributeFilter: ['class'] })",
   'overflow-y: auto !important;',
   'overflow: hidden !important;'
 ]) {
-  if (!html.includes(required)) fail('contrôle final absent: ' + required, 7);
+  if (!html.includes(required)) fail('contrôle CSS final absent: ' + required, 7);
 }
+if (!html.includes('js/qcm-final-page.js')) fail('module pageFinale absent du QCM généré', 7);
+if (/seb-result-scroll-only-script/.test(html)) fail('ancien runtime inline de scroll encore présent', 7);
 
 if (html.includes(calculatorResizeBlock.trim())) {
   fail('listener resize calculatrice encore présent', 8);

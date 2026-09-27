@@ -24,6 +24,22 @@ function patchTri() {
   const { file, html } = readPage('tri_de_cheville.html');
   let out = html;
 
+  if (html.includes('js/tri-page.js')) {
+    const modulePath = path.join(webDir, 'js', 'tri-page.js');
+    if (!fs.existsSync(modulePath)) throw new Error('SEB EvalPro: module tri-page.js introuvable.');
+    const moduleText = fs.readFileSync(modulePath, 'utf8');
+    for (const token of [
+      "const LIVE_KEY = 'seb_evalpro_tri_live_chrono';",
+      'function startChrono()',
+      'function stopChrono()',
+      'function finalizeError(index)',
+      "window.sebParcours.goNext('tri-de-cheville')"
+    ]) {
+      if (!moduleText.includes(token)) throw new Error('SEB EvalPro: contrat Tri modulaire absent: ' + token);
+    }
+    return;
+  }
+
   const prematureSaveBlock = /\n\s*for \(let i = 1; i <= 5; i \+= 1\) \{\s*\['m','s','e'\]\.forEach\(\(prefix\) => \{\s*const input = document\.getElementById\(prefix \+ i\);\s*if \(input\) input\.addEventListener\('change', computeAndPersist\);\s*\}\);\s*\}\s*/m;
   if (!prematureSaveBlock.test(out)) {
     throw new Error('SEB EvalPro: bloc de sauvegarde prématurée du tri introuvable.');
@@ -72,6 +88,24 @@ function patchTri() {
 
 function patchBrique() {
   const { file, html } = readPage('brique.html');
+
+  if (html.includes('js/brique-page.js')) {
+    const modulePath = path.join(webDir, 'js', 'brique-page.js');
+    if (!fs.existsSync(modulePath)) throw new Error('SEB EvalPro: module brique-page.js introuvable.');
+    const moduleText = fs.readFileSync(modulePath, 'utf8');
+    for (const token of [
+      "const CHECKPOINT_KEY = 'seb_evalpro_brique_checkpoint';",
+      'const PERIOD_SECONDS = 1;',
+      'function persistCheckpoint(force)',
+      'function restoreCheckpoint()',
+      'persistCheckpoint(false);',
+      'persistCheckpoint(true);'
+    ]) {
+      if (!moduleText.includes(token)) throw new Error('SEB EvalPro: contrat checkpoint Brique modulaire absent: ' + token);
+    }
+    return;
+  }
+
   if (html.includes('seb-evalpro-brique-checkpoint')) return;
 
   const patch = `
@@ -180,6 +214,11 @@ function patchQcmResume() {
   function saveCurrentDraft(){
     const page = visiblePage();
     if (!page || !page.id || page.id === 'bilanPage') return;
+    if (page.id === 'pageTexteTrous' && window.sebQcmTexteTrous) return;
+    if (page.id === 'page4' && window.sebQcmPage4) return;
+    if (page.id === 'page5' && window.sebQcmPage5) return;
+    if (page.id === 'page5_1' && window.sebQcmPage5_1) return;
+    if (page.id === 'page6' && window.sebQcmPage6) return;
     const controls = Array.from(page.querySelectorAll('input, textarea, select'));
     const values = controls.map((el, index) => ({
       index,
@@ -198,6 +237,11 @@ function patchQcmResume() {
   }
 
   function restoreDraft(page){
+    if (page && page.id === 'pageTexteTrous' && window.sebQcmTexteTrous) return;
+    if (page && page.id === 'page4' && window.sebQcmPage4) return;
+    if (page && page.id === 'page5' && window.sebQcmPage5) return;
+    if (page && page.id === 'page5_1' && window.sebQcmPage5_1) return;
+    if (page && page.id === 'page6' && window.sebQcmPage6) return;
     const draft = readDrafts()[page.id];
     if (!draft) return;
     const controls = Array.from(page.querySelectorAll('input, textarea, select'));
@@ -263,49 +307,39 @@ function patchQcmResume() {
   writePage(file, injectBeforeBodyEnd(html, patch));
 }
 
+function injectBeforeHeadEnd(html, block) {
+  // Le premier </head> est la vraie fermeture du document. lastIndexOf est
+  // interdit ici car certaines pages contiennent littéralement "</head>"
+  // dans du JavaScript de génération Word.
+  const index = html.toLowerCase().indexOf('</head>');
+  if (index < 0) return block + '\n' + html;
+  return html.slice(0, index) + block + '\n' + html.slice(index);
+}
+
 function patchInAppAlerts() {
-  const patch = `<script id="seb-evalpro-in-app-alert">
-(function(){
-  if (window.__sebEvalProAlertInstalled) return;
-  window.__sebEvalProAlertInstalled = true;
-  const queue = [];
-  let visible = false;
-  function ensureStyle(){
-    if (document.getElementById('seb-evalpro-alert-style')) return;
-    const style = document.createElement('style');
-    style.id = 'seb-evalpro-alert-style';
-    style.textContent = '#seb-evalpro-alert-layer{position:fixed;inset:0;z-index:2147483647;background:rgba(0,0,0,.42);display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;font-family:Arial,sans-serif}#seb-evalpro-alert-box{width:min(460px,92vw);max-height:82vh;overflow:auto;background:#fff;border:1px solid #aaa;border-radius:10px;box-shadow:0 14px 45px rgba(0,0,0,.34);padding:20px;box-sizing:border-box}#seb-evalpro-alert-title{font-size:19px;font-weight:700;color:#0070c0;margin:0 0 12px}#seb-evalpro-alert-message{font-size:16px;line-height:1.45;color:#222;white-space:pre-wrap;overflow-wrap:anywhere}#seb-evalpro-alert-actions{display:flex;justify-content:flex-end;margin-top:18px}#seb-evalpro-alert-ok{min-width:100px;padding:9px 18px;border:0;border-radius:6px;background:#0070c0;color:#fff;font:700 15px Arial,sans-serif;cursor:pointer}#seb-evalpro-alert-ok:focus{outline:3px solid rgba(0,112,192,.28);outline-offset:2px}';
-    (document.head || document.documentElement).appendChild(style);
-  }
-  function renderNext(){
-    if (visible || queue.length === 0) return;
-    if (!document.body) { document.addEventListener('DOMContentLoaded', renderNext, { once: true }); return; }
-    visible = true;
-    ensureStyle();
-    const message = queue.shift();
-    const layer = document.createElement('div');
-    layer.id = 'seb-evalpro-alert-layer';
-    layer.innerHTML = '<div id="seb-evalpro-alert-box" role="alertdialog" aria-modal="true"><div id="seb-evalpro-alert-title">SEB EvalPro</div><div id="seb-evalpro-alert-message"></div><div id="seb-evalpro-alert-actions"><button id="seb-evalpro-alert-ok" type="button">OK</button></div></div>';
-    layer.querySelector('#seb-evalpro-alert-message').textContent = String(message == null ? '' : message);
-    const close = () => { layer.remove(); visible = false; setTimeout(renderNext, 0); };
-    layer.querySelector('#seb-evalpro-alert-ok').addEventListener('click', close);
-    layer.addEventListener('keydown', (event) => { if (event.key === 'Enter' || event.key === 'Escape') close(); });
-    document.body.appendChild(layer);
-    layer.querySelector('#seb-evalpro-alert-ok').focus();
-  }
-  window.alert = function(message){ queue.push(message); renderNext(); };
-})();
-</script>`;
+  // Architecture commune : aucune logique inline. Les pages ne reçoivent
+  // que des références vers les ressources partagées.
+  const cssRef = '<link rel="stylesheet" href="css/seb-in-app-alert.css" id="seb-evalpro-in-app-alert-css">';
+  const jsRef = '<script src="js/seb-in-app-alert.js" id="seb-evalpro-in-app-alert-script"></script>';
 
   let count = 0;
   for (const file of fs.readdirSync(webDir)) {
     if (!/\.html?$/i.test(file)) continue;
     const target = path.join(webDir, file);
     let html = fs.readFileSync(target, 'utf8');
-    if (html.includes('seb-evalpro-in-app-alert')) continue;
-    html = injectBeforeBodyEnd(html, patch);
-    fs.writeFileSync(target, html, 'utf8');
-    count += 1;
+    let changed = false;
+    if (!html.includes('seb-evalpro-in-app-alert-css')) {
+      html = injectBeforeHeadEnd(html, cssRef);
+      changed = true;
+    }
+    if (!html.includes('seb-evalpro-in-app-alert-script')) {
+      html = injectBeforeBodyEnd(html, jsRef);
+      changed = true;
+    }
+    if (changed) {
+      fs.writeFileSync(target, html, 'utf8');
+      count += 1;
+    }
   }
   return count;
 }

@@ -164,7 +164,7 @@ function write(file, text) {
   const revisionNumber = Number.isFinite(Number(revision)) ? Number(revision) : 0;
   const revisionSuffix = '_R' + String(revisionNumber).padStart(2, '0');
   const wordFilename = 'Evaluation_' + safe(candidate.nom).toUpperCase() + '_' + safe(candidate.prenom).toUpperCase() + '_' + safe(candidate.date || '') + revisionSuffix + '.doc';
-  const result = ipcRenderer.sendSync('bilan-history:write-word-sync', { filename: wordFilename, html });
+  const result = ipcRenderer.sendSync('bilan-history:write-word-sync', { filename: wordFilename, html, candidate });
   if (!result || !result.ok) throw new Error((result && result.error) || 'Écriture du document Word impossible.');
   return result.path || result.filename || wordFilename;
 }`;
@@ -195,4 +195,4 @@ function write(file, text) {
   for (const token of requiredPreload) if (!preload.includes(token)) fail('contrôle export institutionnel absent: ' + token, 6);
 }
 
-console.log('SEB EvalPro Build #140: export Word historique restauré sous la forme institutionnelle du document de référence; écriture directe dans Documents\\SEB EvalPro\\Bilans; JSON historiques inchangés.');
+console.log('SEB EvalPro Build #140: export Word historique institutionnel conservé; routage final 0.3.8 = Documents\\SEB EvalPro + archive interne candidat; JSON historiques inchangés.');

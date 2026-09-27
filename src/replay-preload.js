@@ -83,8 +83,41 @@ function privacyLayerVisible() {
   }
 }
 
+function adminWorkBlocked() {
+  const page = pageName().toLowerCase();
+  if (page === 'admin-bilan.html' || page === 'bilan.html') return true;
+  const adminButton = document.getElementById('seb-evalpro-admin');
+  if (adminButton && /^verrouiller$/i.test(String(adminButton.textContent || '').trim())) return true;
+  return !!(
+    document.getElementById('seb-evalpro-admin-dialog') ||
+    document.getElementById('seb-evalpro-session-close-dialog') ||
+    document.getElementById('seb-bilan-history-chooser') ||
+    document.getElementById('seb-bilan-history-editor') ||
+    document.getElementById('seb-replay-chooser') ||
+    document.getElementById('seb-replay-viewer')
+  );
+}
+
+function adminInteractionTarget(target) {
+  if (!target || !target.closest) return false;
+  return !!target.closest('#seb-evalpro-topbar,#seb-evalpro-admin-dialog,#seb-evalpro-session-close-dialog,#seb-bilan-history-chooser,#seb-bilan-history-editor,#seb-replay-chooser,#seb-replay-viewer');
+}
+
+// SEB_RESULTS_CAPTURE_STOP
+function replayCaptureStopped() {
+  try { return window.sessionStorage.getItem('seb_evalpro_replay_capture_stopped') === '1'; }
+  catch (_) { return false; }
+}
+
+function stopReplayCaptureAfterResults() {
+  try { window.sessionStorage.setItem('seb_evalpro_replay_capture_stopped', '1'); } catch (_) {}
+  if (captureTimer) { clearTimeout(captureTimer); captureTimer = null; }
+}
+
 async function captureCurrentPage(reason = 'state', force = false) {
   if (!document.body) return { ok: false };
+  if (replayCaptureStopped() && reason !== 'final-results') return { ok: false, resultsComplete: true };
+  if (adminWorkBlocked()) return { ok: false, adminWorkBlocked: true };
   if (window.sessionStorage.getItem('seb_evalpro_replay_archive_file')) return { ok: false, archived: true };
   if (privacyLayerVisible()) return { ok: false, privacy: true };
   if (document.getElementById('seb-replay-viewer') || document.getElementById('seb-replay-chooser')) return { ok: false, replayUi: true };
@@ -114,6 +147,7 @@ async function captureCurrentPage(reason = 'state', force = false) {
 }
 
 function scheduleCapture(reason, delay = 350) {
+  if (adminWorkBlocked() || replayCaptureStopped()) return;
   if (window.sessionStorage.getItem('seb_evalpro_replay_archive_file')) return;
   clearTimeout(captureTimer);
   captureTimer = setTimeout(() => captureCurrentPage(reason), delay);
@@ -132,45 +166,68 @@ function buildArchivePayload() {
   };
 }
 
-async function archiveIfFinalVisible() {
-  if (pageName().toLowerCase() !== 'qcmv1.0.html') return;
+async function archiveIfFinalVisible(options = {}) {
+  if (pageName().toLowerCase() !== 'qcmv1.0.html') return { ok: true, skipped: true };
   const final = document.getElementById('pageFinale');
-  if (!final || !final.classList.contains('visible') || archiveInFlight) return;
-  if (window.sessionStorage.getItem('seb_evalpro_replay_archive_file')) return;
+  if (!final || !final.classList.contains('visible')) return { ok: true, skipped: true };
+  try { window.sessionStorage.setItem('seb_evalpro_results_seen', '1'); } catch (_) {}
+  stopReplayCaptureAfterResults();
+  const existing = window.sessionStorage.getItem('seb_evalpro_replay_archive_file');
+  if (existing) { stopReplayCaptureAfterResults(); return { ok: true, filename: existing, alreadyArchived: true }; }
+  if (archiveInFlight) {
+    for (let i = 0; i < 40 && archiveInFlight; i += 1) await new Promise((resolve) => setTimeout(resolve, 100));
+    const afterWait = window.sessionStorage.getItem('seb_evalpro_replay_archive_file');
+    if (afterWait) return { ok: true, filename: afterWait, alreadyArchived: true };
+    if (archiveInFlight) return { ok: false, error: 'Archivage du parcours toujours en cours.' };
+  }
 
   archiveInFlight = true;
   try {
     await new Promise((resolve) => setTimeout(resolve, 180));
     await captureCurrentPage('final-results', true);
     const result = await ipcRenderer.invoke('replay:archive-final', buildArchivePayload());
-    if (result && result.ok && result.filename) {
-      window.sessionStorage.setItem('seb_evalpro_replay_archive_file', result.filename);
-      window.sessionStorage.setItem('seb_evalpro_replay_archive_build', String(result.build || ''));
-      window.sessionStorage.setItem('seb_evalpro_replay_archive', JSON.stringify({
-        filename: result.filename,
-        build: result.build,
-        slides: result.slides,
-        integritySha256: result.integritySha256
-      }));
-    }
-  } catch (_) {
+    if (!result || !result.ok || !result.filename) throw new Error(result?.error || 'Archivage du parcours refusé.');
+    window.sessionStorage.setItem('seb_evalpro_replay_archive_file', result.filename);
+    window.sessionStorage.setItem('seb_evalpro_replay_archive_build', String(result.build || ''));
+    window.sessionStorage.setItem('seb_evalpro_replay_archive', JSON.stringify({
+      filename: result.filename,
+      build: result.build,
+      slides: result.slides,
+      integritySha256: result.integritySha256
+    }));
+    window.sessionStorage.removeItem('seb_evalpro_replay_archive_error');
+    return result;
+  } catch (error) {
+    const message = error && error.message ? error.message : String(error || 'Archivage impossible.');
+    try { window.sessionStorage.setItem('seb_evalpro_replay_archive_error', message); } catch (_) {}
+    if (options.notify) window.alert('Archivage du parcours impossible : ' + message + '\nLa session ne sera pas fermée tant que le parcours n’est pas archivé.');
+    return { ok: false, error: message };
   } finally {
     archiveInFlight = false;
   }
 }
 
-function installCaptureRecorder() {
-  if (!document.body) return;
-  setTimeout(() => captureCurrentPage('page-open', true), 700);
+async function ensureFinalArchive() {
+  const archived = window.sessionStorage.getItem('seb_evalpro_replay_archive_file');
+  if (archived) return { ok: true, filename: archived, alreadyArchived: true };
+  const resultsSeen = window.sessionStorage.getItem('seb_evalpro_results_seen') === '1';
+  const final = pageName().toLowerCase() === 'qcmv1.0.html' ? document.getElementById('pageFinale') : null;
+  const finalVisible = !!(final && final.classList.contains('visible'));
+  if (!resultsSeen && !finalVisible) return { ok: true, skipped: true };
+  if (!finalVisible) {
+    const error = 'La page Résultats a été atteinte mais le parcours n’est pas archivé. Revenez à l’évaluation puis affichez Résultats avant de fermer la session.';
+    window.alert(error);
+    return { ok: false, error };
+  }
+  return archiveIfFinalVisible({ notify: true });
+}
 
-  document.addEventListener('input', () => scheduleCapture('input', 450), true);
-  document.addEventListener('change', () => scheduleCapture('change', 220), true);
-  document.addEventListener('click', (event) => {
-    const target = event.target && event.target.closest ? event.target.closest('button,a,input,select,textarea,[contenteditable]') : null;
-    if (!target) return;
-    captureCurrentPage('before-action', true);
-    scheduleCapture('after-action', 320);
-  }, true);
+function installCaptureRecorder() {
+  if (!document.body || adminWorkBlocked()) return;
+
+
+
+
 
   const observer = new MutationObserver((mutations) => {
     let pageChanged = false;
@@ -183,7 +240,6 @@ function installCaptureRecorder() {
       }
     }
     if (pageChanged) {
-      scheduleCapture('page-change', 300);
       setTimeout(archiveIfFinalVisible, 380);
     }
   });
@@ -225,8 +281,8 @@ function addReplayStyle() {
     .seb-visual-title{font-size:18px;font-weight:700;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .seb-visual-meta{font-size:12px;font-weight:700;background:#fff;color:#0070c0;padding:4px 8px;border-radius:12px;white-space:nowrap}
     .seb-visual-readonly{font-size:12px;font-weight:700;background:#fff3cd;color:#6e5200;padding:4px 8px;border-radius:12px;white-space:nowrap}
-    .seb-visual-stage{flex:1;min-height:0;overflow:auto;background:#272727;display:flex;align-items:center;justify-content:center;padding:12px;box-sizing:border-box}
-    .seb-visual-stage img{display:block;max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain;background:#fff;box-shadow:0 2px 14px rgba(0,0,0,.35);user-select:none;-webkit-user-drag:none}
+    .seb-visual-stage{flex:1;min-height:0;overflow:auto;background:#272727;display:flex;align-items:flex-start;justify-content:center;padding:12px;box-sizing:border-box}
+    .seb-visual-stage img{display:block;max-width:100%;max-height:none;width:auto;height:auto;object-fit:initial;background:#fff;box-shadow:0 2px 14px rgba(0,0,0,.35);user-select:none;-webkit-user-drag:none}
     .seb-visual-loading{color:#fff;font-size:16px;font-weight:700}.seb-visual-warning{color:#7a5b00;background:#fff3cd;border:1px solid #e7cb70;padding:18px 22px;border-radius:8px;max-width:760px;text-align:center;line-height:1.45}
     .seb-visual-foot{display:flex;align-items:center;gap:10px;padding:10px 14px;border-top:1px solid #444;background:#fff}
     .seb-visual-counter{flex:1;text-align:center;font-weight:700;color:#555}.seb-visual-pagekey{font-size:12px;color:#777;max-width:34%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -459,4 +515,4 @@ function install() {
   installArchiveWatcher();
 }
 
-module.exports = { install, openCandidateReplay };
+module.exports = { install, openCandidateReplay, ensureFinalArchive };
