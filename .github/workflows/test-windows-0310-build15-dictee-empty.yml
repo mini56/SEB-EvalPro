@@ -305,7 +305,7 @@ jobs:
           $setup = (Resolve-Path 'dist\SEB-eval-PRO-0.3.10-Windows-Setup.exe').Path
 
           $installer = Get-Content 'build\installer.nsh' -Raw
-          foreach ($required in @('Version Candidat','Version Administrateur','SEB-IA est intégrée','edition-candidate.flag','edition-admin.flag','SEB_BUILD_LABEL','SEB_BUILD_NUMBER "14"')) {
+          foreach ($required in @('Version Candidat','Version Administrateur','SEB-IA est intégrée','edition-candidate.flag','edition-admin.flag','SEB_BUILD_LABEL','SEB_BUILD_NUMBER "15"')) {
             if (-not $installer.Contains($required)) { throw "Fonction installateur absente : $required" }
           }
           if ($installer -match 'Ministral-3-8B-Instruct|SEB-EvalPro-IA-Pack-Setup|vc_redist\.x64\.exe') {
