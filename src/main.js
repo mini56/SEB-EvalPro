@@ -861,7 +861,7 @@ ipcMain.handle('candidate:complete-active', (_event, mode) => {
   }
 });
 
-ipcMain.handle('admin:export-candidates', async (_event, password, destinationOptions = {}) => {
+ipcMain.handle('admin:export-candidates', async (event, password, destinationOptions = {}) => {
   if (!mainWindow || !adminSessionUnlocked) return { ok: false, error: 'Accès administrateur requis.' };
   try {
     const mode = String(destinationOptions && destinationOptions.mode || 'existing');
@@ -891,6 +891,7 @@ ipcMain.handle('admin:export-candidates', async (_event, password, destinationOp
         };
       }
       fs.mkdirSync(destination, { recursive:false });
+      try { event.sender.send('admin:export-progress', { state:'started' }); } catch (_) {}
       const result = getCandidateTransfer().exportAll(destination, password);
       return { ok:true, ...result, createdExportFolder:true };
     }
@@ -908,6 +909,7 @@ ipcMain.handle('admin:export-candidates', async (_event, password, destinationOp
       return { ok:false, cancelled:true };
     }
 
+    try { event.sender.send('admin:export-progress', { state:'started' }); } catch (_) {}
     const result = getCandidateTransfer().exportAll(selection.filePaths[0], password);
     return { ok:true, ...result, createdExportFolder:false };
   } catch (error) {
