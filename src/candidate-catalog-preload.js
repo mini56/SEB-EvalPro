@@ -45,7 +45,7 @@ function addStyle() {
     .seb-cc-actions button,.seb-cc-foot button,.seb-cc-bilan-row button,.seb-cc-detail-actions button{font:700 14px Arial,sans-serif;padding:8px 14px;border:2px solid #0070c0!important;border-radius:6px;background:#fff!important;color:#0070c0!important;cursor:pointer;box-shadow:0 2px 5px rgba(0,0,0,.18)}
     .seb-cc-actions .primary,.seb-cc-bilan-row .primary,.seb-cc-detail-actions .primary{background:#fff!important;color:#0070c0!important;border-color:#0070c0!important}
     .seb-cc-actions button:hover,.seb-cc-foot button:hover,.seb-cc-bilan-row button:hover,.seb-cc-detail-actions button:hover{background:#f5f9fd!important}
-    .seb-cc-actions .danger{background:#fff;color:#c00000;border-color:#c00000}.seb-cc-actions .confirm{background:#c00000;color:#fff}
+    .seb-cc-actions .danger{background:#fff!important;color:#c00000!important;border-color:#c00000!important}.seb-cc-actions .danger:hover{background:#fff!important;color:#c00000!important;border-color:#c00000!important}.seb-cc-actions .confirm{background:#c00000!important;color:#fff!important;border-color:#c00000!important}
     .seb-cc-detail-actions .danger{margin-left:auto;background:#fff!important;color:#c00000!important;border-color:#c00000!important}
     .seb-cc-detail-actions .danger:hover{background:#fff!important;color:#c00000!important;border-color:#c00000!important}
     #seb-candidate-delete-confirm{position:fixed;inset:0;z-index:2147483647;background:rgba(0,0,0,.66);display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif}
