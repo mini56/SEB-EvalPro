@@ -8,8 +8,8 @@ module.exports = function registerSessionClose({
   ipcMain.handle('admin:close-session', async () => {
     if (!getAdminUnlocked()) return false;
 
-    // Fermer la session sert uniquement à quitter proprement SEB EvalPro.
-    // Le parcours candidat actif reste intact et reprenable.
+    // Le parcours candidat actif est clôturé par le preload avant cet appel.
+    // Ici, on quitte uniquement après cette clôture et la remise à zéro de l'état global.
     setAdminUnlocked(false);
 
     const mainWindow = getMainWindow();
