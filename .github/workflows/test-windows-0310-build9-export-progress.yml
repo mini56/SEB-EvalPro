@@ -98,7 +98,7 @@ jobs:
             }
           }
           if (-not (Test-Path 'app\\web\\branding\\seb-eval-pro-installer.png')) {
-            throw 'Image installateur absente de l’application générée.'
+            throw "Image installateur absente de l application générée."
           }
           Write-Host 'USB_EXPORT_BRANDED_PROGRESS: OK'
 
