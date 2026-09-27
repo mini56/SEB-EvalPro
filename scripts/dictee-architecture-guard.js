@@ -83,10 +83,12 @@ for (const token of [
   'function renderCorrection()',
   'function configureFixedAudio()',
   'function startPlayback(fromBeginning)',
+  'function keepDraftInteractive(message)',
   'function keepVerifiedEditable()',
   'function finalizeVerified()',
   'function ensureActionButton()',
   "action.textContent = done ? 'Suivant' : 'Dictée terminée';",
+  "keepDraftInteractive('Commencez à saisir le texte entendu. Les boutons audio et « Abandonner l’exercice » restent disponibles.');",
   "ui.status.textContent = 'Dictée terminée. Vous pouvez encore relire ou corriger avant de cliquer sur « Suivant ».';",
   "if (state.status === 'verified') finalizeVerified();",
   "sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state));",
@@ -100,6 +102,7 @@ for (const token of [
 
 if (/tri_de_cheville\.html/.test(page)) fail('couplage direct Dictée -> Tri réintroduit');
 if (/confirm\s*\(\s*["'][^"']*Abandonner/i.test(page)) fail('ancien abandon direct Dictée réintroduit');
+if (/window\.alert\s*\(/.test(page)) fail('fenêtre modale window.alert interdite dans la Dictée candidat');
 
 const referenceMatch = page.match(/const REFERENCE = "([^"]+)";/);
 if (!referenceMatch) fail('texte de référence Dictée absent');

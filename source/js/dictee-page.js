@@ -578,6 +578,37 @@
     return action;
   }
 
+  function keepDraftInteractive(message) {
+    if (state.status !== 'draft') return false;
+    const ui = elements();
+    if (ui.textArea) ui.textArea.disabled = false;
+    for (const control of [ui.playBtn, ui.pauseBtn, ui.stopBtn, ui.restartBtn, ui.progress]) {
+      if (control) control.disabled = false;
+    }
+    const action = ensureActionButton();
+    action.textContent = 'Dictée terminée';
+    action.dataset.mode = 'finish';
+    action.disabled = false;
+    if (ui.nextBtn) ui.nextBtn.disabled = true;
+    if (ui.status) {
+      ui.status.textContent = message || 'Commencez à saisir la dictée avant de la terminer.';
+    }
+    const refocus = () => {
+      try {
+        ui.textArea?.focus({ preventScroll:true });
+        if (ui.textArea && typeof ui.textArea.setSelectionRange === 'function') {
+          const end = ui.textArea.value.length;
+          ui.textArea.setSelectionRange(end, end);
+        }
+      } catch (_) {
+        try { ui.textArea?.focus(); } catch (_) {}
+      }
+    };
+    refocus();
+    setTimeout(refocus, 0);
+    return true;
+  }
+
   function verify() {
     const ui = elements();
     if (state.status !== 'draft') {
@@ -585,8 +616,7 @@
       return null;
     }
     if (!String(ui.textArea?.value || '').trim()) {
-      window.alert('Saisissez le texte entendu avant de cliquer sur « Dictée terminée », ou utilisez « Abandonner l’exercice ».');
-      try { ui.textArea?.focus(); } catch (_) {}
+      keepDraftInteractive('Commencez à saisir le texte entendu. Les boutons audio et « Abandonner l’exercice » restent disponibles.');
       return null;
     }
 
@@ -824,6 +854,7 @@
     saveState,
     verify,
     renderCorrection,
+    keepDraftInteractive,
     keepVerifiedEditable,
     finalizeVerified,
     configureFixedAudio,

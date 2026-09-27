@@ -100,11 +100,72 @@ app.whenReady().then(async () => {
     if (initial.inlineScripts !== 0) throw new Error('Scripts inline encore présents dans la Dictée finale.');
     if (initial.feedbackDisplay !== 'none') throw new Error('Correction candidat non masquée.');
 
-    await win.webContents.executeJavaScript('window.alert = function(){}; true;', true);
-    const empty = await win.webContents.executeJavaScript('window.sebDictee.verify()', true);
-    if (empty !== null) throw new Error('Une dictée vide a été validée.');
-    const emptyStatus = await win.webContents.executeJavaScript('window.sebDictee.getState().status', true);
-    if (emptyStatus !== 'draft') throw new Error('La vérification vide a modifié le statut.');
+    await win.webContents.executeJavaScript(
+      "window.__sebDicteeAlertCalls=0; window.alert=function(){window.__sebDicteeAlertCalls+=1;}; true;",
+      true
+    );
+    await win.webContents.executeJavaScript("document.getElementById('seb-dictee-action').click(); true;", true);
+    await sleep(120);
+
+    const emptyUi = await win.webContents.executeJavaScript(`
+      (function(){
+        const text=document.getElementById('candidateText');
+        const fixed=document.getElementById('seb-evalpro-abandon-fixed');
+        const action=document.getElementById('seb-dictee-action');
+        const style=fixed?getComputedStyle(fixed):null;
+        return {
+          status:window.sebDictee.getState().status,
+          alertCalls:Number(window.__sebDicteeAlertCalls||0),
+          textDisabled:!!text.disabled,
+          textFocused:document.activeElement===text,
+          playDisabled:document.getElementById('playBtn').disabled,
+          pauseDisabled:document.getElementById('pauseBtn').disabled,
+          stopDisabled:document.getElementById('stopBtn').disabled,
+          restartDisabled:document.getElementById('restartBtn').disabled,
+          progressDisabled:document.getElementById('progress').disabled,
+          action:String(action?.textContent||'').trim(),
+          mode:String(action?.dataset.mode||''),
+          abandonExists:!!fixed,
+          abandonDisabled:!!fixed?.disabled,
+          abandonVisible:!!fixed && !fixed.hidden && style.display!=='none' && style.visibility!=='hidden'
+        };
+      })()
+    `, true);
+
+    if (emptyUi.status !== 'draft' || emptyUi.alertCalls !== 0 || emptyUi.textDisabled || !emptyUi.textFocused ||
+        emptyUi.playDisabled || emptyUi.pauseDisabled || emptyUi.stopDisabled || emptyUi.restartDisabled ||
+        emptyUi.progressDisabled || emptyUi.action !== 'Dictée terminée' || emptyUi.mode !== 'finish' ||
+        !emptyUi.abandonExists || emptyUi.abandonDisabled || !emptyUi.abandonVisible) {
+      throw new Error('Dictée vide a bloqué l’interface candidat: ' + JSON.stringify(emptyUi));
+    }
+
+    // Vérifier une vraie saisie clavier après le clic vide.
+    await win.webContents.executeJavaScript("document.getElementById('candidateText').focus(); true;", true);
+    win.webContents.sendInputEvent({ type:'keyDown', keyCode:'A' });
+    win.webContents.sendInputEvent({ type:'char', keyCode:'A' });
+    win.webContents.sendInputEvent({ type:'keyUp', keyCode:'A' });
+    await sleep(120);
+    const typedAfterEmpty = await win.webContents.executeJavaScript(
+      "document.getElementById('candidateText').value",
+      true
+    );
+    if (!typedAfterEmpty || !/a/i.test(typedAfterEmpty)) {
+      throw new Error('Impossible de saisir une lettre après Dictée terminée vide: ' + JSON.stringify(typedAfterEmpty));
+    }
+
+    // Le bouton Abandonner doit rester réellement ouvrable après cette erreur.
+    await win.webContents.executeJavaScript("document.getElementById('seb-evalpro-abandon-fixed').click(); true;", true);
+    await sleep(100);
+    const abandonLayerVisible = await win.webContents.executeJavaScript(`
+      (function(){
+        const layer=document.getElementById('seb-evalpro-abandon-layer');
+        if (!layer) return false;
+        const s=getComputedStyle(layer);
+        return !layer.hidden && s.display!=='none' && s.visibility!=='hidden';
+      })()
+    `, true);
+    if (!abandonLayerVisible) throw new Error('Abandonner reste inaccessible après Dictée terminée vide.');
+    await win.webContents.executeJavaScript("document.getElementById('seb-evalpro-abandon-cancel')?.click(); true;", true);
 
     await win.webContents.executeJavaScript(`
       (function(){
@@ -262,6 +323,9 @@ app.whenReady().then(async () => {
 
     console.log('DICTEE_FUNCTIONAL_SMOKE: OK');
     console.log('DICTEE_DRAFT_RESUME=OK');
+    console.log('DICTEE_EMPTY_FINISH_RECOVERY=OK');
+    console.log('DICTEE_EMPTY_FINISH_KEYBOARD=OK');
+    console.log('DICTEE_EMPTY_FINISH_ABANDON=OK');
     console.log('DICTEE_REAL_CASE=65/80_SCORE_16.25');
     console.log('DICTEE_COMPLEX_MOVE_V3=1_SUB_1_OMISSION_0_ADD_3_MOVED');
     console.log('DICTEE_PERFECT=80/80_SCORE_20');
