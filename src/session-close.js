@@ -5,6 +5,15 @@ module.exports = function registerSessionClose({
   getAdminUnlocked,
   setAdminUnlocked
 }) {
+  ipcMain.handle('admin:quit-application', async () => {
+    if (!getAdminUnlocked()) return false;
+
+    // Quitter ferme uniquement SEB EvalPro. Le parcours actif, son pointeur
+    // et sa dernière page restent intacts afin de reprendre au prochain démarrage.
+    setTimeout(() => app.quit(), 80);
+    return true;
+  });
+
   ipcMain.handle('admin:close-session', async () => {
     if (!getAdminUnlocked()) return false;
 
