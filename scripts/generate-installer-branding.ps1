@@ -47,9 +47,11 @@ if ($brandingHash -ne $expectedBrandingHash) {
   throw "SEB-éval-PRO : SHA-256 de l'écran d'accueil incorrect ($brandingHash)."
 }
 
-$buildNumber = $env:GITHUB_RUN_NUMBER
-if ([string]::IsNullOrWhiteSpace($buildNumber)) { $buildNumber = $env:SEB_BUILD_NUMBER }
-if ([string]::IsNullOrWhiteSpace($buildNumber)) { $buildNumber = 'DEV' }
+$packagePath = Join-Path $root 'package.json'
+if (-not (Test-Path $packagePath)) { throw 'SEB-éval-PRO : package.json introuvable pour le numéro de build.' }
+$packageInfo = Get-Content -Raw -Encoding UTF8 $packagePath | ConvertFrom-Json
+$buildNumber = [string]$packageInfo.sebBuildNumber
+if ([string]::IsNullOrWhiteSpace($buildNumber)) { throw 'SEB-éval-PRO : sebBuildNumber absent de package.json.' }
 $buildLabel = "Build #$buildNumber"
 
 # Logo Sauvegarde 56 utilisé uniquement dans le petit bandeau supérieur NSIS.
