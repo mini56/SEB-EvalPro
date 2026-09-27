@@ -223,11 +223,12 @@ module.exports = function registerCandidateReplay({ app, ipcMain, getAdminUnlock
 
   function cleanupOldPending() {
     try {
-      ensurePendingRoot();
+      const legacyPendingRoot = pendingRoot();
+      if (!fs.existsSync(legacyPendingRoot)) return;
       const now = Date.now();
-      for (const entry of fs.readdirSync(pendingRoot(), { withFileTypes: true })) {
+      for (const entry of fs.readdirSync(legacyPendingRoot, { withFileTypes: true })) {
         if (!entry.isDirectory()) continue;
-        const full = path.join(pendingRoot(), entry.name);
+        const full = path.join(legacyPendingRoot, entry.name);
         try {
           const age = now - fs.statSync(full).mtimeMs;
           if (age > 7 * 24 * 60 * 60 * 1000) fs.rmSync(full, { recursive: true, force: true });
