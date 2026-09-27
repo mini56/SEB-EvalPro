@@ -148,6 +148,58 @@ module.exports = function registerCandidateReplay({ app, ipcMain, getAdminUnlock
     return path.join(pendingDir(token), 'index.json');
   }
 
+  function liveReplayFolderName(token) {
+    return 'REPLAY-' + safePart(token, 'PARCOURS').slice(0, 70);
+  }
+
+  function liveReplayFolder(candidateDir, token) {
+    return path.join(candidateDir, 'replay', liveReplayFolderName(token));
+  }
+
+  function candidateSnapshotFromFolder(candidateDir) {
+    return readJsonFile(path.join(candidateDir, 'donnees', 'evaluation-state.json')) || {
+      sessionStorage:{},
+      localStorage:{},
+      lastPage:'',
+      lastEvaluationPage:''
+    };
+  }
+
+  function liveReplayManifest(candidateDir, token) {
+    const folder = liveReplayFolder(candidateDir, token);
+    const current = readManifest(folder);
+    if (current && current.type === TYPE && Array.isArray(current.slides)) return current;
+
+    const candidateManifest = readJsonFile(path.join(candidateDir, 'manifest.json')) || {};
+    const snapshot = candidateSnapshotFromFolder(candidateDir);
+    const manifest = {
+      schemaVersion: SCHEMA_VERSION,
+      type: TYPE,
+      readOnly: true,
+      archiveMode: 'VISUAL_FROZEN_SLIDES',
+      futureVersionIndependent: true,
+      build: BUILD,
+      archivedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      replayStatus: 'EN_COURS',
+      candidate: candidateManifest.candidat || {},
+      snapshotSha256: sha256Json(snapshot),
+      snapshot,
+      slides: []
+    };
+    manifest.integritySha256 = computeArchiveIntegrity(manifest);
+    return manifest;
+  }
+
+  function writeLiveReplayManifest(candidateDir, token, manifest) {
+    const folder = liveReplayFolder(candidateDir, token);
+    ensureDir(path.join(folder, 'slides'));
+    manifest.updatedAt = new Date().toISOString();
+    manifest.integritySha256 = computeArchiveIntegrity(manifest);
+    atomicWriteReplayFile(path.join(folder, 'manifest.json'), encodeJson(manifest), 'utf8');
+    return { folder, folderName:path.basename(folder) };
+  }
+
   function readPendingIndex(token) {
     const file = pendingIndexPath(token);
     if (!fs.existsSync(file)) return { schemaVersion: 1, token, pages: {} };
@@ -295,8 +347,11 @@ module.exports = function registerCandidateReplay({ app, ipcMain, getAdminUnlock
     try {
       const pageKey = safePageKey(payload && payload.pageKey);
       const title = String((payload && payload.title) || pageKey).trim().slice(0, 180) || pageKey;
-      cleanupOldPending();
-      ensurePendingRoot();
+      const active = typeof getActiveCandidate === 'function' ? getActiveCandidate() : null;
+      const candidateDir = active && active.candidateDir ? String(active.candidateDir) : '';
+      if (!candidateDir || !fs.existsSync(candidateDir)) {
+        return { ok:false, error:'Dossier candidat actif introuvable pour le Replay.' };
+      }
 
       const capture = await Promise.race([
         captureFullPage(event.sender),
@@ -306,20 +361,21 @@ module.exports = function registerCandidateReplay({ app, ipcMain, getAdminUnlock
       if (!png || !png.length) return { ok: false, error: 'Capture PNG vide.' };
       const size = capture.size;
 
-      const index = readPendingIndex(token);
-      const existing = index.pages[pageKey];
+      const manifest = liveReplayManifest(candidateDir, token);
+      const existing = (manifest.slides || []).find((slide) => String(slide.pageKey || '') === pageKey);
       const order = existing && Number.isFinite(Number(existing.order))
         ? Number(existing.order)
-        : Object.keys(index.pages).length + 1;
+        : (manifest.slides || []).length + 1;
       const file = existing && existing.file
         ? path.basename(existing.file)
         : `${String(order).padStart(3, '0')}_${safePart(pageKey, 'PAGE').slice(0, 70)}.png`;
-      const targetDir = pendingDir(token);
-      ensureDir(targetDir);
-      const target = path.join(targetDir, file);
-      atomicWriteReplayFile(target, png);
 
-      index.pages[pageKey] = {
+      const replayFolder = liveReplayFolder(candidateDir, token);
+      const slidesDir = path.join(replayFolder, 'slides');
+      ensureDir(slidesDir);
+      atomicWriteReplayFile(path.join(slidesDir, file), png);
+
+      const slide = {
         order,
         pageKey,
         title,
@@ -329,9 +385,20 @@ module.exports = function registerCandidateReplay({ app, ipcMain, getAdminUnlock
         height: Number(size.height || 0),
         sha256: sha256Buffer(png)
       };
-      index.updatedAt = new Date().toISOString();
-      writePendingIndex(token, index);
-      return { ok: true, pageKey, order, file };
+      const slides = Array.isArray(manifest.slides) ? manifest.slides.slice() : [];
+      const existingIndex = slides.findIndex((item) => String(item.pageKey || '') === pageKey);
+      if (existingIndex >= 0) slides[existingIndex] = slide;
+      else slides.push(slide);
+      slides.sort((a,b) => Number(a.order || 0) - Number(b.order || 0));
+
+      const snapshot = candidateSnapshotFromFolder(candidateDir);
+      manifest.snapshot = snapshot;
+      manifest.snapshotSha256 = sha256Json(snapshot);
+      manifest.slides = slides;
+      manifest.replayStatus = 'EN_COURS';
+      const written = writeLiveReplayManifest(candidateDir, token, manifest);
+
+      return { ok:true, pageKey, order, file, filename:written.folderName, storedInCandidate:true };
     } catch (error) {
       return { ok: false, error: error && error.message ? error.message : String(error) };
     }
@@ -370,6 +437,36 @@ module.exports = function registerCandidateReplay({ app, ipcMain, getAdminUnlock
       }
       const candidateReplayRoot = path.join(candidateDir, 'replay');
       ensureDir(candidateReplayRoot);
+
+      // Build #18 : les captures sont déjà dans le dossier candidat au fur et à mesure.
+      // La fin normale ne déplace rien ; elle met seulement à jour le manifeste existant.
+      const directFolder = liveReplayFolder(candidateDir, token);
+      const directManifestPath = path.join(directFolder, 'manifest.json');
+      if (fs.existsSync(directManifestPath)) {
+        const manifest = readManifest(directFolder);
+        if (!manifest || manifest.type !== TYPE || !Array.isArray(manifest.slides) || !manifest.slides.length) {
+          return { ok:false, error:'Replay candidat présent mais manifeste illisible.' };
+        }
+        const snapshot = normalizedSnapshot(payload);
+        manifest.snapshot = snapshot;
+        manifest.snapshotSha256 = sha256Json(snapshot);
+        manifest.replayStatus = 'TERMINE';
+        manifest.archivedAt = new Date().toISOString();
+        const written = writeLiveReplayManifest(candidateDir, token, manifest);
+        const verified = readManifest(written.folder);
+        if (!verifyArchiveDirectory(written.folder, verified)) {
+          return { ok:false, error:'Contrôle d’intégrité du Replay candidat échoué.' };
+        }
+        return {
+          ok:true,
+          filename:written.folderName,
+          build:BUILD,
+          integritySha256:verified.integritySha256,
+          slides:verified.slides.length
+        };
+      }
+
+      // Compatibilité seulement pour les anciens parcours créés avant Build #18.
       const pending = readPendingIndex(token);
       const pendingSlides = Object.values(pending.pages || {}).sort((a, b) => Number(a.order) - Number(b.order));
       if (!pendingSlides.length) {
