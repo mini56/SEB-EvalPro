@@ -14,7 +14,17 @@ module.exports = function registerCandidateReplay({ app, ipcMain, getAdminUnlock
   const candidatesRoot = path.join(storageRoot, 'Candidats');
   const legacyAdminRoot = path.join(storageRoot, 'Admin');
 
-  function findCandidateDirInternal(candidate) {
+  function candidateDirById(candidateId) {
+    const id = String(candidateId || '').trim();
+    if (!id) return null;
+    const record = listCandidateDirs(candidatesRoot, false)
+      .find((item) => String(item.candidateId || '') === id);
+    return record ? record.candidateDir : null;
+  }
+
+  function findCandidateDirInternal(candidate, candidateId = '') {
+    const byId = candidateDirById(candidateId);
+    if (byId) return byId;
     const current = selectCandidate(listCandidateDirs(candidatesRoot, false), candidate);
     if (current) return current.candidateDir;
     const legacy = selectCandidate(listCandidateDirs(legacyAdminRoot, true), candidate);
@@ -349,7 +359,14 @@ module.exports = function registerCandidateReplay({ app, ipcMain, getAdminUnlock
         return { ok: false, error: 'Candidat non identifié : archive non créée.' };
       }
 
-      const candidateDir = findCandidateDirInternal(candidate);
+      let activeCandidateId = '';
+      try {
+        const active = ipcMain && ipcMain.__sebActiveCandidateProvider
+          ? ipcMain.__sebActiveCandidateProvider()
+          : null;
+        activeCandidateId = String(active && active.candidateId || '');
+      } catch (_) {}
+      const candidateDir = findCandidateDirInternal(candidate, activeCandidateId);
       if (!candidateDir) {
         return { ok: false, error: 'Dossier candidat introuvable : replay non créé.' };
       }
