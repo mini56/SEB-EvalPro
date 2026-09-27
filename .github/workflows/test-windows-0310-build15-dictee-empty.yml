@@ -237,7 +237,7 @@ jobs:
           foreach ($required in @(
             'function keepDraftInteractive(message)',
             'Commencez à saisir le texte entendu.',
-            'Les boutons audio et « Abandonner l’exercice » restent disponibles.'
+            "Les boutons audio et « Abandonner l’exercice » restent disponibles."
           )) {
             if (-not $dictee.Contains($required)) { throw "Protection Dictée vide absente : $required" }
           }
