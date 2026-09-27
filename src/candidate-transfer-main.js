@@ -439,41 +439,71 @@ function createCandidateTransfer(options = {}) {
     fs.renameSync(temp, target);
   }
 
-  function assertLocalCandidateFoldersReadable() {
+  function scanLocalCandidateFolders() {
     ensureDir(candidatesRoot);
     const recordsByDir = new Map(listCandidateDirs(candidatesRoot, false).map((r) => [path.resolve(r.candidateDir), r]));
+    const validRecords = [];
+    const invalidFolders = [];
     const entries = fs.readdirSync(candidatesRoot, { withFileTypes:true });
+
+    const reject = (entryName, reason) => {
+      invalidFolders.push({
+        folderName:String(entryName || ''),
+        reason:String(reason || 'Dossier candidat local illisible.')
+      });
+    };
+
     for (const entry of entries) {
       if (!entry.isDirectory() || entry.name.startsWith('.')) continue;
       const dir = path.join(candidatesRoot, entry.name);
       const manifestFile = path.join(dir, 'manifest.json');
+
       if (!fs.existsSync(manifestFile)) {
-        throw new Error('Dossier candidat local sans manifest : ' + entry.name + '. Aucun transfert n’a été effectué.');
+        reject(entry.name, 'Manifest absent.');
+        continue;
       }
+
       const manifest = readJson(manifestFile);
       if (!manifest || !manifest.candidateId) {
-        throw new Error('Dossier candidat local illisible : ' + entry.name + '. Aucun transfert n’a été effectué.');
+        reject(entry.name, 'Manifest illisible.');
+        continue;
       }
+
       const status = String(manifest.status || '');
       if (!['EN_COURS','TERMINE','SESSION_FERMEE'].includes(status)) {
-        throw new Error('Statut candidat local non reconnu : ' + entry.name + '. Aucun transfert n’a été effectué.');
+        reject(entry.name, 'Statut candidat non reconnu.');
+        continue;
       }
+
       const record = recordsByDir.get(path.resolve(dir));
       if (!record) {
-        throw new Error('Dossier candidat local incohérent : ' + entry.name + '. Aucun transfert n’a été effectué.');
+        reject(entry.name, 'Dossier candidat incohérent.');
+        continue;
       }
+
       if (isCompletedStatus(status)) {
         if (!candidateShapeValid(record)) {
-          throw new Error('Dossier candidat terminé incomplet : ' + entry.name + '. Aucun export n’a été effectué.');
+          reject(entry.name, 'Dossier candidat terminé incomplet.');
+          continue;
         }
+
+        let unreadable = '';
         for (const rel of requiredFiles) {
           if (readJson(path.join(dir, rel)) == null) {
-            throw new Error('Fichier candidat illisible : ' + entry.name + '\\' + rel + '. Aucun export n’a été effectué.');
+            unreadable = rel;
+            break;
           }
         }
+        if (unreadable) {
+          reject(entry.name, 'Fichier candidat illisible : ' + unreadable);
+          continue;
+        }
       }
+
+      validRecords.push(record);
     }
-    return Array.from(recordsByDir.values());
+
+    return { records:validRecords, invalidFolders };
   }
 
   function validateTransferPayloadForImport(payload) {
@@ -523,7 +553,9 @@ function createCandidateTransfer(options = {}) {
     else if (!fs.statSync(destinationRoot).isDirectory()) throw new Error('La destination d’export doit être un dossier ou la racine de la clé USB.');
     if (path.resolve(candidatesRoot) === destinationRoot) throw new Error('La destination d’export ne peut pas être le dossier local des candidats.');
 
-    const allRecords = assertLocalCandidateFoldersReadable();
+    const localScan = scanLocalCandidateFolders();
+    const allRecords = localScan.records;
+    const invalidFolders = localScan.invalidFolders.slice();
     const activeId = activeCandidateId();
     const sourceRecords = allRecords
       .filter((record) => String(record.candidateId || '') !== activeId)
@@ -540,7 +572,16 @@ function createCandidateTransfer(options = {}) {
       }
       const target = uniquePortableTarget(destinationRoot, source);
       const filename = path.basename(target);
-      const payload = packCandidate(source);
+      let payload;
+      try {
+        payload = packCandidate(source);
+      } catch (error) {
+        invalidFolders.push({
+          folderName:String(source.folderName || path.basename(source.candidateDir || '') || sourceId),
+          reason:error && error.message ? error.message : String(error)
+        });
+        continue;
+      }
       const encrypted = encryptTransferPayload(payload, password);
       writePortableAtomic(target, encrypted);
       const verified = decryptTransferPayload(fs.readFileSync(target, 'utf8'), password);
@@ -565,6 +606,8 @@ function createCandidateTransfer(options = {}) {
       exportedAt:now().toISOString(),
       verified:true,
       passwordProtected:true,
+      invalidSkipped:invalidFolders.length,
+      invalidFolders,
       format:'SEB-EVALPRO-USB-1'
     };
   }
@@ -636,8 +679,8 @@ function createCandidateTransfer(options = {}) {
 
     ensureDir(candidatesRoot);
     prepareCandidates();
-    assertLocalCandidateFoldersReadable();
-    const destinationRecords = listCandidateDirs(candidatesRoot, false);
+    const destinationScan = scanLocalCandidateFolders();
+    const destinationRecords = destinationScan.records;
     let added = 0, skipped = 0, verifiedFiles = 0;
     const copied = [];
     const createdTargets = [];

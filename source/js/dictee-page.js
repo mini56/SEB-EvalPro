@@ -71,6 +71,10 @@
     return status === 'verified' || status === 'abandoned';
   }
 
+  function interactive(status) {
+    return status === 'draft' || status === 'verified';
+  }
+
   function loadState() {
     state = Object.assign(defaultState(), parseStoredState() || {});
     state.motsTotal = TOTAL_WORDS;
@@ -508,7 +512,7 @@
 
   function startPlayback(fromBeginning) {
     const ui = elements();
-    if (!ui.audio || state.status !== 'draft') return false;
+    if (!ui.audio || !interactive(state.status)) return false;
     ui.audio.playbackRate = 1;
     if (fromBeginning) {
       try { ui.audio.currentTime = 0; } catch (_) {}
@@ -532,16 +536,18 @@
     return true;
   }
 
-  function lockVerified() {
+  function keepVerifiedEditable() {
     if (state.status !== 'verified') return false;
     const ui = elements();
-    if (ui.textArea) ui.textArea.disabled = true;
-    for (const control of [ui.verifyBtn, ui.playBtn, ui.pauseBtn, ui.stopBtn, ui.restartBtn, ui.progress]) {
-      if (control) control.disabled = true;
+    if (ui.textArea) ui.textArea.disabled = false;
+    for (const control of [ui.playBtn, ui.pauseBtn, ui.stopBtn, ui.restartBtn, ui.progress]) {
+      if (control) control.disabled = false;
     }
     if (ui.nextBtn) ui.nextBtn.disabled = false;
-    try { ui.audio?.pause(); } catch (_) {}
-    if (ui.status) ui.status.textContent = 'Dictée vérifiée. Le texte est verrouillé.';
+    if (ui.status) {
+      ui.status.textContent = 'Dictée terminée. Vous pouvez encore relire ou corriger avant de cliquer sur « Suivant ».';
+    }
+    try { ui.textArea?.focus(); } catch (_) {}
     return true;
   }
 
@@ -568,7 +574,7 @@
     action.textContent = done ? 'Suivant' : 'Dictée terminée';
     action.dataset.mode = done ? 'next' : 'finish';
     action.disabled = false;
-    if (state.status === 'verified') lockVerified();
+    if (state.status === 'verified') keepVerifiedEditable();
     return action;
   }
 
@@ -592,12 +598,27 @@
     });
     saveState();
     renderCorrection();
-    lockVerified();
+    keepVerifiedEditable();
     setActionMode();
     return Object.assign({}, result, { status:'verified' });
   }
 
+  function finalizeVerified() {
+    if (state.status !== 'verified') return null;
+    const ui = elements();
+    const text = String(ui.textArea?.value || '');
+    const result = evaluateText(text);
+    state = Object.assign(state, result, {
+      status:'verified',
+      texte:text
+    });
+    saveState();
+    renderCorrection();
+    return Object.assign({}, result, { status:'verified' });
+  }
+
   function goNext() {
+    if (state.status === 'verified') finalizeVerified();
     saveState();
     if (!window.sebParcours?.goNext) throw new Error('Registre de parcours indisponible.');
     window.sebParcours.goNext('dictee');
@@ -641,7 +662,7 @@
   }
 
   function updateInstructionText() {
-    const replacement = 'Relisez votre texte avant de cliquer sur « Dictée terminée ». Votre réponse sera alors verrouillée et ne pourra plus être modifiée. Cliquez ensuite sur « Suivant » pour poursuivre l’évaluation.';
+    const replacement = 'Relisez votre texte avant de cliquer sur « Dictée terminée ». Vous pourrez encore corriger votre texte et utiliser les boutons audio jusqu’au clic sur « Suivant ». Le score final sera calculé avec le texte présent au moment de « Suivant ».';
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
     const nodes = [];
     let node;
@@ -687,7 +708,7 @@
     ui.audio?.addEventListener('loadedmetadata', function () {
       ui.audio.playbackRate = 1;
       ui.audio.defaultPlaybackRate = 1;
-      if (state.status === 'draft' && Number(state.audioPosition) > 0 &&
+      if (interactive(state.status) && Number(state.audioPosition) > 0 &&
           Number(state.audioPosition) < ui.audio.duration) {
         try { ui.audio.currentTime = Number(state.audioPosition); } catch (_) {}
         wasAtStart = false;
@@ -720,10 +741,10 @@
 
     ui.playBtn?.addEventListener('click', function () { startPlayback(false); });
     ui.pauseBtn?.addEventListener('click', function () {
-      if (state.status === 'draft') ui.audio?.pause();
+      if (interactive(state.status)) ui.audio?.pause();
     });
     ui.stopBtn?.addEventListener('click', function () {
-      if (state.status !== 'draft') return;
+      if (!interactive(state.status)) return;
       try {
         ui.audio?.pause();
         if (ui.audio) ui.audio.currentTime = 0;
@@ -736,7 +757,7 @@
     ui.restartBtn?.addEventListener('click', function () { startPlayback(true); });
 
     ui.progress?.addEventListener('input', function () {
-      if (state.status !== 'draft' || !Number.isFinite(ui.audio?.duration)) return;
+      if (!interactive(state.status) || !Number.isFinite(ui.audio?.duration)) return;
       ui.audio.currentTime = (Number(ui.progress.value) / 1000) * ui.audio.duration;
       wasAtStart = ui.audio.currentTime < 0.35;
       updateAudioUi();
@@ -780,7 +801,7 @@
 
     if (state.status === 'verified') {
       renderCorrection();
-      lockVerified();
+      keepVerifiedEditable();
     }
     setActionMode();
     alignPrivacyButtonWithAbandon();

@@ -638,7 +638,9 @@ function createWindow() {
 
     if (windowsOrLauncherKey || escapeToWindows) {
       event.preventDefault();
-      setTimeout(() => enforceCandidateWindowLock(true), 0);
+      // Le raccourci reste bloqué, mais on ne vole pas le focus du champ actif
+      // (notamment le textarea de Dictée) en refocalisant toute la fenêtre.
+      setTimeout(() => enforceCandidateWindowLock(false), 0);
     }
   });
 
