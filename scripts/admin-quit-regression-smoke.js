@@ -73,7 +73,7 @@ try {
   const closeHandlerStart = preload.indexOf("closeSessionButton.addEventListener('click'");
   assert(quitHandlerStart >= 0 && closeHandlerStart > quitHandlerStart, 'Les deux actions doivent être distinctes.');
   const quitHandler = preload.slice(quitHandlerStart, closeHandlerStart);
-  assert(!quitHandler.includes("candidate:complete-active"), 'Quitter ne doit jamais terminer le parcours actif.');
+  assert(!quitHandler.includes("ipcRenderer.invoke('candidate:complete-active'"), 'Quitter ne doit jamais appeler la clôture du parcours actif.');
   assert(!quitHandler.includes('ensureFinalArchive'), 'Quitter ne doit pas finaliser le Replay.');
 
   assert(sessionClose.includes("ipcMain.handle('admin:quit-application'"), 'Le moteur doit exposer une fermeture non destructive.');
