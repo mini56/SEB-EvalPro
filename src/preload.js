@@ -644,6 +644,47 @@ function showTransferMessage(title, message, isError = false) {
 }
 
 
+function showTransferProgress() {
+  const existing = document.getElementById('seb-evalpro-transfer-progress');
+  if (existing) existing.remove();
+
+  const backdrop = document.createElement('div');
+  backdrop.id = 'seb-evalpro-transfer-progress';
+  backdrop.innerHTML = `
+    <div class="seb-transfer-progress-card" role="dialog" aria-modal="true" aria-label="Export en cours">
+      <img class="seb-transfer-progress-brand" src="branding/seb-eval-pro-installer.png" alt="SEB EvalPro - Sauvegarde 56" />
+      <div class="seb-transfer-progress-title">Export en cours vers la clé USB…</div>
+      <div class="seb-transfer-progress-text">Merci de patienter.</div>
+      <div class="seb-transfer-progress-track" aria-hidden="true">
+        <div class="seb-transfer-progress-bar"></div>
+      </div>
+      <div class="seb-transfer-progress-warning">Ne retirez pas la clé USB.</div>
+    </div>`;
+
+  const style = document.createElement('style');
+  style.textContent = `
+    #seb-evalpro-transfer-progress{position:fixed;inset:0;z-index:2147483647;background:rgba(0,0,0,.42);display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif}
+    #seb-evalpro-transfer-progress .seb-transfer-progress-card{width:520px;max-width:calc(100vw - 40px);background:#fff;border:1px solid #aaa;border-radius:8px;padding:22px;box-shadow:0 10px 35px rgba(0,0,0,.3);box-sizing:border-box;text-align:center}
+    #seb-evalpro-transfer-progress .seb-transfer-progress-brand{display:block;max-width:270px;max-height:120px;width:auto;height:auto;object-fit:contain;margin:0 auto 16px}
+    #seb-evalpro-transfer-progress .seb-transfer-progress-title{font-size:20px;font-weight:700;color:#0070c0;margin-bottom:8px}
+    #seb-evalpro-transfer-progress .seb-transfer-progress-text{font-size:14px;line-height:1.5;color:#222;margin-bottom:14px}
+    #seb-evalpro-transfer-progress .seb-transfer-progress-track{height:16px;border-radius:9px;background:#e5e5e5;overflow:hidden;position:relative;border:1px solid #c5c5c5}
+    #seb-evalpro-transfer-progress .seb-transfer-progress-bar{position:absolute;top:0;bottom:0;width:38%;border-radius:8px;background:#0070c0;animation:sebUsbExportProgress 1.15s ease-in-out infinite}
+    #seb-evalpro-transfer-progress .seb-transfer-progress-warning{font-size:14px;font-weight:700;color:#c00000;margin-top:14px}
+    @keyframes sebUsbExportProgress{0%{left:-38%}50%{left:62%}100%{left:100%}}
+    @media (prefers-reduced-motion:reduce){#seb-evalpro-transfer-progress .seb-transfer-progress-bar{animation-duration:2.4s}}
+  `;
+  backdrop.appendChild(style);
+  document.body.appendChild(backdrop);
+
+  return Object.freeze({
+    close() {
+      if (backdrop.isConnected) backdrop.remove();
+    }
+  });
+}
+
+
 // SEB_ADMIN_STATE_SYNC_AFTER_EARLY_BAR
 function sebSyncAdminBarState() {
   const bar = document.getElementById('seb-evalpro-topbar');
@@ -1006,10 +1047,21 @@ function injectAdminBar() {
         if (!newFolderName) return;
       }
 
-      const result = await ipcRenderer.invoke('admin:export-candidates', password, {
-        mode:destinationMode,
-        folderName:newFolderName
-      });
+      let progress = null;
+      const onExportProgress = (_event, payload = {}) => {
+        if (payload && payload.state === 'started' && !progress) progress = showTransferProgress();
+      };
+      ipcRenderer.on('admin:export-progress', onExportProgress);
+      let result;
+      try {
+        result = await ipcRenderer.invoke('admin:export-candidates', password, {
+          mode:destinationMode,
+          folderName:newFolderName
+        });
+      } finally {
+        ipcRenderer.removeListener('admin:export-progress', onExportProgress);
+        if (progress) progress.close();
+      }
       if (!result || result.cancelled) return;
       if (!result.ok) {
         await showTransferMessage('Export impossible', result.error || 'Une erreur est survenue pendant l’export.', true);
