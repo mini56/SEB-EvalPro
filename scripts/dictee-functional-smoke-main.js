@@ -228,7 +228,7 @@ app.whenReady().then(async () => {
     const finalRecalc = await win.webContents.executeJavaScript(`
       (function(){
         const text=document.getElementById('candidateText');
-        text.value=window.sebDictee.reference.replace('Madame', 'Monsieur');
+        text.value=window.sebDictee.reference.replace('Ce matin,', 'Hier matin,');
         text.dispatchEvent(new Event('input',{bubbles:true}));
         return window.sebDictee.finalizeVerified();
       })()
