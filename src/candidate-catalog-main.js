@@ -708,13 +708,38 @@ module.exports = function registerCandidateCatalog({ app, ipcMain, getAdminUnloc
       .sort((a,b) => [a.nom,a.prenom,a.date].join('|').localeCompare([b.nom,b.prenom,b.date].join('|'), 'fr', { sensitivity:'base' }));
   });
 
-  ipcMain.handle('candidate-catalog:delete', () => {
-    // Protection volontaire : SEB EvalPro ne supprime jamais un dossier candidat.
-    // Les éventuels nettoyages historiques restent une action manuelle hors application.
-    return {
-      ok:false,
-      error:'La suppression d’un dossier candidat est désactivée afin d’éviter toute perte de données.'
-    };
+  ipcMain.handle('candidate-catalog:delete', (_event, candidateId) => {
+    if (!getAdminUnlocked()) return { ok:false, error:'Accès administrateur requis.' };
+    synchronize();
+
+    const record = findById(candidateId);
+    if (!record) return { ok:false, error:'Candidat introuvable.' };
+
+    const active = typeof getActiveCandidate === 'function' ? getActiveCandidate() : null;
+    if (active && String(active.candidateId || '') === String(record.candidateId || '')) {
+      return { ok:false, error:'Impossible de supprimer le candidat dont le parcours est actuellement actif.' };
+    }
+
+    const recordsBeforeDelete = listCandidateDirs(candidatesRoot, false);
+    const candidate = record.candidate || (record.manifest && record.manifest.candidat) || {};
+    try {
+      fs.rmSync(record.candidateDir, { recursive:true, force:true });
+
+      // Nettoyer aussi les anciennes copies techniques liées à ce candidat.
+      const cleanup = removeLegacyCandidateCopies(candidate, record, recordsBeforeDelete);
+
+      // Ne toucher à l'état runtime que s'il n'existe aucun autre candidat actif.
+      if (!active) removeCandidateRuntimeState(candidate);
+
+      return {
+        ok:true,
+        candidateId:String(record.candidateId || ''),
+        removedFolder:true,
+        ...cleanup
+      };
+    } catch (error) {
+      return { ok:false, error:'Suppression impossible : ' + String(error && error.message ? error.message : error) };
+    }
   });
 
   ipcMain.handle('candidate-catalog:detail', (_event, candidateId) => {
