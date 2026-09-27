@@ -4,7 +4,7 @@ const crypto = require('crypto');
 const { listCandidateDirs, selectCandidate } = require('./candidate-folder-utils');
 const { readJsonFile, encodeJson } = require('./candidate-data-crypto');
 
-module.exports = function registerCandidateReplay({ app, ipcMain, getAdminUnlocked, buildNumber, dataRoot = null }) {
+module.exports = function registerCandidateReplay({ app, ipcMain, getAdminUnlocked, getActiveCandidate = null, buildNumber, dataRoot = null }) {
   const BUILD = String(buildNumber || 'DEV');
   const TYPE = 'SEB_EVALPRO_PARCOURS_ARCHIVE';
   const SCHEMA_VERSION = 2;
@@ -361,9 +361,7 @@ module.exports = function registerCandidateReplay({ app, ipcMain, getAdminUnlock
 
       let activeCandidateId = '';
       try {
-        const active = ipcMain && ipcMain.__sebActiveCandidateProvider
-          ? ipcMain.__sebActiveCandidateProvider()
-          : null;
+        const active = typeof getActiveCandidate === 'function' ? getActiveCandidate() : null;
         activeCandidateId = String(active && active.candidateId || '');
       } catch (_) {}
       const candidateDir = findCandidateDirInternal(candidate, activeCandidateId);
