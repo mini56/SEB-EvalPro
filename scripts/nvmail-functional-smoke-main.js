@@ -39,6 +39,28 @@ async function runScenario(win) {
       const cc=document.getElementById('cc');
       const subject=document.getElementById('subject');
       const message=document.getElementById('message');
+
+      // Cas régression : Envoyer avec une page totalement vide ne doit pas
+      // simuler un envoi ni débloquer Suivant. Il doit proposer l'abandon.
+      document.getElementById('formEmail').dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));
+      assert(document.getElementById('seb-nvmail-empty-send-layer'),'Alerte nvmail vide absente.');
+      assert(!document.getElementById('resultatScore').textContent.includes('Message envoyé'),'Un mail vide est marqué envoyé à tort.');
+      assert(sessionStorage.getItem('page8_data')===null,'Un mail vide ne doit pas créer page8_data avant décision.');
+
+      document.getElementById('seb-nvmail-empty-stay').click();
+      assert(!document.getElementById('seb-nvmail-empty-send-layer'),'Le bouton Rester ne ferme pas l’alerte.');
+      assert(window.location.pathname.toLowerCase().endsWith('/nvmail.html'),'Le bouton Rester quitte nvmail.');
+
+      document.getElementById('formEmail').dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));
+      assert(document.getElementById('seb-nvmail-empty-send-layer'),'Deuxième alerte nvmail vide absente.');
+      document.getElementById('seb-nvmail-empty-abandon').click();
+      await new Promise((resolve)=>setTimeout(resolve,30));
+      assert(document.getElementById('seb-evalpro-abandon-layer'),'Le choix Abandonner n’ouvre pas la fenêtre d’abandon standard.');
+      assert(document.querySelector('#seb-evalpro-abandon-layer .seb-abandon-exercise')?.textContent.includes('Messagerie électronique'),'La fenêtre d’abandon n’est pas rattachée à nvmail.');
+      document.getElementById('seb-evalpro-abandon-cancel').click();
+      assert(!document.getElementById('seb-evalpro-abandon-layer'),'Annulation de la fenêtre d’abandon impossible.');
+
+
       to.value='conseil.perso@sauvegarde56.org';
       cc.value='stage-pro@sauvegarde56.org';
       subject.value='YY Mail-SEB';
@@ -129,6 +151,8 @@ app.whenReady().then(async () => {
     await waitForPage(win);
     const first=await runScenario(win);
     const reloaded=await verifyReload(win);
+    console.log('NVMAIL_EMPTY_SEND_PROMPT: OK');
+    console.log('NVMAIL_EMPTY_SEND_STANDARD_ABANDON: OK');
     console.log('NVMAIL_FUNCTIONAL_SMOKE: OK');
     console.log('NVMAIL_SCORE='+first.score+'/6');
     console.log('NVMAIL_RELOAD_SCORE='+reloaded.score+'/6');
