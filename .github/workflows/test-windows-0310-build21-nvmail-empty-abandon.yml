@@ -172,9 +172,9 @@ jobs:
           foreach ($required in @(
             'function isCompletelyEmptyMail',
             'function openEmptySendAbandonPrompt',
-            'Vous n’avez rien saisi. Voulez-vous passer à l’exercice suivant ?',
-            'Non – Rester sur cette page',
-            'Oui – Abandonner l’exercice',
+            "Vous n’avez rien saisi. Voulez-vous passer à l’exercice suivant ?",
+            "Non – Rester sur cette page",
+            "Oui – Abandonner l’exercice",
             "document.getElementById('seb-evalpro-abandon-fixed')"
           )) {
             if (-not $page.Contains($required)) { throw "Correctif nvmail vide incomplet : $required" }
