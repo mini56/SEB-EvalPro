@@ -404,21 +404,58 @@ function createCandidateTransfer(options = {}) {
     return 'CAND-' + token + '.seb';
   }
 
-  function existingTransferCandidateIds(destinationRoot, password) {
-    const ids = new Set();
+  function existingTransferCandidates(destinationRoot, password) {
+    const candidates = new Map();
     let entries = [];
     try { entries = fs.readdirSync(destinationRoot, { withFileTypes:true }); } catch (_) { entries = []; }
     for (const entry of entries) {
       if (!entry.isFile() || !entry.name.toLowerCase().endsWith('.seb')) continue;
+      const full = path.join(destinationRoot, entry.name);
       try {
-        const payload = decryptTransferPayload(fs.readFileSync(path.join(destinationRoot, entry.name), 'utf8'), password);
-        if (payload && payload.candidateId) ids.add(String(payload.candidateId));
+        const payload = decryptTransferPayload(fs.readFileSync(full, 'utf8'), password);
+        if (payload && payload.candidateId && !candidates.has(String(payload.candidateId))) {
+          candidates.set(String(payload.candidateId), { file:full, payload });
+        }
       } catch (_) {
         // Un fichier .seb protégé par un autre mot de passe ou endommagé
         // ne doit jamais être écrasé ni empêcher un nouvel export.
       }
     }
-    return ids;
+    return candidates;
+  }
+
+  function transferContentSignature(payload) {
+    return sha256Json({
+      schemaVersion:payload.schemaVersion,
+      type:payload.type,
+      candidateId:String(payload.candidateId || ''),
+      shortId:String(payload.shortId || ''),
+      status:String(payload.status || ''),
+      entries:Array.isArray(payload.entries) ? payload.entries : []
+    });
+  }
+
+  function replacePortableAtomic(target, text, password, expectedCandidateId) {
+    const temp = target + '.seb-copy-' + process.pid + '-' + Date.now() + '.tmp';
+    const backup = target + '.seb-backup-' + process.pid + '-' + Date.now();
+    fs.writeFileSync(temp, text, 'utf8');
+    const verified = decryptTransferPayload(fs.readFileSync(temp, 'utf8'), password);
+    if (String(verified.candidateId || '') !== String(expectedCandidateId || '')) {
+      fs.rmSync(temp, { force:true });
+      throw new Error('Vérification de la mise à jour USB échouée.');
+    }
+    try {
+      fs.renameSync(target, backup);
+      fs.renameSync(temp, target);
+      fs.rmSync(backup, { force:true });
+    } catch (error) {
+      try {
+        if (fs.existsSync(target)) fs.rmSync(target, { force:true });
+        if (fs.existsSync(backup)) fs.renameSync(backup, target);
+      } catch (_) {}
+      try { if (fs.existsSync(temp)) fs.rmSync(temp, { force:true }); } catch (_) {}
+      throw error;
+    }
   }
 
   function uniquePortableTarget(destinationRoot, record) {
@@ -560,18 +597,12 @@ function createCandidateTransfer(options = {}) {
     const sourceRecords = allRecords
       .filter((record) => String(record.candidateId || '') !== activeId)
       .filter((record) => isCompletedStatus(record.manifest && record.manifest.status));
-    let added = 0, skipped = 0, verifiedFiles = 0;
+    let added = 0, updated = 0, skipped = 0, verifiedFiles = 0;
     const copied = [];
-    const existingCandidateIds = existingTransferCandidateIds(destinationRoot, password);
+    const existingCandidates = existingTransferCandidates(destinationRoot, password);
 
     for (const source of sourceRecords) {
       const sourceId = String(source.candidateId || '');
-      if (existingCandidateIds.has(sourceId)) {
-        skipped += 1;
-        continue;
-      }
-      const target = uniquePortableTarget(destinationRoot, source);
-      const filename = path.basename(target);
       let payload;
       try {
         payload = packCandidate(source);
@@ -582,6 +613,24 @@ function createCandidateTransfer(options = {}) {
         });
         continue;
       }
+
+      const existing = existingCandidates.get(sourceId);
+      if (existing) {
+        if (transferContentSignature(existing.payload) === transferContentSignature(payload)) {
+          skipped += 1;
+          continue;
+        }
+        const encrypted = encryptTransferPayload(payload, password);
+        replacePortableAtomic(existing.file, encrypted, password, sourceId);
+        updated += 1;
+        verifiedFiles += payload.entries.filter((entry) => entry.type !== 'dir').length;
+        copied.push({ candidateId:source.candidateId, filename:path.basename(existing.file), transferFile:existing.file, updated:true });
+        existingCandidates.set(sourceId, { file:existing.file, payload });
+        continue;
+      }
+
+      const target = uniquePortableTarget(destinationRoot, source);
+      const filename = path.basename(target);
       const encrypted = encryptTransferPayload(payload, password);
       writePortableAtomic(target, encrypted);
       const verified = decryptTransferPayload(fs.readFileSync(target, 'utf8'), password);
@@ -590,7 +639,7 @@ function createCandidateTransfer(options = {}) {
         throw new Error('Vérification de l’export chiffré échouée.');
       }
       added += 1;
-      existingCandidateIds.add(sourceId);
+      existingCandidates.set(sourceId, { file:target, payload });
       verifiedFiles += payload.entries.filter((entry) => entry.type !== 'dir').length;
       copied.push({ candidateId:source.candidateId, filename, transferFile:target });
     }
@@ -598,7 +647,7 @@ function createCandidateTransfer(options = {}) {
     return {
       total:sourceRecords.length,
       added,
-      updated:0,
+      updated,
       skipped,
       verifiedFiles,
       copied,
