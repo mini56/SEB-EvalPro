@@ -59,7 +59,7 @@ try {
   const pc1 = createCandidateTransfer({ documentsPath:pc1Documents, now:() => new Date(fixedNow) });
   fs.mkdirSync(pc1.paths.candidatesRoot, { recursive:true });
 
-  makeCandidate(pc1.paths.candidatesRoot, 'ANCIEN_DOSSIER_1', 'candidate-1', {
+  const candidate1Dir = makeCandidate(pc1.paths.candidatesRoot, 'ANCIEN_DOSSIER_1', 'candidate-1', {
     nom:'XX', 'prénom':'YY', lieu:'Lorient', groupe:'7', date:'2026-09-18'
   });
   makeCandidate(pc1.paths.candidatesRoot, 'ANCIEN_DOSSIER_2', 'candidate-2', {
@@ -95,10 +95,24 @@ try {
     assert(!raw.includes('Lorient') && !raw.includes('Vannes'), 'Aucune identité/localisation ne doit apparaître en clair dans le fichier USB.');
   }
 
-  const beforeHashes = new Map(usbEntries.filter((e) => e.isFile()).map((e) => [e.name, sha(path.join(usbRoot, e.name))]));
+  // Un bilan et son Word sont créés après le premier export.
+  // Le deuxième export doit mettre à jour le même .seb au lieu de l'ignorer.
+  writeJson(path.join(candidate1Dir, 'bilan', 'historique', 'BILAN_TEST_R00.json'), {
+    type:'SEB_EVALPRO_BILAN_ARCHIVE',
+    candidateId:'candidate-1',
+    candidate:{ nom:'XX', prenom:'YY', lieu:'Lorient', groupe:'7', date:'2026-09-18' },
+    probe:'bilan-apres-premier-export'
+  });
+  fs.writeFileSync(path.join(candidate1Dir, 'bilan', 'exports', 'Evaluation_XX_YY_2026-09-18.doc'), 'WORD-BILAN-UPDATED', 'utf8');
+
   const secondExport = pc1.exportAll(usbRoot, password);
   assert.strictEqual(secondExport.added, 0);
-  assert.strictEqual(secondExport.skipped, 2);
+  assert.strictEqual(secondExport.updated, 1, 'Le candidat enrichi d’un bilan doit mettre à jour son .seb existant.');
+  assert.strictEqual(secondExport.skipped, 1, 'Le candidat inchangé doit rester ignoré.');
+
+  const afterUpdateEntries = fs.readdirSync(usbRoot, { withFileTypes:true }).filter((e) => e.isFile());
+  assert.strictEqual(afterUpdateEntries.length, 2, 'La mise à jour ne doit pas créer de doublon .seb.');
+  const beforeHashes = new Map(afterUpdateEntries.map((e) => [e.name, sha(path.join(usbRoot, e.name))]));
 
   // Le PC Admin utilise volontairement une autre clé locale.
   configureLocalKey(Buffer.alloc(32, 22));
@@ -124,10 +138,20 @@ try {
   assert(importedManifestRaw.startsWith(LOCAL_PREFIX), 'Les données importées doivent être rechiffrées avec la clé locale du PC Admin.');
   assert(records.every((record) => /^CAND-/i.test(record.folderName)), 'Les dossiers importés doivent rester codés.');
 
+  const importedCandidate1 = records.find((record) => String(record.candidateId) === 'candidate-1');
+  assert(importedCandidate1, 'Le candidat 1 importé est introuvable.');
+  assert(fs.existsSync(path.join(importedCandidate1.candidateDir, 'bilan', 'historique', 'BILAN_TEST_R00.json')),
+    'Le bilan ajouté après le premier export doit être présent après import.');
+  assert(fs.existsSync(path.join(importedCandidate1.candidateDir, 'bilan', 'exports', 'Evaluation_XX_YY_2026-09-18.doc')),
+    'Le Word ajouté après le premier export doit être présent après import.');
+
   const importedAgain = admin.importAll(usbRoot, password);
   assert.strictEqual(importedAgain.added, 0);
   assert.strictEqual(importedAgain.skipped, 2, 'Un candidat déjà présent ne doit jamais être écrasé.');
 
+  console.log('USB_EXPORT_EXISTING_CANDIDATE_UPDATE: OK');
+  console.log('USB_IMPORT_BILAN_HISTORY_PRESERVED: OK');
+  console.log('USB_IMPORT_WORD_EXPORT_PRESERVED: OK');
   console.log('Candidate Secure USB Transfer Test: OK');
 } finally {
   fs.rmSync(root, { recursive:true, force:true });
