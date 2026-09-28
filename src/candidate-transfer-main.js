@@ -425,14 +425,15 @@ function createCandidateTransfer(options = {}) {
   }
 
   function transferContentSignature(payload) {
-    return sha256Json({
+    const value = {
       schemaVersion:payload.schemaVersion,
       type:payload.type,
       candidateId:String(payload.candidateId || ''),
       shortId:String(payload.shortId || ''),
       status:String(payload.status || ''),
       entries:Array.isArray(payload.entries) ? payload.entries : []
-    });
+    };
+    return crypto.createHash('sha256').update(JSON.stringify(value), 'utf8').digest('hex');
   }
 
   function replacePortableAtomic(target, text, password, expectedCandidateId) {
