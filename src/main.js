@@ -934,6 +934,7 @@ ipcMain.handle('admin:import-candidates', async (_event, password) => {
     if (selection.canceled || !selection.filePaths || !selection.filePaths[0]) {
       return { ok: false, cancelled: true };
     }
+    try { _event.sender.send('admin:import-progress', { state:'started' }); } catch (_) {}
     const result = getCandidateTransfer().importAll(selection.filePaths[0], password);
     return { ok: true, ...result };
   } catch (error) {
