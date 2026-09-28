@@ -107,5 +107,5 @@
       "artifactName": "SEB-eval-PRO-${version}-Linux.${ext}"
     }
   },
-  "sebBuildNumber": 19
+  "sebBuildNumber": 20
 }
