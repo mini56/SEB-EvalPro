@@ -701,16 +701,16 @@ function showTransferMessage(title, message, isError = false) {
 }
 
 
-function showTransferProgress() {
+function showTransferProgress(mode = 'export') {
   const existing = document.getElementById('seb-evalpro-transfer-progress');
   if (existing) existing.remove();
 
   const backdrop = document.createElement('div');
   backdrop.id = 'seb-evalpro-transfer-progress';
   backdrop.innerHTML = `
-    <div class="seb-transfer-progress-card" role="dialog" aria-modal="true" aria-label="Export en cours">
+    <div class="seb-transfer-progress-card" role="dialog" aria-modal="true" aria-label="${mode === 'import' ? 'Import en cours' : 'Export en cours'}">
       <img class="seb-transfer-progress-brand" src="branding/seb-eval-pro-installer.png" alt="SEB EvalPro - Sauvegarde 56" />
-      <div class="seb-transfer-progress-title">Export en cours vers la clé USB…</div>
+      <div class="seb-transfer-progress-title">${mode === 'import' ? 'Import en cours depuis la clé USB…' : 'Export en cours vers la clé USB…'}</div>
       <div class="seb-transfer-progress-text">Merci de patienter.</div>
       <div class="seb-transfer-progress-track" aria-hidden="true">
         <div class="seb-transfer-progress-bar"></div>
@@ -1169,7 +1169,18 @@ function injectAdminBar() {
     try {
       const password = await createTransferPasswordDialog('import');
       if (!password) return;
-      const result = await ipcRenderer.invoke('admin:import-candidates', password);
+      let progress = null;
+      const onImportProgress = (_event, payload = {}) => {
+        if (payload && payload.state === 'started' && !progress) progress = showTransferProgress('import');
+      };
+      ipcRenderer.on('admin:import-progress', onImportProgress);
+      let result;
+      try {
+        result = await ipcRenderer.invoke('admin:import-candidates', password);
+      } finally {
+        ipcRenderer.removeListener('admin:import-progress', onImportProgress);
+        if (progress) progress.close();
+      }
       if (!result || result.cancelled) return;
       if (!result.ok) {
         await showTransferMessage('Import impossible', result.error || 'Une erreur est survenue pendant l’import.', true);
@@ -1181,7 +1192,7 @@ function injectAdminBar() {
       }
       await showTransferMessage(
         'Import terminé',
-        `${result.total} dossier(s) candidat(s) détecté(s).\n${result.added} ajouté(s), ${result.skipped || 0} déjà présent(s) et ignoré(s).\n${result.verifiedFiles || 0} fichier(s) vérifié(s).\n\nDossier SEB EvalPro : ${result.destinationRoot}`
+        `${result.total} dossier(s) candidat(s) détecté(s).\n${result.added} ajouté(s), ${result.updated || 0} mis à jour, ${result.skipped || 0} déjà présent(s) et ignoré(s).\n${result.verifiedFiles || 0} fichier(s) vérifié(s).\n\nDossier SEB EvalPro : ${result.destinationRoot}`
       );
     } catch (error) {
       await showTransferMessage('Import impossible', String(error && error.message ? error.message : error), true);
