@@ -568,7 +568,7 @@ function createTransferPasswordDialog(mode) {
           ? 'Choisissez le mot de passe qui protégera les fichiers transférés. Il sera demandé sur l’autre PC.'
           : 'Saisissez le mot de passe utilisé lors de l’export de cette clé USB.'}</div>
         <label for="seb-transfer-password">Mot de passe de transfert</label>
-        <input id="seb-transfer-password" type="password" autocomplete="off" />
+        <input id="seb-transfer-password" type="password" autocomplete="off" autofocus tabindex="0" />
         ${isExport ? `
           <label for="seb-transfer-password-confirm">Confirmer le mot de passe</label>
           <input id="seb-transfer-password-confirm" type="password" autocomplete="off" />
@@ -588,7 +588,7 @@ function createTransferPasswordDialog(mode) {
       #seb-evalpro-transfer-password-dialog .seb-transfer-password-title{font-size:20px;font-weight:700;color:#0070c0;margin-bottom:8px}
       #seb-evalpro-transfer-password-dialog .seb-transfer-password-text{font-size:14px;line-height:1.45;color:#333;margin-bottom:14px}
       #seb-evalpro-transfer-password-dialog label{display:block;font-size:14px;font-weight:700;color:#222;margin:10px 0 5px}
-      #seb-evalpro-transfer-password-dialog input{width:100%;font-size:18px;padding:8px 10px;border:1px solid #999;border-radius:4px;box-sizing:border-box}
+      #seb-evalpro-transfer-password-dialog input{width:100%;font-size:18px;padding:8px 10px;border:1px solid #999;border-radius:4px;box-sizing:border-box;background:#fff;color:#111;caret-color:#111;pointer-events:auto}
       #seb-evalpro-transfer-password-dialog button{font-family:Arial,sans-serif;font-size:14px;padding:8px 14px;border:2px solid #0070c0;border-radius:6px;background:#fff;color:#0070c0;font-weight:700;cursor:pointer}
       #seb-evalpro-transfer-password-dialog button.show-password{margin-top:10px;padding:5px 10px;font-size:13px}
       #seb-evalpro-transfer-password-dialog button.primary{background:#0070c0;color:#fff}
@@ -642,7 +642,20 @@ function createTransferPasswordDialog(mode) {
         if (event.key === 'Escape') finish(null);
       });
     }
-    password.focus();
+
+    // Windows/Electron peut rendre le focus au bouton Import à la fin du clic.
+    // Le champ mot de passe reprend alors le focus une fois le dialogue réellement affiché.
+    const ensureInitialPasswordFocus = () => {
+      if (!document.body.contains(password)) return;
+      const active = document.activeElement;
+      if (active && backdrop.contains(active)) return;
+      try { password.focus({ preventScroll:true }); }
+      catch (_) { password.focus(); }
+    };
+    ensureInitialPasswordFocus();
+    if (typeof queueMicrotask === 'function') queueMicrotask(ensureInitialPasswordFocus);
+    requestAnimationFrame(ensureInitialPasswordFocus);
+    setTimeout(ensureInitialPasswordFocus, 60);
   });
 }
 
@@ -893,6 +906,7 @@ function injectAdminBar() {
     if (document.getElementById('seb-evalpro-session-close-dialog')) return;
     if (document.getElementById('seb-evalpro-quit-application-dialog')) return;
     if (document.getElementById('seb-evalpro-transfer-dialog')) return;
+    if (document.getElementById('seb-evalpro-transfer-password-dialog')) return;
     bar.classList.remove('seb-evalpro-visible');
   };
 
