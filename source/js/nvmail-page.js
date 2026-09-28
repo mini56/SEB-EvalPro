@@ -84,6 +84,77 @@
     };
   }
 
+  function isCompletelyEmptyMail(value) {
+    const data = value || {};
+    const file = String(data.file || '').trim();
+    const noFile = !file || file === 'Aucun fichier sélectionné';
+    return !String(data.to || '').trim()
+      && !String(data.cc || '').trim()
+      && !String(data.subject || '').trim()
+      && !String(data.message || '').trim()
+      && noFile;
+  }
+
+  function ensureEmptySendPromptStyle() {
+    if (document.getElementById('seb-nvmail-empty-send-style')) return;
+    const style = document.createElement('style');
+    style.id = 'seb-nvmail-empty-send-style';
+    style.textContent = `
+      #seb-nvmail-empty-send-layer{
+        position:fixed;inset:0;z-index:2147483646;background:rgba(0,0,0,.46);
+        display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;
+        font-family:Arial,sans-serif;
+      }
+      #seb-nvmail-empty-send-box{
+        width:min(560px,94vw);background:#fff;border:1px solid #aaa;border-radius:12px;
+        padding:22px;box-shadow:0 16px 48px rgba(0,0,0,.32);color:#202020;
+      }
+      #seb-nvmail-empty-send-box h2{margin:0 0 12px;color:#1a73e8;font-size:22px}
+      #seb-nvmail-empty-send-box p{margin:0;font-size:16px;line-height:1.45}
+      #seb-nvmail-empty-send-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px;flex-wrap:wrap}
+      #seb-nvmail-empty-send-actions button{
+        min-height:42px;padding:0 16px;border-radius:8px;font-family:Arial,sans-serif;
+        font-size:14px;font-weight:700;cursor:pointer;
+      }
+      #seb-nvmail-empty-stay{background:#fff;color:#1a73e8;border:2px solid #1a73e8}
+      #seb-nvmail-empty-abandon{background:#c62828;color:#fff;border:2px solid #c62828}
+    `;
+    (document.head || document.documentElement).appendChild(style);
+  }
+
+  function openEmptySendAbandonPrompt() {
+    if (document.getElementById('seb-nvmail-empty-send-layer')) return;
+    ensureEmptySendPromptStyle();
+
+    const layer = document.createElement('div');
+    layer.id = 'seb-nvmail-empty-send-layer';
+    layer.innerHTML = `
+      <div id="seb-nvmail-empty-send-box" role="dialog" aria-modal="true" aria-label="Message vide">
+        <h2>Message vide</h2>
+        <p>Vous n’avez rien saisi. Voulez-vous passer à l’exercice suivant ?</p>
+        <div id="seb-nvmail-empty-send-actions">
+          <button type="button" id="seb-nvmail-empty-stay">Non – Rester sur cette page</button>
+          <button type="button" id="seb-nvmail-empty-abandon">Oui – Abandonner l’exercice</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(layer);
+
+    const close = () => layer.remove();
+    layer.querySelector('#seb-nvmail-empty-stay')?.addEventListener('click', close);
+    layer.querySelector('#seb-nvmail-empty-abandon')?.addEventListener('click', () => {
+      close();
+      setTimeout(() => {
+        const abandonButton = document.getElementById('seb-evalpro-abandon-fixed');
+        if (abandonButton) abandonButton.click();
+      }, 0);
+    });
+    layer.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') close();
+    });
+    layer.querySelector('#seb-nvmail-empty-stay')?.focus();
+  }
+
   function saveEmailAnswers(to, cc, subject, message, file) {
     const prenomCandidat = getPrenomCandidat();
     const nomCandidat = getNomCandidat();
@@ -125,7 +196,14 @@
 
   function evaluerFormulaire(event) {
     if (event) event.preventDefault();
-    saveCurrent();
+    const value = readForm();
+
+    if (isCompletelyEmptyMail(value)) {
+      openEmptySendAbandonPrompt();
+      return false;
+    }
+
+    saveEmailAnswers(value.to, value.cc, value.subject, value.message, value.file);
 
     const resultat = document.getElementById('resultatScore');
     if (resultat) {
@@ -203,6 +281,8 @@
     signatureCandidatValide,
     objetMailCandidatValide,
     telephoneMailValide,
+    isCompletelyEmptyMail,
+    openEmptySendAbandonPrompt,
     getPrenomCandidat,
     getNomCandidat,
     saveEmailAnswers,
